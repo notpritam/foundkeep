@@ -19,6 +19,7 @@ Production origin `https://atlas.notpritam.in`. All customer routes under `/api`
 - POST `/api/pairing` `{}` cookie only -> `{code,expiresAt}` (5 minute, one-use, 32 random bytes).
 - POST `/api/pairing/claim` `{code,name}` -> `{account,connection,token}`. Token random, stored hashed, revocable, 90 day expiry; token never in URL.
 - DELETE `/api/connections/:id` -> `{ok:true}`, cookie only, owner scoped.
+- POST `/api/connections/disconnect` -> `{ok:true}`, bearer only, revokes only the calling browser credential. Extension clears local connection immediately and attempts remote revocation; offline failure directs the customer to revoke from dashboard settings.
 - GET `/api/captures?q=&type=&limit=60&cursor=` -> `{captures,nextCursor,total}`. Search owner scoped; descending capturedAt/id; bound limit 100. Type optional.
 - GET `/api/captures/:id` -> `{capture}`.
 - POST `/api/captures` -> `{capture,duplicate:boolean}`. Accept JSON `{clientId,type,sourceUrl,sourceTitle,selectionText,noteText,articleText,dataUrl,width,height,capturedAt}`. Preserve idempotency per account/clientId; ignore submitted enrichment/owner fields. Allowed types `screenshot,selection,bookmark,image,note,tweet`.

@@ -18,3 +18,6 @@ deploy/keys/
 
 # stray crx3 default-name output
 web-extension.*
+
+# Synthetic browser review screenshots
+.impeccable/review/

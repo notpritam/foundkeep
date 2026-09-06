@@ -30,17 +30,19 @@ test('customer signs up, connects the real extension, captures text and screensh
   const directory=await mkdtemp(path.join(os.tmpdir(),'atlas-customer-flow-'));
   const reserve=net.createServer(); reserve.listen(0,'127.0.0.1'); await once(reserve,'listening');
   const port=reserve.address().port; await new Promise(resolve=>reserve.close(resolve));
-  const origin=`http://127.0.0.1:${port}`;
+  // Opt-in production verification creates and deletes only its own QA account.
+  const deployedOrigin=process.env.ATLAS_CUSTOMER_SITE_URL;
+  const origin=deployedOrigin ? new URL(deployedOrigin).origin : `http://127.0.0.1:${port}`;
   const extension=path.join(directory,'extension');
   await cp(path.resolve('apps/extension'),extension,{recursive:true});
   await rewrite(extension,origin);
   const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
-  manifest.externally_connectable={matches:['http://127.0.0.1/*']};
+  manifest.externally_connectable={matches:[`${new URL(origin).protocol}//${new URL(origin).hostname}/*`]};
   await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
-  const backend=spawn(process.env.BUN_BIN || 'bun',['run','apps/backend/src/index.ts'],{
+  const backend=deployedOrigin ? null : spawn(process.env.BUN_BIN || 'bun',['run','apps/backend/src/index.ts'],{
     cwd:process.cwd(),env:{...process.env,ATLAS_PORT:String(port),ATLAS_CUSTOMER_ORIGIN:origin,ATLAS_DATA_DIR:path.join(directory,'data')},stdio:['ignore','pipe','pipe'],
   });
-  let backendOutput=''; backend.stdout.on('data',data=>backendOutput+=data); backend.stderr.on('data',data=>backendOutput+=data);
+  let backendOutput=''; backend?.stdout.on('data',data=>backendOutput+=data); backend?.stderr.on('data',data=>backendOutput+=data);
   const fixture=http.createServer((_req,res)=>{
     res.writeHead(200,{'content-type':'text/html'});
     res.end('<!doctype html><title>Typography workshop</title><style>body{margin:48px;background:white;color:black;font:32px Arial}article{height:450px}</style><article><h1>Typography workshop</h1><p id="selection">Good design makes information easy to find.</p><p>Save the ideas you want to use again.</p></article>');
@@ -48,7 +50,7 @@ test('customer signs up, connects the real extension, captures text and screensh
   fixture.listen(0,'127.0.0.1');await once(fixture,'listening');
   let context;
   try {
-    await poll(async()=>{ if(backend.exitCode!==null) throw new Error(backendOutput);return fetch(origin+'/healthz').then(r=>r.ok).catch(()=>false); });
+    await poll(async()=>{ if(backend && backend.exitCode!==null) throw new Error(backendOutput);return fetch(origin+'/healthz').then(r=>r.ok).catch(()=>false); });
     context=await chromium.launchPersistentContext(path.join(directory,'profile'),{
       channel:'chromium',headless:true,executablePath:process.env.CHROMIUM_PATH || undefined,
       args:['--no-sandbox',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`],
@@ -115,9 +117,9 @@ test('customer signs up, connects the real extension, captures text and screensh
     await request('DELETE','/api/account',{password:'a-long-test-password-2026'});
     assert.equal((await context.request.get(origin+'/api/me')).status(),401);
   } finally {
-    await context?.close();backend.kill('SIGTERM');
-    if(backend.exitCode===null) await Promise.race([once(backend,'exit'),sleep(3000)]);
-    if(backend.exitCode===null) backend.kill('SIGKILL');
+    await context?.close();backend?.kill('SIGTERM');
+    if(backend?.exitCode===null) await Promise.race([once(backend,'exit'),sleep(3000)]);
+    if(backend?.exitCode===null) backend.kill('SIGKILL');
     await new Promise(resolve=>fixture.close(resolve));
     await rm(directory,{recursive:true,force:true});
   }
