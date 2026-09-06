@@ -2,6 +2,8 @@ const CUSTOMER_ORIGIN = "https://atlas.notpritam.in";
 const CONNECTION_KEY = "atlasCustomer";
 const CACHE_KEY = "atlasPreferenceCache";
 const MAX_AGE_MS = 5 * 60 * 1000;
+const pendingRemoteRefreshes = new Map();
+const accountRefreshTails = new Map();
 
 export const DEFAULT_PREFERENCES = Object.freeze({
   version: 1,
@@ -50,24 +52,36 @@ async function stateAndCache() {
   return { state: values[CONNECTION_KEY] || null, cache: values[CACHE_KEY] || null };
 }
 
-export async function clearPreferenceCache() {
-  if (chrome.storage.local.remove) await chrome.storage.local.remove(CACHE_KEY);
-  else await chrome.storage.local.set({ [CACHE_KEY]: null });
+function connectionKey(state) {
+  const accountId = state?.account?.id;
+  if (!accountId || !state?.token || state.status === "reconnect") return null;
+  return [accountId, state.connection?.id || "", state.token].join("\u0000");
 }
 
-export async function getEffectivePreferences({ refresh = false, now = Date.now() } = {}) {
-  const { state, cache } = await stateAndCache();
-  const accountId = state?.account?.id;
-  const usableCache = cache && cache.accountId === accountId && normalizePreferences(cache.preferences)
+function validCache(cache, accountId) {
+  return cache && cache.accountId === accountId && normalizePreferences(cache.preferences) &&
+    Number.isSafeInteger(cache.revision) && cache.revision >= 0 && Number.isSafeInteger(cache.fetchedAt)
     ? cache
     : null;
-  if (!accountId || !state?.token || state.status === "reconnect") {
-    return { preferences: cloneDefaults(), revision: 0, updatedAt: null, source: "default" };
-  }
-  if (!refresh && usableCache && now - usableCache.fetchedAt < MAX_AGE_MS) {
-    return { preferences: structuredClone(usableCache.preferences), revision: usableCache.revision, updatedAt: usableCache.updatedAt, source: "cache" };
-  }
-  try {
+}
+
+function cacheResult(cache, source) {
+  return {
+    preferences: structuredClone(cache.preferences),
+    revision: cache.revision,
+    updatedAt: cache.updatedAt,
+    source,
+  };
+}
+
+async function fetchRemotePreferences(state, now) {
+  const key = connectionKey(state);
+  if (!key) throw new Error("Connect Atlas before refreshing preferences.");
+  if (pendingRemoteRefreshes.has(key)) return pendingRemoteRefreshes.get(key);
+
+  const request = (async () => {
+    const preceding = accountRefreshTails.get(state.account.id);
+    if (preceding) await preceding;
     const response = await fetch(CUSTOMER_ORIGIN + "/api/preferences", {
       method: "GET",
       credentials: "omit",
@@ -81,12 +95,50 @@ export async function getEffectivePreferences({ refresh = false, now = Date.now(
     const preferences = normalizePreferences(result.preferences);
     if (!preferences || !Number.isSafeInteger(result.revision) || result.revision < 0 ||
         !(result.updatedAt === null || Number.isSafeInteger(result.updatedAt))) throw new Error("Invalid preferences");
-    const next = { accountId, preferences, revision: result.revision, updatedAt: result.updatedAt, fetchedAt: now };
+
+    const latest = await stateAndCache();
+    if (connectionKey(latest.state) !== key) throw new Error("Atlas connection changed during preference refresh.");
+    const latestCache = validCache(latest.cache, state.account.id);
+    if (latestCache && latestCache.revision >= result.revision) {
+      return cacheResult(latestCache, latestCache.revision > result.revision ? "newer-cache" : "remote");
+    }
+    const next = { accountId: state.account.id, preferences, revision: result.revision, updatedAt: result.updatedAt, fetchedAt: now };
     await chrome.storage.local.set({ [CACHE_KEY]: next });
-    return { preferences: structuredClone(preferences), revision: result.revision, updatedAt: result.updatedAt, source: "remote" };
-  } catch {
+    return cacheResult(next, "remote");
+  })();
+  const tail = request.then(() => undefined, () => undefined);
+  pendingRemoteRefreshes.set(key, request);
+  accountRefreshTails.set(state.account.id, tail);
+  try {
+    return await request;
+  } finally {
+    if (pendingRemoteRefreshes.get(key) === request) pendingRemoteRefreshes.delete(key);
+    if (accountRefreshTails.get(state.account.id) === tail) accountRefreshTails.delete(state.account.id);
+  }
+}
+
+export async function clearPreferenceCache() {
+  if (chrome.storage.local.remove) await chrome.storage.local.remove(CACHE_KEY);
+  else await chrome.storage.local.set({ [CACHE_KEY]: null });
+}
+
+export async function getEffectivePreferences({ refresh = false, now = Date.now() } = {}) {
+  const { state, cache } = await stateAndCache();
+  const accountId = state?.account?.id;
+  const usableCache = validCache(cache, accountId);
+  if (!connectionKey(state)) {
+    if (refresh) throw new Error("Connect Atlas before refreshing preferences.");
+    return { preferences: cloneDefaults(), revision: 0, updatedAt: null, source: "default" };
+  }
+  if (!refresh && usableCache && now - usableCache.fetchedAt < MAX_AGE_MS) {
+    return { preferences: structuredClone(usableCache.preferences), revision: usableCache.revision, updatedAt: usableCache.updatedAt, source: "cache" };
+  }
+  try {
+    return await fetchRemotePreferences(state, now);
+  } catch (error) {
+    if (refresh) throw error;
     if (usableCache) {
-      return { preferences: structuredClone(usableCache.preferences), revision: usableCache.revision, updatedAt: usableCache.updatedAt, source: "stale-cache" };
+      return cacheResult(usableCache, "stale-cache");
     }
     return { preferences: cloneDefaults(), revision: 0, updatedAt: null, source: "default" };
   }

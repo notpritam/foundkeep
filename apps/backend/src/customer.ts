@@ -535,7 +535,14 @@ export function customerRoutes(db: Database) {
     const current = auth(c, true);
     const body = await jsonBody(c);
     try {
-      return c.json(writeCustomerPreferences(db, current.account.id, body));
+      const result = db.transaction(() => {
+        const verified = auth(c, true, false);
+        if (verified.account.id !== current.account.id || verified.credentialId !== current.credentialId) {
+          fail(401, "unauthorized", "Your session expired. Sign in again.");
+        }
+        return writeCustomerPreferences(db, current.account.id, body);
+      })();
+      return c.json(result);
     } catch (error) {
       if (error instanceof PreferenceValidationError) fail(400, "invalid_preferences", error.message);
       throw error;

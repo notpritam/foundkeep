@@ -41,7 +41,7 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.kill(); await rm(dataDir, { recursive: true, force: true }); });
 
-async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAccount = null, extensionInstalled = true, width = 1440, handler } = {}) {
+async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAccount = null, extensionInstalled = true, extensionPreferenceRevision = 1, width = 1440, handler } = {}) {
   const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce', acceptDownloads: true });
   t.after(() => context.close());
   const requests = []; const model = { account, captures: [...captures], connections: extensionAccount?.id === account.id ? [{ id: 'connected-browser', name: 'Chrome', createdAt: now, lastSeenAt: now }] : [], usage: null, preferences: structuredClone(defaultPreferences), preferenceRevision: 0 };
@@ -75,7 +75,7 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
     return json({ ok: true });
   });
   await context.route('**/customer-config.json', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ extensionIds: ['mjfcgmboaijfcaanepdipbgmipnccnpn'], storeUrl: null }) }));
-  await context.addInitScript(({ extensionAccount, extensionInstalled, account }) => {
+  await context.addInitScript(({ extensionAccount, extensionInstalled, extensionPreferenceRevision, account }) => {
     window.__extensionMessages = [];
     if (!extensionInstalled) return;
     let connected = extensionAccount;
@@ -83,9 +83,9 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
       window.__extensionMessages.push({ id, message });
       if (message.kind === 'atlas-ping') callback({ ok: true, version: '1.5.0', account: connected });
       if (message.kind === 'atlas-connect') { connected = account; callback({ ok: true, account }); }
-      if (message.kind === 'atlas-refresh-preferences') callback({ ok: true, revision: 1 });
+      if (message.kind === 'atlas-refresh-preferences') callback({ ok: true, revision: extensionPreferenceRevision });
     } } };
-  }, { extensionAccount, extensionInstalled, account });
+  }, { extensionAccount, extensionInstalled, extensionPreferenceRevision, account });
   const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
   t.after(() => assert.deepEqual(errors, [], 'No unhandled browser errors'));
   return { page, requests, model, context };
@@ -180,6 +180,7 @@ test('customer controls every extension feature and refreshes the connected brow
   await openLibrary(page); await page.locator('#open-account').click();
   await page.locator('#preference-form[data-ready="true"]').waitFor();
   await page.locator('[data-preference="capture.region"]').uncheck();
+  await page.locator('[data-preference="capture.note"]').uncheck();
   await page.getByText('Sync & automatic context', { exact: true }).click();
   await page.locator('[data-preference="sync.automatic"]').uncheck();
   await page.locator('[data-preference="organization.ocr"]').uncheck();
@@ -190,16 +191,43 @@ test('customer controls every extension feature and refreshes the connected brow
   await page.waitForFunction(() => document.querySelector('#preference-message').textContent.includes('Saved'));
   const write = requests.find(request => request.path === '/api/preferences' && request.method === 'PUT');
   assert.equal(write.body.capture.region, false);
+  assert.equal(write.body.capture.note, false);
   assert.equal(write.body.sync.automatic, false);
   assert.equal(write.body.organization.ocr, false);
   assert.equal(write.body.popup.recentCount, 5);
   assert.deepEqual(write.body.popup.actionOrder, ['bookmark', 'highlight', 'fullPage', 'region']);
   assert.deepEqual(model.preferences, write.body);
-  assert.equal(await page.evaluate(() => window.__extensionMessages.some(item => item.message.kind === 'atlas-refresh-preferences')), true);
+  const refresh = await page.evaluate(() => window.__extensionMessages.find(item => item.message.kind === 'atlas-refresh-preferences'));
+  assert.equal(refresh.message.revision, 1);
+  assert.equal(await page.locator('#new-note').isDisabled(), true);
   await page.setViewportSize({ width: 390, height: 900 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await page.locator('#account-dialog').evaluate(dialog => dialog.scrollWidth <= dialog.clientWidth), true);
   if (process.env.ATLAS_SETTINGS_SCREENSHOT) await page.screenshot({ path: process.env.ATLAS_SETTINGS_SCREENSHOT, fullPage: false });
+});
+
+test('library notes preserve their origin and active processing choices', async t => {
+  const { page, model, requests } = await pageFor(t, { captures: [] });
+  model.preferences.organization = { ocr: false, summaries: true, tags: false };
+  await openLibrary(page); await page.locator('#new-note').click(); await page.locator('#note-text').fill('A note with its capture context.');
+  await page.locator('#save-note').click(); await page.locator('#note-dialog').waitFor({ state: 'hidden' });
+  const write = requests.find(request => request.path === '/api/captures' && request.method === 'POST');
+  assert.deepEqual(write.body.processingOptions, { ocr: false, summaries: true, tags: false });
+  assert.equal(write.body.provenance.captureMethod, 'library-note');
+  assert.equal(write.body.provenance.schemaVersion, 1);
+  assert.equal(write.body.provenance.capturedAt, write.body.capturedAt);
+  assert.equal(write.body.provenance.extractedAt, write.body.capturedAt);
+  assert.equal(write.body.provenance.pageUrl, null);
+  assert.deepEqual(write.body.provenance.authors, []);
+  assert.deepEqual(write.body.provenance.headings, []);
+});
+
+test('dashboard does not claim an older extension preference revision was applied', async t => {
+  const { page } = await pageFor(t, { captures: [], extensionAccount: account, extensionPreferenceRevision: 0 });
+  await openLibrary(page); await page.locator('#open-account').click();
+  await page.locator('#preference-form[data-ready="true"]').waitFor(); await page.locator('#save-preferences').click();
+  await page.waitForFunction(() => document.querySelector('#preference-message').textContent.includes('next time'));
+  assert.match(await page.locator('#preference-message').textContent(), /next time the extension refreshes/);
 });
 
 test('a failed note save retains its text and idempotency key for retry', async t => {

@@ -311,6 +311,22 @@ describe("customer extension preferences", () => {
     expect(isolated.preferences.capture.region).toBe(true);
     expect(isolated.revision).toBe(0);
   });
+
+  test("an in-flight preference write cannot commit after its session is revoked", async () => {
+    const owner = await register();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
+    const pending = app.request(`${ORIGIN}/api/preferences`, {
+      method: "PUT",
+      headers: { origin: ORIGIN, cookie: owner.cookie, "content-type": "application/json", "X-Atlas-Account": owner.account.id },
+      body: stream,
+    });
+    expect((await request("/auth/logout", "POST", {}, owner.cookie)).status).toBe(200);
+    controller.enqueue(new TextEncoder().encode(JSON.stringify(changed)));
+    controller.close();
+    expect((await pending).status).toBe(401);
+    expect((db.query("SELECT COUNT(*) n FROM customer_preferences").get() as any).n).toBe(0);
+  });
 });
 
 describe("private customer captures", () => {

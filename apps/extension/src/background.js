@@ -24,6 +24,8 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
     }
     refreshPreferences()
       .then(async (state) => {
+        const requestedRevision = Number.isSafeInteger(msg.revision) && msg.revision >= 0 ? msg.revision : 0;
+        if (state.revision < requestedRevision) throw new Error("Atlas did not receive the saved preference revision.");
         await reconcileContextMenus(state.preferences);
         announcePreferenceChange();
         drainQueue().catch(() => {});

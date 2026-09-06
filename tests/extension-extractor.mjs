@@ -41,7 +41,11 @@ test("extracts readable article text and traceable structured provenance", async
     }</script>
   </head><body>
     <nav>Subscribe now Navigation noise</nav>
+    <style>.css-hidden { display: none; }.css-invisible { visibility: hidden; }.css-transparent { opacity: 0; }</style>
     <article><h1>A useful article</h1><p>The actual first paragraph explains the finding in detail.</p>
+      <p class="css-hidden">Hidden subscriber identifier 78421</p>
+      <section class="css-invisible"><h2>Invisible account details</h2><p>Private invisible text</p></section>
+      <p class="css-transparent">Transparent tracking copy</p>
       <aside>Advertisement and unrelated links</aside><h2>What changed</h2><p>The second paragraph contains enough useful context to preserve.</p></article>
     <footer>Newsletter signup</footer>
   </body></html>`);
@@ -61,6 +65,8 @@ test("extracts readable article text and traceable structured provenance", async
   assert.match(result.articleText, /The actual first paragraph/);
   assert.match(result.articleText, /The second paragraph/);
   assert.doesNotMatch(result.articleText, /Subscribe now|Advertisement|Newsletter/);
+  assert.doesNotMatch(result.articleText, /subscriber identifier|account details|invisible text|tracking copy/i);
+  assert.deepEqual(result.provenance.headings, ["A useful article", "What changed"]);
   assert.match(result.provenance.contentHash, /^[A-Za-z0-9_-]{43}$/);
   assert.equal(result.provenance.extractionStatus, "complete");
 });

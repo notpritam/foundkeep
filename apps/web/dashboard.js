@@ -352,7 +352,16 @@ $('#delete-capture').addEventListener('click', async () => {
   finally { $('#delete-capture').disabled = false; }
 });
 
-function openNote() { if (state.expired || !state.account) return; openDialog('#note-dialog'); $('#note-text').focus(); }
+function updateNoteAvailability() {
+  const enabled = !state.expired && !!state.account && state.preferences?.capture.note === true;
+  $('#new-note').disabled = !enabled;
+  $('#new-note').title = enabled ? '' : state.preferences?.capture.note === false ? 'Notes are disabled in extension settings.' : 'Loading extension settings…';
+}
+function openNote() {
+  if (state.expired || !state.account) return;
+  if (state.preferences?.capture.note !== true) { toast('Notes are disabled in extension settings.'); return; }
+  openDialog('#note-dialog'); $('#note-text').focus();
+}
 $('#new-note').addEventListener('click', openNote);
 $('#note-text').addEventListener('input', () => { state.noteClientId = null; });
 $('#note-form').addEventListener('submit', async event => {
@@ -362,7 +371,15 @@ $('#note-form').addEventListener('submit', async event => {
   $('#save-note').disabled = true; $('#note-text').disabled = true; $('#save-note').textContent = 'Saving…'; setMessage($('#note-error'), '');
   try {
     state.noteClientId ||= crypto.randomUUID();
-    await api('/captures', { method: 'POST', body: { clientId: state.noteClientId, type: 'note', noteText: note, capturedAt: Date.now() } });
+    if (state.preferences?.capture.note !== true) throw new Error('Notes are disabled in extension settings.');
+    const capturedAt = Date.now();
+    const provenance = {
+      schemaVersion: 1, captureMethod: 'library-note', pageUrl: null, canonicalUrl: null, pageTitle: null,
+      siteName: null, description: null, authors: [], publishedAt: null, modifiedAt: null, language: null,
+      leadImageUrl: null, faviconUrl: null, targetUrl: null, headings: [], capturedAt, extractedAt: capturedAt,
+      extractorVersion: 1, contentHash: null, extractionStatus: 'complete', extractionError: null,
+    };
+    await api('/captures', { method: 'POST', body: { clientId: state.noteClientId, type: 'note', noteText: note, capturedAt, provenance, processingOptions: structuredClone(state.preferences.organization) } });
     $('#note-text').value = ''; state.noteClientId = null; closeDialog('#note-dialog'); toast('Note saved to your library.'); await refreshLibrary();
   } catch (error) { if (!state.expired) setMessage($('#note-error'), error.message); }
   finally { $('#save-note').disabled = false; $('#note-text').disabled = false; $('#save-note').textContent = 'Save note'; }
@@ -390,8 +407,8 @@ function renderPreferences() {
     else control.value = String(value);
   });
   const byAction = new Map([...$('#preference-order').children].map(row => [row.dataset.orderAction, row]));
-  state.preferences.popup.actionOrder.forEach(action => $('#preference-order').append(byAction.get(action)));
-  updateOrderButtons(); $('#preference-form').dataset.ready = 'true'; $('#preference-form').inert = false;
+  state.preferences.popup.actionOrder.filter(action => action !== 'bookmark').forEach(action => $('#preference-order').append(byAction.get(action)));
+  updateOrderButtons(); updateNoteAvailability(); $('#preference-form').dataset.ready = 'true'; $('#preference-form').inert = false;
 }
 async function loadPreferences() {
   $('#preference-form').dataset.ready = 'false'; $('#preference-form').inert = true;
@@ -415,13 +432,13 @@ $('#preference-form').addEventListener('submit', async event => {
   event.preventDefault(); if (!state.preferences || $('#save-preferences').disabled) return;
   const next = structuredClone(state.preferences);
   document.querySelectorAll('[data-preference]').forEach(control => setPreference(next, control.dataset.preference, control.type === 'checkbox' ? control.checked : Number(control.value)));
-  next.popup.actionOrder = [...$('#preference-order').children].map(row => row.dataset.orderAction);
+  next.popup.actionOrder = ['bookmark', ...[...$('#preference-order').children].map(row => row.dataset.orderAction)];
   $('#save-preferences').disabled = true; $('#preference-form').setAttribute('aria-busy', 'true'); setMessage($('#preference-message'), '');
   try {
     const result = await api('/preferences', { method: 'PUT', body: next });
     state.preferences = result.preferences; state.preferenceRevision = result.revision; renderPreferences();
     let refreshed = false;
-    if (state.extensionId) refreshed = await extensionMessage({ kind: 'atlas-refresh-preferences' }, state.extensionId).then(() => true).catch(() => false);
+    if (state.extensionId) refreshed = await extensionMessage({ kind: 'atlas-refresh-preferences', revision: result.revision }, state.extensionId).then(response => response.revision >= result.revision).catch(() => false);
     setMessage($('#preference-message'), refreshed ? 'Saved. Your connected browser has the new settings.' : 'Saved. Atlas will use these settings the next time the extension refreshes.', false);
   } catch (error) { if (!state.expired) setMessage($('#preference-message'), error.message); }
   finally { $('#save-preferences').disabled = false; $('#preference-form').removeAttribute('aria-busy'); }
@@ -484,8 +501,9 @@ window.addEventListener('offline', () => setMessage($('#page-message'), 'You’r
 async function start() {
   try {
     await refreshAccount(); if (state.expired) return;
-    $('#new-note').disabled = false; $('#onboarding').hidden = !!(state.usage.captures && state.connections.length);
+    updateNoteAvailability(); $('#onboarding').hidden = !!(state.usage.captures && state.connections.length);
     await Promise.allSettled([loadCaptures(), detectExtension(), loadPreferences()]);
+    updateNoteAvailability();
     if (location.hash === '#extension-settings' && !state.expired) {
       openDialog('#account-dialog'); $('#extension-settings').scrollIntoView({ block: 'start' }); $('#extension-settings summary').focus();
     }

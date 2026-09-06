@@ -67,6 +67,13 @@ export async function extractPageDocument(options = {}) {
     .sort((a, b) => (b.innerText || "").length - (a.innerText || "").length)[0] || document.body;
   const clone = root?.cloneNode(true);
   if (clone?.querySelectorAll) {
+    const liveNodes = [root, ...root.querySelectorAll("*")];
+    const clonedNodes = [clone, ...clone.querySelectorAll("*")];
+    liveNodes.forEach((node, index) => {
+      const style = getComputedStyle(node);
+      if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" ||
+          style.contentVisibility === "hidden" || Number(style.opacity) === 0) clonedNodes[index]?.remove();
+    });
     const discard = [
       "script", "style", "noscript", "nav", "footer", "header", "aside", "form", "button",
       "input", "textarea", "select", "option", "dialog", "iframe", "canvas", "svg", "[hidden]",
