@@ -37,7 +37,7 @@ import('./customer.js?v=1.4.0').then(({ customerConfig }) => customerConfig()).t
   install.target = '_blank';
   install.rel = 'noopener noreferrer';
   install.textContent = 'Add to Chrome';
-  document.querySelector('.download-note').textContent = 'Chrome Web Store · Manual ZIP installation also available below';
+  document.querySelector('.download-note').textContent = 'Chrome on your computer · Chrome Web Store · Manual ZIP installation also available below';
   const manual = document.createElement('a');
   manual.href = 'atlas-extension.zip'; manual.download = 'atlas-extension.zip';
   manual.className = 'text-link local-install-choice'; manual.textContent = 'Download ZIP for manual installation';

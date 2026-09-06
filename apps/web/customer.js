@@ -1,4 +1,10 @@
 export const EXTENSION_ID = 'mjfcgmboaijfcaanepdipbgmipnccnpn';
+let accountContext = null;
+// Bound once by the dashboard's first authenticated account response. Auth pages
+// never set this context, and later cookie changes cannot overwrite its intent.
+export function setAccountContext(id) {
+  if (accountContext === null && typeof id === 'string' && id) accountContext = id;
+}
 // Set only after a public listing is available. Until then, installation is manual.
 let configPromise;
 export function customerConfig() {
@@ -27,7 +33,7 @@ export async function api(path, { method = 'GET', body, signal, download = false
   try {
     response = await fetch(`/api${path}`, {
       method, credentials: 'same-origin', cache: 'no-store',
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+      headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(accountContext ? { 'X-Atlas-Account': accountContext } : {}) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
@@ -38,7 +44,7 @@ export async function api(path, { method = 'GET', body, signal, download = false
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     // Incorrect password/recovery input does not mean the existing session expired.
-    if (response.status === 401 && !['invalid_credentials', 'invalid_pairing'].includes(data.error)) window.dispatchEvent(new CustomEvent('atlas-session-expired'));
+    if ((response.status === 401 && !['invalid_credentials', 'invalid_pairing'].includes(data.error)) || data.error === 'account_changed') window.dispatchEvent(new CustomEvent('atlas-session-expired', { detail: { code: data.error } }));
     throw new ApiError(data.message || (response.status === 429 ? 'Too many attempts. Please wait a moment and try again.' : 'That request could not be completed. Please try again.'), response.status, data.error);
   }
   if (download) return response.blob();

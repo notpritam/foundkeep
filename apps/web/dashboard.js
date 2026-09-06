@@ -1,4 +1,4 @@
-import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig } from './customer.js?v=1.4.0';
+import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig, setAccountContext } from './customer.js?v=1.4.0';
 
 const state = { account: null, connections: [], usage: null, captures: [], cursor: null, total: 0, type: '', query: '', listRequest: 0, controller: null, detailRequest: 0, detail: null, extension: null, extensionId: null, expired: false, noteClientId: null, recoveryCode: '', connecting: false };
 const kinds = { screenshot: 'Screenshot', selection: 'Highlight', bookmark: 'Bookmark', image: 'Image', note: 'Note', tweet: 'Tweet' };
@@ -17,15 +17,21 @@ function confirmAction(title, description, label = 'Continue') {
   dialog.returnValue = 'cancel'; openDialog('#confirm-dialog'); $('#confirm-cancel').focus();
   return new Promise(resolve => dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true }));
 }
-function expireSession() {
+function expireSession(event) {
   if (state.expired) return;
   state.expired = true; state.controller?.abort(); state.listRequest++; state.detailRequest++;
-  state.account = null; state.captures = []; state.detail = null; state.connections = [];
+  state.account = null; state.captures = []; state.detail = null; state.connections = []; state.usage = null;
+  state.recoveryCode = ''; state.extension = null; state.extensionId = null; state.cursor = null; state.query = '';
   $('#capture-grid').replaceChildren(); $('#detail-body').replaceChildren(textElement('h2', 'Log in to view this capture.'));
   $('#account-name').textContent = 'Your account'; $('#settings-email').textContent = ''; $('#device-list').replaceChildren();
+  $('#account-avatar').textContent = 'A'; $('#nav-count').textContent = '—'; $('#usage-summary').textContent = ''; $('#settings-usage').textContent = '';
+  $('#results-count').textContent = ''; $('#search').value = ''; $('#library-description').textContent = 'Log in to open your private library.';
+  $('#password-recovery-code').textContent = ''; $('#password-recovery-saved').checked = false; $('#extension-status').textContent = '';
+  $('#toast').hidden = true; $('#toast').textContent = ''; setMessage($('#page-message'), '');
   $('#note-text').value = ''; $('#password-form').reset(); $('#delete-account-form').reset();
   document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
   $('#library-state').hidden = true; $('#onboarding').hidden = true; $('#new-note').disabled = true;
+  if (event?.detail?.code === 'account_changed') $('#session-description').textContent = 'Your signed-in account changed in another tab. This action was stopped to protect your collection. Log in again to open the correct library.';
   openDialog('#session-dialog');
 }
 window.addEventListener('atlas-session-expired', expireSession);
@@ -72,6 +78,7 @@ async function refreshAccount() {
     $('#session-description').textContent = 'Your signed-in account changed in another tab. Log in again to open the correct library.';
     return;
   }
+  if (!state.account) setAccountContext(result.account.id);
   state.account = result.account; state.connections = result.connections; state.usage = result.usage;
   updateAccount();
 }
@@ -95,7 +102,7 @@ async function detectExtension() {
     $('#install-extension').href = config.storeUrl; $('#install-extension').removeAttribute('download');
     $('#install-extension').target = '_blank'; $('#install-extension').rel = 'noopener noreferrer';
     $('#install-extension').textContent = 'Add to Chrome';
-    $('#install-description').textContent = 'Add Atlas from the Chrome Web Store, then pin it in your extensions menu.';
+    $('#install-description').textContent = 'Use Chrome on your computer to add Atlas from the Chrome Web Store, then pin it in your extensions menu.';
   }
   const attempts = await Promise.allSettled(config.extensionIds.map(async id => ({ id, result: await extensionMessage({ kind: 'atlas-ping' }, id) })));
   const success = attempts.find(attempt => attempt.status === 'fulfilled');

@@ -103,6 +103,34 @@ test('real API: signup, notes, logout, login, recovery and account deletion', as
   await page.locator('#delete-password').fill('A-new-recovered-password-2096'); await page.locator('#delete-account-submit').click(); await page.waitForURL('**/auth.html?mode=signup&deleted=1');
 });
 
+test('real API: a stale dashboard cannot save a draft into a different signed-in account', async t => {
+  const { page, context } = await pageFor(t, { mock: false });
+  const password = 'Cross-tab-test-password-2096';
+  const register = async suffix => {
+    const response = await context.request.post(`${base}/api/auth/register`, { headers: { Origin: base }, data: { name: `Account ${suffix}`, email: `cross-tab-${suffix}-${now}@example.test`, password } });
+    assert.equal(response.status(), 201); return (await response.json()).account;
+  };
+  const first = await register('a');
+  await openLibrary(page); await page.locator('#new-note').click(); await page.locator('#note-text').fill('This private draft belongs only to account A.');
+  const second = await register('b');
+  assert.notEqual(first.id, second.id);
+  const save = page.waitForResponse(response => response.url().endsWith('/api/captures') && response.request().method() === 'POST');
+  await page.locator('#save-note').click();
+  const response = await save;
+  assert.equal((await response.request().allHeaders())['x-atlas-account'], first.id);
+  assert.equal(response.status(), 409); assert.equal((await response.json()).error, 'account_changed');
+  await page.locator('#session-dialog').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#session-description').textContent(), /changed in another tab/);
+  assert.equal(await page.locator('#note-text').inputValue(), ''); assert.equal(await page.locator('.capture-card').count(), 0);
+  const currentLibrary = await context.request.get(`${base}/api/captures`);
+  assert.equal(currentLibrary.status(), 200); assert.equal((await currentLibrary.json()).total, 0, 'Account B must not receive account A’s draft');
+  await context.request.delete(`${base}/api/account`, { headers: { Origin: base }, data: { password } });
+  const login = await context.request.post(`${base}/api/auth/login`, { headers: { Origin: base }, data: { email: first.email, password } });
+  assert.equal(login.status(), 200);
+  const firstLibrary = await context.request.get(`${base}/api/captures`); assert.equal((await firstLibrary.json()).total, 0);
+  await context.request.delete(`${base}/api/account`, { headers: { Origin: base }, data: { password } });
+});
+
 test('library search, filter and detail render capture text safely', async t => {
   const malicious = { id: 'unsafe', type: 'note', noteText: '<img src=x onerror="window.__xss=true">', sourceTitle: '<script>alert(1)</script>', sourceUrl: 'javascript:window.__xss=true', blobUrl: 'https://evil.example/private', tags: ['<img src=x>'], capturedAt: now, status: 'done' };
   const { page } = await pageFor(t, { captures: [malicious, ...fixtureCaptures] });
