@@ -139,6 +139,74 @@ const MIGRATIONS: string[] = [
     revoked_at INTEGER
   );
   `,
+  // 4 — customer accounts, isolated credentials and private captures.
+  `
+  CREATE TABLE customer_accounts (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    recovery_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE customer_sessions (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX customer_sessions_account ON customer_sessions(account_id);
+  CREATE TABLE customer_connections (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX customer_connections_account ON customer_connections(account_id);
+  CREATE TABLE customer_pairings (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    code_hash TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX customer_pairings_account ON customer_pairings(account_id);
+  CREATE TABLE customer_captures (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    client_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    source_url TEXT,
+    source_title TEXT,
+    selection_text TEXT,
+    note_text TEXT,
+    article_text TEXT,
+    blob_data BLOB,
+    blob_mime TEXT,
+    blob_bytes INTEGER NOT NULL DEFAULT 0,
+    storage_bytes INTEGER NOT NULL,
+    width INTEGER,
+    height INTEGER,
+    captured_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    summary TEXT,
+    ocr_text TEXT,
+    category TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
+    enrich_error TEXT,
+    enrich_attempts INTEGER NOT NULL DEFAULT 0,
+    processing_at INTEGER,
+    UNIQUE(account_id, client_id)
+  );
+  CREATE INDEX customer_captures_owner_date ON customer_captures(account_id, captured_at DESC, id DESC);
+  CREATE INDEX customer_captures_status ON customer_captures(status, created_at);
+  `,
 ];
 
 function migrate(db: Database): void {
@@ -158,6 +226,7 @@ export function openDb(path = join(config.dataDir, "atlas.db")): Database {
   const db = new Database(path, { create: true });
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA busy_timeout = 5000;");
+  db.exec("PRAGMA foreign_keys = ON;");
   migrate(db);
   return db;
 }

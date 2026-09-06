@@ -13,6 +13,7 @@ import {
 import { deviceRoutes } from "./devices.ts";
 import { inviteRoutes } from "./invites.ts";
 import { buildCaptureGraph } from "./graph.ts";
+import { customerRoutes } from "./customer.ts";
 
 function count(db: Database, sql: string): number {
   return (db.query(sql).get() as { n: number }).n;
@@ -21,20 +22,19 @@ function count(db: Database, sql: string): number {
 export function createApp(db: Database): Hono<Env> {
   const app = new Hono<Env>();
 
-  app.use(
-    "*",
-    cors({
-      origin: (origin) => {
-        if (!origin) return null; // non-CORS / same-origin request — no ACAO needed
-        if (origin.startsWith("chrome-extension://")) return origin;
-        if (config.allowedOrigins.includes(origin)) return origin;
-        return null;
-      },
-      allowHeaders: ["authorization", "content-type"],
-      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-      maxAge: 86400,
-    }),
-  );
+  const legacyCors = cors({
+    origin: (origin) => {
+      if (!origin) return null; // non-CORS / same-origin request — no ACAO needed
+      if (origin.startsWith("chrome-extension://")) return origin;
+      if (config.allowedOrigins.includes(origin)) return origin;
+      return null;
+    },
+    allowHeaders: ["authorization", "content-type"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    maxAge: 86400,
+  });
+  // Customer routes enforce their own exact website/extension origin allowlist.
+  app.use("*", (c, next) => c.req.path === "/api" || c.req.path.startsWith("/api/") ? next() : legacyCors(c, next));
 
   // Baseline security headers on every response (safe for the API + static site).
   app.use("*", async (c, next) => {
@@ -48,6 +48,11 @@ export function createApp(db: Database): Hono<Env> {
   app.get("/healthz", (c) =>
     c.json({ ok: true, service: "atlas" as const, version: config.version }),
   );
+
+  app.route("/api", customerRoutes(db));
+  app.get("/signup", (c) => c.redirect("/auth.html?mode=signup", 302));
+  app.get("/login", (c) => c.redirect("/auth.html?mode=login", 302));
+  app.get("/dashboard", (c) => c.redirect("/dashboard.html", 302));
 
   // Admin token minting — own guard, outside the Bearer group.
   app.route("/admin/devices", deviceRoutes(db));
