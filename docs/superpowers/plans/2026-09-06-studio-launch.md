@@ -21,9 +21,9 @@
 - [x] Add repeatable landing browser checks and run them alongside extension and backend tests.
 - [x] Make CI run checks before signing and fail if the signing secret is absent.
 - [x] Independently review launch changes and confirm test evidence.
-- [ ] Record the previous main SHA for rollback, fast-forward production main, and push to origin.
-- [ ] Verify public HTTPS, page assets, privacy, downloads, API health, and the GitHub signed release.
-- [ ] Synchronize generated signed release artifacts to the site's existing direct download URLs and record completion.
+- [x] Record the previous main SHA for rollback, fast-forward production main, and push to origin.
+- [x] Verify public HTTPS, page assets, privacy, downloads, API health, and the GitHub signed release.
+- [x] Synchronize generated signed release artifacts to the site's existing direct download URLs and record completion.
 
 ## Preflight evidence
 
@@ -32,3 +32,16 @@
 - Local v1.3.0 CRX signature verifies cryptographically against the original pinned public key. ZIP/CRX content and update manifest match the source and expected extension identity.
 - Responsive hero image payload reduced from 2,696,952 bytes to 37,572 or 97,604 bytes depending on viewport density. The original artwork is retained.
 - Independent review resolved the picture layout and default-headless-browser regressions. Preview entrypoint now redirects to the documented page path.
+
+## Launch complete — 6 September 2026
+
+- Production: https://atlas.notpritam.in/
+- Extension ZIP: https://atlas.notpritam.in/atlas-extension.zip
+- Signed release: https://github.com/notpritam/atlas/releases/tag/ext-v1.3.0
+- Successful CI: https://github.com/notpritam/atlas/actions/runs/34026655984
+- Release source commit: `01dd104e82e56327d75e142b5aa28a804b9d25ae`.
+- Production main fast-forwarded from the recorded prelaunch SHA and pushed to GitHub. No database migration or service restart was required.
+- Public landing browser checks pass at 320/390/768/1440px. Eleven public site/download/metadata routes returned HTTP 200 with matching release bytes, and `/healthz` remained healthy.
+- Published GitHub ZIP and CRX downloaded and checked: valid archive CRC, every file matches extension source, original extension ID retained, CRX cryptographic signature valid, update manifest version 1.3.0.
+- Direct site downloads synchronized to the verified GitHub artifacts.
+- Remaining rollout behavior: unpacked users reload their existing folder; managed installations follow Chrome’s normal update schedule.

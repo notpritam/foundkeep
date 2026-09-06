@@ -23,7 +23,7 @@ The landing implementation was checked at 320, 390, 768, 1024, 1440, and 1920px.
 
 Impeccable’s mechanical detector ran once per implementation surface in degraded parser mode. The retained warnings concern the specified Geist font and the conventional quote rule on highlight content; screenshot and browser checks supplied the remaining inspection.
 
-ZIP integrity, included source bytes, unchanged Chrome identity/permissions, and absence of preview/signing files were checked after packing. No production deployment was performed.
+ZIP integrity, included source bytes, unchanged Chrome identity/permissions, and absence of preview/signing files were checked after packing. The review phase did not deploy production. The completed launch is documented in `2026-09-06-studio-launch.md`.
 
 ## Review locally
 
