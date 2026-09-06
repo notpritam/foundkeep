@@ -1,267 +1,441 @@
 import * as db from "./db.js";
-import { agentHealth } from "./agent.js";
-import { getSettings, setSettings } from "./storage.js";
-
-const $ = (id) => document.getElementById(id);
+import {
+  $,
+  title,
+  sourceUrl,
+  domain,
+  ago,
+  icon,
+  hydrateIcons,
+  message,
+  openDialog,
+  wireDialog,
+} from "./ui.js";
+import { bindConnections } from "./connections.js";
+import { getSettings } from "./storage.js";
 const state = { type: "", tag: null, category: null, q: "" };
-let urls = [];
-
-const TYPE_ICONS = {
-  screenshot: `<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M14 3h7v7M10 21H3v-7"/>`,
-  highlight: `<path d="M4 20h16M6 16l8-8 4 4-8 8H6z"/>`,
-  bookmark: `<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>`,
-  image: `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>`,
-  note: `<path d="M4 4h16v12l-4 4H4z"/><path d="M16 20v-4h4"/>`,
-};
-const svg = (paths) =>
-  `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-
-const TYPES = [
-  { id: "", label: "All" },
-  { id: "screenshot", label: "Screenshots" },
-  { id: "highlight", label: "Highlights" },
-  { id: "bookmark", label: "Bookmarks" },
-  { id: "image", label: "Images" },
-  { id: "note", label: "Notes" },
+const types = [
+  ["", "All captures", "grid"],
+  ["screenshot", "Screenshots", "screenshot"],
+  ["highlight", "Highlights", "highlight"],
+  ["bookmark", "Links", "bookmark"],
+  ["image", "Images", "image"],
+  ["note", "Notes", "note"],
 ];
-
-function relTime(ts) {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  if (s < 604800) return `${Math.floor(s / 86400)}d`;
-  return new Date(ts).toLocaleDateString();
+let gridUrls = [],
+  detailUrls = [],
+  loadSequence = 0,
+  activeCapture,
+  noteSaving = false;
+hydrateIcons();
+for (const id of ["overlay", "settings", "noteDialog"]) wireDialog($(id));
+const connectionSettings = bindConnections($("connections"));
+function release(urls) {
+  urls.forEach(URL.revokeObjectURL);
+  urls.length = 0;
 }
-const title = (c) => c.summary || c.sourceTitle || c.noteText || c.selectionText || "(untitled)";
-function revokeUrls() { urls.forEach((u) => URL.revokeObjectURL(u)); urls = []; }
-function blobUrl(blob) { const u = URL.createObjectURL(blob); urls.push(u); return u; }
-
-// ---------------------------------------------------------------- rendering
-function statusBadge(c) {
-  if (c.status === "done") return "";
-  if (c.status === "failed") return `<span class="badge failed">retry</span>`;
-  return `<span class="badge ${c.status}"><span class="spin"></span>${c.status === "processing" ? "enriching" : "queued"}</span>`;
+function mediaUrl(blob, urls) {
+  const url = URL.createObjectURL(blob);
+  urls.push(url);
+  return url;
 }
-
-function card(c) {
-  const w = document.createElement("div");
-  w.className = "cardw";
-  const el = document.createElement("article");
-  el.className = "card";
+const isFiltered = () =>
+  !!(state.type || state.tag || state.category || state.q);
+function textElement(tag, className, text) {
+  const el = document.createElement(tag);
+  el.className = className;
+  el.textContent = text;
+  return el;
+}
+function renderCard(c) {
+  const button = document.createElement("button");
+  button.className = "capture-card";
+  button.dataset.type = c.type;
+  button.dataset.capture = c.id;
+  button.dataset.focusKey = "capture:" + c.id;
   const visual = (c.type === "screenshot" || c.type === "image") && c.blob;
-
-  let inner = "";
   if (visual) {
-    inner += `<img class="thumb" style="max-height:360px;object-fit:cover;object-position:top" src="${blobUrl(c.blob)}" alt="" />`;
+    const img = document.createElement("img");
+    img.className = "thumb";
+    img.alt = "";
+    img.loading = "lazy";
+    img.src = mediaUrl(c.blob, gridUrls);
+    button.append(img);
   }
-  inner += `<div class="body"><div class="meta"><span class="type">${svg(TYPE_ICONS[c.type] || "")}${c.type}</span>${statusBadge(c)}<span class="time">${relTime(c.createdAt)}</span></div>`;
-  if (c.type === "highlight" && c.selectionText) {
-    inner += `<div class="quote"></div>`;
-  } else if (!visual) {
-    inner += `<h3></h3>`;
+  const body = document.createElement("span");
+  body.className = "card-body";
+  const meta = document.createElement("span");
+  meta.className = "card-meta";
+  meta.innerHTML = icon(c.type);
+  meta.append(textElement("span", "", c.type === "bookmark" ? "Link" : c.type));
+  const time = textElement("time", "", ago(c.createdAt));
+  time.dateTime = new Date(c.createdAt).toISOString();
+  meta.append(time);
+  body.append(meta);
+  body.append(
+    textElement(
+      "span",
+      "card-title",
+      c.type === "highlight" ? c.selectionText || title(c) : title(c),
+    ),
+  );
+  if (!visual && c.type === "bookmark" && (c.description || c.articleText))
+    body.append(
+      textElement("span", "card-description", c.description || c.articleText),
+    );
+  body.append(
+    textElement(
+      "span",
+      "card-source",
+      c.sourceUrl ? domain(c.sourceUrl) : "Your notebook",
+    ),
+  );
+  if (c.tags?.length) {
+    const tags = document.createElement("span");
+    tags.className = "card-tags";
+    for (const tag of c.tags.slice(0, 4))
+      tags.append(textElement("span", "card-tag", tag));
+    body.append(tags);
   }
-  if (c.summary && (visual || c.type === "bookmark")) inner += `<div class="sum"></div>`;
-  if (c.tags?.length) inner += `<div class="tags">${c.tags.slice(0, 4).map(() => "<span></span>").join("")}</div>`;
-  inner += `</div>`;
-  el.innerHTML = inner;
-
-  // fill text safely
-  const q = el.querySelector(".quote"); if (q) q.textContent = c.selectionText;
-  const h = el.querySelector("h3"); if (h) h.textContent = title(c);
-  const s = el.querySelector(".sum"); if (s) s.textContent = c.summary;
-  const tagEls = el.querySelectorAll(".tags span");
-  (c.tags || []).slice(0, 4).forEach((t, i) => { if (tagEls[i]) tagEls[i].textContent = "#" + t; });
-
-  el.addEventListener("click", () => openDetail(c.id));
-  w.appendChild(el);
-  return w;
+  button.append(body);
+  button.onclick = () => openDetail(c.id, button).catch(showError);
+  return button;
 }
-
+function renderFilters(all, facets) {
+  $("typeFilters").replaceChildren();
+  for (const [id, label, shape] of types) {
+    const button = document.createElement("button");
+    button.className = "nav-item" + (state.type === id ? " on" : "");
+    button.dataset.type = id;
+    button.dataset.focusKey = "type:" + id;
+    button.setAttribute("aria-pressed", String(state.type === id));
+    button.innerHTML = icon(shape);
+    button.append(
+      textElement("span", "", label),
+      textElement(
+        "span",
+        "count",
+        String(id ? all.filter((c) => c.type === id).length : all.length),
+      ),
+    );
+    button.onclick = () => {
+      state.type = id;
+      load();
+    };
+    $("typeFilters").append(button);
+  }
+  $("tagFilters").replaceChildren();
+  $("tagEmpty").hidden = !!facets.tags.length;
+  for (const tag of facets.tags.slice(0, 12)) {
+    const button = document.createElement("button");
+    button.dataset.focusKey = "tag:" + tag.name;
+    button.className =
+      "nav-item tag-filter" + (state.tag === tag.name ? " on" : "");
+    button.setAttribute("aria-pressed", String(state.tag === tag.name));
+    button.append(
+      textElement("span", "tag-symbol", "#"),
+      textElement("span", "tag-name", tag.name),
+      textElement("span", "count", String(tag.count)),
+    );
+    button.onclick = () => {
+      state.tag = state.tag === tag.name ? null : tag.name;
+      load();
+    };
+    $("tagFilters").append(button);
+  }
+  $("facetFilters").replaceChildren();
+  for (const category of facets.categories.slice(0, 6)) {
+    const button = textElement(
+      "button",
+      "category" + (state.category === category.name ? " on" : ""),
+      category.name,
+    );
+    button.dataset.focusKey = "category:" + category.name;
+    button.setAttribute(
+      "aria-pressed",
+      String(state.category === category.name),
+    );
+    button.onclick = () => {
+      state.category = state.category === category.name ? null : category.name;
+      load();
+    };
+    $("facetFilters").append(button);
+  }
+  $("resetFilters").hidden = !isFiltered();
+  $("libraryTitle").replaceChildren(
+    document.createTextNode(
+      state.tag ? `#${state.tag}` : types.find((t) => t[0] === state.type)[1],
+    ),
+    textElement("span", "accent", "."),
+  );
+}
+function showError(error) {
+  $("loadError").hidden = false;
+  message(
+    $("loadError"),
+    error?.message || "Could not load your library. Reload to try again.",
+  );
+}
 async function load() {
-  revokeUrls();
-  const rows = await db.listCaptures(state);
-  const grid = $("grid");
-  const empty = $("empty");
-  grid.innerHTML = "";
-  if (!rows.length) {
-    grid.hidden = true;
-    empty.hidden = false;
-    empty.innerHTML = `<img src="../assets/mark.svg" width="46" height="46" alt="" />
-      <h3>${state.q || state.type || state.tag ? "Nothing matches" : "Your library is empty"}</h3>
-      <p>${state.q || state.type || state.tag ? "Try a different filter." : "Capture a screenshot, highlight, bookmark, tweet or note from any page — it lands here and your Claude Code enriches it."}</p>`;
-  } else {
-    empty.hidden = true;
-    grid.hidden = false;
-    const frag = document.createDocumentFragment();
-    for (const c of rows) frag.appendChild(card(c));
-    grid.appendChild(frag);
-  }
-  renderFilters();
-}
-
-async function renderFilters() {
-  const tf = $("typeFilters");
-  tf.innerHTML = "";
-  for (const t of TYPES) {
-    const b = document.createElement("button");
-    b.className = "chip" + (state.type === t.id ? " on" : "");
-    b.textContent = t.label;
-    b.onclick = () => { state.type = t.id; load(); };
-    tf.appendChild(b);
-  }
-  const ff = $("facetFilters");
-  ff.innerHTML = "";
-  const { tags, categories } = await db.facets();
-  for (const cat of categories.slice(0, 6)) {
-    const b = document.createElement("button");
-    b.className = "chip" + (state.category === cat.name ? " on" : "");
-    b.innerHTML = `${cat.name} <span class="ct">${cat.count}</span>`;
-    b.onclick = () => { state.category = state.category === cat.name ? null : cat.name; load(); };
-    ff.appendChild(b);
-  }
-  for (const tg of tags.slice(0, 12)) {
-    const b = document.createElement("button");
-    b.className = "chip" + (state.tag === tg.name ? " on" : "");
-    b.innerHTML = `#${tg.name} <span class="ct">${tg.count}</span>`;
-    b.onclick = () => { state.tag = state.tag === tg.name ? null : tg.name; load(); };
-    ff.appendChild(b);
+  const sequence = ++loadSequence;
+  try {
+    const [rows, all, facets] = await Promise.all([
+      db.listCaptures({ ...state, limit: 100000 }),
+      db.listCaptures({ limit: 100000 }),
+      db.facets(),
+    ]);
+    if (sequence !== loadSequence) return;
+    if ($("sort").value === "oldest") rows.reverse();
+    const focused = document.activeElement,
+      focusKey = focused?.dataset?.focusKey;
+    release(gridUrls);
+    $("grid").replaceChildren(...rows.map(renderCard));
+    $("grid").hidden = !rows.length;
+    $("empty").hidden = !!rows.length;
+    $("loadError").hidden = true;
+    $("totalCount").textContent =
+      `${all.length} ${all.length === 1 ? "capture" : "captures"} saved`;
+    $("resultCount").textContent =
+      `${rows.length} ${rows.length === 1 ? "capture" : "captures"}`;
+    $("emptyTitle").textContent = isFiltered()
+      ? "Nothing here just yet."
+      : "Make room for a good find.";
+    $("emptyCopy").textContent = isFiltered()
+      ? "Try another keyword or clear your filters to see all your captures."
+      : "Use the Atlas extension to keep a page, an image, or a line that stays with you. Your captures will appear here.";
+    $("emptyAction").textContent = isFiltered()
+      ? "Clear filters"
+      : "Write your first note";
+    renderFilters(all, facets);
+    if (focusKey && !focused.isConnected)
+      document.querySelectorAll("[data-focus-key]").forEach((el) => {
+        if (el.dataset.focusKey === focusKey) el.focus({ preventScroll: true });
+      });
+  } catch (error) {
+    if (sequence === loadSequence) showError(error);
   }
 }
-
-// ---------------------------------------------------------------- detail
-async function openDetail(id) {
+function resetFilters() {
+  clearTimeout(searchTimer);
+  Object.assign(state, { type: "", tag: null, category: null, q: "" });
+  $("q").value = "";
+  load();
+}
+function detailField(label, value) {
+  const section = document.createElement("section");
+  section.className = "detail-field";
+  section.append(textElement("h3", "", label), textElement("p", "", value));
+  return section;
+}
+async function openDetail(id, opener) {
   const c = await db.getCapture(id);
   if (!c) return;
-  const visual = (c.type === "screenshot" || c.type === "image") && c.blob;
-  const sheet = $("sheet");
-  sheet.innerHTML = `
-    <div class="sheet-head">
-      <span class="type">${c.type}</span>${statusBadge(c)}<span class="grow"></span>
-      ${c.sourceUrl ? `<a class="linkbtn" href="${c.sourceUrl}" target="_blank" rel="noreferrer">Source ↗</a>` : ""}
-      <button class="iconbtn sm" id="delBtn" title="Delete">🗑</button>
-      <button class="iconbtn sm" id="closeBtn" aria-label="Close">✕</button>
-    </div>
-    <div class="sheet-body" id="sbody"></div>`;
-  const body = sheet.querySelector("#sbody");
-
-  if (visual) { const img = document.createElement("img"); img.className = "full"; img.src = blobUrl(c.blob); body.appendChild(img); }
-  const h = document.createElement("h2"); h.textContent = title(c); body.appendChild(h);
-  if (c.type === "highlight" && c.selectionText) { const bq = document.createElement("blockquote"); bq.textContent = c.selectionText; body.appendChild(bq); }
-  if (c.type === "note" && c.noteText) { const p = document.createElement("div"); p.className = "field"; p.innerHTML = `<div class="v" style="white-space:pre-wrap"></div>`; p.querySelector(".v").textContent = c.noteText; body.appendChild(p); }
-
-  const field = (k, v, mono) => { const d = document.createElement("div"); d.className = "field"; d.innerHTML = `<div class="k">${k}</div><div class="v ${mono ? "mono" : ""}"></div>`; d.querySelector(".v").textContent = v; return d; };
-  if (c.summary && !visual && c.type !== "note") body.appendChild(field("Summary", c.summary));
-  if (c.description) body.appendChild(field("Description", c.description));
-  if (c.category || c.tags?.length) {
-    const d = document.createElement("div"); d.className = "field";
-    const row = document.createElement("div"); row.className = "tagrow";
-    if (c.category) { const s = document.createElement("span"); s.className = "cat"; s.textContent = c.category; row.appendChild(s); }
-    for (const t of c.tags || []) { const s = document.createElement("span"); s.className = "tag"; s.textContent = "#" + t; row.appendChild(s); }
-    d.innerHTML = `<div class="k">Tags</div>`; d.appendChild(row); body.appendChild(d);
+  activeCapture = c;
+  release(detailUrls);
+  const body = $("detailBody");
+  body.replaceChildren();
+  $("detailType").textContent =
+    `${c.type === "bookmark" ? "Link" : c.type} · Saved locally`;
+  const source = sourceUrl(c.sourceUrl);
+  $("sourceLink").hidden = !source;
+  $("sourceLink").removeAttribute("href");
+  if (source) $("sourceLink").href = source;
+  if (c.blob && ["screenshot", "image"].includes(c.type)) {
+    const img = document.createElement("img");
+    img.className = "full";
+    img.alt = c.description || c.sourceTitle || "Saved capture";
+    img.src = mediaUrl(c.blob, detailUrls);
+    body.append(img);
   }
-  if (c.articleText) { const d = document.createElement("div"); d.className = "field"; d.innerHTML = `<div class="k">Reader</div><div class="reader"></div>`; d.querySelector(".reader").textContent = c.articleText; body.appendChild(d); }
-  if (c.ocrText) { const d = field("Extracted text (OCR)", c.ocrText, true); body.appendChild(d); }
-  if (c.status === "failed" && c.enrichError) body.appendChild(field("Enrichment error", c.enrichError, true));
-
-  $("overlay").hidden = false;
-  sheet.querySelector("#closeBtn").onclick = closeOverlay;
-  sheet.querySelector("#delBtn").onclick = async () => { await db.deleteCapture(id); closeOverlay(); load(); };
+  const heading = textElement("h2", "", title(c));
+  heading.id = "detailTitle";
+  body.append(heading);
+  if (c.type === "highlight" && c.selectionText)
+    body.append(textElement("blockquote", "", c.selectionText));
+  if (c.type === "note" && c.noteText)
+    body.append(detailField("Note", c.noteText));
+  if (c.summary && c.summary !== title(c))
+    body.append(detailField("Summary", c.summary));
+  if (c.description) body.append(detailField("Description", c.description));
+  if (c.category || c.tags?.length)
+    body.append(
+      detailField(
+        "Filed under",
+        [c.category, ...(c.tags || []).map((t) => "#" + t)]
+          .filter(Boolean)
+          .join(" · "),
+      ),
+    );
+  if (c.articleText) body.append(detailField("Saved page text", c.articleText));
+  if (c.ocrText) body.append(detailField("Recognized text", c.ocrText));
+  const { enrichEnabled } = await getSettings();
+  if (enrichEnabled && c.status !== "done")
+    body.append(
+      detailField(
+        "Optional organization",
+        c.status === "failed"
+          ? "Organization needs another try. Your capture is saved. " +
+              (c.enrichError || "")
+          : c.status === "processing"
+            ? "Your companion is organizing this capture."
+            : "Saved and waiting for your companion to organize it.",
+      ),
+    );
+  $("detailDate").textContent = new Date(c.createdAt).toLocaleString(
+    undefined,
+    { dateStyle: "medium", timeStyle: "short" },
+  );
+  history.replaceState(null, "", `#capture=${encodeURIComponent(id)}`);
+  openDialog($("overlay"), opener);
 }
-function closeOverlay() { $("overlay").hidden = true; $("sheet").innerHTML = ""; }
-$("overlay").addEventListener("click", (e) => { if (e.target.id === "overlay") closeOverlay(); });
-
-// ---------------------------------------------------------------- status
-async function refreshStatus() {
-  const dot = $("dot"), conn = $("conn");
-  const c = await db.counts();
-  const { agentUrl } = await getSettings();
-  let online = false;
-  try { await agentHealth(agentUrl); online = true; } catch {}
-  const queued = (c.pending || 0) + (c.processing || 0) + (c.failed || 0);
-  if (!online) { dot.className = "dot bad"; conn.textContent = queued ? `${queued} queued` : "agent offline"; }
-  else if (queued) { dot.className = "dot queue"; conn.textContent = `${queued} enriching`; }
-  else { dot.className = "dot ok"; conn.textContent = `${c.total} saved`; }
-}
-
-// ---------------------------------------------------------------- settings
-async function openSettings() {
-  const s = await getSettings();
-  $("agentUrl").value = s.agentUrl;
-  $("enrichEnabled").checked = s.enrichEnabled;
-  $("relayUrl").value = s.relayUrl;
-  $("relayToken").value = s.relayToken;
-  await testAgent();
-  await updateRelayBox();
-  $("settings").hidden = false;
-}
-async function updateRelayBox() {
-  const box = $("relayBox");
-  if (!box) return;
-  if (!$("relayUrl").value.trim()) {
-    box.innerHTML = `<span class="a-ok">● Local mode</span> — an agent drives this browser over the local bridge.`;
+$("closeDetail").onclick = () => $("overlay").close();
+$("overlay").addEventListener("close", () => {
+  release(detailUrls);
+  activeCapture = null;
+  history.replaceState(null, "", location.pathname + location.search);
+});
+$("deleteCapture").onclick = async () => {
+  if (!activeCapture || !confirm("Delete this capture? This cannot be undone."))
     return;
-  }
   try {
-    const st = await chrome.runtime.sendMessage({ k: "relay-state" });
-    box.innerHTML = st && st.connected
-      ? `<span class="a-ok">● Connected to relay</span> — your agent can drive this browser from anywhere.`
-      : `<span class="a-bad">● Not connected to the relay.</span> Check the URL + token; the backend must be reachable.`;
-  } catch {
-    box.innerHTML = `<span class="a-bad">● Relay status unavailable.</span>`;
+    await db.deleteCapture(activeCapture.id);
+    $("overlay").close();
+    await load();
+    $("q").focus();
+  } catch (error) {
+    showError(error);
   }
-}
-async function testAgent() {
-  const box = $("agentBox");
-  const url = $("agentUrl").value.trim() || "http://127.0.0.1:8791";
-  try {
-    const h = await agentHealth(url);
-    box.innerHTML = h.claude
-      ? `<span class="a-ok">● Connected to Claude Code</span> — enrichment is live.`
-      : `<span class="a-bad">● Agent running, Claude Code not detected.</span> Make sure Claude Code is installed and logged in.`;
-  } catch {
-    box.innerHTML = `<span class="a-bad">● Agent not running.</span> Start it on your machine:<br><br><code>npx @notpritam/atlas-agent</code><br><br>Captures stay safely queued until it's up.`;
-  }
-}
-$("settingsBtn").onclick = openSettings;
-$("settingsClose").onclick = () => ($("settings").hidden = true);
-$("settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("settings").hidden = true; });
-$("saveSettings").onclick = async () => {
-  await setSettings({
-    agentUrl: $("agentUrl").value.trim() || "http://127.0.0.1:8791",
-    enrichEnabled: $("enrichEnabled").checked,
-    relayUrl: $("relayUrl").value.trim(),
-    relayToken: $("relayToken").value.trim(),
-  });
-  await testAgent();
-  chrome.runtime.sendMessage({ kind: "drain" });
-  // give control-bg a moment to reconnect to the new endpoint, then show status
-  setTimeout(updateRelayBox, 1200);
-  refreshStatus();
 };
-$("drainNow").onclick = () => { chrome.runtime.sendMessage({ kind: "drain" }); testAgent(); };
+$("settingsBtn").onclick = async () => {
+  openDialog($("settings"));
+  try {
+    await connectionSettings.load();
+  } catch {
+    message(
+      $("dataFeedback"),
+      "Could not load settings. Close and reopen to retry.",
+      "error",
+    );
+  }
+};
+$("settingsClose").onclick = () => $("settings").close();
 $("exportBtn").onclick = async () => {
-  const rows = await db.listCaptures({ limit: 100000 });
-  const clean = rows.map(({ blob, ...r }) => ({ ...r, hasBlob: !!blob }));
-  const url = URL.createObjectURL(new Blob([JSON.stringify(clean, null, 2)], { type: "application/json" }));
-  const a = document.createElement("a");
-  a.href = url; a.download = `atlas-export-${new Date().toISOString().slice(0, 10)}.json`; a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const rows = await db.listCaptures({ limit: 100000 });
+    const clean = rows.map(({ blob, ...row }) => ({ ...row, hasBlob: !!blob }));
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(clean, null, 2)], { type: "application/json" }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `atlas-metadata-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    message(
+      $("dataFeedback"),
+      "Metadata export downloaded. Image files are not included.",
+      "success",
+    );
+  } catch {
+    message(
+      $("dataFeedback"),
+      "Could not export metadata. Try again.",
+      "error",
+    );
+  }
 };
 $("clearBtn").onclick = async () => {
-  if (!confirm("Delete ALL captures from this browser? This cannot be undone.")) return;
-  await db.clearAll();
-  $("settings").hidden = true;
-  load(); refreshStatus();
+  if (!confirm("Delete ALL captures from this browser? This cannot be undone."))
+    return;
+  try {
+    await db.clearAll();
+    $("settings").close();
+    resetFilters();
+  } catch {
+    message(
+      $("dataFeedback"),
+      "Could not clear the library. Try again.",
+      "error",
+    );
+  }
 };
-
-// ---------------------------------------------------------------- search + live
-let t;
-$("q").addEventListener("input", (e) => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value.trim(); load(); }, 220); });
-$("statusChip").onclick = () => { chrome.runtime.sendMessage({ kind: "drain" }); refreshStatus(); };
-chrome.runtime.onMessage.addListener((m) => { if (m?.kind === "atlas-changed") { load(); refreshStatus(); } });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeOverlay(); $("settings").hidden = true; } });
-
-load();
-refreshStatus();
-setInterval(refreshStatus, 15000);
+function newNote() {
+  message($("noteFeedback"), "");
+  openDialog($("noteDialog"));
+  $("libraryNote").focus();
+}
+$("newNote").onclick = newNote;
+$("noteClose").onclick = () => $("noteDialog").close();
+$("emptyAction").onclick = () => (isFiltered() ? resetFilters() : newNote());
+$("resetFilters").onclick = resetFilters;
+$("noteForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const draft = $("libraryNote").value,
+    text = draft.trim();
+  if (!text || noteSaving) return;
+  noteSaving = true;
+  $("saveLibraryNote").disabled = true;
+  try {
+    await db.addCapture({ type: "note", noteText: text });
+    if ($("libraryNote").value === draft) {
+      $("libraryNote").value = "";
+      $("noteDialog").close();
+    } else
+      message(
+        $("noteFeedback"),
+        "Saved. Your new edits are still here.",
+        "success",
+      );
+    chrome.runtime.sendMessage({ kind: "drain" }).catch(() => {});
+    resetFilters();
+  } catch {
+    message(
+      $("noteFeedback"),
+      "Could not save. Your draft is still here; try again.",
+      "error",
+    );
+  } finally {
+    noteSaving = false;
+    $("saveLibraryNote").disabled = false;
+  }
+});
+$("libraryNote").addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    $("noteForm").requestSubmit();
+  }
+});
+let searchTimer;
+$("q").addEventListener("input", (e) => {
+  clearTimeout(searchTimer);
+  const query = e.target.value.trim();
+  searchTimer = setTimeout(() => {
+    state.q = query;
+    load();
+  }, 160);
+});
+$("sort").onchange = load;
+document.addEventListener("keydown", (e) => {
+  if (
+    e.key === "/" &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) &&
+    !document.querySelector("dialog[open]")
+  ) {
+    e.preventDefault();
+    $("q").focus();
+  }
+});
+chrome.runtime.onMessage.addListener((m) => {
+  if (m.kind === "atlas-changed") load();
+});
+window.addEventListener("focus", load);
+window.addEventListener("pagehide", () => {
+  release(gridUrls);
+  release(detailUrls);
+});
+load().then(() => {
+  const id = new URLSearchParams(location.hash.slice(1)).get("capture");
+  if (id) openDetail(id, $("q")).catch(showError);
+});

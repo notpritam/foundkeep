@@ -10,9 +10,11 @@
     "backend": "bun run --cwd apps/backend dev",
     "test": "bun test",
     "release": "node deploy/release-extension.mjs",
-    "release:publish": "node deploy/release-extension.mjs --publish"
+    "release:publish": "node deploy/release-extension.mjs --publish",
+    "test:extension": "node --test tests/extension-ui.mjs tests/extension-smoke.mjs"
   },
   "devDependencies": {
-    "crx3": "^2.0.0"
+    "crx3": "^2.0.0",
+    "playwright-core": "1.62.1"
   }
 }

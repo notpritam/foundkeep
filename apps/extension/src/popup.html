@@ -2,65 +2,89 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atlas — Capture</title>
+    <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <div id="view-main">
-      <header class="topbar">
-        <div class="brand"><img src="../icons/icon32.png" width="22" height="22" alt="" /> <span>Atlas</span></div>
-        <button id="statusChip" class="status" title="Agent status"><span id="dot" class="dot"></span><span id="conn">…</span></button>
+      <header class="popup-head">
+        <a class="brand" href="#" id="brandLibrary" aria-label="Atlas library"
+          ><img src="../assets/mark.svg" alt="" />Atlas</a
+        ><span class="storage"><i></i>Saved in this browser</span>
       </header>
-
-      <div class="composer">
-        <textarea id="note" rows="3" placeholder="Capture a thought…"></textarea>
-        <div class="composer-foot">
-          <span class="hint">⌘/Ctrl + Enter</span>
-          <button id="save" class="btn btn-primary">Save note</button>
+      <main class="popup-main">
+        <div class="intro">
+          <h1>Found something good?</h1>
+          <p>Keep it close.</p>
         </div>
-      </div>
-
-      <div class="section-label">Clip this page</div>
-      <div class="actions">
-        <button class="action" data-act="region"><span class="a-ic ic-shot"></span><span>Region</span></button>
-        <button class="action" data-act="fullpage"><span class="a-ic ic-page"></span><span>Full page</span></button>
-        <button class="action" data-act="highlight"><span class="a-ic ic-highlight"></span><span>Highlight</span></button>
-        <button class="action" data-act="savepage"><span class="a-ic ic-bookmark"></span><span>Bookmark</span></button>
-      </div>
-
-      <div class="section-label">Recent</div>
-      <ul id="recent" class="recent"></ul>
-
-      <footer class="footer">
-        <button id="openLib" class="btn btn-primary lib">Open Library</button>
-        <button id="openSettings" class="iconbtn" aria-label="Settings"><span class="a-ic ic-gear"></span></button>
+        <div class="current-page">
+          <span class="page-icon" data-icon="bookmark"></span>
+          <div>
+            <span id="page-domain">Current page</span>
+            <p id="page-title">Choose what to keep.</p>
+          </div>
+        </div>
+        <div
+          class="capture-actions"
+          role="group"
+          aria-label="Capture from this page"
+        >
+          <button data-act="region">
+            <span data-icon="screenshot"></span>Region</button
+          ><button data-act="fullpage">
+            <span data-icon="image"></span>Full page</button
+          ><button data-act="highlight">
+            <span data-icon="highlight"></span>Highlight</button
+          ><button data-act="savepage">
+            <span data-icon="bookmark"></span>Save link
+          </button>
+        </div>
+        <p id="captureFeedback" class="fine" role="status">
+          Right-click an image or a selection to save it, too.
+        </p>
+        <div class="composer">
+          <label for="note">Or, keep a thought.</label
+          ><textarea
+            id="note"
+            rows="2"
+            maxlength="100000"
+            placeholder="What’s worth remembering?"
+          ></textarea>
+          <div class="composer-foot">
+            <span class="fine">⌘ / Ctrl + Enter to save</span
+            ><button id="save" class="btn primary" disabled>
+              Save note <span data-icon="arrow"></span>
+            </button>
+          </div>
+          <p id="saveFeedback" class="statusline" role="status"></p>
+        </div>
+        <section class="recent-section" aria-labelledby="recentHeading">
+          <div class="section-heading">
+            <h2 id="recentHeading">Just collected</h2>
+            <span id="savedCount"></span>
+          </div>
+          <ul id="recent"></ul>
+        </section>
+      </main>
+      <footer class="popup-foot">
+        <button id="openLib" class="library-link">
+          Open library <span data-icon="arrow"></span></button
+        ><button id="openSettings" class="iconbtn" aria-label="Settings">
+          <span data-icon="settings"></span>
+        </button>
       </footer>
     </div>
-
     <div id="view-settings" hidden>
-      <header class="topbar">
-        <button id="backBtn" class="iconbtn" aria-label="Back"><span class="a-ic ic-back"></span></button>
-        <div class="brand"><span>Settings</span></div>
-        <span style="width:30px"></span>
+      <header class="popup-head">
+        <button id="backBtn" class="iconbtn" aria-label="Back to capture">
+          <span class="back-arrow" data-icon="arrow"></span>
+        </button>
+        <h2>Settings</h2>
       </header>
-      <div class="settings">
-        <label>Atlas Agent URL <span class="muted">(enrichment)</span></label>
-        <input id="agentUrl" placeholder="http://127.0.0.1:8791" />
-        <label class="row"><input id="enrichEnabled" type="checkbox" /> <span>Enrich captures with Claude Code</span></label>
-
-        <label>Agent control relay <span class="muted">(optional)</span></label>
-        <input id="relayUrl" placeholder="wss://atlas.notpritam.in/agent" />
-        <input id="relayToken" type="password" placeholder="account token" />
-        <div class="agentbox" id="relayBox"></div>
-
-        <button id="saveSettings" class="btn btn-primary full">Save &amp; test</button>
-        <p class="fineprint">
-          Captures + enrichment stay on your machine. The <b>relay</b> is separate —
-          set the URL + your account token to let your agent drive this browser from
-          anywhere (the agent uses the same token). Leave blank for local-only.
-        </p>
-      </div>
+      <div class="settings-panel" id="connections"></div>
     </div>
-
     <script type="module" src="popup.js"></script>
   </body>
 </html>

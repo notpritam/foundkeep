@@ -6,7 +6,7 @@
 const MARK_SVG = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="7" x2="6.5" y2="17"/><line x1="12" y1="7" x2="17.5" y2="17"/><line x1="6.5" y1="17" x2="17.5" y2="17"/></g><g fill="currentColor"><circle cx="12" cy="6.4" r="2.5"/><circle cx="6.2" cy="17.2" r="2"/><circle cx="17.8" cy="17.2" r="2"/></g></svg>`;
 const CHECK_SVG = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const IDLE = "rgb(113, 118, 123)";
-const ACCENT = "#6366f1";
+const ACCENT = "#c63b23";
 
 function extract(article) {
   const link = [...article.querySelectorAll('a[href*="/status/"]')].find((a) =>
@@ -36,7 +36,7 @@ function setState(btn, state) {
     btn.style.opacity = "0.6";
   } else if (state === "saved") {
     btn.style.color = ACCENT;
-    btn.style.background = "rgba(99,102,241,0.12)";
+    btn.style.background = "rgba(198,59,35,0.12)";
     btn.style.opacity = "1";
     btn.innerHTML = CHECK_SVG;
     btn.title = "Saved to Atlas";
@@ -77,7 +77,7 @@ function makeButton() {
   btn.addEventListener("mouseenter", () => {
     if (btn.dataset.state === "saved") return;
     btn.style.color = ACCENT;
-    btn.style.background = "rgba(99,102,241,0.1)";
+    btn.style.background = "rgba(198,59,35,0.1)";
   });
   btn.addEventListener("mouseleave", () => {
     if (btn.dataset.state === "saved") return;

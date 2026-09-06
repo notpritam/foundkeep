@@ -5,7 +5,7 @@ import "./control-bg.js"; // agent-control bridge (WebSocket → Atlas Browser M
 // Feedback: a short badge flash (no notifications permission needed).
 // ---------------------------------------------------------------------------
 async function flash(ok, label) {
-  await chrome.action.setBadgeBackgroundColor({ color: ok ? "#6e56cf" : "#d03b3b" });
+  await chrome.action.setBadgeBackgroundColor({ color: ok ? "#c63b23" : "#d03b3b" });
   await chrome.action.setBadgeText({ text: ok ? "✓" : "!" });
   if (!ok && label) console.error("[atlas]", label);
   setTimeout(() => chrome.action.setBadgeText({ text: "" }), 1500);
@@ -229,7 +229,7 @@ function regionSelectInPage() {
       "position:fixed;inset:0;z-index:2147483647;cursor:crosshair;background:rgba(0,0,0,0.15)";
     const box = document.createElement("div");
     box.style.cssText =
-      "position:fixed;border:2px solid #6e56cf;background:rgba(110,86,207,0.15);pointer-events:none;left:0;top:0;width:0;height:0";
+      "position:fixed;border:2px solid #c63b23;background:rgba(198,59,35,0.15);pointer-events:none;left:0;top:0;width:0;height:0";
     const hint = document.createElement("div");
     hint.textContent = "Drag to capture · Esc to cancel";
     hint.style.cssText =
