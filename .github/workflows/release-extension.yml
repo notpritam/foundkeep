@@ -67,7 +67,7 @@ jobs:
           tag_name: ext-v${{ steps.v.outputs.version }}
           name: Atlas extension v${{ steps.v.outputs.version }}
           body: |
-            Atlas customer capture: private accounts, browser connection, automatic cloud sync, and a searchable dashboard.
+            Atlas 1.5 saves readable page copies with their original source and gives customers direct control over capture methods, popup layout, sync, OCR, summaries and tags from the dashboard.
 
             Get started at https://atlas.notpritam.in/signup and follow the browser setup in your dashboard.
 
@@ -75,7 +75,7 @@ jobs:
             - Signed extension: `atlas-extension.crx`
             - Unpacked bundle: `atlas-extension.zip`
 
-            Existing local captures stay local until you choose to import them. ZIP installation requires Chrome Developer mode; Chrome Web Store publication is pending. The signed build supports existing managed installations.
+            Existing local captures stay local until you choose to import them. The unpacked ZIP supports Chrome, Edge, Brave, Opera and Vivaldi on desktop. Chrome Web Store publication is pending; the signed build supports existing managed Chrome installations.
           files: |
             apps/web/ext/atlas-extension.crx
             apps/web/updates.xml
