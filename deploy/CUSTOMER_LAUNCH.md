@@ -7,6 +7,9 @@ in `customer_*` SQLite tables. Never mint legacy device tokens for customers.
 ## Runtime
 
 - Bun, SQLite, the existing `atlas-backend` service and Caddy TLS.
+- Keep the runtime data directory mode 0700 and SQLite files mode 0600. The
+  service uses `UMask=0077`; existing installations can apply that setting with
+  a systemd service drop-in without replacing their other configuration.
 - Install `tesseract`, English trained data and `prlimit` (util-linux).
   Arch: `sudo pacman -S --needed tesseract tesseract-data-eng util-linux`.
   Debian/Ubuntu: `sudo apt-get install tesseract-ocr tesseract-ocr-eng util-linux`.

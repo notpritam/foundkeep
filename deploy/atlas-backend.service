@@ -5,6 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=pritam
+UMask=0077
 WorkingDirectory=/home/pritam/personal/apps/atlas/apps/backend
 Environment=ATLAS_PORT=8790
 Environment=ATLAS_DATA_DIR=/home/pritam/.local/share/atlas
