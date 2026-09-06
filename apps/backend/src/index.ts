@@ -9,7 +9,7 @@ const app = createApp(db);
 const hub = new RelayHub(db);
 const stopCustomerWorker = startCustomerWorker(db);
 
-const server = Bun.serve<ConnData, undefined>({
+const server = Bun.serve<ConnData>({
   port: config.port,
   hostname: config.hostname,
   maxRequestBodySize: 12 * 1024 * 1024,

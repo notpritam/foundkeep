@@ -6,18 +6,20 @@
 web
 
 ## Purpose and operating context
-Atlas is a Chrome extension for deliberately saving screenshots, highlights, bookmarks, images, tweets and notes, and optionally letting an external agent act on one explicitly enabled browser tab. A local searchable library retains the captured source context. The existing platform is native HTML/CSS/JavaScript with a Manifest V3 service worker; backend and MCP bridge already exist.
+Atlas is a customer capture product: save screenshots, highlights, bookmarks, images, tweets and notes, then find them in a private library. Native HTML/CSS/JavaScript, Chrome Manifest V3 extension, Bun/Hono/SQLite backend.
 
 ## Capabilities and constraints
-Captures remain in IndexedDB in this browser. Search is keyword-based, with type, tag and category filters. Optional enrichment calls a configured companion for OCR, summaries and tags. Claude Code may use remote model services even if the companion runs locally. Browser control uses a local bridge or a token-authenticated hosted relay; enabling control permits page context and actions to transit that connection. Only one tab is granted at a time.
+Customers create an email/password account, save a recovery code, install and connect the extension. New captures save locally first and automatically upload to that account. Durable retries retain account ownership. Existing local captures require explicit import consent. Website sessions and extension credentials are separate and revocable. Every customer query and image is owner scoped; legacy backend tables/APIs remain separate.
 
-Preserve existing database, settings keys, keyboard shortcuts, capture actions, extension key and control protocol. No additional permissions. No invented integrated cloud sync, semantic search, pricing, reviews or Web Store availability. Manual ZIP installation remains supported.
+Hosted organization provides extractive summaries, topic tags and English OCR using a bounded local processor. No customer agent setup is required. No semantic search, conversational assistant or email reset delivery is claimed. Search is keyword based. Local-only capture remains available. Cloud/local deletion are separate. Quotas are 1000 captures and 200 MiB per account.
+
+Preserve the existing IndexedDB database, saved records, keyboard shortcuts and signed extension key. Remove customer browser-control overlays, debugger permission and relay/token setup. Never silently upload local history or transfer a pending capture to a different account.
 
 ## Confirmed brand commitment
-The user selected Atlas Studio (option 04) combined with Operator (option 02): bold, visually creative capture story plus clear external-agent control and visible permission states. The product is being rethought across landing, popup, library and settings. The user then clarified: do not focus on the agent part. Capture, collecting and retrieval lead; existing browser control remains secondary and unchanged.
+The user selected Atlas Studio (option04) combined with Operator (option02), then asked to avoid agent focus. Studio supplies the creative visual identity; Operator supplies useful, clear product controls. Capture, collecting and retrieval lead.
 
-## Scope decision
-No agent chat, new permission workflow or control-worker changes. Existing control remains available through its existing setup; no new permissions.
+## Current scope
+The user explicitly requested a customer-facing extension/dashboard where customers create an account, set up the extension and captures flow automatically, extending the earlier approved redesign/launch. Deliver the account service, hosted dashboard, extension pairing/sync, truthful landing/privacy, and launch verification. Google sign-in is not assumed. Chrome Web Store publication depends on a publisher account and actual store approval; manual ZIP setup remains truthfully labeled until available.
 
 ## Evidence
-Prior review and five approved-choice concepts are in `../atlas-landing-2026-09-06/`. Current code and browser-harness captures establish functionality. Demo data must be labeled and isolated from user data.
+Implementation contract: docs/superpowers/plans/2026-09-06-customer-cloud.md. Customer backend security tests, extension queue tests and real Chromium signup/pair/capture/dashboard tests establish functionality. Synthetic demo content stays isolated from real accounts.

@@ -2,8 +2,9 @@
 
 The backend runs as a systemd service on omni. Caddy exposes both the production
 website and service at `https://atlas.notpritam.in`, forwarding to port 8790.
-The bb plugin uses `localhost:8790` directly. The browser extension stores its
-capture library locally; hosted browser control is an optional, separate connection.
+The bb plugin uses `localhost:8790` directly. The customer extension saves locally and syncs new captures to the connected account.
+See [customer service operations](CUSTOMER_LAUNCH.md) for account security, OCR,
+quotas, migration/backup and Chrome Web Store release requirements.
 
 ## Backend service (already installed)
 
@@ -77,10 +78,11 @@ bb plugin reload tracker
 
 ## Wiring the extension
 
-Load `apps/extension` unpacked in Chrome and pin Atlas. Capture, browse, and
-keyword search need no account or token. Optional organization is configured in
-Settings using the Atlas companion (default `http://127.0.0.1:8791`). Optional
-hosted browser control uses the relay address and account token under Advanced.
+Create a customer account on the website and save the recovery code. Install
+the extension and click Connect extension in the signed-in dashboard. New saves
+sync automatically. Local-only capture remains available. Do not mint legacy
+device tokens for customer accounts. The customer extension has no agent-control
+overlay or debugger permission.
 See [the extension guide](../apps/extension/README.md).
 
 ## Releases & auto-update (GitHub Releases)
