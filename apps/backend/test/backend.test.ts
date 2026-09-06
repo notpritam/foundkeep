@@ -10,7 +10,9 @@ const { openDb } = await import("../src/db.ts");
 const { createApp } = await import("../src/app.ts");
 const { mintDevice } = await import("../src/devices.ts");
 
-const db = openDb();
+// Another test file may have imported config already. Always select this test's
+// own DB explicitly so repeated runs cannot read an earlier run's captures.
+const db = openDb(join(process.env.ATLAS_DATA_DIR!, "atlas.db"));
 const app = createApp(db);
 const full = mintDevice(db, {
   name: "test-all",
