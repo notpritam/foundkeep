@@ -778,6 +778,12 @@ h1 {
   padding-top:75px;
 }
 
+.install-intro .local-install-choice {
+  font-size:13px;
+  line-height:1.6;
+  margin:22px 0 16px;
+}
+
 .install-intro h2 {
   font-size:clamp(44px,5.3vw,76px);
 }
