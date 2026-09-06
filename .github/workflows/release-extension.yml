@@ -38,11 +38,15 @@ jobs:
       - name: Install Chromium for browser checks
         run: bunx playwright-core install --with-deps chromium
 
+      - name: Install bounded customer OCR runtime
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng util-linux
+
       - name: Verify backend and browser flows
         run: |
           bun test
           bun run test:extension
           bun run test:web
+          bun run test:customer
 
       - name: Read extension version
         id: v

@@ -13,7 +13,6 @@ import {
   createHash,
   createPrivateKey,
   createPublicKey,
-  generateKeyPairSync,
 } from "node:crypto";
 import {
   existsSync,
@@ -48,12 +47,9 @@ const opt = (n) => {
 //    it's a file generated once and kept out of git. The key fixes the ID forever.
 mkdirSync(dirname(KEY_PATH), { recursive: true });
 if (process.env.EXTENSION_PEM_B64) {
-  writeFileSync(KEY_PATH, Buffer.from(process.env.EXTENSION_PEM_B64, "base64"));
+  writeFileSync(KEY_PATH, Buffer.from(process.env.EXTENSION_PEM_B64, "base64"), {mode:0o600});
 } else if (!existsSync(KEY_PATH)) {
-  if (process.env.CI) throw new Error("EXTENSION_PEM_B64 secret is required in CI");
-  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-  writeFileSync(KEY_PATH, privateKey.export({ type: "pkcs8", format: "pem" }));
-  console.log("• generated new signing key at deploy/keys/atlas-extension.pem");
+  throw new Error("The existing Atlas signing key is required. Refusing to create a different extension identity.");
 }
 
 // 2. Public key → manifest "key" (pins the extension ID) + the ID itself.
@@ -65,6 +61,9 @@ const manifestKey = der.toString("base64");
 const extId = [...createHash("sha256").update(der).digest().subarray(0, 16).toString("hex")]
   .map((c) => String.fromCharCode(97 + parseInt(c, 16)))
   .join("");
+if (extId !== "mjfcgmboaijfcaanepdipbgmipnccnpn") {
+  throw new Error("Signing key does not match the existing Atlas extension identity.");
+}
 
 // 3. Update manifest.json: version, key, update_url.
 const manifestPath = join(EXT_DIR, "manifest.json");
@@ -91,8 +90,9 @@ function walk(dir) {
   return out;
 }
 const files = walk(EXT_DIR)
-  .filter((f) => !f.endsWith(".DS_Store"))
-  .map((f) => relative(EXT_DIR, f));
+  .map((f) => relative(EXT_DIR, f))
+  .filter((f) => /^(?:manifest\.json|README\.md|(?:icons|assets|src)\/)/.test(f))
+  .filter((f) => !f.endsWith(".DS_Store") && !/\.(?:pem|key)$/.test(f));
 
 // 5. Sign the .crx and write updates.xml.
 mkdirSync(join(WEB_DIR, "ext"), { recursive: true });

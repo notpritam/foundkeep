@@ -63,7 +63,8 @@ data restore. Backups contain private customer data and must have mode 0600.
 `bash deploy/pack-store.sh` builds a separate store upload. It has no self-hosted
 update URL or key. The Web Store assigns its own ID, so after creating the listing,
 add its ID to `apps/web/customer-config.json` alongside the existing self-hosted
-ID. Set `storeUrl` to the approved listing's `https://chromewebstore.google.com/…`
+ID, and set `ATLAS_CUSTOMER_EXTENSION_IDS` to the store ID in the backend service
+environment, then restart it (the signed ID remains allowed). Set `storeUrl` to the approved listing's `https://chromewebstore.google.com/…`
 URL only once customers can install it. The dashboard then uses that install link.
 
 Until a publisher submits it and Google approves it, onboarding accurately offers

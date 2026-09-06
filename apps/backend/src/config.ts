@@ -7,6 +7,10 @@ export const config = {
   version: process.env.ATLAS_VERSION ?? "1.0.0",
   /** Origin used for customer cookie/CSRF checks and extension pairing. */
   customerOrigin: process.env.ATLAS_CUSTOMER_ORIGIN ?? "https://atlas.notpritam.in",
+  customerExtensionIds: [...new Set([
+    "mjfcgmboaijfcaanepdipbgmipnccnpn",
+    ...(process.env.ATLAS_CUSTOMER_EXTENSION_IDS ?? "").split(",").map(value => value.trim()).filter(value => /^[a-p]{32}$/.test(value)),
+  ])],
   /** Reverse proxy owns public TLS; bind the backend to loopback by default. */
   hostname: process.env.ATLAS_HOST ?? "127.0.0.1",
   /** Where the SQLite db + blobs live. Defaults to apps/backend/data. */

@@ -1,81 +1,87 @@
-# Chrome Web Store — Atlas submission
+# Atlas customer extension — Chrome Web Store submission
 
-Everything needed to publish Atlas to the Chrome Web Store.
+Build: `bash deploy/pack-store.sh`. Upload `deploy/dist/atlas-store-1.4.0.zip`
+to the Chrome Web Store developer dashboard. The publisher account and Google
+review are required; generating this file does not publish the extension.
 
-## Build the upload
+The store package removes `key` and `update_url`. Once assigned, add the store ID
+to `apps/web/customer-config.json` and `ATLAS_CUSTOMER_EXTENSION_IDS` on the backend.
+Keep the existing self-hosted ID alongside it. Set the public `storeUrl` only
+after the approved listing is installable.
 
-```bash
-bash deploy/pack-store.sh
-# → deploy/dist/atlas-store-<version>.zip  (no key / no update_url — store manages both)
-```
+## Listing
 
-Upload that zip in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole)
-(one-time US$5 developer registration). The store assigns its own extension id —
-different from the self-hosted id `mjfcgmboaijfcaanepdipbgmipnccnpn`.
+Name: **Atlas — Save what matters**
 
-> Keep the self-hosted flow (`pack-extension.sh`, `key`, `update_url`) for the
-> direct-download build on the landing page. The store build is separate.
+Short description (under 132 characters):
+> Save screenshots, highlights, links and notes. Connect your Atlas account to keep a private, searchable cloud library.
 
-## Listing copy
+Category: Productivity. Language: English.
 
-**Name:** Atlas — Capture to your second brain
-**Short (≤132 chars):** Save screenshots, highlights, links and notes to a private, local library — auto-organized by your own AI. No account, no tracking.
+Description:
 
-**Category:** Productivity
-**Language:** English
+Atlas gives the good things you find on the web a place to stay.
 
-**Detailed description:**
-> Atlas is a privacy-first "capture everything" tool. Grab a screenshot, highlight
-> text, bookmark a page, save a tweet, or jot a note — and Atlas files it into a
-> private library, auto-tagged and summarized by your own local Claude Code.
->
-> • Region + full-page screenshots
-> • Save highlighted text with its source
-> • One-click bookmarks and tweet saves
-> • Quick notes from the popup
-> • Auto-organized: tags, summaries, categories — computed locally
->
-> Local by default: your captures live in your browser, and enrichment runs on
-> your own machine. No account. No analytics. No data sent to us. Optionally point
-> it at your own self-hosted Atlas backend.
->
-> Open source — github.com/notpritam/atlas
+- Capture a region or a full page, save highlighted text, bookmark a link, or write a quick note.
+- Create an Atlas account and connect your browser in one click after installation.
+- New captures save on your device first and sync automatically to your private online library.
+- Search your library, filter by capture type, view original sources and collect from multiple browsers.
+- Cloud text extracts, topic tags and English screenshot text recognition run automatically.
+- Offline saves wait on your device and retry when a connection is available.
+- Export your cloud library, revoke connected browsers, or delete your account from settings.
 
-**Privacy policy URL:** https://atlas.notpritam.in/privacy.html
-**Homepage URL:** https://atlas.notpritam.in
-**Support:** github.com/notpritam/atlas/issues
+An account is optional for local capture. Previous local captures stay on the
+device unless you explicitly choose to import them into your connected account.
+Local and cloud copies are separate: deleting one does not erase the other.
 
-## Permission justifications (the store asks for each)
+Cloud accounts include up to 1,000 captures and 200 MiB of saved content.
+Save the recovery code provided at signup; Atlas does not send password-reset
+emails. Text recognition currently supports English. Organization produces text
+extracts and topic tags; it is not a conversational assistant.
 
-- **activeTab / scripting / tabs** — take the screenshot and read the selection on the current tab, only when the user triggers a capture.
-- **host permission `<all_urls>`** — the user can capture from any site they're on; the extension acts only on explicit capture, never reads pages in the background.
-- **host permission `localhost` / `127.0.0.1`** — sends captures to the user's own local Claude Code companion for private, on-device organizing.
-- **storage** — store captures and settings locally.
-- **contextMenus** — the right-click "Save to Atlas".
-- **alarms** — periodically enrich pending captures locally.
+Homepage: https://atlas.notpritam.in
+Privacy policy: https://atlas.notpritam.in/privacy.html
+Support: https://github.com/notpritam/atlas/issues
 
-Single purpose: *capture web content into the user's personal library and organize it locally.*
+## Single purpose and permissions
 
-## Assets to prepare
+Single purpose: save web content into the customer's private local or connected
+Atlas library so it can be found and used again.
 
-- Icon: 128×128 (already in `icons/icon128.png`).
-- Screenshots: 1280×800 (or 640×400), at least 1 — recommend 3–5:
-  1. The popup composer + quick-action grid
-  2. A region screenshot in progress
-  3. The dashboard/library with auto-tags
-  4. Right-click "Save to Atlas"
-- Small promo tile 440×280 (optional but recommended).
+- `activeTab`, `tabs`, `scripting`: capture the user-selected page and its source
+  information after an explicit action. Full-page screenshots require scrolling
+  and stitching the visible page.
+- `<all_urls>` host access: users can choose links, images and captures on any
+  eligible website; upload connected captures to Atlas. Optional local companion
+  access remains for customers using advanced local organization.
+- `storage`: account connection settings and the durable local upload queue.
+- `contextMenus`: explicit right-click save actions for text, links and images.
+- `alarms`: retry pending uploads and optional local organization.
+- External messaging: only the Atlas website may detect and connect the extension
+  with a short-lived, one-use pairing code. Browser credentials are never exposed
+  to the webpage.
 
-## Pre-submit checklist
+There is no browser-control debugger permission or agent control overlay in the
+customer extension.
 
-- [ ] `pack-store.sh` zip has **no** `key` and **no** `update_url` (script verifies).
-- [ ] No `.pem`/private keys in the zip (script strips them).
-- [ ] Privacy policy live at the URL above (deploy `apps/web/privacy.html` via `deploy/sync-web.sh`).
-- [ ] Description matches actual behavior; permissions all justified.
-- [ ] Version bumped in `apps/extension/manifest.json`.
-- [ ] Tested unpacked in Chrome (Load unpacked → `apps/extension`).
+## Data disclosures for the publisher
 
-## After approval
+The cloud product processes account email/name, user-saved website content,
+screenshots/images, selected text, notes, source URLs and titles. These are used
+to provide the requested private library and organization. The user chooses when
+to capture and whether to connect cloud sync. No advertising, data sale or
+cross-site behavior tracking is part of Atlas. Review the live privacy policy
+against the exact submitted build when completing the store's data-use form.
 
-- Update the landing page's install button to the Web Store link (in addition to the direct .zip).
-- Announce (ties into the Content Engine initiative #3).
+## Submission assets and verification
+
+- Icon: `apps/extension/icons/icon128.png`.
+- Prepare 1280×800 screenshots of the connected popup, the cloud library, and a
+  capture detail. Use a disposable QA account with synthetic content.
+- Test signup → connect → capture → cloud dashboard from the final store build
+  after its assigned ID has been added to the website/backend allowlists.
+- Verify the archive has no `.pem`, `.key`, `key`, or `update_url` fields, and
+  matches the final manifest permissions and privacy disclosures.
+
+Do not direct ordinary customers to managed-browser force-install policies.
+Until the store listing is approved, disclose the manual ZIP installation steps.
