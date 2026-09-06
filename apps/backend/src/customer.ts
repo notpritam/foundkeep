@@ -6,6 +6,7 @@ import { config } from "./config.ts";
 
 const DAY = 86_400_000;
 const MAX_BODY = 12 * 1024 * 1024;
+const BODY_READ_DEADLINE_MS = 30_000;
 const MAX_IMAGE = 8 * 1024 * 1024;
 const MAX_CAPTURES = 1000;
 const MAX_BYTES = 200 * 1024 * 1024;
@@ -29,7 +30,7 @@ type CustomerEnv = { Bindings: { clientIp?: string }; Variables: { customerAuth:
 type C = Context<CustomerEnv>;
 type JsonObject = Record<string, unknown>;
 class CustomerError extends Error {
-  constructor(readonly status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429 | 503, readonly code: string, message: string) { super(message); }
+  constructor(readonly status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429 | 503, readonly code: string, message: string, readonly retryAfter?: number) { super(message); }
 }
 function fail(status: CustomerError["status"], code: string, message: string): never { throw new CustomerError(status, code, message); }
 function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
@@ -75,18 +76,33 @@ async function jsonBody(c: C, max = 16_384): Promise<JsonObject> {
   if (!reader) fail(400, "invalid_json", "Send a JSON object.");
   const chunks: Uint8Array[] = [];
   let length = 0;
+  let interrupt!: (reason: CustomerError) => void;
+  const interrupted = new Promise<never>((_, reject) => { interrupt = reject; });
+  const abort = () => interrupt(new CustomerError(400, "request_aborted", "The upload was interrupted. Please try again."));
+  const deadline = setTimeout(() => interrupt(new CustomerError(503, "body_timeout", "The upload took too long. Please try again.", 3)), BODY_READ_DEADLINE_MS);
+  const signal = c.req.raw.signal;
+  signal.addEventListener("abort", abort, { once: true });
+  if (signal.aborted) abort();
   try {
     while (true) {
-      const { value, done } = await reader.read();
+      // One deadline covers the whole body; sending another byte cannot reset
+      // it and retain an upload slot indefinitely.
+      const { value, done } = await Promise.race([interrupted, reader.read()]);
       if (done) break;
       length += value.byteLength;
-      if (length > max) {
-        await reader.cancel();
-        fail(413, "request_too_large", "This request is too large.");
-      }
+      if (length > max) fail(413, "request_too_large", "This request is too large.");
       chunks.push(value);
     }
-  } finally { reader.releaseLock(); }
+  } catch (error) {
+    if (error instanceof CustomerError) throw error;
+    fail(400, "request_aborted", "The upload was interrupted. Please try again.");
+  } finally {
+    clearTimeout(deadline);
+    signal.removeEventListener("abort", abort);
+    // Cancellation must not await an uncooperative stream implementation.
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
   let body: unknown;
   try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { fail(400, "invalid_json", "Send a valid JSON object."); }
   if (!body || typeof body !== "object" || Array.isArray(body)) fail(400, "invalid_json", "Send a JSON object.");
@@ -118,6 +134,24 @@ async function passwordWork<T>(work: () => Promise<T>) {
 }
 const hashPassword = (password: string) => passwordWork(() => Bun.password.hash(password, { algorithm: "argon2id", memoryCost: 19456, timeCost: 2 }));
 const verifyPassword = (password: string, stored: string) => passwordWork(() => Bun.password.verify(password, stored));
+
+// Process-wide slots bound retained body buffers before decoding or quota
+// checks. Account entries disappear on completion, so this map is bounded too.
+let activeUploads = 0;
+const accountUploads = new Map<string, number>();
+function acquireUpload(accountId: string) {
+  const own = accountUploads.get(accountId) || 0;
+  if (own >= 2) throw new CustomerError(429, "upload_busy", "Two captures are already uploading. Please try again shortly.", 3);
+  if (activeUploads >= 8) throw new CustomerError(503, "upload_busy", "Atlas is receiving other captures. Please try again shortly.", 3);
+  activeUploads++;
+  accountUploads.set(accountId, own + 1);
+  return () => {
+    activeUploads--;
+    const remaining = accountUploads.get(accountId)! - 1;
+    if (remaining) accountUploads.set(accountId, remaining);
+    else accountUploads.delete(accountId);
+  };
+}
 
 function decodeImage(raw: unknown): { data: Buffer | null; mime: string | null; bytes: number; width: number | null; height: number | null } {
   if (raw === undefined || raw === null || raw === "") return { data: null, mime: null, bytes: 0, width: null, height: null };
@@ -239,7 +273,8 @@ export function customerRoutes(db: Database) {
 
   app.onError((error, c) => {
     if (error instanceof CustomerError) {
-      if (error.status === 429) c.header("Retry-After", "900");
+      if (error.retryAfter !== undefined) c.header("Retry-After", String(error.retryAfter));
+      else if (error.status === 429) c.header("Retry-After", "900");
       return c.json({ error: error.code, message: error.message }, error.status);
     }
     // Captured content and credentials must never be written into error logs.
@@ -497,6 +532,8 @@ export function customerRoutes(db: Database) {
   app.post("/captures", async (c) => {
     const current = auth(c);
     rates.take(`upload:${current.account.id}`, 120, 60_000);
+    const release = acquireUpload(current.account.id);
+    try {
     const body = await jsonBody(c, MAX_BODY);
     const clientId = textField(body, "clientId", 128, true)!;
     const type = textField(body, "type", 20, true)!;
@@ -538,6 +575,7 @@ export function customerRoutes(db: Database) {
       return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
     })();
     return c.json(result, result.duplicate ? 200 : 201);
+    } finally { release(); }
   });
 
   app.get("/captures/:id/blob", (c) => {

@@ -37,6 +37,17 @@ async function connect(cookie: string) {
 async function capture(credential: string, extra: Record<string, unknown> = {}) {
   return request("/captures", "POST", { clientId: crypto.randomUUID(), type: "note", noteText: "Private note", ...extra }, credential);
 }
+function heldUpload(cookie: string, target = app) {
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  let cancelled = false;
+  const signal = new AbortController();
+  const body = new ReadableStream<Uint8Array>({
+    start(value) { controller = value; controller.enqueue(new TextEncoder().encode('{"noteText":"')); },
+    cancel() { cancelled = true; },
+  });
+  const response = target.request(`${ORIGIN}/api/captures`, { method: "POST", headers: { origin: ORIGIN, cookie, "content-type": "application/json" }, body, signal: signal.signal });
+  return { response, signal, controller, isCancelled: () => cancelled, close() { try { controller.close(); } catch {} } };
+}
 
 describe("customer account security", () => {
   test("register hashes secrets, sets a protected cookie and persists a private account", async () => {
@@ -194,6 +205,59 @@ describe("customer account security", () => {
 });
 
 describe("private customer captures", () => {
+  test("only two uploads per account can retain request bodies, with slots released after invalid bodies", async () => {
+    const a = await register();
+    const held = [heldUpload(a.cookie), heldUpload(a.cookie)];
+    try {
+      const response = await capture(a.cookie);
+      expect(response.status).toBe(429);
+      expect(Number(response.headers.get("retry-after"))).toBeLessThanOrEqual(5);
+    } finally { held.forEach((value) => value.close()); await Promise.all(held.map((value) => value.response)); }
+    expect((await capture(a.cookie, { type: "invalid" })).status).toBe(400);
+    expect((await capture(a.cookie)).status).toBe(201);
+  });
+
+  test("eight retained upload bodies exhaust the process-wide limit across app instances and accounts", async () => {
+    const owners = [];
+    for (let index = 0; index < 5; index++) owners.push(await register());
+    const held = owners.slice(0,4).flatMap((owner) => [heldUpload(owner.cookie), heldUpload(owner.cookie)]);
+    try {
+      const response = await createApp(db).request(`${ORIGIN}/api/captures`, { method: "POST", headers: { origin: ORIGIN, cookie: owners[4].cookie, "content-type": "application/json" }, body: JSON.stringify({ clientId: "extra-process-upload", type: "note" }) });
+      expect(response.status).toBe(503);
+      expect(Number(response.headers.get("retry-after"))).toBeLessThanOrEqual(5);
+      held[0]!.close();
+      await held[0]!.response;
+      expect((await capture(owners[4].cookie)).status).toBe(201);
+    } finally { held.forEach((value) => value.close()); await Promise.all(held.map((value) => value.response)); }
+  });
+
+  test("an aborted streamed upload releases its slot without saving partial data", async () => {
+    const a = await register();
+    const held = [heldUpload(a.cookie), heldUpload(a.cookie)];
+    try {
+      held[0]!.signal.abort();
+      expect((await held[0]!.response).status).toBe(400);
+      expect(held[0]!.isCancelled()).toBe(true);
+      expect((await capture(a.cookie)).status).toBe(201);
+      expect((db.query("SELECT COUNT(*) n FROM customer_captures").get() as any).n).toBe(1);
+    } finally { held.forEach((value) => value.close()); await Promise.all(held.map((value) => value.response)); }
+  });
+
+  test("a slow body has an absolute thirty-second deadline even when another chunk arrives", async () => {
+    const a = await register();
+    const held = heldUpload(a.cookie);
+    const extra = setTimeout(() => held.controller.enqueue(new TextEncoder().encode("still sending")), 15_000);
+    const started = performance.now();
+    try {
+      const response = await held.response;
+      expect(response.status).toBe(503);
+      expect(response.headers.get("retry-after")).toBe("3");
+      expect(performance.now() - started).toBeLessThan(34_000);
+      expect(held.isCancelled()).toBe(true);
+      expect((await capture(a.cookie)).status).toBe(201);
+    } finally { clearTimeout(extra); held.close(); await held.response; }
+  }, 35_000);
+
   test("tenant-scopes list, search, detail, blobs, delete, exports and ignores submitted ownership/enrichment", async () => {
     const a = await register();
     const b = await register();
