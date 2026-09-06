@@ -2,23 +2,19 @@
   "manifest_version": 3,
   "name": "Atlas Capture",
   "version": "1.3.0",
-  "description": "Keep screenshots, highlights, links, images and notes in your browser. Find them again with a visual library and keyword search.",
+  "description": "Keep screenshots, highlights, links and notes. Connect your Atlas account to sync new captures, with a local library available offline.",
   "permissions": [
     "activeTab",
     "scripting",
     "contextMenus",
     "storage",
     "tabs",
-    "alarms",
-    "debugger"
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>",
     "http://localhost/*",
-    "http://127.0.0.1/*",
-    "ws://localhost/*",
-    "ws://127.0.0.1/*",
-    "wss://*/*"
+    "http://127.0.0.1/*"
   ],
   "icons": {
     "16": "icons/icon16.png",
@@ -40,25 +36,14 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "*://x.com/*",
-        "*://twitter.com/*"
-      ],
-      "js": [
-        "src/twitter.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "src/agent-control.js"
-      ],
+      "matches": ["*://x.com/*", "*://twitter.com/*"],
+      "js": ["src/twitter.js"],
       "run_at": "document_idle"
     }
   ],
+  "externally_connectable": {
+    "matches": ["https://atlas.notpritam.in/*"]
+  },
   "commands": {
     "region-screenshot": {
       "suggested_key": {

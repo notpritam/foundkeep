@@ -17,8 +17,8 @@
       <main class="popup-main">
         <div class="intro">
           <h1>Found something good?</h1>
-          <p>Keep it close.</p>
         </div>
+        <div id="cloudSummary"></div>
         <div class="current-page">
           <span class="page-icon" data-icon="bookmark"></span>
           <div>
@@ -49,7 +49,7 @@
           ><textarea
             id="note"
             rows="2"
-            maxlength="100000"
+            maxlength="50000"
             placeholder="What’s worth remembering?"
           ></textarea>
           <div class="composer-foot">
@@ -71,6 +71,8 @@
       <footer class="popup-foot">
         <button id="openLib" class="library-link">
           Open library <span data-icon="arrow"></span></button
+        ><button id="openLocalLib" class="cloud-text-button" hidden>
+          Local library</button
         ><button id="openSettings" class="iconbtn" aria-label="Settings">
           <span data-icon="settings"></span>
         </button>

@@ -34,7 +34,7 @@ body {
   border: 1px solid var(--line);
   border-radius: 7px;
   padding: 11px;
-  margin-top: 20px;
+  margin-top: 12px;
 }
 .current-page > div {
   min-width: 0;
@@ -85,8 +85,8 @@ body {
   height: 19px;
 }
 .composer {
-  margin-top: 20px;
-  padding-top: 18px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
 }
 .composer > label {

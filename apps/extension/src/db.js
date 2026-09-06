@@ -1,5 +1,6 @@
 // Local-first store. Every capture (and its blob) lives in IndexedDB on the
-// user's machine — nothing is sent to a server. Shared by the background worker
+// user's machine. Connected captures also carry a durable cloud outbox binding.
+// Shared by the background worker
 // and the dashboard (both run in the extension context, same origin => same DB).
 
 const DB_NAME = "atlas";
@@ -38,6 +39,39 @@ function reqToPromise(request) {
   });
 }
 
+// Request success is not transaction success: quota, shutdown, or a later
+// abort can still roll back the write. Never acknowledge a save before commit.
+async function write(operation) {
+  const store = await tx("readwrite");
+  const transaction = store.transaction;
+  const completed = new Promise((resolve, reject) => {
+    transaction.oncomplete = resolve;
+    transaction.onabort = () =>
+      reject(
+        transaction.error ||
+          new DOMException("The capture could not be committed.", "AbortError"),
+      );
+    transaction.onerror = () =>
+      reject(
+        transaction.error || new Error("The capture could not be stored."),
+      );
+  });
+  completed.catch(() => {});
+  try {
+    const result = await operation(store);
+    await completed;
+    return result;
+  } catch (error) {
+    try {
+      transaction.abort();
+    } catch {
+      /* already finished */
+    }
+    await completed.catch(() => {});
+    throw error;
+  }
+}
+
 function newId() {
   return `cap_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -45,10 +79,18 @@ function newId() {
 /** Insert a capture. `input` carries the client fields; server-ish fields are set here. */
 export async function addCapture(input) {
   const now = Date.now();
+  const id = newId();
   const rec = {
-    id: newId(),
+    id,
     type: input.type,
-    status: "pending",
+    status: input.cloudAccountId ? "done" : "pending",
+    cloudAccountId: input.cloudAccountId || null,
+    cloudClientId: id,
+    cloudType: input.cloudType || null,
+    cloudStatus: input.cloudAccountId ? "queued" : "local",
+    cloudError: null,
+    cloudAttempts: 0,
+    cloudNextRetryAt: 0,
     sourceUrl: input.sourceUrl ?? null,
     sourceTitle: input.sourceTitle ?? null,
     faviconUrl: input.faviconUrl ?? null,
@@ -74,9 +116,10 @@ export async function addCapture(input) {
     updatedAt: now,
     enrichedAt: null,
   };
-  const store = await tx("readwrite");
-  await reqToPromise(store.add(rec));
-  return rec;
+  return write(async (store) => {
+    await reqToPromise(store.add(rec));
+    return rec;
+  });
 }
 
 export async function getCapture(id) {
@@ -85,24 +128,33 @@ export async function getCapture(id) {
 }
 
 export async function updateCapture(id, patch) {
-  const store = await tx("readwrite");
-  const rec = await reqToPromise(store.get(id));
-  if (!rec) return null;
-  Object.assign(rec, patch, { updatedAt: Date.now() });
-  await reqToPromise(store.put(rec));
-  return rec;
+  return updateWhere(id, patch, () => true);
+}
+async function updateWhere(id, patch, allowed) {
+  return write(async (store) => {
+    const rec = await reqToPromise(store.get(id));
+    if (!rec || !allowed(rec)) return null;
+    Object.assign(rec, patch, { updatedAt: Date.now() });
+    await reqToPromise(store.put(rec));
+    return rec;
+  });
+}
+export function updateLocalCapture(id, patch) {
+  return updateWhere(id, patch, (record) => !record.cloudAccountId);
 }
 
 export async function deleteCapture(id) {
-  const store = await tx("readwrite");
-  await reqToPromise(store.delete(id));
-  return true;
+  return write(async (store) => {
+    await reqToPromise(store.delete(id));
+    return true;
+  });
 }
 
 export async function clearAll() {
-  const store = await tx("readwrite");
-  await reqToPromise(store.clear());
-  return true;
+  return write(async (store) => {
+    await reqToPromise(store.clear());
+    return true;
+  });
 }
 
 async function getAll() {
@@ -111,7 +163,14 @@ async function getAll() {
 }
 
 /** List with in-memory filtering (fine at personal scale; no server FTS needed). */
-export async function listCaptures({ type, status, tag, category, q, limit = 500 } = {}) {
+export async function listCaptures({
+  type,
+  status,
+  tag,
+  category,
+  q,
+  limit = 500,
+} = {}) {
   let rows = await getAll();
   rows.sort((a, b) => b.createdAt - a.createdAt);
   if (type) rows = rows.filter((r) => r.type === type);
@@ -145,14 +204,25 @@ export async function listCaptures({ type, status, tag, category, q, limit = 500
 export async function pendingCaptures(limit = 5) {
   const rows = await getAll();
   return rows
-    .filter((r) => r.status === "pending" || (r.status === "failed" && r.enrichAttempts < 4))
+    .filter(
+      (r) =>
+        !r.cloudAccountId &&
+        (r.status === "pending" ||
+          (r.status === "failed" && r.enrichAttempts < 4)),
+    )
     .sort((a, b) => a.createdAt - b.createdAt)
     .slice(0, limit);
 }
 
 export async function counts() {
   const rows = await getAll();
-  const by = { total: rows.length, pending: 0, processing: 0, done: 0, failed: 0 };
+  const by = {
+    total: rows.length,
+    pending: 0,
+    processing: 0,
+    done: 0,
+    failed: 0,
+  };
   for (const r of rows) by[r.status] = (by[r.status] || 0) + 1;
   return by;
 }
@@ -165,6 +235,9 @@ export async function facets() {
     for (const t of r.tags || []) tags.set(t, (tags.get(t) || 0) + 1);
     if (r.category) cats.set(r.category, (cats.get(r.category) || 0) + 1);
   }
-  const sort = (m) => [...m.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  const sort = (m) =>
+    [...m.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
   return { tags: sort(tags), categories: sort(cats) };
 }

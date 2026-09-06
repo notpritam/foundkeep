@@ -1,10 +1,22 @@
 import * as db from "./db.js";
 import { $, title, domain, ago, icon, hydrateIcons, message } from "./ui.js";
 import { bindConnections } from "./connections.js";
+import { bindCloud } from "./cloud-ui.js";
+import { CUSTOMER_ORIGIN } from "./cloud.js";
 hydrateIcons();
 let blobUrls = [],
   saving = false;
 const settings = bindConnections($("connections"));
+let cloudState = null;
+const cloud = bindCloud($("cloudSummary"), {
+  compact: true,
+  onStatus: (state) => {
+    cloudState = state;
+    $("openLib").innerHTML =
+      (state.account ? "Open dashboard" : "Open library") + " " + icon("arrow");
+    $("openLocalLib").hidden = !state.account;
+  },
+});
 async function openLibrary(id) {
   try {
     await chrome.tabs.create({
@@ -116,7 +128,20 @@ for (const button of document.querySelectorAll("[data-act]"))
       );
     }
   };
-$("openLib").onclick = () => openLibrary();
+$("openLib").onclick = () =>
+  cloudState?.account
+    ? chrome.tabs
+        .create({ url: CUSTOMER_ORIGIN + "/dashboard.html" })
+        .then(() => window.close())
+        .catch(() =>
+          message(
+            $("saveFeedback"),
+            "Could not open Atlas. Your local library is still available.",
+            "error",
+          ),
+        )
+    : openLibrary();
+$("openLocalLib").onclick = () => openLibrary();
 $("brandLibrary").onclick = (e) => {
   e.preventDefault();
   openLibrary();
@@ -133,8 +158,13 @@ $("backBtn").onclick = () => {
   $("openSettings").focus();
 };
 chrome.runtime.onMessage.addListener((m) => {
-  if (m.kind === "atlas-changed") renderRecent().catch(() => {});
+  if (m.kind === "atlas-changed") {
+    renderRecent().catch(() => {});
+    cloud.load();
+    if (!$("view-settings").hidden) settings.refreshCloud();
+  }
 });
+window.addEventListener("focus", () => cloud.load());
 window.addEventListener("pagehide", () =>
   blobUrls.forEach(URL.revokeObjectURL),
 );
@@ -154,6 +184,7 @@ async function init() {
         .forEach((b) => (b.disabled = true));
     }
     await renderRecent();
+    await cloud.load();
   } catch {
     message(
       $("saveFeedback"),

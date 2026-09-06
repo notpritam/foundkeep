@@ -394,3 +394,72 @@ dialog::backdrop {
 .fine[data-tone="error"] {
   color: var(--bad);
 }
+.cloud-panel {
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+.cloud-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.cloud-heading strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 550;
+}
+.cloud-heading .btn {
+  flex-shrink: 0;
+  padding: 8px 11px;
+  font-size: 12px;
+}
+.cloud-panel .fine {
+  margin-top: 9px;
+  line-height: 1.6;
+}
+.cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.cloud-actions:has(> :not([hidden])) {
+  margin-top: 10px;
+}
+.cloud-text-button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 3px 0;
+  font-size: 11px;
+  cursor: pointer;
+}
+.cloud-text-button:hover {
+  color: var(--ink);
+}
+.cloud-panel .notice {
+  margin-top: 12px;
+}
+.cloud-panel .statusline:not(:empty) {
+  margin-top: 10px;
+}
+.cloud-panel.compact {
+  padding: 10px 0 0;
+  border: 0;
+}
+.cloud-panel.compact .cloud-heading strong {
+  font-size: 11px;
+}
+.cloud-panel.compact .fine {
+  font-size: 11px;
+  margin-top: 6px;
+}
+#localCompanion form {
+  margin-top: 16px;
+}
+#localCompanion .fine {
+  margin-top: 10px;
+}

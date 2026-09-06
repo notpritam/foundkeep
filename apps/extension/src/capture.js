@@ -4,10 +4,15 @@
 import * as db from "./db.js";
 import { agentEnrich, agentHealth } from "./agent.js";
 import { getSettings } from "./storage.js";
+import {
+  captureBinding,
+  drainCloudQueue,
+  startLocalOrganization,
+} from "./cloud.js";
 
 /** Save a capture locally and kick off a drain attempt. */
 export async function saveCapture(input) {
-  const rec = await db.addCapture(input);
+  const rec = await db.addCapture({ ...input, ...(await captureBinding()) });
   drainQueue().catch(() => {});
   broadcast();
   return rec;
@@ -37,9 +42,13 @@ let draining = false;
 /** Try to enrich a batch of pending captures via the local agent. Safe to call
  *  often; no-ops when the agent is offline or the queue is empty. */
 export async function drainQueue() {
+  // Cloud has its own single-flight queue. A slow optional local companion
+  // must never hold new customer captures behind its long-running request.
+  await drainCloudQueue();
   if (draining) return;
   draining = true;
   try {
+    if ((await captureBinding()).cloudAccountId) return;
     const { agentUrl, enrichEnabled } = await getSettings();
     if (!enrichEnabled) return;
 
@@ -52,8 +61,10 @@ export async function drainQueue() {
     } catch {
       return;
     }
+    if ((await captureBinding()).cloudAccountId) return;
 
-    for (const r of pending) await db.updateCapture(r.id, { status: "processing" });
+    for (const r of pending)
+      await db.updateLocalCapture(r.id, { status: "processing" });
 
     const items = [];
     for (const r of pending) {
@@ -62,7 +73,8 @@ export async function drainQueue() {
         type: r.type,
         sourceTitle: r.sourceTitle,
         sourceUrl: r.sourceUrl,
-        text: r.selectionText || r.noteText || r.articleText || r.sourceTitle || "",
+        text:
+          r.selectionText || r.noteText || r.articleText || r.sourceTitle || "",
       };
       if (r.blob && (r.type === "screenshot" || r.type === "image")) {
         item.imageBase64 = await blobToBase64(r.blob);
@@ -73,10 +85,19 @@ export async function drainQueue() {
 
     let results;
     try {
-      results = await agentEnrich(agentUrl, items);
+      const operation = await startLocalOrganization(
+        pending.map((r) => r.id),
+        () => agentEnrich(agentUrl, items),
+      );
+      if (!operation) {
+        for (const r of pending)
+          await db.updateLocalCapture(r.id, { status: "pending" });
+        return;
+      }
+      results = await operation.result;
     } catch (e) {
       for (const r of pending) {
-        await db.updateCapture(r.id, {
+        await db.updateLocalCapture(r.id, {
           status: "failed",
           enrichError: String(e).slice(0, 300),
           enrichAttempts: (r.enrichAttempts || 0) + 1,
@@ -89,13 +110,13 @@ export async function drainQueue() {
     for (const r of pending) {
       const en = byId.get(r.id);
       if (!en || en.error) {
-        await db.updateCapture(r.id, {
+        await db.updateLocalCapture(r.id, {
           status: "failed",
           enrichError: en?.error || "no result",
           enrichAttempts: (r.enrichAttempts || 0) + 1,
         });
       } else {
-        await db.updateCapture(r.id, {
+        await db.updateLocalCapture(r.id, {
           status: "done",
           ocrText: en.ocrText ?? r.ocrText,
           description: en.description ?? null,

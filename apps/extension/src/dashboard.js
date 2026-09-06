@@ -269,7 +269,17 @@ async function openDetail(id, opener) {
   if (c.articleText) body.append(detailField("Saved page text", c.articleText));
   if (c.ocrText) body.append(detailField("Recognized text", c.ocrText));
   const { enrichEnabled } = await getSettings();
-  if (enrichEnabled && c.status !== "done")
+  if (c.cloudAccountId)
+    body.append(
+      detailField(
+        "Account sync",
+        c.cloudStatus === "synced"
+          ? "Saved to your Atlas account. Open the dashboard for its organized version."
+          : c.cloudError ||
+              "Saved in this browser and waiting to sync to its connected account.",
+      ),
+    );
+  if (!c.cloudAccountId && enrichEnabled && c.status !== "done")
     body.append(
       detailField(
         "Optional organization",
@@ -295,7 +305,12 @@ $("overlay").addEventListener("close", () => {
   history.replaceState(null, "", location.pathname + location.search);
 });
 $("deleteCapture").onclick = async () => {
-  if (!activeCapture || !confirm("Delete this capture? This cannot be undone."))
+  if (
+    !activeCapture ||
+    !confirm(
+      "Delete this capture from this browser? Its account copy, if synced, stays in your dashboard. This local deletion cannot be undone.",
+    )
+  )
     return;
   try {
     await db.deleteCapture(activeCapture.id);
@@ -376,7 +391,13 @@ $("noteForm").addEventListener("submit", async (e) => {
   noteSaving = true;
   $("saveLibraryNote").disabled = true;
   try {
-    await db.addCapture({ type: "note", noteText: text });
+    const response = await chrome.runtime.sendMessage({
+      kind: "saveNote",
+      text,
+      source: "library",
+    });
+    if (!response?.ok)
+      throw new Error(response?.error || "Could not save this note.");
     if ($("libraryNote").value === draft) {
       $("libraryNote").value = "";
       $("noteDialog").close();
@@ -428,7 +449,10 @@ document.addEventListener("keydown", (e) => {
   }
 });
 chrome.runtime.onMessage.addListener((m) => {
-  if (m.kind === "atlas-changed") load();
+  if (m.kind === "atlas-changed") {
+    load();
+    if ($("settings").open) connectionSettings.refreshCloud();
+  }
 });
 window.addEventListener("focus", load);
 window.addEventListener("pagehide", () => {

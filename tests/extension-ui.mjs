@@ -51,6 +51,17 @@ async function pageWithExtension(t, { saveFails = false } = {}) {
         agentUrl: "http://127.0.0.1:8791",
       };
       window.close = () => {};
+      window.__cloudStatus = {
+        account: null,
+        status: "disconnected",
+        pending: 0,
+        failed: 0,
+        synced: 0,
+        localOnly: 0,
+        otherAccount: 0,
+        error: null,
+      };
+      window.__imports = [];
       window.chrome = {
         storage: {
           local: {
@@ -65,14 +76,27 @@ async function pageWithExtension(t, { saveFails = false } = {}) {
           getURL: (p) => "http://atlas.test/" + p,
           onMessage: { addListener: () => {}, removeListener: () => {} },
           sendMessage: async (m) => {
+            if (m.kind === "cloud-status")
+              return { ok: true, ...window.__cloudStatus };
+            if (m.kind === "cloud-import") {
+              window.__imports.push(m);
+              return { ok: true, imported: window.__cloudStatus.localOnly };
+            }
+            if (m.kind === "cloud-retry") return { ok: true };
+            if (m.kind === "cloud-disconnect") {
+              window.__cloudStatus.account = null;
+              window.__cloudStatus.status = "disconnected";
+              return { ok: true };
+            }
             if (m.kind === "saveNote") {
               if (saveFails) return { ok: false, error: "Disk full" };
               const db = await import("/src/db.js");
               await db.addCapture({
                 type: "note",
                 noteText: m.text,
-                sourceTitle: "Sample article",
-                sourceUrl: "https://example.com/article",
+                sourceTitle: m.source === "library" ? null : "Sample article",
+                sourceUrl:
+                  m.source === "library" ? null : "https://example.com/article",
               });
               return { ok: true };
             }
@@ -262,15 +286,13 @@ test("keyboard focus survives filtering, refreshing an open detail, and closing 
     "settingsBtn",
   );
 });
-test("settings changes persist and browser-control remains under advanced setup", async (t) => {
+test("optional local settings persist and customer setup has no browser-control token inputs", async (t) => {
   const page = await pageWithExtension(t);
   await page.goto("http://atlas.test/src/dashboard.html");
   await page.locator("#settingsBtn").click();
-  await page.waitForFunction(() =>
-    document.querySelector("#agentBox").textContent.includes("off"),
-  );
-  assert.equal(await page.locator("#relayUrl").isVisible(), false);
-  await page.getByText("Set up the companion", { exact: true }).click();
+  assert.equal(await page.locator("#relayUrl").count(), 0);
+  assert.equal(await page.locator("#relayToken").count(), 0);
+  await page.getByText("Advanced: local companion", { exact: true }).click();
   await page.locator("#agentUrl").fill("https://example.com/companion");
   await page.locator("#saveSettings").click();
   await page.waitForFunction(
@@ -285,6 +307,72 @@ test("settings changes persist and browser-control remains under advanced setup"
     "https://example.com/companion",
   );
   assert.equal(await page.locator("#enrichEnabled").isChecked(), false);
+});
+test("popup offers real account connection and preserves a local-library fallback while offline", async (t) => {
+  const page = await pageWithExtension(t);
+  await page.goto("http://atlas.test/src/popup.html");
+  await page.locator("#popup-cloudAction").click();
+  assert.equal(
+    await page.evaluate(() => window.__opened),
+    "https://atlas.notpritam.in/dashboard.html",
+  );
+  await page.evaluate(() => {
+    window.__cloudStatus = {
+      account: { id: "account-a", email: "alice@example.test", name: "Alice" },
+      status: "reconnect",
+      pending: 2,
+      failed: 0,
+      localOnly: 1,
+      synced: 0,
+      otherAccount: 0,
+      error: "Reconnect this browser to resume syncing.",
+    };
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.waitForFunction(() =>
+    document
+      .querySelector("#popup-cloudAction")
+      .textContent.includes("Reconnect"),
+  );
+  assert.match(
+    await page.locator("#popup-cloudStatus").textContent(),
+    /Reconnect/,
+  );
+  await page.locator("#openLocalLib").click();
+  assert.equal(
+    await page.evaluate(() => window.__opened),
+    "http://atlas.test/src/dashboard.html",
+  );
+});
+test("historical import requires explicit confirmation showing the destination account", async (t) => {
+  const page = await pageWithExtension(t);
+  await page.goto("http://atlas.test/src/dashboard.html");
+  await page.evaluate(() => {
+    window.__cloudStatus = {
+      account: { id: "account-a", email: "alice@example.test", name: "Alice" },
+      status: "connected",
+      pending: 0,
+      failed: 0,
+      synced: 0,
+      localOnly: 3,
+      otherAccount: 2,
+      error: null,
+    };
+  });
+  await page.locator("#settingsBtn").click();
+  await page.locator("#cloudImport").click();
+  assert.match(
+    await page.locator("#cloudImportText").textContent(),
+    /alice@example.test/,
+  );
+  assert.equal(await page.evaluate(() => __imports.length), 0);
+  await page.locator("#cloudImportCancel").click();
+  assert.equal(await page.evaluate(() => __imports.length), 0);
+  await page.locator("#cloudImport").click();
+  await page.locator("#cloudImportConfirm").click();
+  assert.deepEqual(await page.evaluate(() => __imports), [
+    { kind: "cloud-import", confirmed: true, accountId: "account-a" },
+  ]);
 });
 test("mobile retains tag filtering and popup keeps Open library within Chrome height limit", async (t) => {
   const page = await pageWithExtension(t);
@@ -308,6 +396,12 @@ test("mobile retains tag filtering and popup keeps Open library within Chrome he
   assert.ok(
     b.y + b.height <= 600,
     "Library shortcut must remain within the 600px Chrome action popup",
+  );
+  const saveButton = await page.locator("#save").boundingBox();
+  const footer = await page.locator(".popup-foot").boundingBox();
+  assert.ok(
+    saveButton.y + saveButton.height <= footer.y,
+    "Quick-note save remains visible above the popup footer",
   );
 });
 test("new library note saves and deletion requires confirmation", async (t) => {

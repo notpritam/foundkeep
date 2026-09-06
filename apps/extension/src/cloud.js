@@ -1,0 +1,429 @@
+// Customer credentials and a durable, account-bound outbox. Only the background
+// worker calls mutating operations; pages ask it for a credential-free status.
+import * as db from "./db.js";
+
+export const CUSTOMER_ORIGIN = "https://atlas.notpritam.in";
+const STATE_KEY = "atlasCustomer";
+let draining = null;
+let mutations = Promise.resolve();
+let pairingSequence = 0;
+
+function exclusive(action) {
+  const result = mutations.then(action, action);
+  mutations = result.catch(() => {});
+  return result;
+}
+function announce() {
+  try {
+    chrome.runtime.sendMessage({ kind: "atlas-changed" }).catch(() => {});
+  } catch {
+    /* no open view */
+  }
+}
+async function readState() {
+  return (await chrome.storage.local.get(STATE_KEY))[STATE_KEY] || null;
+}
+async function writeState(state) {
+  await chrome.storage.local.set({ [STATE_KEY]: state });
+  announce();
+}
+const sameConnection = (a, b) =>
+  !!a &&
+  !!b &&
+  a.account.id === b.account.id &&
+  a.connection.id === b.connection.id &&
+  a.token === b.token;
+async function updateConnection(expected, patch) {
+  return exclusive(async () => {
+    const current = await readState();
+    if (sameConnection(current, expected))
+      await writeState({ ...current, ...patch });
+  });
+}
+function publicAccount(account) {
+  return account
+    ? {
+        id: account.id,
+        email: account.email,
+        name: account.name,
+        createdAt: account.createdAt,
+      }
+    : null;
+}
+export async function protectCloudStorage() {
+  // This also protects legacy connection settings from content-script access.
+  await chrome.storage.local.setAccessLevel?.({
+    accessLevel: "TRUSTED_CONTEXTS",
+  });
+}
+async function revokeCredential(previous) {
+  if (!previous?.token) return { revoked: true, warning: null };
+  try {
+    const response = await fetch(
+      CUSTOMER_ORIGIN + "/api/connections/disconnect",
+      {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: { Authorization: "Bearer " + previous.token },
+        signal: AbortSignal.timeout(3000),
+      },
+    );
+    if (response.ok || response.status === 401)
+      return { revoked: true, warning: null };
+  } catch {
+    /* Local disconnect is immediate even when revocation is offline. */
+  }
+  return {
+    revoked: false,
+    warning:
+      "The previous browser credential could not be revoked. Remove it from Connected browsers in your Atlas dashboard.",
+  };
+}
+export function trustedPairingSender(sender) {
+  try {
+    return (
+      !sender?.id &&
+      (sender.frameId === undefined || sender.frameId === 0) &&
+      new URL(sender.url).origin === CUSTOMER_ORIGIN &&
+      (sender.origin === undefined || sender.origin === CUSTOMER_ORIGIN)
+    );
+  } catch {
+    return false;
+  }
+}
+export async function handleExternalMessage(message, sender) {
+  if (!trustedPairingSender(sender))
+    return { ok: false, error: "This page cannot connect Atlas." };
+  if (message?.kind === "atlas-ping") {
+    const state = await readState();
+    return {
+      ok: true,
+      version: chrome.runtime.getManifest().version,
+      account:
+        state?.token && state.status !== "reconnect"
+          ? publicAccount(state.account)
+          : null,
+    };
+  }
+  if (
+    message?.kind !== "atlas-connect" ||
+    Object.keys(message).some((k) => !["kind", "code"].includes(k)) ||
+    typeof message.code !== "string" ||
+    !/^[a-zA-Z0-9_-]{32,256}$/.test(message.code)
+  ) {
+    return { ok: false, error: "Request a new connection code from Atlas." };
+  }
+  const sequence = ++pairingSequence;
+  try {
+    await protectCloudStorage();
+    const response = await fetch(CUSTOMER_ORIGIN + "/api/pairing/claim", {
+      method: "POST",
+      credentials: "omit",
+      redirect: "error",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: message.code, name: "Chrome browser" }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const result = await response.json();
+    if (!response.ok)
+      return {
+        ok: false,
+        error:
+          result.message ||
+          "This connection code expired. Try connecting again.",
+      };
+    if (
+      !result.account?.id ||
+      !result.account.email ||
+      !result.connection?.id ||
+      typeof result.token !== "string" ||
+      !result.token ||
+      result.token.length > 4096
+    ) {
+      return {
+        ok: false,
+        error: "Atlas returned an incomplete connection. Try again.",
+      };
+    }
+    let previous, next;
+    const connected = await exclusive(async () => {
+      if (sequence !== pairingSequence)
+        return {
+          ok: false,
+          error: "A newer connection request replaced this one.",
+        };
+      previous = await readState();
+      next = {
+        account: publicAccount(result.account),
+        connection: result.connection,
+        token: result.token,
+        status: "connected",
+        error: null,
+      };
+      await writeState(next);
+      return { ok: true, account: publicAccount(result.account) };
+    });
+    if (!connected.ok) {
+      // A slower claim can finish after a newer request. Its credential was
+      // never installed and must not linger as an unused connected browser.
+      await revokeCredential({ token: result.token });
+      return connected;
+    }
+    if (connected.ok && previous?.token && previous.token !== next.token) {
+      const revoked = await revokeCredential(previous);
+      if (revoked.warning) {
+        await updateConnection(next, { notice: revoked.warning });
+        return { ...connected, warning: revoked.warning };
+      }
+    }
+    return connected;
+  } catch {
+    return {
+      ok: false,
+      error: "Could not reach Atlas. Check your connection and try again.",
+    };
+  }
+}
+
+/** Snapshot the selected account at save time, even while its token needs renewal. */
+export async function captureBinding() {
+  const state = await readState();
+  return { cloudAccountId: state?.account?.id || null };
+}
+export async function getCloudStatus() {
+  const [state, records] = await Promise.all([
+    readState(),
+    db.listCaptures({ limit: Infinity }),
+  ]);
+  const own = records.filter(
+    (r) => r.cloudAccountId && r.cloudAccountId === state?.account?.id,
+  );
+  const pending = own.filter((r) => r.cloudStatus === "queued").length;
+  const failed = own.filter((r) => r.cloudStatus === "failed");
+  return {
+    account: publicAccount(state?.account),
+    status: state?.status || "disconnected",
+    pending,
+    failed: failed.length,
+    synced: own.filter((r) => r.cloudStatus === "synced").length,
+    localOnly: records.filter((r) => !r.cloudAccountId).length,
+    otherAccount: records.filter(
+      (r) => r.cloudAccountId && r.cloudAccountId !== state?.account?.id,
+    ).length,
+    error: state?.error || failed[0]?.cloudError || null,
+    notice: state?.notice || null,
+  };
+}
+export async function disconnectCloud() {
+  pairingSequence++;
+  const previous = await exclusive(async () => {
+    const state = await readState();
+    await writeState(null);
+    return state;
+  });
+  return revokeCredential(previous);
+}
+
+/** Serialize the final local-only check and request dispatch with pairing and
+ * import. Return the in-flight promise inside an object so the lock is released
+ * immediately after dispatch, not after the companion's potentially long work. */
+export function startLocalOrganization(ids, start) {
+  return exclusive(async () => {
+    if ((await readState())?.account) return null;
+    for (const id of ids) {
+      const record = await db.getCapture(id);
+      if (!record || record.cloudAccountId) return null;
+    }
+    return { result: start() };
+  });
+}
+export async function importLocalCaptures({ confirmed, accountId } = {}) {
+  if (confirmed !== true || !accountId)
+    throw new Error("Confirm which account will receive these local captures.");
+  return exclusive(async () => {
+    const current = await readState();
+    if (!current?.token || current.account.id !== accountId)
+      throw new Error("The account changed. Reopen import and confirm again.");
+    const records = await db.listCaptures({ limit: Infinity });
+    let imported = 0;
+    for (const record of records) {
+      if (record.cloudAccountId) continue;
+      await db.updateCapture(record.id, {
+        cloudAccountId: accountId,
+        cloudClientId: record.cloudClientId || record.id,
+        cloudStatus: "queued",
+        cloudError: null,
+        cloudAttempts: 0,
+        cloudNextRetryAt: 0,
+        status: "done",
+      });
+      imported++;
+    }
+    announce();
+    return { imported };
+  });
+}
+async function uploadBody(record) {
+  let sourceUrl = null;
+  try {
+    const url = new URL(record.sourceUrl);
+    if (
+      ["http:", "https:"].includes(url.protocol) &&
+      !url.username &&
+      !url.password
+    )
+      sourceUrl = url.href;
+  } catch {
+    /* Notes on browser pages have no public source URL. */
+  }
+  const body = {
+    clientId: record.cloudClientId || record.id,
+    type:
+      record.cloudType ||
+      (record.type === "highlight" ? "selection" : record.type),
+    sourceUrl,
+    sourceTitle: record.sourceTitle,
+    selectionText: record.selectionText,
+    noteText: record.noteText,
+    articleText: record.articleText,
+    width: record.width,
+    height: record.height,
+    capturedAt: record.capturedAt,
+  };
+  if (record.blob) {
+    if (record.blob.size > 8 * 1024 * 1024)
+      throw new Error(
+        "This image exceeds the 8 MiB upload limit. It is still saved in this browser.",
+      );
+    const bytes = new Uint8Array(await record.blob.arrayBuffer());
+    let text = "";
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    body.dataUrl = `data:${record.blob.type || record.blobMime || "image/png"};base64,${btoa(text)}`;
+  }
+  return body;
+}
+async function drain() {
+  // Serial uploads bound memory and make retries/restarts safe. A persisted
+  // record remains queued until acknowledgement, so an interrupted request
+  // always retries the same account/clientId pair.
+  for (let n = 0; n < 10; n++) {
+    const connection = await readState();
+    if (!connection?.token || connection.status === "reconnect") return;
+    const records = await db.listCaptures({ limit: Infinity });
+    const record = records
+      .reverse()
+      .find(
+        (r) =>
+          r.cloudAccountId === connection.account.id &&
+          r.cloudStatus === "queued" &&
+          (!r.cloudNextRetryAt || r.cloudNextRetryAt <= Date.now()),
+      );
+    if (!record) return;
+    let body;
+    try {
+      body = await uploadBody(record);
+    } catch (error) {
+      await db.updateCapture(record.id, {
+        cloudStatus: "failed",
+        cloudError: error.message,
+      });
+      announce();
+      continue;
+    }
+    // Blob conversion yields. Never use a newly selected account's credential
+    // for this record, and stop an obsolete request before sending it.
+    if (!sameConnection(connection, await readState())) continue;
+    if (!(await db.getCapture(record.id))) continue;
+    try {
+      const response = await fetch(CUSTOMER_ORIGIN + "/api/captures", {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + connection.token,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        await updateConnection(connection, {
+          token: null,
+          status: "reconnect",
+          error:
+            "Reconnect this browser to resume syncing. Your captures are safe locally.",
+        });
+        announce();
+        continue;
+      }
+      if (!response.ok) {
+        const error = new Error(
+          result.message ||
+            `Atlas could not sync this capture (${response.status}).`,
+        );
+        error.permanent =
+          response.status >= 400 &&
+          response.status < 500 &&
+          response.status !== 429;
+        throw error;
+      }
+      if (!result.capture?.id)
+        throw new Error(
+          "Atlas did not confirm the upload. It will be retried safely.",
+        );
+      await db.updateCapture(record.id, {
+        cloudStatus: "synced",
+        cloudRemoteId: result.capture.id,
+        cloudEnrichmentStatus: result.capture.status,
+        cloudError: null,
+        cloudNextRetryAt: 0,
+        status: "done",
+      });
+      await updateConnection(connection, { status: "connected", error: null });
+    } catch (error) {
+      const attempts = (record.cloudAttempts || 0) + 1;
+      const detail = error.permanent
+        ? error.message
+        : "Could not reach Atlas. Saved in this browser; sync will retry automatically.";
+      await db.updateCapture(record.id, {
+        cloudStatus: error.permanent ? "failed" : "queued",
+        cloudError: detail,
+        cloudAttempts: attempts,
+        cloudNextRetryAt:
+          Date.now() + Math.min(300000, 15000 * 2 ** Math.min(attempts - 1, 5)),
+      });
+      await updateConnection(connection, { error: detail });
+      // Connectivity failures affect the whole batch. Do not hammer the API.
+      if (!error.permanent) return;
+    } finally {
+      announce();
+    }
+  }
+}
+export function drainCloudQueue() {
+  if (!draining)
+    draining = drain().finally(() => {
+      draining = null;
+    });
+  return draining;
+}
+export async function retryCloudSync() {
+  const connection = await readState();
+  if (!connection?.token) return;
+  for (const record of await db.listCaptures({ limit: Infinity })) {
+    if (
+      record.cloudAccountId === connection.account.id &&
+      ["queued", "failed"].includes(record.cloudStatus)
+    ) {
+      await db.updateCapture(record.id, {
+        cloudStatus: "queued",
+        cloudNextRetryAt: 0,
+        cloudError: null,
+      });
+    }
+  }
+  return drainCloudQueue();
+}

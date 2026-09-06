@@ -1,11 +1,37 @@
 import { drainQueue, saveCapture } from "./capture.js";
-import "./control-bg.js"; // agent-control bridge (WebSocket → Atlas Browser MCP)
+import {
+  protectCloudStorage,
+  handleExternalMessage,
+  getCloudStatus,
+  importLocalCaptures,
+  retryCloudSync,
+  disconnectCloud,
+} from "./cloud.js";
+
+protectCloudStorage().catch(() => {});
+chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
+  handleExternalMessage(msg, sender)
+    .then((result) => {
+      respond(result);
+      if (result.ok && msg.kind === "atlas-connect")
+        retryCloudSync().catch(() => {});
+    })
+    .catch(() =>
+      respond({
+        ok: false,
+        error: "Atlas could not complete this connection. Please try again.",
+      }),
+    );
+  return true;
+});
 
 // ---------------------------------------------------------------------------
 // Feedback: a short badge flash (no notifications permission needed).
 // ---------------------------------------------------------------------------
 async function flash(ok, label) {
-  await chrome.action.setBadgeBackgroundColor({ color: ok ? "#c63b23" : "#d03b3b" });
+  await chrome.action.setBadgeBackgroundColor({
+    color: ok ? "#c63b23" : "#d03b3b",
+  });
   await chrome.action.setBadgeText({ text: ok ? "✓" : "!" });
   if (!ok && label) console.error("[atlas]", label);
   setTimeout(() => chrome.action.setBadgeText({ text: "" }), 1500);
@@ -31,8 +57,12 @@ chrome.runtime.onInstalled.addListener(() => {
     for (const m of MENUS) chrome.contextMenus.create(m);
   });
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
+  drainQueue().catch(() => {});
 });
-chrome.runtime.onStartup?.addListener(() => drainQueue().catch(() => {}));
+chrome.runtime.onStartup?.addListener(() => {
+  chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
+  drainQueue().catch(() => {});
+});
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === "atlas-drain") drainQueue().catch(() => {});
 });
@@ -41,7 +71,11 @@ chrome.alarms.onAlarm.addListener((a) => {
 // Context menus
 // ---------------------------------------------------------------------------
 const MENUS = [
-  { id: "save-selection", title: "Save selection to Atlas", contexts: ["selection"] },
+  {
+    id: "save-selection",
+    title: "Save selection to Atlas",
+    contexts: ["selection"],
+  },
   { id: "save-link", title: "Save link to Atlas", contexts: ["link"] },
   { id: "save-image", title: "Save image to Atlas", contexts: ["image"] },
   { id: "savepage", title: "Save page as bookmark", contexts: ["page"] },
@@ -81,10 +115,56 @@ chrome.commands.onCommand.addListener(async (command) => {
 // ---------------------------------------------------------------------------
 // Messages from popup / content scripts
 // ---------------------------------------------------------------------------
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.kind?.startsWith("cloud-")) {
+    // Content scripts and websites cannot read credentials, disconnect an
+    // account, or authorize a historical import through the internal channel.
+    if (
+      sender.id !== chrome.runtime.id ||
+      !sender.url?.startsWith(chrome.runtime.getURL("src/"))
+    ) {
+      sendResponse({
+        ok: false,
+        error: "Open Atlas to manage this connection.",
+      });
+      return;
+    }
+    (async () => {
+      try {
+        if (msg.kind === "cloud-status")
+          return sendResponse({ ok: true, ...(await getCloudStatus()) });
+        if (msg.kind === "cloud-import") {
+          const result = await importLocalCaptures({
+            confirmed: msg.confirmed,
+            accountId: msg.accountId,
+          });
+          sendResponse({ ok: true, ...result });
+          drainQueue().catch(() => {});
+          return;
+        }
+        if (msg.kind === "cloud-retry") {
+          retryCloudSync().catch(() => {});
+          return sendResponse({ ok: true });
+        }
+        if (msg.kind === "cloud-disconnect") {
+          return sendResponse({ ok: true, ...(await disconnectCloud()) });
+        }
+        sendResponse({ ok: false, error: "Unknown Atlas request." });
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          error: error.message || "Please try again.",
+        });
+      }
+    })();
+    return true;
+  }
   if (msg?.kind === "capture") {
     (async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       if (!tab) return;
       try {
         await performCapture(msg.action, { tab });
@@ -101,6 +181,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         const p = msg.payload;
         await saveCapture({
           type: "highlight",
+          cloudType: "tweet",
           sourceUrl: p.url,
           sourceTitle: p.title,
           selectionText: p.text,
@@ -116,14 +197,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg?.kind === "saveNote") {
     (async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       try {
         await saveCapture({
           type: "note",
           noteText: msg.text,
-          sourceUrl: tab?.url,
-          sourceTitle: tab?.title,
-          faviconUrl: tab?.favIconUrl,
+          sourceUrl: msg.source === "library" ? null : tab?.url,
+          sourceTitle: msg.source === "library" ? null : tab?.title,
+          faviconUrl: msg.source === "library" ? null : tab?.favIconUrl,
           capturedAt: Date.now(),
         });
         sendResponse({ ok: true });
@@ -153,7 +237,9 @@ async function performCapture(action, { tab, info }) {
     case "savepage":
       return saveCapture(pageMeta(tab, { type: "bookmark" }));
     case "save-selection":
-      return saveCapture(pageMeta(tab, { type: "highlight", selectionText: info.selectionText }));
+      return saveCapture(
+        pageMeta(tab, { type: "highlight", selectionText: info.selectionText }),
+      );
     case "save-link":
       return saveCapture({
         type: "bookmark",
@@ -184,7 +270,9 @@ async function saveHighlight(tab) {
       if (sel && sel.rangeCount) {
         const node = sel.getRangeAt(0).commonAncestorContainer;
         const el = node.nodeType === 1 ? node : node.parentElement;
-        paragraph = (el?.closest("p,li,article,section,div")?.innerText || "").slice(0, 1000);
+        paragraph = (
+          el?.closest("p,li,article,section,div")?.innerText || ""
+        ).slice(0, 1000);
       }
       return { text, paragraph };
     },
@@ -209,7 +297,9 @@ async function regionScreenshot(tab) {
   });
   if (!result) return;
   const { rect, dpr } = result;
-  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
+  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+    format: "png",
+  });
   const blob = await cropDataUrl(dataUrl, rect, dpr);
   return saveCapture(
     pageMeta(tab, {
@@ -236,33 +326,68 @@ function regionSelectInPage() {
       "position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:2147483647;font:600 13px -apple-system,system-ui,sans-serif;color:#fff;background:rgba(17,16,22,0.82);padding:7px 14px;border-radius:999px;pointer-events:none";
     overlay.appendChild(box);
     document.body.append(overlay, hint);
-    let sx = 0, sy = 0, dragging = false;
-    const cleanup = () => { overlay.remove(); hint.remove(); };
-    overlay.addEventListener("mousedown", (e) => { dragging = true; sx = e.clientX; sy = e.clientY; });
+    let sx = 0,
+      sy = 0,
+      dragging = false;
+    const cleanup = () => {
+      overlay.remove();
+      hint.remove();
+    };
+    overlay.addEventListener("mousedown", (e) => {
+      dragging = true;
+      sx = e.clientX;
+      sy = e.clientY;
+    });
     overlay.addEventListener("mousemove", (e) => {
       if (!dragging) return;
-      const x = Math.min(sx, e.clientX), y = Math.min(sy, e.clientY);
-      box.style.left = x + "px"; box.style.top = y + "px";
+      const x = Math.min(sx, e.clientX),
+        y = Math.min(sy, e.clientY);
+      box.style.left = x + "px";
+      box.style.top = y + "px";
       box.style.width = Math.abs(e.clientX - sx) + "px";
       box.style.height = Math.abs(e.clientY - sy) + "px";
     });
     overlay.addEventListener("mouseup", (e) => {
       dragging = false;
-      const x = Math.min(sx, e.clientX), y = Math.min(sy, e.clientY);
-      const w = Math.abs(e.clientX - sx), h = Math.abs(e.clientY - sy);
+      const x = Math.min(sx, e.clientX),
+        y = Math.min(sy, e.clientY);
+      const w = Math.abs(e.clientX - sx),
+        h = Math.abs(e.clientY - sy);
       cleanup();
       if (w < 5 || h < 5) return resolve(null);
       resolve({ rect: { x, y, w, h }, dpr });
     });
-    window.addEventListener("keydown", (e) => { if (e.key === "Escape") { cleanup(); resolve(null); } }, { once: true });
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape") {
+          cleanup();
+          resolve(null);
+        }
+      },
+      { once: true },
+    );
   });
 }
 
 async function cropDataUrl(dataUrl, rect, dpr) {
   const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
-  const w = Math.round(rect.w * dpr), h = Math.round(rect.h * dpr);
+  const w = Math.round(rect.w * dpr),
+    h = Math.round(rect.h * dpr);
   const canvas = new OffscreenCanvas(w, h);
-  canvas.getContext("2d").drawImage(bmp, Math.round(rect.x * dpr), Math.round(rect.y * dpr), w, h, 0, 0, w, h);
+  canvas
+    .getContext("2d")
+    .drawImage(
+      bmp,
+      Math.round(rect.x * dpr),
+      Math.round(rect.y * dpr),
+      w,
+      h,
+      0,
+      0,
+      w,
+      h,
+    );
   return canvas.convertToBlob({ type: "image/webp", quality: 0.92 });
 }
 
@@ -272,23 +397,34 @@ async function cropDataUrl(dataUrl, rect, dpr) {
 const MAX_PAGE_PX = 15000;
 
 async function fullPageScreenshot(tab) {
-  const [{ result: dims }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: prepFullPage });
+  const [{ result: dims }] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: prepFullPage,
+  });
   const totalH = Math.min(dims.totalHeight, MAX_PAGE_PX);
   const shots = [];
   try {
     for (let y = 0; y < totalH; y += dims.viewH) {
       const [{ result: actualY }] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (yy) => { window.scrollTo(0, yy); return window.scrollY; },
+        func: (yy) => {
+          window.scrollTo(0, yy);
+          return window.scrollY;
+        },
         args: [y],
       });
       await sleep(500);
-      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
+      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: "png",
+      });
       shots.push({ y: actualY, dataUrl });
       if (actualY + dims.viewH >= totalH) break;
     }
   } finally {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: restoreFullPage });
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: restoreFullPage,
+    });
   }
   const blob = await stitch(shots, dims, totalH);
   return saveCapture(
@@ -328,10 +464,15 @@ function restoreFullPage() {
 }
 
 async function stitch(shots, dims, totalH) {
-  const canvas = new OffscreenCanvas(Math.round(dims.viewW * dims.dpr), Math.round(totalH * dims.dpr));
+  const canvas = new OffscreenCanvas(
+    Math.round(dims.viewW * dims.dpr),
+    Math.round(totalH * dims.dpr),
+  );
   const ctx = canvas.getContext("2d");
   for (const shot of shots) {
-    const bmp = await createImageBitmap(await (await fetch(shot.dataUrl)).blob());
+    const bmp = await createImageBitmap(
+      await (await fetch(shot.dataUrl)).blob(),
+    );
     ctx.drawImage(bmp, 0, Math.round(shot.y * dims.dpr));
   }
   return canvas.convertToBlob({ type: "image/webp", quality: 0.9 });

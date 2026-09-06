@@ -1,15 +1,22 @@
 # Atlas Capture — browser extension (Chrome MV3)
 
-Keep screenshots, highlights, links, images, and notes in a local visual library.
-No account or companion is required to capture, browse, or search. No build step.
+Keep screenshots, highlights, links, images, and notes. Connect your Atlas account to sync new captures to a private dashboard, with a local library available offline.
 
 ## Install or update
 
 1. Extract the extension ZIP into a folder you can keep, or use this `apps/extension` directory.
 2. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the folder containing `manifest.json`.
-3. Pin Atlas from Chrome’s extensions menu. Open the popup to capture a page or write a note.
+3. Pin Atlas from Chrome’s extensions menu.
 
-To update an existing unpacked installation, replace the files in its existing folder and click **Reload** in `chrome://extensions`. Keep the existing installation to retain its local library. Uninstalling removes extension data.
+To update an existing unpacked installation, replace its files in the existing folder and click **Reload**. Keep the existing installation to retain the local library. Uninstalling removes extension data. Managed installations can receive signed updates.
+
+## Connect your account
+
+Choose **Connect Atlas** in the popup, create an account or sign in at [Atlas](https://atlas.notpritam.in/dashboard.html), then connect this browser from the dashboard. The website hands the extension a short-lived, one-use connection code. No developer token or companion setup is required.
+
+New captures made while an account is selected are saved locally and queued for that account. Atlas retries automatically after network failures. **Try sync again** requests an immediate retry; **Reconnect** appears if the browser credential expires or is revoked. Captures remain available locally throughout.
+
+Existing local captures are never uploaded automatically. To include them, open **Settings → Import local captures**, review the destination account, then confirm. Switching accounts never moves captures or pending uploads between accounts. Reconnecting the original account resumes its pending captures.
 
 ## Capture
 
@@ -18,34 +25,38 @@ To update an existing unpacked installation, replace the files in its existing f
 - **Keyboard:** `Alt+Shift+S` captures a region, `Alt+Shift+F` a full page, and `Alt+Shift+H` selected text. Change assignments at `chrome://extensions/shortcuts`.
 - **X / Twitter:** the Atlas button in a tweet’s action bar saves the author, text, and permalink.
 
-Page capture requires a normal web page. Chrome restricts capture on internal browser pages and certain protected pages.
+Page capture requires a normal web page. Chrome restricts capture on internal browser pages and certain protected pages. Notes can still be saved there. Cloud uploads allow images up to 8 MiB; larger images remain local with an actionable sync error.
 
-## Your library
+## Your libraries
 
-Choose **Open library** in the popup. Browse visual captures, filter by type, tag, or category, sort by date, and search by keyword. Open a capture to read its saved content or return to its source. Create a note directly in the library with **New note**.
+**Open dashboard** opens the private account library, including organized text and screenshots. **Local library** opens captures stored in this browser: browse, filter, sort, search by keyword, open details, or create a note. Local library notes follow the same account binding and sync queue as popup captures.
 
-Captures and images are stored in IndexedDB in this browser profile. There is no automatic cloud sync. **Settings → Export metadata** downloads text, links, and metadata as JSON; it does not include image files and is not a complete backup.
+Local copies remain in IndexedDB. Deleting a local copy does not delete a synced account copy; use the account dashboard to manage that copy. Local **Export metadata** includes text and metadata but not image files, so it is not a complete backup. The account dashboard has its own export and account-deletion controls.
 
-## Optional organization
+You can also use Atlas without an account. Disconnected captures stay local until you explicitly import them. Disconnecting keeps existing pending captures assigned to their original account. Manage and revoke connected browsers in your account dashboard.
 
-In **Settings**, turn on **Organize automatically** to use the Atlas companion for OCR, summaries, and tags. Open **Set up the companion** for its address and startup command:
+## Optional local organization
+
+When no account is selected, **Settings → Advanced: local companion** retains the optional companion for local-only captures:
 
 ```sh
 npx @notpritam/atlas-agent
 ```
 
-The default companion address is `http://127.0.0.1:8791`. It needs your Claude Code connection. Save settings to apply changes. If the companion is unavailable, captures remain saved and wait for organization.
+The default address is `http://127.0.0.1:8791`. The companion uses your Claude Code connection; its model provider may process capture content remotely. Saving and keyword search work without it. Connected account captures use Atlas’s organization service and are never sent to this companion.
 
-Organization sends capture content to your configured companion. Its model provider may process that content remotely. Running the companion locally does not mean all processing stays on your computer.
-
-## Advanced browser control
-
-Existing local bridge and hosted relay settings are available under **Settings → Advanced: browser control**. Set a `ws://` or `wss://` relay address and account token for a hosted connection, or leave the relay address blank to use the local bridge. Enable the on-page Agent button to grant access to an individual tab. Control is separate from the capture library.
+The customer extension does not activate the legacy browser-control integration or request the debugger permission.
 
 ## Development checks
 
-From the repository root, run `bun install --ignore-scripts`, install Chromium with `bunx playwright-core install chromium`, then run `bun run test:extension`.
+From the repository root:
 
-For an existing browser installation, set `CHROMIUM_PATH` to the Chromium executable. `PLAYWRIGHT_MODULE` can point to an existing `playwright-core` module. The tests use temporary browser profiles and synthetic captures.
+```sh
+bun install --frozen-lockfile --ignore-scripts
+bunx playwright-core install chromium
+bun run test:extension
+```
 
-Run `node scripts/preview-server.mjs` for the sample website and library preview on port 9048. Demo fixtures stay outside the packaged extension.
+Tests use temporary browser profiles and synthetic captures. Queue tests use real IndexedDB with controlled storage and API transport. The real MV3 smoke test uses Playwright’s Chromium channel. `CHROMIUM_PATH` can select an existing Chromium executable.
+
+Run `node scripts/preview-server.mjs`; the website is at `/apps/web/` and the sample library at `/apps/extension/src/dashboard.html` on port 9048. Preview fixtures stay outside the packaged extension. Customer pairing is available only from the production Atlas origin; integration tests rewrite a temporary extension copy for a loopback backend.
