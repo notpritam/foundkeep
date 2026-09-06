@@ -1,8 +1,9 @@
 # Deploying Atlas on omni
 
-The backend runs as a systemd service on omni; a Cloudflare Tunnel exposes it at
-`atlas.notpritam.in` for the browser extension. The **bb plugin talks to the
-backend over `localhost:8790`**, so it does not depend on the tunnel.
+The backend runs as a systemd service on omni. Caddy exposes both the production
+website and service at `https://atlas.notpritam.in`, forwarding to port 8790.
+The bb plugin uses `localhost:8790` directly. The browser extension stores its
+capture library locally; hosted browser control is an optional, separate connection.
 
 ## Backend service (already installed)
 
@@ -50,8 +51,10 @@ needed.
    firewall is attached, allow inbound 80 + 443 there too.
 3. **caddy** (already installed):
    ```bash
-   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
-   sudo systemctl enable --now caddy
+   # Add only the Atlas block from deploy/Caddyfile to the shared config.
+   # Preserve blocks belonging to other services.
+   sudo caddy validate --config /etc/caddy/Caddyfile
+   sudo systemctl reload caddy
    sudo journalctl -u caddy -f      # watch the cert get issued
    ```
 
@@ -74,12 +77,17 @@ bb plugin reload tracker
 
 ## Wiring the extension
 
-Load `apps/extension` unpacked in Chrome, then in the popup Settings enter
-`https://atlas.notpritam.in` and the **ingest** token.
+Load `apps/extension` unpacked in Chrome and pin Atlas. Capture, browse, and
+keyword search need no account or token. Optional organization is configured in
+Settings using the Atlas companion (default `http://127.0.0.1:8791`). Optional
+hosted browser control uses the relay address and account token under Advanced.
+See [the extension guide](../apps/extension/README.md).
 
 ## Releases & auto-update (GitHub Releases)
 
-The extension auto-updates from **GitHub Releases** — no manual re-download ever.
+Managed installations update from **GitHub Releases** using the policy below.
+Unpacked installations are updated by replacing files in their existing folder
+and clicking Reload; do not uninstall them if you want to retain their library.
 
 - Extension ID: `mjfcgmboaijfcaanepdipbgmipnccnpn` (pinned by the signing key).
 - Update manifest: `https://github.com/notpritam/atlas/releases/latest/download/updates.xml`
@@ -88,15 +96,16 @@ The extension auto-updates from **GitHub Releases** — no manual re-download ev
 ### Cutting a release
 
 Automatic: bump `apps/extension/manifest.json` `version`, push to `main`, and the
-**Release extension** GitHub Action signs the `.crx`, writes `updates.xml`, and
-publishes a `ext-v<version>` release. Chrome picks it up within ~5h (or via
+**Release extension** GitHub Action first runs backend, installed-extension,
+and landing browser checks. It then signs the `.crx`, writes `updates.xml`, and
+publishes an `ext-v<version>` release. A missing signing secret fails the job. Managed Chrome installations check for updates periodically (or via
 `chrome://extensions` → Update).
 
 Manual from omni (needs `gh auth login` once):
 
 ```bash
-bun run release:publish          # bump patch, sign, and publish the release
-# or: node deploy/release-extension.mjs --version 0.4.0 --publish
+node deploy/release-extension.mjs --no-bump --publish
+# Set the intended manifest version and push its commit before publishing.
 ```
 
 ### One-time setup
@@ -121,3 +130,20 @@ bun run release:publish          # bump patch, sign, and publish the release
 
    Verify at `chrome://policy` (Reload policies) and `chrome://extensions` — Atlas
    installs itself and can't be removed by hand. That's the "force update" behavior.
+
+## Deploying a tested site revision
+
+The production checkout is `/home/pritam/personal/apps/atlas` on `main`. Keep it
+clean, record its current commit, verify the release branch, then fast-forward
+main to that branch and push it. Static files are served directly; no backend or
+Caddy restart is needed for website changes. Preserve the runtime data directory.
+
+Verify `/`, `/privacy.html`, `/atlas-extension.zip`, `/healthz`, and
+`/assets/atlas-social.png` over public HTTPS after deployment. Wait for the
+GitHub release job, then check the released update manifest has the intended
+version and extension ID. Local signed builds also refresh the legacy direct
+`/ext/atlas-extension.crx` and `/updates.xml` routes.
+
+Run `ATLAS_SITE_URL=https://atlas.notpritam.in bun run test:web` to exercise the
+public landing demo, download, artwork, metadata, and mobile layout. These
+checks never access private captures or account APIs.

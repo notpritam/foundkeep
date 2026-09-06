@@ -1,35 +1,27 @@
-# Atlas — landing page
+# Atlas — website
 
-A static, zero-build marketing site (`index.html` + `styles.css` + `app.js` +
-`assets/`). Deploy anywhere that serves static files.
+The production landing page is live at **https://atlas.notpritam.in/**. It is static HTML, CSS, JavaScript, and self-hosted assets; there is no build step.
 
-## Local preview
+## Production
 
-```bash
-cd apps/web
-python3 -m http.server 4321   # or: bunx serve .
+The `atlas-backend` systemd service serves `apps/web` directly from the main repository checkout. Caddy forwards `atlas.notpritam.in` to that service on port 8790. Updating the main checkout deploys site files immediately. Do not deploy the marketing site to a separate hostname or replace the shared Caddyfile.
+
+## Preview and test
+
+From the repository root:
+
+```sh
+node scripts/preview-server.mjs
+bun run test:web
 ```
 
-## Deploy to Vercel
+Open `http://localhost:9048/apps/web/` for the landing page or
+`http://localhost:9048/apps/extension/src/dashboard.html` for the sample library. The demo runtime is not part of `apps/web` or the extension download.
 
-```bash
-cd apps/web
-vercel deploy --prod
-```
+`ATLAS_SITE_URL=https://atlas.notpritam.in bun run test:web` verifies the live landing page with the same browser checks. It exercises only public pages, downloads, and the illustrative demo.
 
-`vercel.json` sets clean URLs + long-lived caching for `/assets`. Point a
-subdomain (e.g. `get.notpritam.in`) at it — note `atlas.notpritam.in` is the
-API backend, so the marketing site needs its own hostname.
+## Downloads and artwork
 
-## Extension download
+`bash deploy/pack-extension.sh` refreshes `atlas-extension.zip` from the current extension source. The signed CRX and update manifest are built by the GitHub release workflow; see [release instructions](../../deploy/README.md).
 
-The landing page's "Download the extension" button serves
-`atlas-extension.zip` from this folder (no GitHub redirect). Regenerate it after
-changing the extension:
-
-```bash
-../../deploy/pack-extension.sh
-```
-
-The zip unpacks to an `atlas-extension/` folder ready for
-`chrome://extensions` → Developer mode → **Load unpacked**.
+`bun run prepare:web-assets` encodes responsive WebP images from the retained original artwork and renders the 1200×630 social preview. It requires Playwright Chromium. Social and canonical metadata, robots.txt, and sitemap.xml point to the production domain.

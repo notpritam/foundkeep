@@ -27,7 +27,22 @@ jobs:
         with:
           bun-version: latest
 
-      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Require the existing extension signing key
+        if: env.HAS_KEY != 'true'
+        run: |
+          echo "The EXTENSION_PEM secret is required to publish Atlas updates."
+          exit 1
+
+      - name: Install Chromium for browser checks
+        run: bunx playwright-core install --with-deps chromium
+
+      - name: Verify backend and browser flows
+        run: |
+          bun test
+          bun run test:extension
+          bun run test:web
 
       - name: Read extension version
         id: v

@@ -27,6 +27,7 @@ test(
     let context;
     try {
       context = await chromium.launchPersistentContext(profile, {
+        channel: "chromium",
         headless: true,
         executablePath: process.env.CHROMIUM_PATH || undefined,
         args: [

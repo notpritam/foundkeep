@@ -21,7 +21,11 @@ http
       let url = decodeURIComponent(
         new URL(req.url, "http://localhost").pathname,
       );
-      if (url === "/") url = "/apps/web/";
+      if (url === "/") {
+        res.writeHead(302, { Location: "/apps/web/" });
+        res.end();
+        return;
+      }
       if (url.endsWith("/")) url += "index.html";
       if (url === "/__preview/runtime.js") url = "/scripts/preview/runtime.js";
       if (

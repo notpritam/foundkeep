@@ -50,7 +50,9 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "<all_urls>"
+      ],
       "js": [
         "src/agent-control.js"
       ],

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /v1/
+Disallow: /admin/
+Disallow: /invite/
+Disallow: /redeem
+
+Sitemap: https://atlas.notpritam.in/sitemap.xml

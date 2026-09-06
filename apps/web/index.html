@@ -9,12 +9,22 @@
   <meta property="og:title" content="Atlas — Found it? Keep it." />
   <meta property="og:description" content="Screenshots, highlights and stray ideas. One local library for the things that catch your eye." />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://atlas.notpritam.in" />
+  <meta property="og:url" content="https://atlas.notpritam.in/" />
+  <link rel="canonical" href="https://atlas.notpritam.in/" />
+  <meta property="og:site_name" content="Atlas" />
+  <meta property="og:image" content="https://atlas.notpritam.in/assets/atlas-social.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Atlas — Found it? Keep it. A library for screenshots, highlights and ideas." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Atlas — Found it? Keep it." />
+  <meta name="twitter:description" content="Screenshots, highlights and stray ideas. One local library for your next good find." />
+  <meta name="twitter:image" content="https://atlas.notpritam.in/assets/atlas-social.png" />
   <link rel="icon" href="assets/studio-mark.svg" type="image/svg+xml" />
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/ClarityCity-Bold.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/geist-latin.woff2" crossorigin />
-  <link rel="stylesheet" href="styles.css" />
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=1.3.0" />
+  <script src="app.js?v=1.3.0" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -33,7 +43,7 @@
           <span class="hero-note">A Chrome extension. Saved in your browser.</span>
         </div>
         <div class="capture-collage" aria-label="Illustrative collection of an architectural image, a design note and a highlight beside the Atlas extension">
-          <figure class="architecture"><img src="assets/studio-architecture.png" width="1536" height="1024" alt="Sunlit concrete stairway beside an olive tree and a vermilion doorway" fetchpriority="high" /><span class="capture-corner corner-tl"></span><span class="capture-corner corner-tr"></span><span class="capture-corner corner-bl"></span><span class="capture-corner corner-br"></span></figure>
+          <figure class="architecture"><picture><source type="image/webp" srcset="assets/studio-architecture-640.webp 640w, assets/studio-architecture-1024.webp 1024w" sizes="(max-width: 600px) 45vw, (max-width: 1100px) 40vw, 340px" /><img src="assets/studio-architecture.png" width="1536" height="1024" alt="Sunlit concrete stairway beside an olive tree and a vermilion doorway" fetchpriority="high" /></picture><span class="capture-corner corner-tl"></span><span class="capture-corner corner-tr"></span><span class="capture-corner corner-bl"></span><span class="capture-corner corner-br"></span></figure>
           <div class="type-specimen" aria-hidden="true">Good<br />things<br /><span>are worth<br />keeping.</span></div>
           <figure class="highlight-specimen"><blockquote><mark>Keep the visual<br />details you want<br />to return to.</mark></blockquote><figcaption>Sample highlight</figcaption></figure>
           <figure class="popup-shot"><img src="assets/extension-popup.png" width="380" height="600" alt="Atlas extension with screenshot, highlight, bookmark and note capture actions" /><figcaption>Atlas extension · sample collection</figcaption></figure>
@@ -78,11 +88,12 @@
     </section>
 
     <section class="install-section wrap section" id="how" aria-labelledby="install-heading">
-      <div class="install-intro" id="get"><h2 id="install-heading">Keep the next<br /><span>good thing.</span></h2><p>Add Atlas to Chrome.<br />Your first collection starts with your next find.</p><a class="button" href="atlas-extension.zip" download="atlas-extension.zip">Download Atlas <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4" /></svg></a><span class="download-note">Chrome extension · ZIP · manual installation</span></div>
+      <div class="install-intro" id="get"><h2 id="install-heading">Keep the next<br /><span>good thing.</span></h2><p>Add Atlas to Chrome.<br />Your first collection starts with your next find.</p><a class="button" href="atlas-extension.zip" download="atlas-extension.zip">Download Atlas <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4" /></svg></a><span class="download-note">v1.3.0 · Chrome extension · ZIP</span></div>
       <ol class="install-steps"><li><div><h3>Download and unzip.</h3><p>Extract the ZIP into a folder you can keep. Chrome will load the extension from that folder.</p></div></li><li><div><h3>Load it in Chrome.</h3><p>Open <code>chrome://extensions</code>, switch on <strong>Developer mode</strong>, then choose <strong>Load unpacked</strong> and select the extracted folder.</p><button class="copy-button" id="copyExtensions" type="button">Copy extensions address <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4" /></svg></button><span class="copy-status" id="copyStatus" role="status"></span></div></li><li><div><h3>Pin Atlas. Save something.</h3><p>Open Chrome’s extensions menu and pin Atlas. Try a screenshot, save a highlight, or write yourself a note.</p></div></li></ol>
     </section>
 
     <section class="faq-section wrap section" aria-labelledby="faq-heading"><h2 id="faq-heading">A few useful details.</h2><div class="faq-list">
+      <details><summary>Already using Atlas?<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14" /></svg></summary><p>For an unpacked installation, replace the extension files in your existing folder, then click <strong>Reload</strong> at <code>chrome://extensions</code>. Keep your existing installation to retain its library. If your browser uses Atlas’s managed installation, it can receive the signed update automatically. <a href="https://github.com/notpritam/atlas/releases/latest" target="_blank" rel="noreferrer">See the latest release.</a></p></details>
       <details><summary>Where do my captures live?<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14" /></svg></summary><p>Atlas stores captures in IndexedDB in the browser where you installed it. There is no automatic cloud sync. Optional enrichment sends content to your configured companion; its model provider may process that content remotely. <a href="privacy.html">Read about data handling.</a></p></details>
       <details><summary>Do I need an account or an AI companion?<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14" /></svg></summary><p>You can capture, browse and search your local library without an account or a companion. A companion is optional and adds OCR, summaries and tags.</p></details>
       <details><summary>Can I use keyboard shortcuts?<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14" /></svg></summary><p>Yes. The suggested shortcuts are <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> for a region screenshot, <kbd>F</kbd> instead of S for a full-page screenshot, and <kbd>H</kbd> for a highlight. Check or change assigned shortcuts at <code>chrome://extensions/shortcuts</code>; your browser or operating system may reserve some combinations.</p></details>
