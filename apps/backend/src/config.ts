@@ -5,6 +5,10 @@ export const config = {
   port: Number(process.env.ATLAS_PORT ?? 8787),
   /** Service version, surfaced by the public /healthz probe. */
   version: process.env.ATLAS_VERSION ?? "1.0.0",
+  /** Origin used for customer cookie/CSRF checks and extension pairing. */
+  customerOrigin: process.env.ATLAS_CUSTOMER_ORIGIN ?? "https://atlas.notpritam.in",
+  /** Reverse proxy owns public TLS; bind the backend to loopback by default. */
+  hostname: process.env.ATLAS_HOST ?? "127.0.0.1",
   /** Where the SQLite db + blobs live. Defaults to apps/backend/data. */
   dataDir:
     process.env.ATLAS_DATA_DIR ??
