@@ -312,6 +312,70 @@ describe("customer extension preferences", () => {
 });
 
 describe("private customer captures", () => {
+  test("preserves bounded provenance and processing choices without trusting unsafe origins", async () => {
+    const owner = await register();
+    const other = await register();
+    const provenance = {
+      schemaVersion: 1,
+      captureMethod: "popup-save-page",
+      pageUrl: "https://visited.example/story?from=feed",
+      canonicalUrl: "https://visited.example/story",
+      pageTitle: "A useful article",
+      siteName: "The Example",
+      description: "A precise description.",
+      authors: ["Mina Rao", "Eli Stone"],
+      publishedAt: "2026-08-14T09:30:00.000Z",
+      modifiedAt: "2026-08-15T11:00:00.000Z",
+      language: "en",
+      leadImageUrl: "https://visited.example/media/lead.jpg",
+      faviconUrl: "https://visited.example/favicon.ico",
+      targetUrl: null,
+      headings: ["The first section", "What changed"],
+      capturedAt: 1_786_013_400_000,
+      extractedAt: 1_786_013_400_123,
+      extractorVersion: 1,
+      contentHash: "a".repeat(43),
+      extractionStatus: "complete",
+      extractionError: null,
+    };
+    const processingOptions = { ocr: false, summaries: true, tags: false };
+    const response = await capture(owner.cookie, {
+      clientId: "rich-bookmark",
+      type: "bookmark",
+      sourceUrl: provenance.pageUrl,
+      sourceTitle: provenance.pageTitle,
+      articleText: "Readable body text from the saved article.",
+      capturedAt: provenance.capturedAt,
+      provenance,
+      processingOptions,
+    });
+    expect(response.status).toBe(201);
+    const saved = (await response.json()).capture;
+    expect(saved.provenance).toEqual(provenance);
+    expect(saved.processingOptions).toEqual(processingOptions);
+    expect(saved.articleText).toContain("Readable body text");
+    expect((await request(`/captures/${saved.id}`, "GET", undefined, other.cookie)).status).toBe(404);
+    const exported = await (await request("/account/export", "GET", undefined, owner.cookie)).json();
+    expect(exported.captures[0].provenance).toEqual(provenance);
+    const stored = db.query("SELECT storage_bytes,provenance_json,processing_options_json FROM customer_captures WHERE id=?").get(saved.id) as any;
+    expect(stored.provenance_json).toBe(JSON.stringify(provenance));
+    expect(stored.processing_options_json).toBe(JSON.stringify(processingOptions));
+    expect(stored.storage_bytes).toBeGreaterThan(Buffer.byteLength("Readable body text from the saved article.", "utf8"));
+
+    for (const invalid of [
+      { ...provenance, canonicalUrl: "javascript:alert(1)" },
+      { ...provenance, pageUrl: "https://name:secret@visited.example/story" },
+      { ...provenance, authors: Array(9).fill("Writer") },
+      { ...provenance, headings: Array(21).fill("Heading") },
+      { ...provenance, publishedAt: "last Thursday" },
+      { ...provenance, contentHash: "not-a-hash" },
+      { ...provenance, unexpected: "field" },
+    ]) {
+      expect((await capture(owner.cookie, { type: "bookmark", provenance: invalid })).status).toBe(400);
+    }
+    expect((await capture(owner.cookie, { processingOptions: { ocr: true, summaries: true, tags: true, execute: true } })).status).toBe(400);
+  });
+
   test("only two uploads per account can retain request bodies, with slots released after invalid bodies", async () => {
     const a = await register();
     const held = [heldUpload(a.cookie), heldUpload(a.cookie)];

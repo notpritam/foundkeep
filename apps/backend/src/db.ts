@@ -216,6 +216,11 @@ const MIGRATIONS: string[] = [
     updated_at INTEGER NOT NULL
   );
   `,
+  // 6 — customer capture provenance and immutable processing choices.
+  `
+  ALTER TABLE customer_captures ADD COLUMN provenance_json TEXT;
+  ALTER TABLE customer_captures ADD COLUMN processing_options_json TEXT;
+  `,
 ];
 
 function migrate(db: Database): void {

@@ -12,7 +12,7 @@ function fixture() {
     article_text TEXT, blob_data BLOB, blob_mime TEXT, summary TEXT, ocr_text TEXT,
     category TEXT, tags TEXT, enrich_error TEXT, enrich_attempts INTEGER DEFAULT 0,
     processing_at INTEGER, updated_at INTEGER DEFAULT 0, created_at INTEGER DEFAULT 0,
-    storage_bytes INTEGER NOT NULL DEFAULT 1
+    storage_bytes INTEGER NOT NULL DEFAULT 1, processing_options_json TEXT
   )`);
   return db;
 }
@@ -40,6 +40,29 @@ describe("safe customer organization", () => {
     expect(rows[1].ocr_text).toBe("Typography workshop Wednesday");
     expect(rows[1].status).toBe("done");
     expect(rows[1].enrich_attempts).toBe(1);
+    db.close();
+  });
+
+  test("honors immutable per-capture organization choices", async () => {
+    const db = fixture();
+    db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,blob_mime,note_text,processing_options_json) VALUES(?,?,?,?,?,?,?)")
+      .run("private","owner-a","image",new Uint8Array([1]),"image/png","Design reference",JSON.stringify({ocr:false,summaries:false,tags:false}));
+    let ocrCalls = 0;
+    await processCustomerQueue(db, { ocr: async () => { ocrCalls++; return "Private image text"; } });
+    const row = db.query("SELECT * FROM customer_captures WHERE id='private'").get() as any;
+    expect(ocrCalls).toBe(0);
+    expect(row.status).toBe("done");
+    expect(row.ocr_text).toBeNull();
+    expect(row.summary).toBeNull();
+    expect(row.tags).toBe("[]");
+    expect(row.category).toBe("design");
+    db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,blob_mime,note_text,processing_options_json) VALUES(?,?,?,?,?,?,?)")
+      .run("private-fail","owner-a","image",new Uint8Array([2]),"image/png","Travel reference",JSON.stringify({ocr:true,summaries:false,tags:false}));
+    await processCustomerQueue(db, { ocr: async () => { throw new Error("OCR unavailable"); } });
+    const failed = db.query("SELECT * FROM customer_captures WHERE id='private-fail'").get() as any;
+    expect(failed.status).toBe("failed");
+    expect(failed.summary).toBeNull();
+    expect(failed.tags).toBe("[]");
     db.close();
   });
 

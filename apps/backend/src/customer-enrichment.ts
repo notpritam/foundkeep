@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { DEFAULT_PROCESSING_OPTIONS, parseStoredJson, type ProcessingOptions } from "./customer-provenance.ts";
 
 type Content = {
   type: string;
@@ -12,6 +13,7 @@ type Content = {
 type Row = Content & {
   id: string; account_id: string; blob_data: Uint8Array | null;
   blob_mime: string | null; enrich_attempts: number;
+  processing_options_json: string | null;
 };
 const STOP = new Set("about after again also always another before being between both could does each from have here into just more most much must only other over same should some such than that their them then there these they this those through under very were what when where which while will with would your http https www com ignore instructions".split(" "));
 const TOPICS: [string, RegExp][] = [
@@ -163,15 +165,26 @@ export async function processCustomerQueue(db: Database, options: Options = {}):
          (status='processing' AND COALESCE(processing_at,0)<?))
         ORDER BY created_at,id LIMIT 1)
       RETURNING id,account_id,type,source_title,source_url,note_text,selection_text,
-        article_text,ocr_text,blob_data,blob_mime,enrich_attempts`).get(stamp,stamp,stamp-RETRY_MS,stamp-LEASE_MS) as Row | null;
+        article_text,ocr_text,blob_data,blob_mime,enrich_attempts,processing_options_json`).get(stamp,stamp,stamp-RETRY_MS,stamp-LEASE_MS) as Row | null;
     if (!row) break;
+    const processing = parseStoredJson<ProcessingOptions>(row.processing_options_json, { ...DEFAULT_PROCESSING_OPTIONS });
     try {
-      const ocrText = row.blob_data ? (await (options.ocr || recognizeImage)(row.blob_data)).slice(0,100_000) || null : row.ocr_text || null;
+      const ocrText = processing.ocr && row.blob_data ? (await (options.ocr || recognizeImage)(row.blob_data)).slice(0,100_000) || null : row.ocr_text || null;
       const result = organizeText({...row,ocr_text:ocrText});
-      finalizeCapture(db,row,stamp,now(),"done",{summary:result.summary,ocr_text:ocrText,category:result.category,tags:JSON.stringify(result.tags)});
+      finalizeCapture(db,row,stamp,now(),"done",{
+        summary: processing.summaries ? result.summary : null,
+        ocr_text: processing.ocr ? ocrText : null,
+        category: result.category,
+        tags: processing.tags ? JSON.stringify(result.tags) : "[]",
+      });
     } catch {
       const result = organizeText(row);
-      finalizeCapture(db,row,stamp,now(),"failed",{summary:result.summary,ocr_text:row.ocr_text || null,category:result.category,tags:JSON.stringify(result.tags)});
+      finalizeCapture(db,row,stamp,now(),"failed",{
+        summary: processing.summaries ? result.summary : null,
+        ocr_text: processing.ocr ? row.ocr_text || null : null,
+        category: result.category,
+        tags: processing.tags ? JSON.stringify(result.tags) : "[]",
+      });
     }
     processed++;
   }

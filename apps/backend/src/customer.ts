@@ -8,6 +8,15 @@ import {
   readCustomerPreferences,
   writeCustomerPreferences,
 } from "./customer-preferences.ts";
+import {
+  DEFAULT_PROCESSING_OPTIONS,
+  ProvenanceValidationError,
+  normalizeProcessingOptions,
+  normalizeProvenance,
+  parseStoredJson,
+  type CaptureProvenance,
+  type ProcessingOptions,
+} from "./customer-provenance.ts";
 
 const DAY = 86_400_000;
 const MAX_BODY = 12 * 1024 * 1024;
@@ -16,7 +25,7 @@ const MAX_IMAGE = 8 * 1024 * 1024;
 const MAX_CAPTURES = 1000;
 const MAX_BYTES = 200 * 1024 * 1024;
 const TYPES = new Set(["screenshot", "selection", "bookmark", "image", "note", "tweet"]);
-const CAPTURE_COLUMNS = "id,account_id,client_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at";
+const CAPTURE_COLUMNS = "id,account_id,client_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json";
 
 interface AccountRow { id: string; email: string; name: string; password_hash: string; recovery_hash: string; created_at: number }
 interface ConnectionRow { id: string; account_id: string; name: string; created_at: number; last_seen_at: number | null; expires_at: number }
@@ -29,6 +38,7 @@ export interface CustomerCaptureRow {
   width: number | null; height: number | null; captured_at: number; created_at: number; updated_at: number;
   summary: string | null; ocr_text: string | null; category: string | null; tags: string;
   enrich_error: string | null; enrich_attempts: number; processing_at: number | null;
+  provenance_json: string | null; processing_options_json: string | null;
 }
 interface Auth { account: AccountRow; kind: "session" | "connection"; credentialId: string }
 type CustomerEnv = { Bindings: { clientIp?: string }; Variables: { customerAuth: Auth } };
@@ -51,6 +61,8 @@ export function customerCaptureDto(row: CustomerCaptureRow) {
     blobUrl: row.blob_mime ? `/api/captures/${row.id}/blob` : null,
     width: row.width, height: row.height, capturedAt: row.captured_at, createdAt: row.created_at,
     updatedAt: row.updated_at, enrichError: row.enrich_error,
+    provenance: parseStoredJson<CaptureProvenance | null>(row.provenance_json, null),
+    processingOptions: parseStoredJson<ProcessingOptions>(row.processing_options_json, { ...DEFAULT_PROCESSING_OPTIONS }),
   };
 }
 
@@ -592,7 +604,17 @@ export function customerRoutes(db: Database) {
     const height = image.height ?? dimension("height");
     const capturedAt = body.capturedAt ?? Date.now();
     if (!Number.isSafeInteger(capturedAt) || (capturedAt as number) < 0 || (capturedAt as number) > Date.now() + DAY) fail(400, "invalid_date", "Use a valid capture timestamp in milliseconds.");
-    const storageBytes = image.bytes + [sourceUrl, sourceTitle, selectionText, noteText, articleText, clientId].reduce((sum, text) => sum + Buffer.byteLength(text || "", "utf8"), 0);
+    let provenance, processingOptions;
+    try {
+      provenance = normalizeProvenance(body.provenance, capturedAt as number);
+      processingOptions = normalizeProcessingOptions(body.processingOptions);
+    } catch (error) {
+      if (error instanceof ProvenanceValidationError) fail(400, "invalid_capture_context", error.message);
+      throw error;
+    }
+    const provenanceJson = provenance ? JSON.stringify(provenance) : null;
+    const processingOptionsJson = JSON.stringify(processingOptions);
+    const storageBytes = image.bytes + [sourceUrl, sourceTitle, selectionText, noteText, articleText, clientId, provenanceJson, processingOptionsJson].reduce((sum, text) => sum + Buffer.byteLength(text || "", "utf8"), 0);
     const result = db.transaction(() => {
       // Authentication must still hold after the streamed body was received.
       auth(c);
@@ -604,7 +626,7 @@ export function customerRoutes(db: Database) {
       if (global.captures >= globalMaxCaptures || global.bytes + storageBytes > globalMaxBytes) fail(503, "storage_unavailable", "Atlas storage is temporarily full. Your extension will keep this capture locally.");
       const id = crypto.randomUUID();
       const now = Date.now();
-      db.query("INSERT INTO customer_captures(id,account_id,client_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now);
+      db.query("INSERT INTO customer_captures(id,account_id,client_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,provenance_json,processing_options_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now, provenanceJson, processingOptionsJson);
       return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
     })();
     return c.json(result, result.duplicate ? 200 : 201);
