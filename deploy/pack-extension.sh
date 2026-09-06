@@ -20,6 +20,8 @@ with tempfile.TemporaryDirectory() as tmp:
         for r, _, fs in os.walk(stage):
             for f in fs:
                 full = os.path.join(r, f)
+                if f in ('control-bg.js', 'agent-control.js') or f.endswith(('.pem', '.key')):
+                    continue
                 z.write(full, os.path.relpath(full, tmp))
 print("wrote", out, os.path.getsize(out), "bytes")
 PY

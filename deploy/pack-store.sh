@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # Belt & braces: never ship a private key.
     for r, _, fs in os.walk(stage):
         for f in fs:
-            if f.endswith(".pem") or f.endswith(".key"):
+            if f.endswith(".pem") or f.endswith(".key") or f in ("control-bg.js", "agent-control.js"):
                 os.remove(os.path.join(r, f))
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for r, _, fs in os.walk(stage):

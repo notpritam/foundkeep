@@ -92,6 +92,7 @@ function walk(dir) {
 const files = walk(EXT_DIR)
   .map((f) => relative(EXT_DIR, f))
   .filter((f) => /^(?:manifest\.json|README\.md|(?:icons|assets|src)\/)/.test(f))
+  .filter((f) => !["src/control-bg.js", "src/agent-control.js"].includes(f))
   .filter((f) => !f.endsWith(".DS_Store") && !/\.(?:pem|key)$/.test(f));
 
 // 5. Sign the .crx and write updates.xml.

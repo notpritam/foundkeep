@@ -13,7 +13,7 @@
     "release:publish": "node deploy/release-extension.mjs --publish",
     "test:extension": "node --test tests/extension-ui.mjs tests/extension-smoke.mjs tests/extension-cloud.mjs",
     "test:web": "node --test tests/landing-smoke.mjs",
-    "test:customer": "node --test tests/customer-flow.mjs",
+    "test:customer": "node --test tests/customer-flow.mjs tests/customer-web.mjs",
     "prepare:web-assets": "node scripts/prepare-web-assets.mjs"
   },
   "devDependencies": {
