@@ -3,6 +3,11 @@ import { createHash, randomBytes } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { config } from "./config.ts";
+import {
+  PreferenceValidationError,
+  readCustomerPreferences,
+  writeCustomerPreferences,
+} from "./customer-preferences.ts";
 
 const DAY = 86_400_000;
 const MAX_BODY = 12 * 1024 * 1024;
@@ -300,7 +305,7 @@ export function customerRoutes(db: Database) {
     if (c.req.method === "OPTIONS") {
       if (allowed) {
         c.header("Access-Control-Allow-Headers", "Authorization, Content-Type" + (requestOrigin === origin ? ", X-Atlas-Account" : ""));
-        c.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+        c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         c.header("Access-Control-Max-Age", "600");
       }
       return c.body(null, 204);
@@ -412,6 +417,7 @@ export function customerRoutes(db: Database) {
       if (latest.account.password_hash !== current.account.password_hash) fail(401, "invalid_credentials", "Your password changed. Sign in again.");
       // Explicit deletes also protect installations opened without FK enforcement.
       revoke(current.account.id);
+      db.query("DELETE FROM customer_preferences WHERE account_id = ?").run(current.account.id);
       db.query("DELETE FROM customer_captures WHERE account_id = ?").run(current.account.id);
       db.query("DELETE FROM customer_accounts WHERE id = ?").run(current.account.id);
     })();
@@ -505,6 +511,22 @@ export function customerRoutes(db: Database) {
     const result = db.query("DELETE FROM customer_connections WHERE id = ? AND account_id = ?").run(c.req.param("id"), current.account.id);
     if (!result.changes) fail(404, "not_found", "Browser connection not found.");
     return c.json({ ok: true });
+  });
+
+  app.get("/preferences", (c) => {
+    const current = auth(c);
+    return c.json(readCustomerPreferences(db, current.account.id));
+  });
+
+  app.put("/preferences", async (c) => {
+    const current = auth(c, true);
+    const body = await jsonBody(c);
+    try {
+      return c.json(writeCustomerPreferences(db, current.account.id, body));
+    } catch (error) {
+      if (error instanceof PreferenceValidationError) fail(400, "invalid_preferences", error.message);
+      throw error;
+    }
   });
 
   app.get("/captures", (c) => {

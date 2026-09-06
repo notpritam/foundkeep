@@ -230,6 +230,87 @@ describe("customer account security", () => {
   });
 });
 
+describe("customer extension preferences", () => {
+  const changed = {
+    version: 1,
+    capture: {
+      region: false,
+      fullPage: true,
+      highlight: true,
+      bookmark: true,
+      image: false,
+      tweet: true,
+      note: true,
+    },
+    bookmark: { readableText: true, extendedMetadata: true, headings: false },
+    notes: { attachSource: false },
+    popup: {
+      actionOrder: ["bookmark", "highlight", "fullPage", "region"],
+      showRecent: true,
+      recentCount: 5,
+    },
+    sync: { automatic: false },
+    organization: { ocr: false, summaries: true, tags: false },
+    feedback: { success: true },
+    contextMenus: false,
+  };
+
+  test("preferences are customer-owned, validated, and shared with connected browsers", async () => {
+    const owner = await register();
+    const other = await register();
+    const firstBrowser = await connect(owner.cookie);
+    const secondBrowser = await connect(owner.cookie);
+
+    const defaults = await (await request("/preferences", "GET", undefined, owner.cookie)).json();
+    expect(defaults.revision).toBe(0);
+    expect(defaults.preferences).toEqual({
+      version: 1,
+      capture: { region: true, fullPage: true, highlight: true, bookmark: true, image: true, tweet: true, note: true },
+      bookmark: { readableText: true, extendedMetadata: true, headings: true },
+      notes: { attachSource: true },
+      popup: { actionOrder: ["bookmark", "highlight", "region", "fullPage"], showRecent: true, recentCount: 3 },
+      sync: { automatic: true },
+      organization: { ocr: true, summaries: true, tags: true },
+      feedback: { success: true },
+      contextMenus: true,
+    });
+
+    expect((await request("/preferences", "PUT", changed, firstBrowser.bearer, EXTENSION)).status).toBe(403);
+    const unknown = await app.request(`${ORIGIN}/api/preferences`, {
+      method: "PUT",
+      headers: { origin: ORIGIN, cookie: owner.cookie, "content-type": "application/json", "X-Atlas-Account": owner.account.id },
+      body: JSON.stringify({ ...changed, operatorOverride: true }),
+    });
+    expect(unknown.status).toBe(400);
+    const invalid = await app.request(`${ORIGIN}/api/preferences`, {
+      method: "PUT",
+      headers: { origin: ORIGIN, cookie: owner.cookie, "content-type": "application/json", "X-Atlas-Account": owner.account.id },
+      body: JSON.stringify({ ...changed, popup: { ...changed.popup, recentCount: 9 } }),
+    });
+    expect(invalid.status).toBe(400);
+
+    const savedResponse = await app.request(`${ORIGIN}/api/preferences`, {
+      method: "PUT",
+      headers: { origin: ORIGIN, cookie: owner.cookie, "content-type": "application/json", "X-Atlas-Account": owner.account.id },
+      body: JSON.stringify(changed),
+    });
+    expect(savedResponse.status).toBe(200);
+    const saved = await savedResponse.json() as any;
+    expect(saved.preferences).toEqual(changed);
+    expect(saved.revision).toBe(1);
+    expect(saved.updatedAt).toBeGreaterThan(0);
+
+    for (const browser of [firstBrowser, secondBrowser]) {
+      const shared = await (await request("/preferences", "GET", undefined, browser.bearer, EXTENSION)).json();
+      expect(shared.preferences).toEqual(changed);
+      expect(shared.revision).toBe(1);
+    }
+    const isolated = await (await request("/preferences", "GET", undefined, other.cookie)).json();
+    expect(isolated.preferences.capture.region).toBe(true);
+    expect(isolated.revision).toBe(0);
+  });
+});
+
 describe("private customer captures", () => {
   test("only two uploads per account can retain request bodies, with slots released after invalid bodies", async () => {
     const a = await register();

@@ -207,6 +207,15 @@ const MIGRATIONS: string[] = [
   CREATE INDEX customer_captures_owner_date ON customer_captures(account_id, captured_at DESC, id DESC);
   CREATE INDEX customer_captures_status ON customer_captures(status, created_at);
   `,
+  // 5 — customer-owned extension preferences.
+  `
+  CREATE TABLE customer_preferences (
+    account_id TEXT PRIMARY KEY REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    value_json TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 1,
+    updated_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 function migrate(db: Database): void {
