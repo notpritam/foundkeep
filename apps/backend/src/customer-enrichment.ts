@@ -80,6 +80,76 @@ export async function recognizeImage(bytes: Uint8Array): Promise<string> {
 type Options = { ocr?: (bytes: Uint8Array) => Promise<string>; batchSize?: number; now?: () => number };
 const RETRY_MS = 120_000;
 const LEASE_MS = 120_000;
+const ACCOUNT_MAX_BYTES = 200 * 1024 * 1024;
+const RECOGNITION_ERROR = "Saved safely. Text recognition could not finish. Search by the page title or source.";
+const STORAGE_ERROR = "Saved safely. Some searchable text was omitted because storage is full.";
+
+type Derived = { summary: string | null; ocr_text: string | null; category: string | null; tags: string };
+function derivedBytes(value: Derived) {
+  // Empty tags and fixed bookkeeping (status, error message) are metadata, as
+  // they are on initial ingest. All generated customer content counts as data.
+  return Buffer.byteLength(value.summary || "", "utf8")
+    + Buffer.byteLength(value.ocr_text || "", "utf8")
+    + Buffer.byteLength(value.category || "", "utf8")
+    + (value.tags && value.tags !== "[]" ? Buffer.byteLength(value.tags, "utf8") : 0);
+}
+
+function fitDerived(wanted: Derived, budget: number): Derived {
+  let remaining = Math.max(0, Math.floor(budget));
+  function takeText(text: string | null) {
+    if (!text || !remaining) return null;
+    const bytes = Buffer.from(text, "utf8");
+    let end = Math.min(bytes.length, remaining);
+    // A truncated multibyte character must not become replacement text or
+    // consume more bytes than the remaining quota permits.
+    while (end > 0 && end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--;
+    const kept = bytes.subarray(0, end).toString("utf8");
+    remaining -= end;
+    return kept || null;
+  }
+  const summary = takeText(wanted.summary);
+  let category: string | null = null;
+  if (wanted.category && Buffer.byteLength(wanted.category, "utf8") <= remaining) category = takeText(wanted.category);
+  const keptTags: string[] = [];
+  for (const tag of JSON.parse(wanted.tags) as string[]) {
+    const candidate = [...keptTags, tag];
+    if (Buffer.byteLength(JSON.stringify(candidate), "utf8") <= remaining) keptTags.push(tag);
+  }
+  const tags = JSON.stringify(keptTags);
+  if (keptTags.length) remaining -= Buffer.byteLength(tags, "utf8");
+  const ocr_text = takeText(wanted.ocr_text);
+  return { summary, category, tags, ocr_text };
+}
+
+function finalizeCapture(db: Database, row: Row, stamp: number, updatedAt: number, status: "done" | "failed", wanted: Derived) {
+  db.transaction(() => {
+    // OCR yields to uploads, deletes, account recovery and other workers. Read
+    // ownership, lease and current usage together only when ready to commit.
+    const current = db.query(`SELECT summary,ocr_text,category,tags,storage_bytes
+      FROM customer_captures WHERE id=? AND account_id=? AND status='processing'
+        AND processing_at=? AND EXISTS(SELECT 1 FROM customer_accounts WHERE id=?)`)
+      .get(row.id,row.account_id,stamp,row.account_id) as (Derived & { storage_bytes: number }) | null;
+    if (!current) return;
+    const used = db.query(`SELECT COALESCE(SUM(storage_bytes),0) total,
+      COALESCE(SUM(CASE WHEN account_id=? THEN storage_bytes ELSE 0 END),0) owner
+      FROM customer_captures`).get(row.account_id) as { total: number; owner: number };
+    const configured = process.env.ATLAS_CUSTOMER_GLOBAL_MAX_BYTES;
+    const globalMax = configured && /^\d+$/.test(configured) && Number(configured) > 0
+      ? Number(configured) : 2 * 1024 * 1024 * 1024;
+    const previousBytes = derivedBytes(current);
+    const baseBytes = Math.max(0,current.storage_bytes - previousBytes);
+    const available = Math.max(0,Math.min(ACCOUNT_MAX_BYTES-used.owner,globalMax-used.total)+previousBytes);
+    const kept = fitDerived(wanted,available);
+    const omitted = kept.summary !== wanted.summary || kept.ocr_text !== wanted.ocr_text
+      || kept.category !== wanted.category || kept.tags !== wanted.tags;
+    db.query(`UPDATE customer_captures SET status=?,summary=?,ocr_text=?,category=?,tags=?,
+      storage_bytes=?,enrich_error=?,processing_at=NULL,updated_at=?
+      WHERE id=? AND account_id=? AND status='processing' AND processing_at=?`)
+      .run(status,kept.summary,kept.ocr_text,kept.category,kept.tags,baseBytes+derivedBytes(kept),
+        status === "failed" ? RECOGNITION_ERROR : omitted ? STORAGE_ERROR : null,
+        updatedAt,row.id,row.account_id,stamp);
+  }).immediate();
+}
 
 export async function processCustomerQueue(db: Database, options: Options = {}): Promise<number> {
   const now = options.now || Date.now;
@@ -96,20 +166,12 @@ export async function processCustomerQueue(db: Database, options: Options = {}):
         article_text,ocr_text,blob_data,blob_mime,enrich_attempts`).get(stamp,stamp,stamp-RETRY_MS,stamp-LEASE_MS) as Row | null;
     if (!row) break;
     try {
-      const ocrText = row.blob_data ? await (options.ocr || recognizeImage)(row.blob_data) : row.ocr_text || null;
+      const ocrText = row.blob_data ? (await (options.ocr || recognizeImage)(row.blob_data)).slice(0,100_000) || null : row.ocr_text || null;
       const result = organizeText({...row,ocr_text:ocrText});
-      db.query(`UPDATE customer_captures SET status='done',summary=?,ocr_text=?,
-        category=?,tags=?,enrich_error=NULL,processing_at=NULL,updated_at=?
-        WHERE id=? AND account_id=? AND status='processing' AND processing_at=?`)
-        .run(result.summary,ocrText,result.category,JSON.stringify(result.tags),now(),row.id,row.account_id,stamp);
+      finalizeCapture(db,row,stamp,now(),"done",{summary:result.summary,ocr_text:ocrText,category:result.category,tags:JSON.stringify(result.tags)});
     } catch {
       const result = organizeText(row);
-      db.query(`UPDATE customer_captures SET status='failed',summary=?,category=?,tags=?,
-        enrich_error=?,processing_at=NULL,updated_at=? WHERE id=? AND account_id=?
-        AND status='processing' AND processing_at=?`)
-        .run(result.summary,result.category,JSON.stringify(result.tags),
-          "Saved safely. Text recognition could not finish. Search by the page title or source.",
-          now(),row.id,row.account_id,stamp);
+      finalizeCapture(db,row,stamp,now(),"failed",{summary:result.summary,ocr_text:row.ocr_text || null,category:result.category,tags:JSON.stringify(result.tags)});
     }
     processed++;
   }

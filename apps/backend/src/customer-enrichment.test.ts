@@ -4,12 +4,15 @@ import { organizeText, processCustomerQueue } from "./customer-enrichment.ts";
 
 function fixture() {
   const db = new Database(":memory:");
-  db.exec(`CREATE TABLE customer_captures (
+  db.exec(`CREATE TABLE customer_accounts (id TEXT PRIMARY KEY);
+    INSERT INTO customer_accounts(id) VALUES('owner-a'),('owner-b');
+    CREATE TABLE customer_captures (
     id TEXT PRIMARY KEY, account_id TEXT, type TEXT, status TEXT DEFAULT 'pending',
     source_title TEXT, source_url TEXT, note_text TEXT, selection_text TEXT,
     article_text TEXT, blob_data BLOB, blob_mime TEXT, summary TEXT, ocr_text TEXT,
     category TEXT, tags TEXT, enrich_error TEXT, enrich_attempts INTEGER DEFAULT 0,
-    processing_at INTEGER, updated_at INTEGER DEFAULT 0, created_at INTEGER DEFAULT 0
+    processing_at INTEGER, updated_at INTEGER DEFAULT 0, created_at INTEGER DEFAULT 0,
+    storage_bytes INTEGER NOT NULL DEFAULT 1
   )`);
   return db;
 }
@@ -62,6 +65,100 @@ describe("safe customer organization", () => {
     db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,status,processing_at) VALUES(?,?,?,?,?,?)").run("a","owner-a","image",new Uint8Array([1]),"processing",1);
     await processCustomerQueue(db,{now:()=>1000000,ocr:async()=>{db.query("DELETE FROM customer_captures WHERE id='a'").run();return "gone";}});
     expect(db.query("SELECT * FROM customer_captures").all()).toHaveLength(0);
+    db.close();
+  });
+
+  test("counts derived UTF-8 content once across OCR failure and retry", async () => {
+    const db = fixture();
+    db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,storage_bytes) VALUES(?,?,?,?,?)").run("a","owner-a","image",new Uint8Array([1]),100);
+    await processCustomerQueue(db,{now:()=>1000000,ocr:async()=>{throw new Error("unavailable");}});
+    let row = db.query("SELECT * FROM customer_captures").get() as any;
+    const firstBytes = row.storage_bytes;
+    expect(firstBytes).toBeGreaterThan(100);
+    await processCustomerQueue(db,{now:()=>1300000,ocr:async()=>"📷"});
+    row = db.query("SELECT * FROM customer_captures").get() as any;
+    expect(row.status).toBe("done");
+    // Original 100 + emoji summary 4 + emoji OCR 4 + category 'images' 6.
+    expect(row.storage_bytes).toBe(114);
+    expect(row.ocr_text).toBe("📷");
+    db.query("UPDATE customer_captures SET status='failed',updated_at=0").run();
+    await processCustomerQueue(db,{now:()=>1600000,ocr:async()=>"📷"});
+    expect((db.query("SELECT storage_bytes FROM customer_captures").get() as any).storage_bytes).toBe(114);
+    db.close();
+  });
+
+  test("account quota keeps original content and bounds added Unicode text without a stuck status", async () => {
+    const db = fixture();
+    db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,storage_bytes) VALUES(?,?,?,?,?)").run("a","owner-a","image",new Uint8Array([1]),209715200-3);
+    await processCustomerQueue(db,{ocr:async()=>"📷 unreadable within three bytes"});
+    const row = db.query("SELECT * FROM customer_captures").get() as any;
+    expect(row.status).toBe("done");
+    expect(row.processing_at).toBeNull();
+    expect(row.blob_data).toEqual(new Uint8Array([1]));
+    expect(row.ocr_text || "").not.toContain("�");
+    expect(row.summary || "").not.toContain("�");
+    expect(row.storage_bytes).toBeLessThanOrEqual(209715200);
+    expect(row.enrich_error).toContain("storage");
+    db.close();
+  });
+
+  test("an upload while OCR awaits consumes the remaining account quota before finalization", async () => {
+    const db = fixture();
+    db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,storage_bytes) VALUES(?,?,?,?,?)").run("a","owner-a","image",new Uint8Array([1]),100);
+    await processCustomerQueue(db,{batchSize:1,ocr:async()=>{
+      await Promise.resolve();
+      db.query("INSERT INTO customer_captures(id,account_id,type,storage_bytes,status) VALUES('upload','owner-a','note',209715100,'done')").run();
+      return "Captured content that cannot consume more bytes";
+    }});
+    const row = db.query("SELECT * FROM customer_captures WHERE id='a'").get() as any;
+    expect(row.status).toBe("done");
+    expect(row.storage_bytes).toBe(100);
+    expect(row.ocr_text).toBeNull();
+    expect(row.summary).toBeNull();
+    expect(row.tags).toBe("[]");
+    expect((db.query("SELECT SUM(storage_bytes) n FROM customer_captures").get() as any).n).toBe(209715200);
+    db.close();
+  });
+
+  test("global quota bounds enrichment even when the owner has room", async () => {
+    const db = fixture();
+    const before = process.env.ATLAS_CUSTOMER_GLOBAL_MAX_BYTES;
+    process.env.ATLAS_CUSTOMER_GLOBAL_MAX_BYTES = "100";
+    try {
+      db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,storage_bytes) VALUES(?,?,?,?,?)").run("a","owner-a","image",new Uint8Array([1]),10);
+      db.query("INSERT INTO customer_captures(id,account_id,type,storage_bytes,status) VALUES('other','owner-b','note',90,'done')").run();
+      await processCustomerQueue(db,{ocr:async()=>"Recognized text"});
+      const row = db.query("SELECT * FROM customer_captures WHERE id='a'").get() as any;
+      expect(row.status).toBe("done");
+      expect(row.storage_bytes).toBe(10);
+      expect(row.summary).toBeNull();
+      expect(row.enrich_error).toContain("storage");
+    } finally {
+      if (before === undefined) delete process.env.ATLAS_CUSTOMER_GLOBAL_MAX_BYTES;
+      else process.env.ATLAS_CUSTOMER_GLOBAL_MAX_BYTES = before;
+      db.close();
+    }
+  });
+
+  test("finalization cannot write after the account is deleted or the processing lease changes", async () => {
+    const db = fixture();
+    db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,storage_bytes) VALUES(?,?,?,?,?)").run("a","owner-a","image",new Uint8Array([1]),100);
+    await processCustomerQueue(db,{batchSize:1,now:()=>1000000,ocr:async()=>{
+      db.query("UPDATE customer_captures SET processing_at=2000000 WHERE id='a'").run();
+      return "Old worker content";
+    }});
+    let row = db.query("SELECT * FROM customer_captures").get() as any;
+    expect(row.processing_at).toBe(2000000);
+    expect(row.summary).toBeNull();
+    expect(row.storage_bytes).toBe(100);
+    db.query("UPDATE customer_captures SET status='pending'").run();
+    await processCustomerQueue(db,{batchSize:1,now:()=>3000000,ocr:async()=>{
+      db.query("DELETE FROM customer_accounts WHERE id='owner-a'").run();
+      return "Deleted owner content";
+    }});
+    row = db.query("SELECT * FROM customer_captures").get() as any;
+    expect(row.summary).toBeNull();
+    expect(row.storage_bytes).toBe(100);
     db.close();
   });
 });
