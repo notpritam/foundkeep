@@ -54,12 +54,12 @@ approved store listing exists.
 
 The release candidate passed on 6 September 2026:
 
-- 50 Bun backend tests, including tenant isolation, strict preferences,
+- 51 Bun backend tests, including tenant isolation, strict preferences,
   provenance validation, export, quotas and immutable processing choices.
-- 37 extension tests, including a real Manifest V3 browser, readable extraction,
+- 39 extension tests, including a real Manifest V3 browser, readable extraction,
   every capture origin record, account switching, offline queues, preference
   caching and the 600px popup layout.
-- 12 customer browser tests, including the real signup → connect → preference
+- 14 customer browser tests, including the real signup → connect → preference
   refresh → readable page/highlight/screenshot → dashboard → revoke flow.
 - 5 landing browser tests across 320px through 1440px layouts.
 - The signed CRX reports version 1.5.0, retains the established extension ID,
