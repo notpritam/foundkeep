@@ -108,6 +108,7 @@ function makeButton() {
 }
 
 function inject() {
+  if (!featureEnabled) return;
   const groups = document.querySelectorAll(
     'article[data-testid="tweet"] div[role="group"]',
   );
@@ -120,7 +121,8 @@ function inject() {
 }
 
 // X is a virtualized SPA — re-run on DOM changes, throttled to a frame.
-let queued = false;
+let queued = false,
+  featureEnabled = false;
 const observer = new MutationObserver(() => {
   if (queued) return;
   queued = true;
@@ -129,5 +131,21 @@ const observer = new MutationObserver(() => {
     inject();
   });
 });
-observer.observe(document.body, { childList: true, subtree: true });
-inject();
+
+function refreshFeature() {
+  chrome.runtime.sendMessage({ kind: "feature-status", feature: "tweet" }, (result) => {
+    if (chrome.runtime.lastError) return;
+    featureEnabled = result?.enabled !== false;
+    if (!featureEnabled) document.querySelectorAll("[data-atlas]").forEach((node) => node.remove());
+    observer.disconnect();
+    if (featureEnabled) {
+      observer.observe(document.body, { childList: true, subtree: true });
+      inject();
+    }
+  });
+}
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.kind === "atlas-preferences-changed") refreshFeature();
+});
+refreshFeature();

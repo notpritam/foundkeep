@@ -7,15 +7,43 @@ import {
   importLocalCaptures,
   retryCloudSync,
   disconnectCloud,
+  trustedPairingSender,
 } from "./cloud.js";
+import {
+  capturePreferenceKey,
+  getEffectivePreferences,
+  refreshPreferences,
+} from "./preferences.js";
 
 protectCloudStorage().catch(() => {});
 chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
+  if (msg?.kind === "atlas-refresh-preferences") {
+    if (!trustedPairingSender(sender)) {
+      respond({ ok: false, error: "This page cannot update Atlas." });
+      return;
+    }
+    refreshPreferences()
+      .then(async (state) => {
+        await reconcileContextMenus(state.preferences);
+        announcePreferenceChange();
+        drainQueue().catch(() => {});
+        respond({ ok: true, revision: state.revision });
+      })
+      .catch(() => respond({ ok: false, error: "Atlas kept the last saved preferences." }));
+    return true;
+  }
   handleExternalMessage(msg, sender)
     .then((result) => {
       respond(result);
-      if (result.ok && msg.kind === "atlas-connect")
+      if (result.ok && msg.kind === "atlas-connect") {
+        refreshPreferences()
+          .then(async (state) => {
+            await reconcileContextMenus(state.preferences);
+            announcePreferenceChange();
+          })
+          .catch(() => {});
         retryCloudSync().catch(() => {});
+      }
     })
     .catch(() =>
       respond({
@@ -36,6 +64,19 @@ async function flash(ok, label) {
   await chrome.action.setBadgeText({ text: ok ? "✓" : "!" });
   if (!ok && label) console.error("[atlas]", label);
   setTimeout(() => chrome.action.setBadgeText({ text: "" }), 1500);
+}
+
+async function configuredFlash(ok, label) {
+  if (!ok || (await getEffectivePreferences()).preferences.feedback.success)
+    await flash(ok, label);
+}
+
+function announcePreferenceChange() {
+  try { chrome.runtime.sendMessage({ kind: "atlas-preferences-changed" }).catch(() => {}); }
+  catch { /* no extension view is open */ }
+  chrome.tabs.query({ url: ["*://x.com/*", "*://twitter.com/*"] })
+    .then((tabs) => Promise.allSettled(tabs.map((tab) => chrome.tabs.sendMessage(tab.id, { kind: "atlas-preferences-changed" }))))
+    .catch(() => {});
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -133,18 +174,26 @@ function methodFor(action, trigger) {
 // Queue drain — periodic (in case the agent was offline) + on demand.
 // ---------------------------------------------------------------------------
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.removeAll(() => {
-    for (const m of MENUS) chrome.contextMenus.create(m);
-  });
+  getEffectivePreferences({ refresh: true })
+    .then((state) => reconcileContextMenus(state.preferences))
+    .catch(() => reconcileContextMenus());
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
   drainQueue().catch(() => {});
 });
 chrome.runtime.onStartup?.addListener(() => {
+  getEffectivePreferences()
+    .then((state) => reconcileContextMenus(state.preferences))
+    .catch(() => reconcileContextMenus());
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
   drainQueue().catch(() => {});
 });
 chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === "atlas-drain") drainQueue().catch(() => {});
+  if (a.name === "atlas-drain") {
+    getEffectivePreferences()
+      .then((state) => reconcileContextMenus(state.preferences))
+      .catch(() => {});
+    drainQueue().catch(() => {});
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -163,12 +212,22 @@ const MENUS = [
   { id: "fullpage", title: "Full-page screenshot → Atlas", contexts: ["page"] },
 ];
 
+async function reconcileContextMenus(preferences) {
+  const state = preferences || (await getEffectivePreferences()).preferences;
+  await new Promise((resolve) => chrome.contextMenus.removeAll(resolve));
+  if (!state.contextMenus) return;
+  for (const menu of MENUS) {
+    const key = capturePreferenceKey(menu.id);
+    if (state.capture[key]) chrome.contextMenus.create(menu);
+  }
+}
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
     await performCapture(info.menuItemId, { tab, info, trigger: "context" });
-    flash(true);
+    configuredFlash(true);
   } catch (e) {
-    flash(false, String(e));
+    configuredFlash(false, String(e));
   }
 });
 
@@ -186,9 +245,9 @@ chrome.commands.onCommand.addListener(async (command) => {
   if (!action) return;
   try {
     await performCapture(action, { tab, trigger: "keyboard" });
-    flash(true);
+    configuredFlash(true);
   } catch (e) {
-    flash(false, String(e));
+    configuredFlash(false, String(e));
   }
 });
 
@@ -196,6 +255,22 @@ chrome.commands.onCommand.addListener(async (command) => {
 // Messages from popup / content scripts
 // ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.kind === "feature-status") {
+    getEffectivePreferences()
+      .then((state) => sendResponse({ ok: true, enabled: !!state.preferences.capture[msg.feature] }))
+      .catch(() => sendResponse({ ok: true, enabled: true }));
+    return true;
+  }
+  if (msg?.kind === "preferences-status") {
+    if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL("src/"))) {
+      sendResponse({ ok: false, error: "Open Atlas to view preferences." });
+      return;
+    }
+    getEffectivePreferences({ refresh: msg.refresh === true })
+      .then((state) => sendResponse({ ok: true, ...state }))
+      .catch(() => sendResponse({ ok: false, error: "Atlas could not load preferences." }));
+    return true;
+  }
   if (msg?.kind?.startsWith("cloud-")) {
     // Content scripts and websites cannot read credentials, disconnect an
     // account, or authorize a historical import through the internal channel.
@@ -250,11 +325,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (acknowledgeStart) sendResponse({ ok: true, started: true });
       try {
         const capture = await performCapture(msg.action, { tab, trigger: "popup" });
-        flash(true);
+        configuredFlash(true);
         if (!acknowledgeStart)
           sendResponse({ ok: true, capture: capture ? { id: capture.id, type: capture.type, cloudStatus: capture.cloudStatus } : null });
       } catch (e) {
-        flash(false, String(e));
+        configuredFlash(false, String(e));
         if (!acknowledgeStart) sendResponse({ ok: false, error: e.message || String(e) });
       }
     })();
@@ -263,6 +338,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.kind === "saveTweet") {
     (async () => {
       try {
+        const preferenceState = await getEffectivePreferences();
+        if (!preferenceState.preferences.capture.tweet) throw new Error("Tweet capture is disabled in your Atlas preferences.");
         const p = msg.payload;
         const capturedAt = Date.now();
         await saveCapture({
@@ -289,9 +366,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         currentWindow: true,
       });
       try {
+        const preferenceState = await getEffectivePreferences();
+        if (!preferenceState.preferences.capture.note) throw new Error("Notes are disabled in your Atlas preferences.");
         const local = msg.source === "library";
-        const context = local
-          ? { articleText: null, provenance: fallbackProvenance(null, "library-note", Date.now()) }
+        const attachSource = !local && preferenceState.preferences.notes.attachSource;
+        const context = !attachSource
+          ? { articleText: null, provenance: fallbackProvenance(null, local ? "library-note" : "extension-note", Date.now()) }
           : await capturePageContext(tab, { captureMethod: "extension-note" });
         await saveCapture({
           type: "note",
@@ -320,6 +400,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ---------------------------------------------------------------------------
 async function performCapture(action, { tab, info, trigger = "popup" }) {
   const captureMethod = methodFor(action, trigger);
+  const preferenceState = await getEffectivePreferences();
+  const preferences = preferenceState.preferences;
+  const feature = capturePreferenceKey(action);
+  if (!preferences.capture[feature]) throw new Error(`${feature === "fullPage" ? "Full-page screenshot" : feature[0].toUpperCase() + feature.slice(1)} capture is disabled in your Atlas preferences.`);
   switch (action) {
     case "region":
       return regionScreenshot(tab, captureMethod);
@@ -328,7 +412,12 @@ async function performCapture(action, { tab, info, trigger = "popup" }) {
     case "highlight":
       return saveHighlight(tab, captureMethod);
     case "savepage": {
-      const context = await capturePageContext(tab, { captureMethod, readableText: true, extendedMetadata: true, headings: true });
+      const context = await capturePageContext(tab, {
+        captureMethod,
+        readableText: preferences.bookmark.readableText,
+        extendedMetadata: preferences.bookmark.extendedMetadata,
+        headings: preferences.bookmark.headings,
+      });
       return saveCapture({
         type: "bookmark",
         sourceUrl: context.provenance.pageUrl,

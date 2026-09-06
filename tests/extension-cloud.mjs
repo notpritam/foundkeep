@@ -57,6 +57,21 @@ async function fixture(t) {
     window.requests = [];
     window.uploads = new Map();
     window.mode = "online";
+    window.preferenceEnvelope = {
+      preferences: {
+        version: 1,
+        capture: { region: true, fullPage: true, highlight: true, bookmark: true, image: true, tweet: true, note: true },
+        bookmark: { readableText: true, extendedMetadata: true, headings: true },
+        notes: { attachSource: true },
+        popup: { actionOrder: ["bookmark", "highlight", "region", "fullPage"], showRecent: true, recentCount: 3 },
+        sync: { automatic: true },
+        organization: { ocr: true, summaries: true, tags: true },
+        feedback: { success: true },
+        contextMenus: true,
+      },
+      revision: 1,
+      updatedAt: 1,
+    };
     const claims = {};
     window.fetch = async (url, options = {}) => {
       const body = JSON.parse(options.body || "{}");
@@ -65,6 +80,8 @@ async function fixture(t) {
         body,
         authorization: options.headers?.Authorization,
       });
+      if (url.endsWith("/api/preferences"))
+        return new Response(JSON.stringify(preferenceEnvelope), { status: 200 });
       if (url.endsWith("/api/pairing/claim")) {
         const id = body.code.startsWith("b") ? "account-b" : "account-a";
         claims[id] = (claims[id] || 0) + 1;
@@ -144,6 +161,7 @@ async function fixture(t) {
   await page.evaluate(async () => {
     window.cloud = await import("/src/cloud.js");
     window.db = await import("/src/db.js");
+    window.preferenceClient = await import("/src/preferences.js");
   });
   return page;
 }
@@ -241,6 +259,33 @@ test("pairing leaves historical records local until confirmed account-specific i
   );
   await page.evaluate(() => cloud.drainCloudQueue());
   assert.equal(await page.evaluate(() => uploads.size), 2);
+});
+
+test("automatic upload and organization choices follow the connected account preferences", async (t) => {
+  const page = await fixture(t);
+  await pair(page);
+  const record = await page.evaluate(async () => {
+    preferenceEnvelope.preferences.sync.automatic = false;
+    preferenceEnvelope.preferences.organization = { ocr: false, summaries: true, tags: false };
+    await preferenceClient.clearPreferenceCache();
+    return db.addCapture({
+      type: "note",
+      noteText: "Stay queued by customer choice",
+      ...(await cloud.captureBinding()),
+    });
+  });
+  assert.deepEqual(record.processingOptions, { ocr: false, summaries: true, tags: false });
+  await page.evaluate(() => cloud.drainCloudQueue());
+  assert.equal(await page.evaluate(() => uploads.size), 0);
+  assert.equal((await page.evaluate((id) => db.getCapture(id), record.id)).cloudStatus, "queued");
+
+  await page.evaluate(async () => {
+    preferenceEnvelope.preferences.sync.automatic = true;
+    preferenceEnvelope.revision++;
+    await preferenceClient.refreshPreferences();
+    await cloud.drainCloudQueue();
+  });
+  assert.equal(await page.evaluate(() => uploads.size), 1);
 });
 test("offline and ambiguous uploads survive module restart without duplicates", async (t) => {
   const page = await fixture(t);

@@ -1,6 +1,7 @@
 // Customer credentials and a durable, account-bound outbox. Only the background
 // worker calls mutating operations; pages ask it for a credential-free status.
 import * as db from "./db.js";
+import { clearPreferenceCache, getEffectivePreferences } from "./preferences.js";
 
 export const CUSTOMER_ORIGIN = "https://atlas.notpritam.in";
 const STATE_KEY = "atlasCustomer";
@@ -80,6 +81,13 @@ async function revokeCredential(previous) {
       "The previous browser credential could not be revoked. Remove it from Connected browsers in your Atlas dashboard.",
   };
 }
+
+function browserLabel() {
+  const agent = navigator.userAgent || "";
+  const browser = /Edg\//.test(agent) ? "Edge" : /OPR\//.test(agent) ? "Opera" : /Chrome\//.test(agent) || /Chromium\//.test(agent) ? "Chrome" : "Chromium browser";
+  const platform = /CrOS/.test(agent) ? "ChromeOS" : /Windows/.test(agent) ? "Windows" : /Mac OS X/.test(agent) ? "macOS" : /Linux/.test(agent) ? "Linux" : null;
+  return platform ? `${browser} · ${platform}` : browser;
+}
 export function trustedPairingSender(sender) {
   try {
     return (
@@ -122,7 +130,7 @@ export async function handleExternalMessage(message, sender) {
       credentials: "omit",
       redirect: "error",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: message.code, name: "Chrome browser" }),
+      body: JSON.stringify({ code: message.code, name: browserLabel() }),
       signal: AbortSignal.timeout(15000),
     });
     const result = await response.json();
@@ -188,8 +196,23 @@ export async function handleExternalMessage(message, sender) {
 
 /** Snapshot the selected account at save time, even while its token needs renewal. */
 export async function captureBinding() {
-  const state = await readState();
-  return { cloudAccountId: state?.account?.id || null };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const state = await readState();
+    const preferenceState = await getEffectivePreferences();
+    const current = await readState();
+    if ((!state && !current) || sameConnection(state, current)) {
+      return {
+        cloudAccountId: state?.account?.id || null,
+        processingOptions: { ...preferenceState.preferences.organization },
+      };
+    }
+  }
+  // If the selected account is changing continuously, leave this capture local.
+  // A later explicit import can bind it once the customer has made a selection.
+  return {
+    cloudAccountId: null,
+    processingOptions: { ocr: true, summaries: true, tags: true },
+  };
 }
 export async function getCloudStatus() {
   const [state, records] = await Promise.all([
@@ -222,6 +245,7 @@ export async function disconnectCloud() {
     await writeState(null);
     return state;
   });
+  await clearPreferenceCache();
   return revokeCredential(previous);
 }
 
@@ -313,6 +337,8 @@ async function drain() {
   for (let n = 0; n < 10; n++) {
     const connection = await readState();
     if (!connection?.token || connection.status === "reconnect") return;
+    const preferenceState = await getEffectivePreferences();
+    if (!preferenceState.preferences.sync.automatic) return;
     const records = await db.listCaptures({ limit: Infinity });
     const record = records
       .reverse()

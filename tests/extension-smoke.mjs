@@ -130,10 +130,55 @@ test(
       await popup.locator("#note").fill("Actual extension note");
       await popup.locator("#save").click();
       await count(5);
+      await worker.evaluate(async () => {
+        const preferences = {
+          version: 1,
+          capture: { region: true, fullPage: true, highlight: false, bookmark: true, image: true, tweet: true, note: true },
+          bookmark: { readableText: false, extendedMetadata: false, headings: false },
+          notes: { attachSource: true },
+          popup: { actionOrder: ["bookmark", "highlight", "region", "fullPage"], showRecent: true, recentCount: 3 },
+          sync: { automatic: true },
+          organization: { ocr: true, summaries: true, tags: true },
+          feedback: { success: true },
+          contextMenus: true,
+        };
+        await chrome.storage.local.set({
+          atlasCustomer: {
+            account: { id: "account-a", email: "person@example.test", name: "Person" },
+            connection: { id: "connection-a" },
+            token: "t".repeat(43),
+            status: "connected",
+          },
+          atlasPreferenceCache: {
+            accountId: "account-a",
+            preferences,
+            revision: 3,
+            updatedAt: Date.now(),
+            fetchedAt: Date.now(),
+          },
+        });
+      });
+      await web.bringToFront();
+      const disabled = await popup.evaluate(() =>
+        chrome.runtime.sendMessage({ kind: "capture", action: "highlight" }),
+      );
+      assert.equal(disabled.ok, false);
+      assert.match(disabled.error, /disabled/i);
+      await popup.evaluate(() =>
+        chrome.runtime.sendMessage({ kind: "capture", action: "savepage" }),
+      );
+      await count(6);
+      const minimalBookmark = await popup.evaluate(async () => {
+        const db = await import("./db.js");
+        return (await db.listCaptures()).find((capture) => capture.type === "bookmark" && capture.cloudAccountId);
+      });
+      assert.equal(minimalBookmark.articleText, null);
+      assert.deepEqual(minimalBookmark.provenance.authors, []);
+      assert.equal(minimalBookmark.processingOptions.ocr, true);
       const lib = await context.newPage();
       await lib.goto(`chrome-extension://${id}/src/dashboard.html`);
       await lib.waitForSelector(".capture-card");
-      assert.equal(await lib.locator(".capture-card").count(), 5);
+      assert.equal(await lib.locator(".capture-card").count(), 6);
       assert.equal(await lib.locator("#settings").isVisible(), false);
       const finalCaptures = await popup.evaluate(async () => {
         const db = await import("./db.js");
