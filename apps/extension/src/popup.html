@@ -8,84 +8,70 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div id="view-main">
+    <div id="view-main" class="popup-view">
       <header class="popup-head">
-        <a class="brand" href="#" id="brandLibrary" aria-label="Atlas library"
-          ><img src="../assets/mark.svg" alt="" />Atlas</a
-        ><span class="storage"><i></i>Saved in this browser</span>
+        <a class="brand" href="#" id="brandLibrary" aria-label="Open Atlas library">
+          <img src="../assets/mark.svg" alt="" /><span>Atlas</span>
+        </a>
+        <span class="storage" id="storageState"><i></i>Saved locally</span>
       </header>
+
       <main class="popup-main">
-        <div class="intro">
-          <h1>Found something good?</h1>
-        </div>
         <div id="cloudSummary"></div>
-        <div class="current-page">
-          <span class="page-icon" data-icon="bookmark"></span>
-          <div>
-            <span id="page-domain">Current page</span>
-            <p id="page-title">Choose what to keep.</p>
+        <section class="capture-section" aria-labelledby="captureHeading">
+          <div class="current-page">
+            <span class="page-icon" data-icon="bookmark"></span>
+            <div><span id="page-domain">Current page</span><p id="page-title">Choose what to keep.</p></div>
           </div>
-        </div>
-        <div
-          class="capture-actions"
-          role="group"
-          aria-label="Capture from this page"
-        >
-          <button data-act="region">
-            <span data-icon="screenshot"></span>Region</button
-          ><button data-act="fullpage">
-            <span data-icon="image"></span>Full page</button
-          ><button data-act="highlight">
-            <span data-icon="highlight"></span>Highlight</button
-          ><button data-act="savepage">
-            <span data-icon="bookmark"></span>Save link
+          <h1 id="captureHeading">Keep this page</h1>
+          <button id="savePage" class="save-page-action" data-act="savepage" data-feature="bookmark" type="button">
+            <span class="action-icon" data-icon="bookmark"></span>
+            <span class="action-copy"><strong class="action-label">Save page</strong><small>Readable copy, key details, and its original source</small></span>
+            <span class="action-arrow" data-icon="arrow"></span>
           </button>
-        </div>
-        <p id="captureFeedback" class="fine" role="status">
-          Right-click an image or a selection to save it, too.
-        </p>
-        <div class="composer">
-          <label for="note">Or, keep a thought.</label
-          ><textarea
-            id="note"
-            rows="2"
-            maxlength="50000"
-            placeholder="What’s worth remembering?"
-          ></textarea>
+          <div id="secondaryActions" class="capture-actions" role="group" aria-label="Other ways to capture">
+            <button data-act="highlight" data-feature="highlight" type="button"><span data-icon="highlight"></span><span class="action-label">Highlight</span></button>
+            <button data-act="region" data-feature="region" type="button"><span data-icon="screenshot"></span><span class="action-label">Region</span></button>
+            <button data-act="fullpage" data-feature="fullPage" type="button"><span data-icon="image"></span><span class="action-label">Full page</span></button>
+          </div>
+          <p id="captureFeedback" class="capture-feedback" role="status">You can also right-click text, links, or images.</p>
+        </section>
+
+        <section id="noteComposer" class="composer" aria-labelledby="noteLabel">
+          <div class="composer-heading"><label id="noteLabel" for="note">Add a note</label><span>Optional</span></div>
+          <textarea id="note" rows="2" maxlength="50000" placeholder="What should you remember?"></textarea>
           <div class="composer-foot">
-            <span class="fine">⌘ / Ctrl + Enter to save</span
-            ><button id="save" class="btn primary" disabled>
-              Save note <span data-icon="arrow"></span>
-            </button>
+            <span class="fine">⌘ / Ctrl + Enter</span>
+            <button id="save" class="btn primary" disabled type="button">Save note <span data-icon="arrow"></span></button>
           </div>
           <p id="saveFeedback" class="statusline" role="status"></p>
-        </div>
-        <section class="recent-section" aria-labelledby="recentHeading">
-          <div class="section-heading">
-            <h2 id="recentHeading">Just collected</h2>
-            <span id="savedCount"></span>
-          </div>
+        </section>
+
+        <section id="recentSection" class="recent-section" aria-labelledby="recentHeading">
+          <div class="section-heading"><h2 id="recentHeading">Recently saved</h2><span id="savedCount"></span></div>
           <ul id="recent"></ul>
         </section>
       </main>
+
       <footer class="popup-foot">
-        <button id="openLib" class="library-link">
-          Open library <span data-icon="arrow"></span></button
-        ><button id="openLocalLib" class="cloud-text-button" hidden>
-          Local library</button
-        ><button id="openSettings" class="iconbtn" aria-label="Settings">
-          <span data-icon="settings"></span>
-        </button>
+        <div class="library-actions">
+          <button id="openLib" class="library-link" type="button">Open library <span data-icon="arrow"></span></button>
+          <button id="openLocalLib" class="cloud-text-button" type="button" hidden>Local copy</button>
+        </div>
+        <button id="openSettings" class="iconbtn" type="button" aria-label="Account and settings"><span data-icon="settings"></span></button>
       </footer>
     </div>
-    <div id="view-settings" hidden>
-      <header class="popup-head">
-        <button id="backBtn" class="iconbtn" aria-label="Back to capture">
-          <span class="back-arrow" data-icon="arrow"></span>
-        </button>
-        <h2>Settings</h2>
+
+    <div id="view-settings" class="popup-view" hidden>
+      <header class="popup-head settings-head">
+        <button id="backBtn" class="iconbtn" type="button" aria-label="Back to capture"><span class="back-arrow" data-icon="arrow"></span></button>
+        <div><span class="eyebrow">Atlas</span><h2>Account &amp; settings</h2></div>
       </header>
-      <div class="settings-panel" id="connections"></div>
+      <div class="settings-panel">
+        <div id="connections"></div>
+        <button id="openPreferenceDashboard" class="btn secondary dashboard-settings" type="button">Customize capture settings <span data-icon="arrow"></span></button>
+        <p class="fine settings-note">Capture controls sync with your Atlas account across connected browsers.</p>
+      </div>
     </div>
     <script type="module" src="popup.js"></script>
   </body>

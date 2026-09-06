@@ -18,7 +18,7 @@ before(async () => {
 after(async () => {
   await browser?.close();
 });
-async function pageWithExtension(t, { saveFails = false } = {}) {
+async function pageWithExtension(t, { saveFails = false, preferences = null } = {}) {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
   });
@@ -43,14 +43,27 @@ async function pageWithExtension(t, { saveFails = false } = {}) {
     }
   });
   await context.addInitScript(
-    ({ saveFails }) => {
+    ({ saveFails, preferences }) => {
       let settings = {
         enrichEnabled: false,
         relayUrl: "",
         relayToken: "",
         agentUrl: "http://127.0.0.1:8791",
       };
-      window.close = () => {};
+      window.__closed = false;
+      window.close = () => { window.__closed = true; };
+      window.__captureRequests = [];
+      window.__preferences = preferences || {
+        version: 1,
+        capture: { region: true, fullPage: true, highlight: true, bookmark: true, image: true, tweet: true, note: true },
+        bookmark: { readableText: true, extendedMetadata: true, headings: true },
+        notes: { attachSource: true },
+        popup: { actionOrder: ["bookmark", "highlight", "region", "fullPage"], showRecent: true, recentCount: 3 },
+        sync: { automatic: true },
+        organization: { ocr: true, summaries: true, tags: true },
+        feedback: { success: true },
+        contextMenus: true,
+      };
       window.__cloudStatus = {
         account: null,
         status: "disconnected",
@@ -76,6 +89,13 @@ async function pageWithExtension(t, { saveFails = false } = {}) {
           getURL: (p) => "http://atlas.test/" + p,
           onMessage: { addListener: () => {}, removeListener: () => {} },
           sendMessage: async (m) => {
+            if (m.kind === "preferences-status")
+              return { ok: true, preferences: window.__preferences, revision: 1, source: "cache" };
+            if (m.kind === "capture") {
+              window.__captureRequests.push(m);
+              await new Promise((resolve) => setTimeout(resolve, 60));
+              return { ok: true, status: m.action === "region" ? "started" : "saved" };
+            }
             if (m.kind === "cloud-status")
               return { ok: true, ...window.__cloudStatus };
             if (m.kind === "cloud-import") {
@@ -117,7 +137,7 @@ async function pageWithExtension(t, { saveFails = false } = {}) {
         },
       };
     },
-    { saveFails },
+    { saveFails, preferences },
   );
   return context.newPage();
 }
@@ -401,8 +421,54 @@ test("mobile retains tag filtering and popup keeps Open library within Chrome he
   const footer = await page.locator(".popup-foot").boundingBox();
   assert.ok(
     saveButton.y + saveButton.height <= footer.y,
-    "Quick-note save remains visible above the popup footer",
+    `Quick-note save remains visible above the popup footer (${JSON.stringify({ saveButton, footer })})`,
   );
+  assert.equal(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    true,
+    "The popup must not overflow horizontally",
+  );
+  assert.equal(
+    await page.locator("#recent").evaluate((node) => getComputedStyle(node).overflowY),
+    "visible",
+    "Recent captures must not create a nested scroll area",
+  );
+});
+test("popup follows customer action controls and reports capture progress without closing", async (t) => {
+  const preferences = {
+    version: 1,
+    capture: { region: false, fullPage: true, highlight: true, bookmark: true, image: true, tweet: true, note: true },
+    bookmark: { readableText: true, extendedMetadata: true, headings: true },
+    notes: { attachSource: true },
+    popup: { actionOrder: ["fullPage", "bookmark", "highlight", "region"], showRecent: false, recentCount: 0 },
+    sync: { automatic: true },
+    organization: { ocr: true, summaries: true, tags: true },
+    feedback: { success: true },
+    contextMenus: true,
+  };
+  const page = await pageWithExtension(t, { preferences });
+  await page.setViewportSize({ width: 392, height: 600 });
+  await page.goto("http://atlas.test/src/popup.html");
+  await page.waitForFunction(() => document.body.dataset.preferencesReady === "true");
+  assert.deepEqual(
+    await page.locator("#secondaryActions [data-feature]:visible").evaluateAll((nodes) => nodes.map((node) => node.dataset.feature)),
+    ["fullPage", "highlight"],
+  );
+  assert.equal(await page.locator('[data-feature="region"]').isHidden(), true);
+  assert.equal(await page.locator("#recentSection").isHidden(), true);
+  const capture = page.locator("#savePage");
+  await capture.click({ noWaitAfter: true });
+  await page.waitForFunction(() => document.querySelector("#savePage")?.getAttribute("aria-busy") === "true");
+  await page.waitForFunction(() => document.querySelector("#captureFeedback")?.textContent.includes("Saved"));
+  assert.equal(await capture.getAttribute("aria-busy"), null);
+  assert.equal(await page.evaluate(() => window.__closed), false);
+  assert.deepEqual(await page.evaluate(() => window.__captureRequests), [
+    { kind: "capture", action: "savepage" },
+  ]);
+  const footer = await page.locator(".popup-foot").boundingBox();
+  assert.ok(footer.y + footer.height <= 600);
+  if (process.env.ATLAS_POPUP_SCREENSHOT)
+    await page.screenshot({ path: process.env.ATLAS_POPUP_SCREENSHOT });
 });
 test("new library note saves and deletion requires confirmation", async (t) => {
   const page = await pageWithExtension(t);

@@ -3,39 +3,49 @@ import { $, title, domain, ago, icon, hydrateIcons, message } from "./ui.js";
 import { bindConnections } from "./connections.js";
 import { bindCloud } from "./cloud-ui.js";
 import { CUSTOMER_ORIGIN } from "./cloud.js";
+import { DEFAULT_PREFERENCES } from "./preferences.js";
+
 hydrateIcons();
-let blobUrls = [],
-  saving = false;
-const settings = bindConnections($("connections"));
+
+let blobUrls = [];
+let saving = false;
+let captureBusy = false;
+let preferences = structuredClone(DEFAULT_PREFERENCES);
 let cloudState = null;
+
+const settings = bindConnections($("connections"));
 const cloud = bindCloud($("cloudSummary"), {
   compact: true,
   onStatus: (state) => {
     cloudState = state;
-    $("openLib").innerHTML =
-      (state.account ? "Open dashboard" : "Open library") + " " + icon("arrow");
+    $("openLib").innerHTML = (state.account ? "Open dashboard" : "Open library") + " " + icon("arrow");
     $("openLocalLib").hidden = !state.account;
+    $("storageState").dataset.state = state.status === "reconnect" ? "reconnect" : state.pending ? "waiting" : "ready";
+    $("storageState").lastChild.textContent = state.status === "reconnect"
+      ? "Reconnect needed"
+      : state.pending
+        ? `${state.pending} waiting`
+        : state.account
+          ? "Synced to Atlas"
+          : "Saved locally";
   },
 });
+
 async function openLibrary(id) {
   try {
     await chrome.tabs.create({
-      url:
-        chrome.runtime.getURL("src/dashboard.html") +
-        (id ? `#capture=${encodeURIComponent(id)}` : ""),
+      url: chrome.runtime.getURL("src/dashboard.html") + (id ? `#capture=${encodeURIComponent(id)}` : ""),
     });
     window.close();
   } catch (error) {
-    message(
-      $("saveFeedback"),
-      error.message || "Could not open the library.",
-      "error",
-    );
+    message($("saveFeedback"), error.message || "Could not open the library.", "error");
   }
 }
+
 async function renderRecent() {
+  const limit = preferences.popup.showRecent ? preferences.popup.recentCount : 0;
   const [rows, counts] = await Promise.all([
-    db.listCaptures({ limit: 3 }),
+    limit ? db.listCaptures({ limit }) : Promise.resolve([]),
     db.counts(),
   ]);
   blobUrls.forEach(URL.revokeObjectURL);
@@ -43,34 +53,69 @@ async function renderRecent() {
   $("savedCount").textContent = `${counts.total} saved`;
   $("recent").replaceChildren();
   for (const capture of rows) {
-    const li = document.createElement("li"),
-      button = document.createElement("button");
+    const item = document.createElement("li");
+    const button = document.createElement("button");
     button.className = "recent-item";
     button.innerHTML = `<span class="r-icon">${icon(capture.type)}</span><span class="r-copy"><span class="r-title"></span><span class="r-meta"></span></span><span class="r-time"></span>`;
     button.querySelector(".r-title").textContent = title(capture);
     button.querySelector(".r-meta").textContent = domain(capture.sourceUrl);
     button.querySelector(".r-time").textContent = ago(capture.createdAt);
     if (capture.blob) {
-      const img = document.createElement("img");
-      img.alt = "";
-      img.src = URL.createObjectURL(capture.blob);
-      blobUrls.push(img.src);
-      button.querySelector(".r-icon").replaceChildren(img);
+      const image = document.createElement("img");
+      image.alt = "";
+      image.src = URL.createObjectURL(capture.blob);
+      blobUrls.push(image.src);
+      button.querySelector(".r-icon").replaceChildren(image);
     }
     button.onclick = () => openLibrary(capture.id);
-    li.append(button);
-    $("recent").append(li);
+    item.append(button);
+    $("recent").append(item);
   }
-  if (!rows.length) {
-    const li = document.createElement("li");
-    li.className = "recent-empty";
-    li.textContent = "Your next good find starts here.";
-    $("recent").append(li);
+  if (!rows.length && limit) {
+    const empty = document.createElement("li");
+    empty.className = "recent-empty";
+    empty.textContent = "Your next good find starts here.";
+    $("recent").append(empty);
   }
 }
+
+function applyPreferences(next) {
+  if (!next?.popup || !next?.capture) return;
+  preferences = structuredClone(next);
+  $("savePage").hidden = !preferences.capture.bookmark;
+  $("noteComposer").hidden = !preferences.capture.note;
+  $("recentSection").hidden = !preferences.popup.showRecent || preferences.popup.recentCount === 0;
+  const order = new Map(preferences.popup.actionOrder.map((name, index) => [name, index]));
+  const actions = [...$("secondaryActions").querySelectorAll("[data-feature]")];
+  actions
+    .sort((a, b) => (order.get(a.dataset.feature) ?? 99) - (order.get(b.dataset.feature) ?? 99))
+    .forEach((button) => {
+      button.hidden = !preferences.capture[button.dataset.feature];
+      $("secondaryActions").append(button);
+    });
+  const visibleSecondary = actions.some((button) => !button.hidden);
+  $("secondaryActions").hidden = !visibleSecondary;
+  if ($("savePage").hidden && !visibleSecondary) {
+    message($("captureFeedback"), "Page capture is turned off in your Atlas settings.");
+  }
+  document.body.dataset.preferencesReady = "true";
+}
+
+async function loadPreferences({ refresh = false } = {}) {
+  try {
+    const result = await chrome.runtime.sendMessage({ kind: "preferences-status", refresh });
+    if (result?.ok) applyPreferences(result.preferences);
+    else applyPreferences(DEFAULT_PREFERENCES);
+  } catch {
+    applyPreferences(DEFAULT_PREFERENCES);
+  }
+  await renderRecent();
+}
+
 function updateSave() {
   $("save").disabled = saving || !$("note").value.trim();
 }
+
 async function saveNote() {
   const text = $("note").value.trim();
   if (!text || saving) return;
@@ -80,72 +125,66 @@ async function saveNote() {
   $("save").textContent = "Saving…";
   message($("saveFeedback"), "");
   try {
-    const response = await chrome.runtime.sendMessage({
-      kind: "saveNote",
-      text,
-    });
-    if (!response?.ok)
-      throw new Error(
-        response?.error || "Could not save your note. Try again.",
-      );
+    const response = await chrome.runtime.sendMessage({ kind: "saveNote", text });
+    if (!response?.ok) throw new Error(response?.error || "Could not save your note. Try again.");
     if ($("note").value === draft) $("note").value = "";
     message($("saveFeedback"), "Saved in your library.", "success");
     await renderRecent();
   } catch (error) {
-    message(
-      $("saveFeedback"),
-      error.message || "Could not save. Your draft is still here.",
-      "error",
-    );
+    message($("saveFeedback"), error.message || "Could not save. Your draft is still here.", "error");
   } finally {
     saving = false;
     $("save").innerHTML = `Save note ${icon("arrow")}`;
     updateSave();
   }
 }
+
+async function runCapture(button) {
+  if (captureBusy) return;
+  captureBusy = true;
+  const action = button.dataset.act;
+  const label = button.querySelector(".action-label");
+  const original = label?.textContent;
+  button.setAttribute("aria-busy", "true");
+  document.querySelectorAll("[data-act]").forEach((item) => { item.disabled = true; });
+  if (label) label.textContent = action === "savepage" ? "Saving page…" : "Capturing…";
+  message($("captureFeedback"), action === "savepage" ? "Collecting readable text and source details…" : "Starting capture…");
+  try {
+    const response = await chrome.runtime.sendMessage({ kind: "capture", action });
+    if (!response?.ok) throw new Error(response?.error || "Could not capture this page.");
+    if (action === "region") {
+      window.close();
+      return;
+    }
+    message($("captureFeedback"), "Saved in your Atlas library.", "success");
+    await renderRecent();
+  } catch (error) {
+    message($("captureFeedback"), error.message || "Could not start capture. Reload this page and try again.", "error");
+  } finally {
+    captureBusy = false;
+    button.removeAttribute("aria-busy");
+    document.querySelectorAll("[data-act]").forEach((item) => { item.disabled = false; });
+    if (label && original) label.textContent = original;
+  }
+}
+
 $("note").addEventListener("input", updateSave);
-$("note").addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-    e.preventDefault();
+$("note").addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    event.preventDefault();
     saveNote();
   }
 });
 $("save").onclick = saveNote;
-for (const button of document.querySelectorAll("[data-act]"))
-  button.onclick = async () => {
-    try {
-      await chrome.runtime.sendMessage({
-        kind: "capture",
-        action: button.dataset.act,
-      });
-      window.close();
-    } catch (error) {
-      message(
-        $("captureFeedback"),
-        error.message ||
-          "Could not start capture. Reload this page and try again.",
-        "error",
-      );
-    }
-  };
-$("openLib").onclick = () =>
-  cloudState?.account
-    ? chrome.tabs
-        .create({ url: CUSTOMER_ORIGIN + "/dashboard.html" })
-        .then(() => window.close())
-        .catch(() =>
-          message(
-            $("saveFeedback"),
-            "Could not open Atlas. Your local library is still available.",
-            "error",
-          ),
-        )
-    : openLibrary();
+document.querySelectorAll("[data-act]").forEach((button) => { button.onclick = () => runCapture(button); });
+
+$("openLib").onclick = () => cloudState?.account
+  ? chrome.tabs.create({ url: CUSTOMER_ORIGIN + "/dashboard.html" }).then(() => window.close()).catch(() => message($("saveFeedback"), "Could not open Atlas. Your local library is still available.", "error"))
+  : openLibrary();
 $("openLocalLib").onclick = () => openLibrary();
-$("brandLibrary").onclick = (e) => {
-  e.preventDefault();
-  openLibrary();
-};
+$("brandLibrary").onclick = (event) => { event.preventDefault(); openLibrary(); };
+$("openPreferenceDashboard").onclick = () => chrome.tabs.create({ url: CUSTOMER_ORIGIN + "/dashboard.html#extension-settings" }).then(() => window.close());
+
 $("openSettings").onclick = async () => {
   $("view-main").hidden = true;
   $("view-settings").hidden = false;
@@ -157,40 +196,34 @@ $("backBtn").onclick = () => {
   $("view-main").hidden = false;
   $("openSettings").focus();
 };
-chrome.runtime.onMessage.addListener((m) => {
-  if (m.kind === "atlas-changed") {
+
+chrome.runtime.onMessage.addListener((messageValue) => {
+  if (messageValue.kind === "atlas-changed") {
     renderRecent().catch(() => {});
     cloud.load();
     if (!$("view-settings").hidden) settings.refreshCloud();
   }
+  if (messageValue.kind === "atlas-preferences-changed") loadPreferences().catch(() => {});
 });
+
 window.addEventListener("focus", () => cloud.load());
-window.addEventListener("pagehide", () =>
-  blobUrls.forEach(URL.revokeObjectURL),
-);
+window.addEventListener("pagehide", () => blobUrls.forEach(URL.revokeObjectURL));
+
 async function init() {
   try {
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab && /^https?:\/\//.test(tab.url || "")) {
       $("page-domain").textContent = domain(tab.url);
       $("page-title").textContent = tab.title || tab.url;
     } else {
       $("page-title").textContent = "Open a web page to capture it.";
-      document
-        .querySelectorAll("[data-act]")
-        .forEach((b) => (b.disabled = true));
+      document.querySelectorAll("[data-act]").forEach((button) => { button.disabled = true; });
     }
-    await renderRecent();
-    await cloud.load();
+    await Promise.all([loadPreferences(), cloud.load()]);
   } catch {
-    message(
-      $("saveFeedback"),
-      "Could not load recent captures. Try reopening Atlas.",
-      "error",
-    );
+    applyPreferences(DEFAULT_PREFERENCES);
+    message($("saveFeedback"), "Could not load recent captures. Try reopening Atlas.", "error");
   }
 }
+
 init();
