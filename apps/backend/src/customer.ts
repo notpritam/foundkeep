@@ -225,6 +225,10 @@ export function customerRoutes(db: Database) {
   }
   function account(id: string) { return db.query("SELECT * FROM customer_accounts WHERE id = ?").get(id) as AccountRow | null; }
   function emailAccount(email: string) { return db.query("SELECT * FROM customer_accounts WHERE email = ?").get(email) as AccountRow | null; }
+  function accountIntent(c: C, accountId: string) {
+    const expected = c.req.header("X-Atlas-Account");
+    if (expected !== undefined && expected !== accountId) fail(409, "account_changed", "Your signed-in account changed. Reload Atlas to continue.");
+  }
   function auth(c: C, cookieOnly = false, countRequest = true): Auth {
     const authorization = c.req.header("authorization");
     const kind = authorization ? "connection" : "session";
@@ -236,6 +240,9 @@ export function customerRoutes(db: Database) {
     if (!credential || credential.expires_at <= Date.now()) fail(401, "unauthorized", "Your session expired. Sign in or reconnect your extension.");
     const owner = account(credential.account_id);
     if (!owner) fail(401, "unauthorized", "Sign in or reconnect your extension.");
+    // This optional header expresses the page's existing account context. It
+    // can reject a cookie changed in another tab; it never grants authority.
+    if (kind === "session") accountIntent(c, owner.id);
     if (kind === "session" && !["GET", "HEAD", "OPTIONS"].includes(c.req.method)) website(c);
     if (kind === "connection") db.query("UPDATE customer_connections SET last_seen_at = ? WHERE id = ?").run(Date.now(), credential.id);
     if (countRequest) rates.take(`account:${owner.id}`, 600, 60_000);
@@ -292,7 +299,7 @@ export function customerRoutes(db: Database) {
     }
     if (c.req.method === "OPTIONS") {
       if (allowed) {
-        c.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
+        c.header("Access-Control-Allow-Headers", "Authorization, Content-Type" + (requestOrigin === origin ? ", X-Atlas-Account" : ""));
         c.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         c.header("Access-Control-Max-Age", "600");
       }
@@ -361,7 +368,11 @@ export function customerRoutes(db: Database) {
     website(c);
     // Expired or already revoked sessions can still clear their browser cookie.
     const token = getCookie(c, cookieName);
-    if (token) db.query("DELETE FROM customer_sessions WHERE token_hash = ?").run(hash(token));
+    if (token) {
+      const current = db.query("SELECT account_id FROM customer_sessions WHERE token_hash = ? AND expires_at > ?").get(hash(token), Date.now()) as { account_id: string } | null;
+      if (current && account(current.account_id)) accountIntent(c, current.account_id);
+      db.query("DELETE FROM customer_sessions WHERE token_hash = ?").run(hash(token));
+    }
     deleteCookie(c, cookieName, cookieOptions);
     return c.json({ ok: true });
   });

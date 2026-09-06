@@ -202,6 +202,32 @@ describe("customer account security", () => {
     expect((await pending).status).toBe(401);
     expect((db.query("SELECT COUNT(*) n FROM customer_captures").get() as any).n).toBe(0);
   });
+
+  test("a stale dashboard account header rejects a changed cookie owner for reads, writes and logout", async () => {
+    const a = await register();
+    const b = await register();
+    for (const [path, method, body] of [
+      ["/me", "GET", undefined],
+      ["/captures", "POST", JSON.stringify({ clientId: "wrong-account", type: "note", noteText: "Intended for A" })],
+      ["/auth/logout", "POST", undefined],
+    ] as const) {
+      const response = await app.request(`${ORIGIN}/api${path}`, { method, headers: { origin: ORIGIN, cookie: b.cookie, "content-type": "application/json", "X-Atlas-Account": a.account.id }, body });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: "account_changed", message: "Your signed-in account changed. Reload Atlas to continue." });
+    }
+    expect((await request("/me", "GET", undefined, b.cookie)).status).toBe(200);
+    expect((db.query("SELECT COUNT(*) n FROM customer_captures").get() as any).n).toBe(0);
+    const own = await app.request(`${ORIGIN}/api/captures`, { method: "POST", headers: { origin: ORIGIN, cookie: b.cookie, "content-type": "application/json", "X-Atlas-Account": b.account.id }, body: JSON.stringify({ clientId: "correct-account", type: "note" }) });
+    expect(own.status).toBe(201);
+    const browser = await connect(b.cookie);
+    const bearer = await app.request(`${ORIGIN}/api/me`, { headers: { authorization: browser.bearer, "X-Atlas-Account": a.account.id } });
+    expect(bearer.status).toBe(200);
+    expect((await bearer.json() as any).account.id).toBe(b.account.id);
+    db.query("UPDATE customer_sessions SET expires_at=0 WHERE account_id=?").run(b.account.id);
+    const expired = await app.request(`${ORIGIN}/api/auth/logout`, { method: "POST", headers: { origin: ORIGIN, cookie: b.cookie, "X-Atlas-Account": a.account.id } });
+    expect(expired.status).toBe(200);
+    expect(expired.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
 });
 
 describe("private customer captures", () => {
