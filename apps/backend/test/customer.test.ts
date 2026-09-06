@@ -162,6 +162,35 @@ describe("customer account security", () => {
     expect((await pending).status).toBe(401);
     expect((db.query("SELECT COUNT(*) n FROM customer_captures").get() as any).n).toBe(0);
   });
+
+  test("browser disconnect revokes only its own bearer and rejects cookie authority", async () => {
+    const a = await register();
+    const first = await connect(a.cookie);
+    const second = await connect(a.cookie);
+    expect((await request("/connections/disconnect", "POST", {}, a.cookie)).status).toBe(403);
+    const response = await request("/connections/disconnect", "POST", { id: second.connection.id }, first.bearer, EXTENSION);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect((await request("/me", "GET", undefined, first.bearer)).status).toBe(401);
+    expect((await request("/connections/disconnect", "POST", {}, first.bearer, EXTENSION)).status).toBe(401);
+    expect((await request("/me", "GET", undefined, second.bearer)).status).toBe(200);
+    expect((await request("/me", "GET", undefined, a.cookie)).status).toBe(200);
+  });
+
+  test("browser disconnect prevents an in-flight upload from committing afterwards", async () => {
+    const a = await register();
+    const browser = await connect(a.cookie);
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
+    const pending = app.request(`${ORIGIN}/api/captures`, {
+      method: "POST", headers: { origin: EXTENSION, authorization: browser.bearer, "content-type": "application/json" }, body: stream,
+    });
+    expect((await request("/connections/disconnect", "POST", undefined, browser.bearer, EXTENSION)).status).toBe(200);
+    controller.enqueue(new TextEncoder().encode(JSON.stringify({ clientId: "late-browser-upload", type: "note" })));
+    controller.close();
+    expect((await pending).status).toBe(401);
+    expect((db.query("SELECT COUNT(*) n FROM customer_captures").get() as any).n).toBe(0);
+  });
 });
 
 describe("private customer captures", () => {

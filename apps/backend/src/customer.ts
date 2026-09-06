@@ -445,6 +445,15 @@ export function customerRoutes(db: Database) {
     return c.json({ ...result, token }, 201);
   });
 
+  app.post("/connections/disconnect", (c) => {
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "browser_connection_required", "Disconnect using the connected browser, or remove it in your account settings.");
+    // Caller-supplied IDs are never used: a browser can only revoke the
+    // credential that authorized this request, including during replacement.
+    db.query("DELETE FROM customer_connections WHERE id = ? AND account_id = ?").run(current.credentialId, current.account.id);
+    return c.json({ ok: true });
+  });
+
   app.delete("/connections/:id", (c) => {
     const current = auth(c, true);
     const result = db.query("DELETE FROM customer_connections WHERE id = ? AND account_id = ?").run(c.req.param("id"), current.account.id);
