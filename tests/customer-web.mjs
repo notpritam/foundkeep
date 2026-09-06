@@ -8,11 +8,22 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-c
 let browser, server, base, dataDir;
 const now = Date.now();
 const account = { id: 'test-account', email: 'collector@example.test', name: 'Alex', createdAt: now };
+const defaultPreferences = {
+  version: 1,
+  capture: { region: true, fullPage: true, highlight: true, bookmark: true, image: true, tweet: true, note: true },
+  bookmark: { readableText: true, extendedMetadata: true, headings: true },
+  notes: { attachSource: true },
+  popup: { actionOrder: ['bookmark', 'highlight', 'region', 'fullPage'], showRecent: true, recentCount: 3 },
+  sync: { automatic: true },
+  organization: { ocr: true, summaries: true, tags: true },
+  feedback: { success: true },
+  contextMenus: true,
+};
 const fixtureCaptures = [
   { id: 'photo', type: 'image', sourceTitle: 'An unexpected doorway', sourceUrl: 'https://example.com/architecture', blobUrl: '/api/captures/photo/blob', tags: ['architecture', 'inspiration'] },
   { id: 'highlight', type: 'selection', sourceTitle: 'A thought on collecting', selectionText: 'A good collection starts with noticing. Leave a little room for the unexpected.', sourceUrl: 'https://example.com/field-notes', tags: ['ideas'] },
   { id: 'note', type: 'note', noteText: 'Bring a little more intention to the things we keep. Start with the details worth returning to.', tags: [] },
-  { id: 'bookmark', type: 'bookmark', sourceTitle: 'A field guide to seeing', articleText: 'A few observations about everyday places, objects and the details that make them memorable.', sourceUrl: 'https://example.com/field-guide', tags: [] },
+  { id: 'bookmark', type: 'bookmark', sourceTitle: 'A field guide to seeing', articleText: 'A few observations about everyday places, objects and the details that make them memorable.', sourceUrl: 'https://example.com/field-guide', tags: [], provenance: { schemaVersion: 1, captureMethod: 'popup-save-page', pageUrl: 'https://example.com/field-guide?from=atlas', canonicalUrl: 'https://example.com/field-guide', pageTitle: 'A field guide to seeing', siteName: 'Example Review', description: 'A guide to noticing.', authors: ['Mina Vale'], publishedAt: '2026-08-22T09:00:00.000Z', modifiedAt: null, language: 'en', leadImageUrl: null, faviconUrl: 'https://example.com/favicon.ico', targetUrl: null, headings: ['Look closely', 'Keep context'], capturedAt: new Date(now).toISOString(), extractedAt: new Date(now + 50).toISOString(), extractorVersion: 'atlas-readable/1', contentHash: 'QJ7wKGnJ-txQi4PddSI5BQbzLW-uKr7CemEJGc9uYWQ', extractionStatus: 'complete', extractionError: null } },
   { id: 'image-2', type: 'screenshot', sourceTitle: 'Light, material, rhythm', blobUrl: '/api/captures/image-2/blob', sourceUrl: 'https://example.com/studio', tags: [] },
   { id: 'note-2', type: 'note', noteText: 'Things to come back to: olive greens, concrete textures, and this particular afternoon light.', tags: [] },
 ].map((capture, index) => ({ clientId: capture.id, status: 'done', capturedAt: now - index * 86400000, ...capture }));
@@ -33,7 +44,7 @@ after(async () => { await browser?.close(); server?.kill(); await rm(dataDir, { 
 async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAccount = null, extensionInstalled = true, width = 1440, handler } = {}) {
   const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce', acceptDownloads: true });
   t.after(() => context.close());
-  const requests = []; const model = { account, captures: [...captures], connections: extensionAccount?.id === account.id ? [{ id: 'connected-browser', name: 'Chrome', createdAt: now, lastSeenAt: now }] : [], usage: null };
+  const requests = []; const model = { account, captures: [...captures], connections: extensionAccount?.id === account.id ? [{ id: 'connected-browser', name: 'Chrome', createdAt: now, lastSeenAt: now }] : [], usage: null, preferences: structuredClone(defaultPreferences), preferenceRevision: 0 };
   if (mock) await context.route('**/api/**', async route => {
     const request = route.request(), url = new URL(request.url());
     const body = request.postDataJSON(); requests.push({ path: url.pathname, query: url.searchParams, method: request.method(), body });
@@ -42,6 +53,8 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
     const json = body => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
     if (url.pathname.endsWith('/blob')) return route.fulfill({ contentType: 'image/webp', path: path.resolve('apps/web/assets/studio-architecture-640.webp') });
     if (url.pathname === '/api/me') return json({ account: model.account, connections: model.connections, usage: { captures: model.captures.length, bytes: 1432020, maxCaptures: 1000, maxBytes: 209715200 } });
+    if (url.pathname === '/api/preferences' && request.method() === 'GET') return json({ preferences: model.preferences, revision: model.preferenceRevision, updatedAt: null });
+    if (url.pathname === '/api/preferences' && request.method() === 'PUT') { model.preferences = body.preferences; model.preferenceRevision += 1; return json({ preferences: model.preferences, revision: model.preferenceRevision, updatedAt: now }); }
     if (url.pathname === '/api/captures' && request.method() === 'GET') {
       const items = model.captures.filter(capture => (!url.searchParams.get('type') || capture.type === url.searchParams.get('type')) && (!url.searchParams.get('q') || JSON.stringify(capture).toLowerCase().includes(url.searchParams.get('q').toLowerCase())));
       return json({ captures: items, nextCursor: null, total: items.length });
@@ -70,6 +83,7 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
       window.__extensionMessages.push({ id, message });
       if (message.kind === 'atlas-ping') callback({ ok: true, version: '1.4.0', account: connected });
       if (message.kind === 'atlas-connect') { connected = account; callback({ ok: true, account }); }
+      if (message.kind === 'atlas-refresh-preferences') callback({ ok: true, revision: 1 });
     } } };
   }, { extensionAccount, extensionInstalled, account });
   const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -142,6 +156,50 @@ test('library search, filter and detail render capture text safely', async t => 
   await page.keyboard.press('Escape'); await page.locator('#search').fill('no-such-capture'); await page.getByRole('heading', { name: 'No finds this time.' }).waitFor();
   await page.getByRole('button', { name: 'Clear filters' }).click(); await page.locator('.capture-open').nth(6).waitFor();
   await page.keyboard.press('/'); assert.equal(await page.evaluate(() => document.activeElement.id), 'search');
+});
+
+test('bookmark details preserve a readable trail back to the original page', async t => {
+  const { page } = await pageFor(t, { captures: [fixtureCaptures.find(capture => capture.id === 'bookmark')] });
+  await openLibrary(page); await page.locator('.capture-open').click();
+  await page.locator('#capture-origin').waitFor({ state: 'visible' });
+  const origin = page.locator('#capture-origin');
+  assert.match(await origin.textContent(), /Example Review/);
+  assert.match(await origin.textContent(), /Mina Vale/);
+  assert.match(await origin.textContent(), /Saved from popup/);
+  assert.match(await origin.textContent(), /atlas-readable\/1/);
+  assert.match(await origin.textContent(), /QJ7wKGnJ/);
+  assert.deepEqual(await origin.locator('a').evaluateAll(links => links.map(link => link.href)), [
+    'https://example.com/field-guide?from=atlas',
+    'https://example.com/field-guide',
+    'https://example.com/favicon.ico',
+  ]);
+});
+
+test('customer controls every extension feature and refreshes the connected browser', async t => {
+  const { page, model, requests } = await pageFor(t, { captures: [], extensionAccount: account });
+  await openLibrary(page); await page.locator('#open-account').click();
+  await page.locator('#preference-form[data-ready="true"]').waitFor();
+  await page.locator('[data-preference="capture.region"]').uncheck();
+  await page.getByText('Sync & automatic context', { exact: true }).click();
+  await page.locator('[data-preference="sync.automatic"]').uncheck();
+  await page.locator('[data-preference="organization.ocr"]').uncheck();
+  await page.getByText('Popup layout', { exact: true }).click();
+  await page.locator('[data-preference="popup.recentCount"]').selectOption('5');
+  await page.locator('[data-order-action="fullPage"] [data-order-direction="up"]').click();
+  await page.locator('#save-preferences').click();
+  await page.waitForFunction(() => document.querySelector('#preference-message').textContent.includes('Saved'));
+  const write = requests.find(request => request.path === '/api/preferences' && request.method === 'PUT');
+  assert.equal(write.body.preferences.capture.region, false);
+  assert.equal(write.body.preferences.sync.automatic, false);
+  assert.equal(write.body.preferences.organization.ocr, false);
+  assert.equal(write.body.preferences.popup.recentCount, 5);
+  assert.deepEqual(write.body.preferences.popup.actionOrder, ['bookmark', 'highlight', 'fullPage', 'region']);
+  assert.deepEqual(model.preferences, write.body.preferences);
+  assert.equal(await page.evaluate(() => window.__extensionMessages.some(item => item.message.kind === 'atlas-refresh-preferences')), true);
+  await page.setViewportSize({ width: 390, height: 900 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  assert.equal(await page.locator('#account-dialog').evaluate(dialog => dialog.scrollWidth <= dialog.clientWidth), true);
+  if (process.env.ATLAS_SETTINGS_SCREENSHOT) await page.screenshot({ path: process.env.ATLAS_SETTINGS_SCREENSHOT, fullPage: false });
 });
 
 test('a failed note save retains its text and idempotency key for retry', async t => {

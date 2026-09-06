@@ -1,6 +1,6 @@
-import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig, setAccountContext } from './customer.js?v=1.4.0';
+import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig, setAccountContext } from './customer.js?v=1.5.0';
 
-const state = { account: null, connections: [], usage: null, captures: [], cursor: null, total: 0, type: '', query: '', listRequest: 0, controller: null, detailRequest: 0, detail: null, extension: null, extensionId: null, expired: false, noteClientId: null, recoveryCode: '', connecting: false };
+const state = { account: null, connections: [], usage: null, captures: [], cursor: null, total: 0, type: '', query: '', listRequest: 0, controller: null, detailRequest: 0, detail: null, extension: null, extensionId: null, expired: false, noteClientId: null, recoveryCode: '', connecting: false, preferences: null, preferenceRevision: 0 };
 const kinds = { screenshot: 'Screenshot', selection: 'Highlight', bookmark: 'Bookmark', image: 'Image', note: 'Note', tweet: 'Tweet' };
 let toastTimer, searchTimer, listRetry = () => loadCaptures();
 
@@ -21,14 +21,14 @@ function expireSession(event) {
   if (state.expired) return;
   state.expired = true; state.controller?.abort(); state.listRequest++; state.detailRequest++;
   state.account = null; state.captures = []; state.detail = null; state.connections = []; state.usage = null;
-  state.recoveryCode = ''; state.extension = null; state.extensionId = null; state.cursor = null; state.query = '';
+  state.recoveryCode = ''; state.extension = null; state.extensionId = null; state.cursor = null; state.query = ''; state.preferences = null; state.preferenceRevision = 0;
   $('#capture-grid').replaceChildren(); $('#detail-body').replaceChildren(textElement('h2', 'Log in to view this capture.'));
   $('#account-name').textContent = 'Your account'; $('#settings-email').textContent = ''; $('#device-list').replaceChildren();
   $('#account-avatar').textContent = 'A'; $('#nav-count').textContent = '—'; $('#usage-summary').textContent = ''; $('#settings-usage').textContent = '';
   $('#results-count').textContent = ''; $('#search').value = ''; $('#library-description').textContent = 'Log in to open your private library.';
   $('#password-recovery-code').textContent = ''; $('#password-recovery-saved').checked = false; $('#extension-status').textContent = '';
   $('#toast').hidden = true; $('#toast').textContent = ''; setMessage($('#page-message'), '');
-  $('#note-text').value = ''; $('#password-form').reset(); $('#delete-account-form').reset();
+  $('#note-text').value = ''; $('#password-form').reset(); $('#delete-account-form').reset(); $('#preference-form').reset(); $('#preference-form').dataset.ready = 'false';
   document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
   $('#library-state').hidden = true; $('#onboarding').hidden = true; $('#new-note').disabled = true;
   if (event?.detail?.code === 'account_changed') $('#session-description').textContent = 'Your signed-in account changed in another tab. This action was stopped to protect your collection. Log in again to open the correct library.';
@@ -160,6 +160,54 @@ function showLibraryState(title, description, { loading = false, retry, action, 
 function captureTitle(capture) {
   return capture.sourceTitle || (capture.noteText || capture.selectionText || '').slice(0, 120) || `Untitled ${kinds[capture.type]?.toLowerCase() || 'capture'}`;
 }
+
+const captureMethods = {
+  'popup-save-page': 'Saved from popup', 'popup-highlight': 'Highlight from popup', 'popup-region': 'Region from popup', 'popup-full-page': 'Full page from popup',
+  'keyboard-highlight': 'Highlight keyboard shortcut', 'keyboard-region': 'Region keyboard shortcut', 'keyboard-full-page': 'Full page keyboard shortcut',
+  'context-save-page': 'Saved from right-click menu', 'context-selection': 'Selection from right-click menu', 'context-link': 'Link from right-click menu', 'context-image': 'Image from right-click menu',
+  'extension-note': 'Note from extension', 'library-note': 'Note from library', 'twitter-action': 'Saved from X',
+};
+function originValue(list, label, value) {
+  if (value === null || value === undefined || value === '') return;
+  const term = textElement('dt', label); const detail = textElement('dd'); detail.append(value instanceof Node ? value : document.createTextNode(String(value))); list.append(term, detail);
+}
+function originLink(url, label) {
+  const safe = safeSource(url); if (!safe) return null;
+  const link = textElement('a', safe.href); link.href = safe.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.setAttribute('aria-label', `${label}: ${safe.href}`); return link;
+}
+function appendCaptureOrigin(body, capture) {
+  const provenance = capture.provenance;
+  if (!provenance || typeof provenance !== 'object') return;
+  const section = textElement('section', null, 'detail-origin'); section.id = 'capture-origin';
+  section.append(textElement('h3', 'Original source'), textElement('p', 'Atlas keeps this record with the capture so you can trace it back to where it came from.', 'detail-origin-intro'));
+  const list = textElement('dl');
+  originValue(list, 'Original page', originLink(provenance.pageUrl, 'Original page'));
+  if (provenance.canonicalUrl !== provenance.pageUrl) originValue(list, 'Canonical page', originLink(provenance.canonicalUrl, 'Canonical page'));
+  originValue(list, 'Saved target', originLink(provenance.targetUrl, 'Saved target'));
+  originValue(list, 'Page title', provenance.pageTitle);
+  originValue(list, 'Publisher', provenance.siteName);
+  originValue(list, 'Description', provenance.description);
+  originValue(list, 'Author', Array.isArray(provenance.authors) ? provenance.authors.join(', ') : null);
+  originValue(list, 'Published', provenance.publishedAt ? dateLabel(provenance.publishedAt, true) : null);
+  originValue(list, 'Last changed', provenance.modifiedAt ? dateLabel(provenance.modifiedAt, true) : null);
+  originValue(list, 'Page language', provenance.language);
+  originValue(list, 'Lead image', originLink(provenance.leadImageUrl, 'Lead image'));
+  originValue(list, 'Site icon', originLink(provenance.faviconUrl, 'Site icon'));
+  originValue(list, 'Capture method', captureMethods[provenance.captureMethod] || provenance.captureMethod);
+  originValue(list, 'Captured', provenance.capturedAt ? dateLabel(provenance.capturedAt, true) : null);
+  originValue(list, 'Extracted', provenance.extractedAt ? dateLabel(provenance.extractedAt, true) : null);
+  originValue(list, 'Extractor', provenance.extractorVersion);
+  originValue(list, 'Origin record', provenance.schemaVersion ? `Version ${provenance.schemaVersion}` : null);
+  if (provenance.contentHash) originValue(list, 'Content fingerprint', textElement('code', provenance.contentHash));
+  originValue(list, 'Extraction', provenance.extractionStatus);
+  if (provenance.extractionError) originValue(list, 'Extraction note', provenance.extractionError);
+  section.append(list);
+  if (Array.isArray(provenance.headings) && provenance.headings.length) {
+    const outline = textElement('details', null, 'origin-outline'); outline.append(textElement('summary', `Page outline · ${provenance.headings.length} headings`));
+    const headings = textElement('ol'); headings.append(...provenance.headings.map(heading => textElement('li', String(heading)))); outline.append(headings); section.append(outline);
+  }
+  body.append(section);
+}
 function captureCard(capture) {
   const card = textElement('article', null, `capture-card capture-${Object.hasOwn(kinds, capture.type) ? capture.type : 'note'}`);
   const button = textElement('button', null, 'capture-open'); button.type = 'button';
@@ -261,7 +309,7 @@ async function openCapture(id) {
     state.detail = capture; const body = $('#detail-body'); body.replaceChildren();
     $('#detail-kind').textContent = kinds[capture.type] || 'Capture';
     body.append(Object.assign(textElement('h2', captureTitle(capture)), { id: 'detail-title' }));
-    const source = safeSource(capture.sourceUrl);
+    const source = safeSource(capture.provenance?.pageUrl || capture.sourceUrl);
     if (source) {
       const link = textElement('a', `Open source · ${source.hostname}`, 'detail-source'); link.href = source.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; body.append(link);
     }
@@ -273,6 +321,7 @@ async function openCapture(id) {
         const retry = textElement('button', 'Retry image', 'subtle-button'); retry.type = 'button'; retry.addEventListener('click', () => openCapture(id)); errorBox.append(retry); image.replaceWith(errorBox);
       }, { once: true }); body.append(image);
     }
+    appendCaptureOrigin(body, capture);
     for (const [title, content] of [['Highlight', capture.selectionText], ['Note', capture.noteText], ['Summary', capture.summary], ['Article text', capture.articleText], ['Text in image', capture.ocrText]]) {
       if (!content) continue;
       const section = textElement('section', null, 'detail-section'); section.append(textElement('h3', title), textElement('p', content)); body.append(section);
@@ -319,10 +368,69 @@ $('#note-form').addEventListener('submit', async event => {
   finally { $('#save-note').disabled = false; $('#note-text').disabled = false; $('#save-note').textContent = 'Save note'; }
 });
 
+function preferenceAt(source, path) {
+  return path.split('.').reduce((value, key) => value?.[key], source);
+}
+function setPreference(source, path, value) {
+  const keys = path.split('.'); const last = keys.pop();
+  const parent = keys.reduce((object, key) => object[key], source); parent[last] = value;
+}
+function updateOrderButtons() {
+  const rows = [...$('#preference-order').children];
+  rows.forEach((row, index) => {
+    row.querySelector('[data-order-direction="up"]').disabled = index === 0;
+    row.querySelector('[data-order-direction="down"]').disabled = index === rows.length - 1;
+  });
+}
+function renderPreferences() {
+  if (!state.preferences) return;
+  document.querySelectorAll('[data-preference]').forEach(control => {
+    const value = preferenceAt(state.preferences, control.dataset.preference);
+    if (control.type === 'checkbox') control.checked = !!value;
+    else control.value = String(value);
+  });
+  const byAction = new Map([...$('#preference-order').children].map(row => [row.dataset.orderAction, row]));
+  state.preferences.popup.actionOrder.forEach(action => $('#preference-order').append(byAction.get(action)));
+  updateOrderButtons(); $('#preference-form').dataset.ready = 'true'; $('#preference-form').inert = false;
+}
+async function loadPreferences() {
+  $('#preference-form').dataset.ready = 'false'; $('#preference-form').inert = true;
+  try {
+    const result = await api('/preferences');
+    if (state.expired) return;
+    state.preferences = result.preferences; state.preferenceRevision = result.revision; renderPreferences();
+  } catch (error) {
+    $('#preference-form').inert = false;
+    if (!state.expired) setMessage($('#preference-message'), error.message);
+  }
+}
+$('#preference-order').addEventListener('click', event => {
+  const button = event.target.closest('[data-order-direction]'); if (!button) return;
+  const row = button.closest('[data-order-action]');
+  if (button.dataset.orderDirection === 'up' && row.previousElementSibling) row.previousElementSibling.before(row);
+  if (button.dataset.orderDirection === 'down' && row.nextElementSibling) row.nextElementSibling.after(row);
+  updateOrderButtons();
+});
+$('#preference-form').addEventListener('submit', async event => {
+  event.preventDefault(); if (!state.preferences || $('#save-preferences').disabled) return;
+  const next = structuredClone(state.preferences);
+  document.querySelectorAll('[data-preference]').forEach(control => setPreference(next, control.dataset.preference, control.type === 'checkbox' ? control.checked : Number(control.value)));
+  next.popup.actionOrder = [...$('#preference-order').children].map(row => row.dataset.orderAction);
+  $('#save-preferences').disabled = true; $('#preference-form').setAttribute('aria-busy', 'true'); setMessage($('#preference-message'), '');
+  try {
+    const result = await api('/preferences', { method: 'PUT', body: { preferences: next } });
+    state.preferences = result.preferences; state.preferenceRevision = result.revision; renderPreferences();
+    let refreshed = false;
+    if (state.extensionId) refreshed = await extensionMessage({ kind: 'atlas-refresh-preferences' }, state.extensionId).then(() => true).catch(() => false);
+    setMessage($('#preference-message'), refreshed ? 'Saved. Your connected browser has the new settings.' : 'Saved. Atlas will use these settings the next time the extension refreshes.', false);
+  } catch (error) { if (!state.expired) setMessage($('#preference-message'), error.message); }
+  finally { $('#save-preferences').disabled = false; $('#preference-form').removeAttribute('aria-busy'); }
+});
+
 $('#open-account').addEventListener('click', async () => {
   if (state.expired || !state.account) return;
   setMessage($('#account-message'), ''); openDialog('#account-dialog');
-  try { await refreshAccount(); } catch (error) { if (!state.expired) setMessage($('#account-message'), error.message); }
+  try { await Promise.all([refreshAccount(), loadPreferences()]); } catch (error) { if (!state.expired) setMessage($('#account-message'), error.message); }
 });
 $('#export-account').addEventListener('click', async () => {
   if (!await confirmAction('Export your cloud library?', 'Download a JSON file containing your saved captures, text and images. The file may contain private information. Large libraries can take a moment.', 'Download export')) return;
@@ -377,7 +485,10 @@ async function start() {
   try {
     await refreshAccount(); if (state.expired) return;
     $('#new-note').disabled = false; $('#onboarding').hidden = !!(state.usage.captures && state.connections.length);
-    await Promise.allSettled([loadCaptures(), detectExtension()]);
+    await Promise.allSettled([loadCaptures(), detectExtension(), loadPreferences()]);
+    if (location.hash === '#extension-settings' && !state.expired) {
+      openDialog('#account-dialog'); $('#extension-settings').scrollIntoView({ block: 'start' }); $('#extension-settings summary').focus();
+    }
   } catch (error) {
     if (!state.expired) showLibraryState('Atlas couldn’t open your account.', error.message, { retry: start });
   }
