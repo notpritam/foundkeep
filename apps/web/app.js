@@ -1,51 +1,28 @@
-// Landing interactions: staggered scroll reveals (once), nav state, mobile menu.
-// Motion is gentle and honors prefers-reduced-motion (cross-fade, no travel).
-(() => {
-  const nav = document.getElementById("nav");
-  const toggle = document.getElementById("navToggle");
-  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+const saveButton = document.querySelector('#demoSave');
+const resetButton = document.querySelector('#demoReset');
 
-  // Sticky nav gains a translucent background past the top.
-  const onScroll = () => nav.classList.toggle("scrolled", window.scrollY > 8);
-  onScroll();
-  addEventListener("scroll", onScroll, { passive: true });
+function setDemoSaved(saved) {
+  document.querySelector('#demoEmpty').hidden = saved;
+  document.querySelector('#demoSaved').hidden = !saved;
+  document.querySelector('#demoCount').textContent = saved ? '1 item' : '0 items';
+  document.querySelector('#demo-selection').classList.toggle('is-saved', saved);
+  saveButton.disabled = saved;
+  document.querySelector('#demoStatus').textContent = saved
+    ? 'Highlight saved in this illustration. Your Atlas library has not changed.'
+    : 'Try it here. This demo does not save to your Atlas library.';
+  // Move focus to the next useful action when its previous control disappears.
+  (saved ? resetButton : saveButton).focus({ preventScroll: true });
+}
 
-  // Mobile menu.
-  toggle?.addEventListener("click", () => {
-    const open = nav.classList.toggle("open");
-    toggle.setAttribute("aria-expanded", String(open));
-  });
-  nav.querySelectorAll(".nav-links a").forEach((a) =>
-    a.addEventListener("click", () => {
-      nav.classList.remove("open");
-      toggle?.setAttribute("aria-expanded", "false");
-    }),
-  );
+saveButton?.addEventListener('click', () => setDemoSaved(true));
+resetButton?.addEventListener('click', () => setDemoSaved(false));
 
-  // Reveal on scroll — once, staggered by position among reveal siblings.
-  const items = [...document.querySelectorAll(".reveal")];
-  for (const el of items) {
-    const sibs = [...el.parentElement.children].filter((c) => c.classList.contains("reveal"));
-    const i = sibs.indexOf(el);
-    if (i > 0) el.style.transitionDelay = `${Math.min(i, 6) * 55}ms`;
+document.querySelector('#copyExtensions')?.addEventListener('click', async () => {
+  const status = document.querySelector('#copyStatus');
+  try {
+    await navigator.clipboard.writeText('chrome://extensions');
+    status.textContent = 'Copied. Paste it into Chrome’s address bar.';
+  } catch {
+    status.textContent = 'Copy chrome://extensions from the step above and paste it into Chrome’s address bar.';
   }
-
-  if (reduce.matches || !("IntersectionObserver" in window)) {
-    items.forEach((el) => el.classList.add("in"));
-  } else {
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          e.target.classList.add("in");
-          io.unobserve(e.target);
-        }
-      },
-      { rootMargin: "0px 0px -12% 0px", threshold: 0.1 },
-    );
-    items.forEach((el) => io.observe(el));
-  }
-
-  const y = document.getElementById("year");
-  if (y) y.textContent = String(new Date().getFullYear());
-})();
+});
