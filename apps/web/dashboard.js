@@ -114,7 +114,7 @@ async function detectExtension() {
     $('#extension-status').classList.toggle('connection-success', account?.id === state.account?.id);
   } else {
     state.extension = null; state.extensionId = null;
-    $('#extension-status').textContent = 'Atlas isn’t detected. Install it in Chrome, then reload this page. If it’s already installed, reload it at chrome://extensions.';
+    $('#extension-status').textContent = 'Atlas isn’t detected. Install it in a supported Chromium browser, then reload this page. If it’s already installed, reload it from the browser’s extensions page.';
     $('#extension-status').classList.remove('connection-success');
   }
   updateOnboarding(); return state.extension;
@@ -418,7 +418,7 @@ $('#preference-form').addEventListener('submit', async event => {
   next.popup.actionOrder = [...$('#preference-order').children].map(row => row.dataset.orderAction);
   $('#save-preferences').disabled = true; $('#preference-form').setAttribute('aria-busy', 'true'); setMessage($('#preference-message'), '');
   try {
-    const result = await api('/preferences', { method: 'PUT', body: { preferences: next } });
+    const result = await api('/preferences', { method: 'PUT', body: next });
     state.preferences = result.preferences; state.preferenceRevision = result.revision; renderPreferences();
     let refreshed = false;
     if (state.extensionId) refreshed = await extensionMessage({ kind: 'atlas-refresh-preferences' }, state.extensionId).then(() => true).catch(() => false);

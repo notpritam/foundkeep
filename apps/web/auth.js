@@ -1,4 +1,4 @@
-import { $, api, setMessage, recoveryDownload } from './customer.js?v=1.4.0';
+import { $, api, setMessage, recoveryDownload } from './customer.js?v=1.5.0';
 
 let mode = 'signup';
 let recoveryCode = '';

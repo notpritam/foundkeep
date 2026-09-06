@@ -433,6 +433,8 @@ test("mobile retains tag filtering and popup keeps Open library within Chrome he
     "visible",
     "Recent captures must not create a nested scroll area",
   );
+  if (process.env.ATLAS_POPUP_LANDING_SCREENSHOT)
+    await page.locator("#view-main").screenshot({ path: process.env.ATLAS_POPUP_LANDING_SCREENSHOT });
 });
 test("popup follows customer action controls and reports capture progress without closing", async (t) => {
   const preferences = {

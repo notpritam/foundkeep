@@ -26,7 +26,7 @@ async function rewrite(directory, origin) {
   }
 }
 
-test('customer signs up, connects the real extension, captures text and screenshot, and sees an isolated cloud library', {timeout:120000}, async()=>{
+test('customer signs up, configures the real extension, captures a readable page, text and screenshot, and sees an isolated cloud library', {timeout:120000}, async()=>{
   const directory=await mkdtemp(path.join(os.tmpdir(),'atlas-customer-flow-'));
   const reserve=net.createServer(); reserve.listen(0,'127.0.0.1'); await once(reserve,'listening');
   const port=reserve.address().port; await new Promise(resolve=>reserve.close(resolve));
@@ -45,7 +45,7 @@ test('customer signs up, connects the real extension, captures text and screensh
   let backendOutput=''; backend?.stdout.on('data',data=>backendOutput+=data); backend?.stderr.on('data',data=>backendOutput+=data);
   const fixture=http.createServer((_req,res)=>{
     res.writeHead(200,{'content-type':'text/html'});
-    res.end('<!doctype html><title>Typography workshop</title><style>body{margin:48px;background:white;color:black;font:32px Arial}article{height:450px}</style><article><h1>Typography workshop</h1><p id="selection">Good design makes information easy to find.</p><p>Save the ideas you want to use again.</p></article>');
+    res.end('<!doctype html><title>Typography workshop</title><link rel="canonical" href="/workshop"><meta name="author" content="Ada Example"><meta name="description" content="A practical workshop on legible design."><script type="application/ld+json">{"@type":"Article","author":{"name":"Ada Example"},"datePublished":"2026-08-20T10:00:00Z","publisher":{"name":"Example Studio"}}</script><style>body{margin:48px;background:white;color:black;font:32px Arial}article{height:450px}</style><article><h1>Typography workshop</h1><p id="selection">Good design makes information easy to find.</p><h2>Keep the useful context</h2><p>Save the ideas you want to use again. A readable copy should remain useful even when you are offline.</p></article>');
   });
   fixture.listen(0,'127.0.0.1');await once(fixture,'listening');
   let context;
@@ -86,6 +86,16 @@ test('customer signs up, connects the real extension, captures text and screensh
     const ping=await account.evaluate(id=>new Promise(resolve=>chrome.runtime.sendMessage(id,{kind:'atlas-ping'},resolve)),id);
     assert.equal(ping.account.id,me.account.id);assert.equal(ping.token,undefined);
     const popup=await context.newPage();await popup.goto(`chrome-extension://${id}/src/popup.html`);
+    const preferenceState=await request('GET','/api/preferences');
+    preferenceState.preferences.capture.region=false;
+    preferenceState.preferences.popup.recentCount=5;
+    const preferenceWrite=await request('PUT','/api/preferences',preferenceState.preferences);
+    assert.equal(preferenceWrite.revision,1);
+    const preferenceRefresh=await account.evaluate(id=>new Promise(resolve=>chrome.runtime.sendMessage(id,{kind:'atlas-refresh-preferences'},resolve)),id);
+    assert.equal(preferenceRefresh.ok,true,JSON.stringify(preferenceRefresh));
+    const extensionPreferences=await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'preferences-status'}));
+    assert.equal(extensionPreferences.preferences.capture.region,false);
+    assert.equal(extensionPreferences.preferences.popup.recentCount,5);
     const note='Remember the typography workshop and bring a notebook.';
     const saved=await popup.evaluate(text=>chrome.runtime.sendMessage({kind:'saveNote',text}),note);
     assert.equal(saved.ok,true,JSON.stringify(saved));
@@ -96,21 +106,35 @@ test('customer signs up, connects the real extension, captures text and screensh
     await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'capture',action:'highlight'}));
     await poll(async()=>{const result=await request('GET','/api/captures');return result.captures.some(c=>c.selectionText?.includes('Good design'));});
     await page.bringToFront();
+    const pageCapture=await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'capture',action:'savepage'}));
+    assert.equal(pageCapture.ok,true,JSON.stringify(pageCapture));
+    const bookmark=await poll(async()=>{const result=await request('GET','/api/captures');return result.captures.find(c=>c.type==='bookmark'&&c.status==='done');});
+    assert.match(bookmark.articleText,/readable copy should remain useful/i);
+    assert.match(bookmark.provenance.canonicalUrl,/\/workshop$/);
+    assert.deepEqual(bookmark.provenance.authors,['Ada Example']);
+    assert.equal(bookmark.provenance.siteName,'Example Studio');
+    assert.equal(bookmark.provenance.captureMethod,'popup-save-page');
+    assert.match(bookmark.provenance.contentHash,/^[A-Za-z0-9_-]{43}$/);
+    await page.bringToFront();
     await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'capture',action:'fullpage'}));
     const screenshot=await poll(async()=>{const result=await request('GET','/api/captures');return result.captures.find(c=>c.type==='screenshot'&&c.status==='done');},45000);
     assert.match(screenshot.ocrText,/Typography workshop/i);
     const blob=await context.request.get(origin+screenshot.blobUrl);assert.equal(blob.status(),200);assert.match(blob.headers()['content-type'],/image\/(png|jpeg|webp)/);
     await account.reload();
     await account.getByText(note,{exact:false}).first().waitFor();
+    await account.locator('.capture-bookmark .capture-open').click();
+    await account.locator('#capture-origin').waitFor({state:'visible'});
+    assert.match(await account.locator('#capture-origin').textContent(),/Ada Example/);
+    await account.keyboard.press('Escape');
     assert.equal(errors.length,0,errors.join('\n'));
     // Requests without the owning session cannot see the capture or its image.
     assert.equal((await fetch(origin+'/api/captures/'+screenshot.id)).status,401);
     assert.equal((await fetch(origin+screenshot.blobUrl)).status,401);
-    const after=await request('GET','/api/me');assert.equal(after.connections.length,1);assert.equal(after.usage.captures,3);
+    const after=await request('GET','/api/me');assert.equal(after.connections.length,1);assert.equal(after.usage.captures,4);
     await request('DELETE','/api/connections/'+after.connections[0].id);
     await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'saveNote',text:'Saved safely after connection revoked'}));
     await sleep(1500);
-    assert.equal((await request('GET','/api/me')).usage.captures,3);
+    assert.equal((await request('GET','/api/me')).usage.captures,4);
     // A revoked upload never discards the local copy.
     const local=await popup.evaluate(async()=>{const db=await import('./db.js');return db.listCaptures();});
     assert.ok(local.some(c=>c.noteText==='Saved safely after connection revoked'));

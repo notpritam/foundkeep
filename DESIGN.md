@@ -6,6 +6,6 @@ Use existing self-hosted Clarity City Bold/Semibold and Geist. Landing display i
 
 Landing mode: Persuade. Hero: “Found it? Keep it.” A saved architectural image and a dark library/capture composition prove the core workflow. Follow with capture, real library, automatic organization and explicit setup paths. Primary CTA creates an account; dashboard onboarding connects the installed extension. Installation links must reflect actual distribution availability.
 
-Extension mode: Operate. Popup leads with quick capture, a note composer and Open Library. Show local save and cloud sync status clearly. Library has navigation, search, type filters, readable cards, a focused detail dialog, useful empty/results states and unobtrusive connections/settings. Keep account connection primary. No developer token fields in customer setup.
+Extension mode: Operate. Popup leads with one primary Save page action, then configurable capture actions, a compact note composer and a fixed Open Library footer. Only the main popup content scrolls within the 600px browser limit. Show local save and cloud sync status clearly. Library has navigation, search, type filters, readable cards, a focused detail dialog with source provenance, useful empty/results states and account-owned capture controls. Keep account connection primary. No developer token fields in customer setup.
 
 Remove the customer Agent overlay and browser-control settings. Operator contributes precise dark product panels. Respect reduced motion in changed UI. No purple gradients, fake testimonials or tracking scripts.

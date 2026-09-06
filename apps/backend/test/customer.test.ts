@@ -299,6 +299,8 @@ describe("customer extension preferences", () => {
     expect(saved.preferences).toEqual(changed);
     expect(saved.revision).toBe(1);
     expect(saved.updatedAt).toBeGreaterThan(0);
+    const exported = await (await request("/account/export", "GET", undefined, owner.cookie)).json() as any;
+    expect(exported.preferences).toEqual(changed);
 
     for (const browser of [firstBrowser, secondBrowser]) {
       const shared = await (await request("/preferences", "GET", undefined, browser.bearer, EXTENSION)).json();

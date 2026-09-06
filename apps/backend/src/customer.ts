@@ -441,6 +441,7 @@ export function customerRoutes(db: Database) {
     const current = auth(c, true);
     rates.take(`export:${current.account.id}`, 3, 60_000);
     const ids = db.query("SELECT id FROM customer_captures WHERE account_id = ? ORDER BY captured_at DESC,id DESC").all(current.account.id) as { id: string }[];
+    const preferenceState = readCustomerPreferences(db, current.account.id);
     // Only one image/record is materialized at a time; a quota-sized export must
     // not multiply its entire image footprint in memory.
     const encoder = new TextEncoder();
@@ -453,7 +454,7 @@ export function customerRoutes(db: Database) {
           auth(c, true, false);
           if (!started) {
             started = true;
-            controller.enqueue(encoder.encode(JSON.stringify({ account: accountDto(current.account), exportedAt: Date.now() }).slice(0, -1) + ',"captures":['));
+            controller.enqueue(encoder.encode(JSON.stringify({ account: accountDto(current.account), exportedAt: Date.now(), preferences: preferenceState.preferences, preferenceRevision: preferenceState.revision, preferencesUpdatedAt: preferenceState.updatedAt }).slice(0, -1) + ',"captures":['));
             return;
           }
           while (index < ids.length) {

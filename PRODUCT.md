@@ -6,14 +6,14 @@
 web
 
 ## Purpose and operating context
-Atlas is a customer capture product: save screenshots, highlights, bookmarks, images, tweets and notes, then find them in a private library. Native HTML/CSS/JavaScript, Chrome Manifest V3 extension, Bun/Hono/SQLite backend.
+Atlas is a customer capture product: save readable pages, screenshots, highlights, bookmarks, images, posts on X and notes with traceable source records, then find them in a private library. Native HTML/CSS/JavaScript, Chromium Manifest V3 extension, Bun/Hono/SQLite backend.
 
 ## Capabilities and constraints
-Customers create an email/password account, save a recovery code, install and connect the extension. New captures save locally first and automatically upload to that account. Durable retries retain account ownership. Existing local captures require explicit import consent. Website sessions and extension credentials are separate and revocable. Every customer query and image is owner scoped; legacy backend tables/APIs remain separate.
+Customers create an email/password account, save a recovery code, install and connect the extension. New captures save locally first and upload to that account when automatic sync is enabled. Durable retries retain account ownership. Existing local captures require explicit import consent. Website sessions and extension credentials are separate and revocable. Every customer query, preference and image is owner scoped; legacy backend tables/APIs remain separate.
 
-Hosted organization provides extractive summaries, topic tags and English OCR using a bounded local processor. No customer agent setup is required. No semantic search, conversational assistant or email reset delivery is claimed. Search is keyword based. Local-only capture remains available. Cloud/local deletion are separate. Quotas are 1000 captures and 200 MiB per account.
+Hosted organization provides optional extractive summaries, topic tags and English OCR using a bounded local processor. Customers control those choices plus capture methods, readable bookmark extraction, note sources, popup layout, context menus, sync and feedback from the dashboard. No customer agent setup is required. No semantic search, conversational assistant or email reset delivery is claimed. Search is keyword based. Local-only capture remains available. Cloud/local deletion are separate. Quotas are 1000 captures and 200 MiB per account.
 
-Preserve the existing IndexedDB database, saved records, keyboard shortcuts and signed extension key. Remove customer browser-control overlays, debugger permission and relay/token setup. Never silently upload local history or transfer a pending capture to a different account.
+Preserve the existing IndexedDB database, saved records, keyboard shortcuts and signed extension key. Store readable text and structured provenance without raw HTML. Remove customer browser-control overlays, debugger permission and relay/token setup. Never silently upload local history, reuse preference caches across accounts or transfer a pending capture to a different account.
 
 ## Confirmed brand commitment
 The user selected Atlas Studio (option04) combined with Operator (option02), then asked to avoid agent focus. Studio supplies the creative visual identity; Operator supplies useful, clear product controls. Capture, collecting and retrieval lead.

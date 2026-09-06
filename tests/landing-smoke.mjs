@@ -164,3 +164,11 @@ test("search and sharing metadata resolve to the production site and a real imag
   await page.locator('a[href="privacy.html"]').first().click();
   assert.match(await page.title(), /Privacy/);
 });
+test("customer copy explains readable bookmarks, source records, controls and Chromium support", async (t) => {
+  const page = await pageFor(t);
+  const copy = await page.locator('body').textContent();
+  assert.match(copy, /readable copy/i);
+  assert.match(copy, /original source/i);
+  assert.match(copy, /capture settings/i);
+  assert.match(copy, /Chrome, Edge, Brave, Opera/i);
+});

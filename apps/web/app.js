@@ -28,7 +28,7 @@ document.querySelector('#copyExtensions')?.addEventListener('click', async () =>
 });
 
 // A Web Store install button is shown only when a verified public listing is configured.
-import('./customer.js?v=1.4.0').then(({ customerConfig }) => customerConfig()).then(config => {
+import('./customer.js?v=1.5.0').then(({ customerConfig }) => customerConfig()).then(config => {
   if (!config.storeUrl) return;
   const install = document.querySelector('[data-extension-install]');
   if (!install) return;

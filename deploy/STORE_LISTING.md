@@ -1,6 +1,6 @@
 # Atlas customer extension — Chrome Web Store submission
 
-Build: `bash deploy/pack-store.sh`. Upload `deploy/dist/atlas-store-1.4.0.zip`
+Build: `bash deploy/pack-store.sh`. Upload `deploy/dist/atlas-store-1.5.0.zip`
 to the Chrome Web Store developer dashboard. The publisher account and Google
 review are required; generating this file does not publish the extension.
 
@@ -14,7 +14,7 @@ after the approved listing is installable.
 Name: **Atlas — Save what matters**
 
 Short description (under 132 characters):
-> Save screenshots, highlights, links and notes. Connect your Atlas account to keep a private, searchable cloud library.
+> Save readable pages, screenshots, highlights and notes with their source in a private, searchable Atlas library.
 
 Category: Productivity. Language: English.
 
@@ -22,17 +22,21 @@ Description:
 
 Atlas gives the good things you find on the web a place to stay.
 
-- Capture a region or a full page, save highlighted text, bookmark a link, or write a quick note.
+- Save a readable page copy with its original source, capture a region or full page, keep highlighted text, bookmark a link, or write a quick note.
 - Create an Atlas account and connect your browser in one click after installation.
-- New captures save on your device first and sync automatically to your private online library.
-- Search your library, filter by capture type, view original sources and collect from multiple browsers.
-- Cloud text extracts, topic tags and English screenshot text recognition run automatically.
+- New captures save on your device first and sync to your private online library when automatic sync is enabled.
+- Search your library, filter by capture type, view detailed origin records and collect from multiple Chromium browsers.
+- Control capture methods, popup layout, sync, OCR, summaries and tags from the account dashboard without reinstalling the extension.
+- Cloud text extracts, topic tags and English screenshot text recognition can run automatically.
 - Offline saves wait on your device and retry when a connection is available.
 - Export your cloud library, revoke connected browsers, or delete your account from settings.
 
 An account is optional for local capture. Previous local captures stay on the
 device unless you explicitly choose to import them into your connected account.
 Local and cloud copies are separate: deleting one does not erase the other.
+
+Saved pages can include readable text, headings, visited and canonical URLs,
+page metadata and a content fingerprint. Atlas does not store raw page HTML.
 
 Cloud accounts include up to 1,000 captures and 200 MiB of saved content.
 Save the recovery code provided at signup; Atlas does not send password-reset
@@ -48,8 +52,8 @@ Support: https://github.com/notpritam/atlas/issues
 Single purpose: save web content into the customer's private local or connected
 Atlas library so it can be found and used again.
 
-- `activeTab`, `tabs`, `scripting`: capture the user-selected page and its source
-  information after an explicit action. Full-page screenshots require scrolling
+- `activeTab`, `tabs`, `scripting`: capture the user-selected page, readable
+  content and source information after an explicit action. Full-page screenshots require scrolling
   and stitching the visible page.
 - `<all_urls>` host access: users can choose links, images and captures on any
   eligible website; upload connected captures to Atlas. Optional local companion
@@ -58,16 +62,17 @@ Atlas library so it can be found and used again.
 - `contextMenus`: explicit right-click save actions for text, links and images.
 - `alarms`: retry pending uploads and optional local organization.
 - External messaging: only the Atlas website may detect and connect the extension
-  with a short-lived, one-use pairing code. Browser credentials are never exposed
-  to the webpage.
+  with a short-lived, one-use pairing code or request a refresh of account-owned
+  capture settings. Browser credentials are never exposed to the webpage.
 
 There is no browser-control debugger permission or agent control overlay in the
 customer extension.
 
 ## Data disclosures for the publisher
 
-The cloud product processes account email/name, user-saved website content,
-screenshots/images, selected text, notes, source URLs and titles. These are used
+The cloud product processes account email/name, capture preferences, user-saved
+website content, screenshots/images, selected text, notes, readable article text,
+source provenance and page metadata. These are used
 to provide the requested private library and organization. The user chooses when
 to capture and whether to connect cloud sync. No advertising, data sale or
 cross-site behavior tracking is part of Atlas. Review the live privacy policy

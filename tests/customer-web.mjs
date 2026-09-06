@@ -54,7 +54,7 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
     if (url.pathname.endsWith('/blob')) return route.fulfill({ contentType: 'image/webp', path: path.resolve('apps/web/assets/studio-architecture-640.webp') });
     if (url.pathname === '/api/me') return json({ account: model.account, connections: model.connections, usage: { captures: model.captures.length, bytes: 1432020, maxCaptures: 1000, maxBytes: 209715200 } });
     if (url.pathname === '/api/preferences' && request.method() === 'GET') return json({ preferences: model.preferences, revision: model.preferenceRevision, updatedAt: null });
-    if (url.pathname === '/api/preferences' && request.method() === 'PUT') { model.preferences = body.preferences; model.preferenceRevision += 1; return json({ preferences: model.preferences, revision: model.preferenceRevision, updatedAt: now }); }
+    if (url.pathname === '/api/preferences' && request.method() === 'PUT') { model.preferences = body; model.preferenceRevision += 1; return json({ preferences: model.preferences, revision: model.preferenceRevision, updatedAt: now }); }
     if (url.pathname === '/api/captures' && request.method() === 'GET') {
       const items = model.captures.filter(capture => (!url.searchParams.get('type') || capture.type === url.searchParams.get('type')) && (!url.searchParams.get('q') || JSON.stringify(capture).toLowerCase().includes(url.searchParams.get('q').toLowerCase())));
       return json({ captures: items, nextCursor: null, total: items.length });
@@ -81,7 +81,7 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
     let connected = extensionAccount;
     window.chrome = { runtime: { sendMessage(id, message, callback) {
       window.__extensionMessages.push({ id, message });
-      if (message.kind === 'atlas-ping') callback({ ok: true, version: '1.4.0', account: connected });
+      if (message.kind === 'atlas-ping') callback({ ok: true, version: '1.5.0', account: connected });
       if (message.kind === 'atlas-connect') { connected = account; callback({ ok: true, account }); }
       if (message.kind === 'atlas-refresh-preferences') callback({ ok: true, revision: 1 });
     } } };
@@ -189,12 +189,12 @@ test('customer controls every extension feature and refreshes the connected brow
   await page.locator('#save-preferences').click();
   await page.waitForFunction(() => document.querySelector('#preference-message').textContent.includes('Saved'));
   const write = requests.find(request => request.path === '/api/preferences' && request.method === 'PUT');
-  assert.equal(write.body.preferences.capture.region, false);
-  assert.equal(write.body.preferences.sync.automatic, false);
-  assert.equal(write.body.preferences.organization.ocr, false);
-  assert.equal(write.body.preferences.popup.recentCount, 5);
-  assert.deepEqual(write.body.preferences.popup.actionOrder, ['bookmark', 'highlight', 'fullPage', 'region']);
-  assert.deepEqual(model.preferences, write.body.preferences);
+  assert.equal(write.body.capture.region, false);
+  assert.equal(write.body.sync.automatic, false);
+  assert.equal(write.body.organization.ocr, false);
+  assert.equal(write.body.popup.recentCount, 5);
+  assert.deepEqual(write.body.popup.actionOrder, ['bookmark', 'highlight', 'fullPage', 'region']);
+  assert.deepEqual(model.preferences, write.body);
   assert.equal(await page.evaluate(() => window.__extensionMessages.some(item => item.message.kind === 'atlas-refresh-preferences')), true);
   await page.setViewportSize({ width: 390, height: 900 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

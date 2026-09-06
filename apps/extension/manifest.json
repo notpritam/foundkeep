@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Atlas Capture",
-  "version": "1.4.0",
-  "description": "Keep screenshots, highlights, links and notes. Connect your Atlas account to sync new captures, with a local library available offline.",
+  "version": "1.5.0",
+  "description": "Save readable pages, screenshots, highlights, images and notes with their source. Sync and control capture features from Atlas.",
   "permissions": [
     "activeTab",
     "scripting",

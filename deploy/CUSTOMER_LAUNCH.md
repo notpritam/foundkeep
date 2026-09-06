@@ -13,7 +13,9 @@ in `customer_*` SQLite tables. Never mint legacy device tokens for customers.
 - Install `tesseract`, English trained data and `prlimit` (util-linux).
   Arch: `sudo pacman -S --needed tesseract tesseract-data-eng util-linux`.
   Debian/Ubuntu: `sudo apt-get install tesseract-ocr tesseract-ocr-eng util-linux`.
-- Customer text organization and English OCR run automatically in the backend.
+- Customer text organization and English OCR run in the backend when the choices
+  saved with a capture enable them. Customers control OCR, summaries and tags in
+  the dashboard; disabling a choice does not remove earlier derived content.
   Content is processed as data, without a model, local agent tools or arbitrary
   URL fetching. OCR is bounded by CPU, memory, execution time and output size.
   If recognition fails, the original capture remains available.
@@ -42,6 +44,23 @@ Connecting a browser only uploads new captures. Customers can explicitly import
 their previous local library. Queued captures retain their original account
 owner across disconnects, retries and account switches.
 
+Capture preferences are stored per customer account and read by every connected
+browser. They control capture methods, readable page extraction, note source
+attachment, popup layout, right-click menus, sync and automatic organization.
+Preference-only changes do not need an extension release. Manifest permissions,
+new capture code and security fixes do. The extension keeps a five-minute,
+account-bound cache so malformed or offline responses cannot cross accounts.
+
+Saved pages include bounded readable text and an immutable provenance document,
+not raw HTML. The record carries available origin URLs, metadata, headings,
+timestamps, extraction status and a content hash. The visited page remains the
+source even when a different canonical URL is advertised. The dashboard and
+account export expose this origin record.
+
+The current package targets Chromium MV3 and can be loaded in Chrome, Edge,
+Brave, Opera and Vivaldi. Release verification uses Chromium. Firefox and Safari
+need separate packages and are not currently advertised as supported builds.
+
 ## Release and rollback
 
 1. Run `bun test`, `bun run test:extension`, `bun run test:web`, and
@@ -56,7 +75,8 @@ owner across disconnects, retries and account switches.
    account endpoint. Do not inspect real customer captures while checking health.
 5. Publish the signed version and verify the unchanged ID and download artifacts.
 
-Migrations are append-only. For a code rollback, point the service at the previous
+Migrations are append-only. Preferences and provenance use migrations 5 and 6.
+For a code rollback, point the service at the previous
 commit; customer tables can remain. Restoring a pre-release DB discards captures
 created since that backup, so stop writes and preserve a fresh backup before any
 data restore. Backups contain private customer data and must have mode 0600.

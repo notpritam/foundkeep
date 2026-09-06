@@ -1,20 +1,20 @@
 # Atlas
 
-**Found it? Keep it.** Screenshots, highlights, links, images, and stray ideas in your private, searchable library.
+**Found it? Keep it.** Readable pages, screenshots, highlights, images, and stray ideas with their source in your private, searchable library.
 
 [Get Atlas](https://atlas.notpritam.in) · [Extension releases](https://github.com/notpritam/atlas/releases/latest) · [Privacy & data](https://atlas.notpritam.in/privacy.html)
 
 ## Start collecting
 
 1. [Create an Atlas account](https://atlas.notpritam.in/signup) and save your recovery code.
-2. Follow the installation steps in your dashboard. Chrome Web Store publication is pending; the current ZIP needs Chrome Developer mode and **Load unpacked**.
+2. Follow the installation steps in your dashboard. Chrome Web Store publication is pending; the current ZIP uses **Load unpacked** in Chrome, Edge, Brave, Opera or Vivaldi on desktop.
 3. Click **Connect extension** in your dashboard. Pin Atlas and start saving.
 
-New captures save in your browser first and automatically sync to the connected account. Open your [dashboard](https://atlas.notpritam.in/dashboard) from any browser to search and browse them. Cloud organization creates text extracts, topic tags and English screenshot OCR without a local companion.
+New captures save in your browser first and sync to the connected account when automatic sync is enabled. Saved pages include readable text and a traceable origin record rather than raw HTML. Open your [dashboard](https://atlas.notpritam.in/dashboard) to search, browse and control capture methods, popup layout, sync, OCR, summaries and tags across connected browsers.
 
 Previous local captures stay local unless you explicitly import them. You can also use local capture without an account. Cloud and local copies are separate; deleting one does not erase the other. Accounts include up to 1,000 captures and 200 MiB of content.
 
-To update an unpacked installation, replace its files in the existing folder and use **Reload** in Chrome. Keep the existing installation to retain the local library. Managed installations can receive signed updates from GitHub Releases.
+To update an unpacked installation, replace its files in the existing folder and use **Reload** on the browser's extensions page. Keep the existing installation to retain the local library. Managed Chrome installations can receive signed updates from GitHub Releases.
 
 [Full extension guide](apps/extension/README.md)
 
@@ -32,7 +32,7 @@ The customer extension has no agent-control overlay or debugger permission. Lega
 
 ## Repository
 
-- `apps/extension` — Chrome MV3 capture popup, durable account-bound sync queue and local IndexedDB library.
+- `apps/extension` — Chromium MV3 capture popup, readable page extraction, durable account-bound sync queue and local IndexedDB library.
 - `apps/web` — the landing page, account setup, customer dashboard and extension downloads, served at `atlas.notpritam.in`.
 - `apps/agent` — optional organization companion.
 - `apps/backend` — Bun/Hono customer accounts, private capture APIs and bounded organization worker. Separate legacy APIs support existing integrations.
