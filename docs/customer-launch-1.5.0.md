@@ -64,3 +64,20 @@ The release candidate passed on 6 September 2026:
 - 5 landing browser tests across 320px through 1440px layouts.
 - The signed CRX reports version 1.5.0, retains the established extension ID,
   matches the update manifest and passes signature verification.
+
+## Production verification
+
+Atlas 1.5.0 was deployed to `https://atlas.notpritam.in` on 6 September 2026
+from commit `89ed5dbe8768b7fa0b4e8a474338a863261cd34a`.
+
+- The pre-migration SQLite backup is
+  `/home/pritam/.local/share/atlas/backups/before-atlas-1.5.0-20260906T161714Z.sqlite`;
+  it has mode 0600 and passed `PRAGMA integrity_check`.
+- The production database reached migration level 7 and passed its integrity
+  check after the backend restart.
+- The live landing checks and the complete live signup → connect → preference
+  refresh → capture → dashboard → revoke → account cleanup journey passed.
+- GitHub Actions run `34044961636` passed and published `ext-v1.5.0`. The
+  downloaded release CRX passed signature, extension ID, version and update
+  manifest verification. Store submission and listing-asset archives are
+  attached to the release for publisher upload.
