@@ -287,6 +287,8 @@ async function uploadBody(record) {
     selectionText: record.selectionText,
     noteText: record.noteText,
     articleText: record.articleText,
+    provenance: record.provenance,
+    processingOptions: record.processingOptions,
     width: record.width,
     height: record.height,
     capturedAt: record.capturedAt,

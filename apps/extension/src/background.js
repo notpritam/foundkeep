@@ -1,4 +1,5 @@
 import { drainQueue, saveCapture } from "./capture.js";
+import { extractPageDocument } from "./page-extractor.js";
 import {
   protectCloudStorage,
   handleExternalMessage,
@@ -49,6 +50,85 @@ function pageMeta(tab, extra) {
   };
 }
 
+function safeHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function fallbackProvenance(tab, captureMethod, capturedAt, targetUrl = null, error = null) {
+  return {
+    schemaVersion: 1,
+    captureMethod,
+    pageUrl: safeHttpUrl(tab?.url),
+    canonicalUrl: null,
+    pageTitle: tab?.title || null,
+    siteName: null,
+    description: null,
+    authors: [],
+    publishedAt: null,
+    modifiedAt: null,
+    language: null,
+    leadImageUrl: null,
+    faviconUrl: safeHttpUrl(tab?.favIconUrl),
+    targetUrl: safeHttpUrl(targetUrl),
+    headings: [],
+    capturedAt,
+    extractedAt: Date.now(),
+    extractorVersion: 1,
+    contentHash: null,
+    extractionStatus: error ? "partial" : "complete",
+    extractionError: error,
+  };
+}
+
+async function capturePageContext(tab, {
+  captureMethod,
+  readableText = false,
+  extendedMetadata = true,
+  headings = false,
+  targetUrl = null,
+} = {}) {
+  const capturedAt = Date.now();
+  if (!tab?.id || !safeHttpUrl(tab.url)) {
+    return { articleText: null, provenance: fallbackProvenance(tab, captureMethod, capturedAt, targetUrl, "Page details were unavailable.") };
+  }
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: extractPageDocument,
+      args: [{ captureMethod, capturedAt, readableText, extendedMetadata, headings }],
+    });
+    if (!result?.provenance) throw new Error("No page context returned");
+    result.provenance.targetUrl = safeHttpUrl(targetUrl);
+    if (!readableText) {
+      result.provenance.extractionStatus = "complete";
+      result.provenance.extractionError = null;
+    }
+    return result;
+  } catch {
+    return { articleText: null, provenance: fallbackProvenance(tab, captureMethod, capturedAt, targetUrl, "Atlas saved the source, but some page details were unavailable.") };
+  }
+}
+
+function methodFor(action, trigger) {
+  if (action === "save-selection") return "context-selection";
+  if (action === "save-link") return "context-link";
+  if (action === "save-image") return "context-image";
+  const suffix = {
+    savepage: "save-page",
+    highlight: "highlight",
+    region: "region",
+    fullpage: "full-page",
+  }[action];
+  return `${trigger || "popup"}-${suffix}`;
+}
+
 // ---------------------------------------------------------------------------
 // Queue drain — periodic (in case the agent was offline) + on demand.
 // ---------------------------------------------------------------------------
@@ -85,7 +165,7 @@ const MENUS = [
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
-    await performCapture(info.menuItemId, { tab, info });
+    await performCapture(info.menuItemId, { tab, info, trigger: "context" });
     flash(true);
   } catch (e) {
     flash(false, String(e));
@@ -105,7 +185,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   }[command];
   if (!action) return;
   try {
-    await performCapture(action, { tab });
+    await performCapture(action, { tab, trigger: "keyboard" });
     flash(true);
   } catch (e) {
     flash(false, String(e));
@@ -165,20 +245,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         active: true,
         currentWindow: true,
       });
-      if (!tab) return;
+      if (!tab) return sendResponse({ ok: false, error: "Open a web page to capture it." });
+      const acknowledgeStart = msg.action === "region";
+      if (acknowledgeStart) sendResponse({ ok: true, started: true });
       try {
-        await performCapture(msg.action, { tab });
+        const capture = await performCapture(msg.action, { tab, trigger: "popup" });
         flash(true);
+        if (!acknowledgeStart)
+          sendResponse({ ok: true, capture: capture ? { id: capture.id, type: capture.type, cloudStatus: capture.cloudStatus } : null });
       } catch (e) {
         flash(false, String(e));
+        if (!acknowledgeStart) sendResponse({ ok: false, error: e.message || String(e) });
       }
     })();
-    return;
+    return true;
   }
   if (msg?.kind === "saveTweet") {
     (async () => {
       try {
         const p = msg.payload;
+        const capturedAt = Date.now();
         await saveCapture({
           type: "highlight",
           cloudType: "tweet",
@@ -186,7 +272,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sourceTitle: p.title,
           selectionText: p.text,
           faviconUrl: p.favicon,
-          capturedAt: Date.now(),
+          capturedAt,
+          provenance: fallbackProvenance({ url: p.url, title: p.title, favIconUrl: p.favicon }, "twitter-action", capturedAt),
         });
         sendResponse({ ok: true });
       } catch (e) {
@@ -202,13 +289,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         currentWindow: true,
       });
       try {
+        const local = msg.source === "library";
+        const context = local
+          ? { articleText: null, provenance: fallbackProvenance(null, "library-note", Date.now()) }
+          : await capturePageContext(tab, { captureMethod: "extension-note" });
         await saveCapture({
           type: "note",
           noteText: msg.text,
-          sourceUrl: msg.source === "library" ? null : tab?.url,
-          sourceTitle: msg.source === "library" ? null : tab?.title,
-          faviconUrl: msg.source === "library" ? null : tab?.favIconUrl,
-          capturedAt: Date.now(),
+          sourceUrl: local ? null : context.provenance.pageUrl,
+          sourceTitle: local ? null : context.provenance.pageTitle,
+          faviconUrl: local ? null : context.provenance.faviconUrl,
+          capturedAt: context.provenance.capturedAt,
+          provenance: context.provenance,
         });
         sendResponse({ ok: true });
       } catch (e) {
@@ -226,41 +318,72 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ---------------------------------------------------------------------------
 // The one place every capture action is defined.
 // ---------------------------------------------------------------------------
-async function performCapture(action, { tab, info }) {
+async function performCapture(action, { tab, info, trigger = "popup" }) {
+  const captureMethod = methodFor(action, trigger);
   switch (action) {
     case "region":
-      return regionScreenshot(tab);
+      return regionScreenshot(tab, captureMethod);
     case "fullpage":
-      return fullPageScreenshot(tab);
+      return fullPageScreenshot(tab, captureMethod);
     case "highlight":
-      return saveHighlight(tab);
-    case "savepage":
-      return saveCapture(pageMeta(tab, { type: "bookmark" }));
-    case "save-selection":
-      return saveCapture(
-        pageMeta(tab, { type: "highlight", selectionText: info.selectionText }),
-      );
-    case "save-link":
+      return saveHighlight(tab, captureMethod);
+    case "savepage": {
+      const context = await capturePageContext(tab, { captureMethod, readableText: true, extendedMetadata: true, headings: true });
+      return saveCapture({
+        type: "bookmark",
+        sourceUrl: context.provenance.pageUrl,
+        sourceTitle: context.provenance.pageTitle,
+        faviconUrl: context.provenance.faviconUrl,
+        articleText: context.articleText,
+        capturedAt: context.provenance.capturedAt,
+        provenance: context.provenance,
+      });
+    }
+    case "save-selection": {
+      const context = await capturePageContext(tab, { captureMethod });
+      return saveCapture({
+        type: "highlight",
+        sourceUrl: context.provenance.pageUrl,
+        sourceTitle: context.provenance.pageTitle,
+        faviconUrl: context.provenance.faviconUrl,
+        selectionText: info.selectionText,
+        capturedAt: context.provenance.capturedAt,
+        provenance: context.provenance,
+      });
+    }
+    case "save-link": {
+      const context = await capturePageContext(tab, { captureMethod, targetUrl: info.linkUrl });
       return saveCapture({
         type: "bookmark",
         sourceUrl: info.linkUrl,
         sourceTitle: info.linkText || info.linkUrl,
-        faviconUrl: tab.favIconUrl,
-        capturedAt: Date.now(),
+        faviconUrl: context.provenance.faviconUrl,
+        capturedAt: context.provenance.capturedAt,
+        provenance: context.provenance,
       });
+    }
     case "save-image":
-      return saveImage(info.srcUrl, tab);
+      return saveImage(info.srcUrl, tab, captureMethod);
     default:
       return null;
   }
 }
 
-async function saveImage(srcUrl, tab) {
+async function saveImage(srcUrl, tab, captureMethod) {
+  const context = await capturePageContext(tab, { captureMethod, targetUrl: srcUrl });
   const blob = await (await fetch(srcUrl)).blob();
-  return saveCapture(pageMeta(tab, { type: "image", blob }));
+  return saveCapture({
+    type: "image",
+    blob,
+    sourceUrl: context.provenance.pageUrl,
+    sourceTitle: context.provenance.pageTitle,
+    faviconUrl: context.provenance.faviconUrl,
+    capturedAt: context.provenance.capturedAt,
+    provenance: context.provenance,
+  });
 }
 
-async function saveHighlight(tab) {
+async function saveHighlight(tab, captureMethod) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: () => {
@@ -278,19 +401,25 @@ async function saveHighlight(tab) {
     },
   });
   if (!result?.text) throw new Error("no text selected");
+  const context = await capturePageContext(tab, { captureMethod });
   return saveCapture(
-    pageMeta(tab, {
+    {
       type: "highlight",
+      sourceUrl: context.provenance.pageUrl,
+      sourceTitle: context.provenance.pageTitle,
+      faviconUrl: context.provenance.faviconUrl,
       selectionText: result.text,
       selectionContext: { paragraph: result.paragraph },
-    }),
+      capturedAt: context.provenance.capturedAt,
+      provenance: context.provenance,
+    },
   );
 }
 
 // ---------------------------------------------------------------------------
 // Region screenshot
 // ---------------------------------------------------------------------------
-async function regionScreenshot(tab) {
+async function regionScreenshot(tab, captureMethod) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: regionSelectInPage,
@@ -301,13 +430,19 @@ async function regionScreenshot(tab) {
     format: "png",
   });
   const blob = await cropDataUrl(dataUrl, rect, dpr);
+  const context = await capturePageContext(tab, { captureMethod });
   return saveCapture(
-    pageMeta(tab, {
+    {
       type: "screenshot",
+      sourceUrl: context.provenance.pageUrl,
+      sourceTitle: context.provenance.pageTitle,
+      faviconUrl: context.provenance.faviconUrl,
       width: Math.round(rect.w * dpr),
       height: Math.round(rect.h * dpr),
       blob,
-    }),
+      capturedAt: context.provenance.capturedAt,
+      provenance: context.provenance,
+    },
   );
 }
 
@@ -396,7 +531,7 @@ async function cropDataUrl(dataUrl, rect, dpr) {
 // ---------------------------------------------------------------------------
 const MAX_PAGE_PX = 15000;
 
-async function fullPageScreenshot(tab) {
+async function fullPageScreenshot(tab, captureMethod) {
   const [{ result: dims }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: prepFullPage,
@@ -427,13 +562,19 @@ async function fullPageScreenshot(tab) {
     });
   }
   const blob = await stitch(shots, dims, totalH);
+  const context = await capturePageContext(tab, { captureMethod });
   return saveCapture(
-    pageMeta(tab, {
+    {
       type: "screenshot",
+      sourceUrl: context.provenance.pageUrl,
+      sourceTitle: context.provenance.pageTitle,
+      faviconUrl: context.provenance.faviconUrl,
       width: Math.round(dims.viewW * dims.dpr),
       height: Math.round(totalH * dims.dpr),
       blob,
-    }),
+      capturedAt: context.provenance.capturedAt,
+      provenance: context.provenance,
+    },
   );
 }
 

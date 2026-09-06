@@ -19,7 +19,7 @@ test(
     const server = http.createServer((req, res) => {
       res.writeHead(200, { "Content-Type": "text/html" });
       res.end(
-        '<!doctype html><title>Capture fixture</title><style>body{margin:40px;background:#f3f3f0;font:24px system-ui}article{height:400px}</style><article><h1>Good things worth keeping</h1><p id="selection">A good collection starts with noticing.</p></article>',
+        '<!doctype html><html lang="en"><head><title>Capture fixture</title><link rel="canonical" href="/original"/><meta name="author" content="Mina Rao"/><meta name="description" content="A fixture worth preserving."/><style>body{margin:40px;background:#f3f3f0;font:24px system-ui}article{height:400px}</style></head><body><article><h1>Good things worth keeping</h1><p id="selection">A good collection starts with noticing.</p></article></body></html>',
       );
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -86,6 +86,19 @@ test(
         chrome.runtime.sendMessage({ kind: "capture", action: "savepage" }),
       );
       await count(2);
+      captures = await popup.evaluate(async () => {
+        const db = await import("./db.js");
+        return db.listCaptures();
+      });
+      const bookmark = captures.find((capture) => capture.type === "bookmark");
+      assert.match(bookmark.articleText, /Good things worth keeping/);
+      assert.equal(bookmark.provenance.pageUrl, source);
+      assert.equal(bookmark.provenance.canonicalUrl, source + "original");
+      assert.deepEqual(bookmark.provenance.authors, ["Mina Rao"]);
+      assert.match(bookmark.provenance.contentHash, /^[A-Za-z0-9_-]{43}$/);
+      const highlight = captures.find((capture) => capture.type === "highlight");
+      assert.equal(highlight.provenance.pageUrl, source);
+      assert.equal(highlight.provenance.captureMethod, "popup-highlight");
       await popup.evaluate(() =>
         chrome.runtime.sendMessage({ kind: "capture", action: "fullpage" }),
       );
@@ -122,6 +135,12 @@ test(
       await lib.waitForSelector(".capture-card");
       assert.equal(await lib.locator(".capture-card").count(), 5);
       assert.equal(await lib.locator("#settings").isVisible(), false);
+      const finalCaptures = await popup.evaluate(async () => {
+        const db = await import("./db.js");
+        return db.listCaptures();
+      });
+      assert.ok(finalCaptures.every((capture) => capture.provenance?.schemaVersion === 1));
+      assert.ok(finalCaptures.every((capture) => capture.provenance?.pageUrl === source));
     } finally {
       await context?.close();
       await new Promise((resolve) => server.close(resolve));

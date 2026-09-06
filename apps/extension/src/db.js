@@ -97,6 +97,8 @@ export async function addCapture(input) {
     selectionText: input.selectionText ?? null,
     selectionContext: input.selectionContext ?? null,
     noteText: input.noteText ?? null,
+    provenance: input.provenance ?? null,
+    processingOptions: input.processingOptions ?? null,
     blob: input.blob ?? null, // a Blob, stored directly by IndexedDB
     blobMime: input.blob?.type ?? null,
     width: input.width ?? null,
@@ -107,7 +109,7 @@ export async function addCapture(input) {
     category: null,
     tags: [],
     associations: [],
-    articleText: null,
+    articleText: input.articleText ?? null,
     model: null,
     enrichError: null,
     enrichAttempts: 0,

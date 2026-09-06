@@ -8,7 +8,8 @@ const PROVENANCE_KEYS = [
 const METHODS = new Set([
   "popup-save-page", "keyboard-save-page", "context-selection", "context-link", "context-image",
   "popup-highlight", "keyboard-highlight", "popup-region", "keyboard-region", "popup-full-page",
-  "keyboard-full-page", "extension-note", "library-note", "twitter-action",
+  "keyboard-full-page", "context-save-page", "context-region", "context-full-page",
+  "extension-note", "library-note", "twitter-action",
 ]);
 
 export type ProcessingOptions = { ocr: boolean; summaries: boolean; tags: boolean };
