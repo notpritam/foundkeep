@@ -42,6 +42,10 @@ window.chrome = {
       removeListener: () => {},
     },
     sendMessage: async (m) => {
+      if (m.kind === "cloud-status") {
+        const db = await import("/apps/extension/src/db.js");
+        return {ok:true,account:null,status:"disconnected",pending:0,failed:0,synced:0,localOnly:(await db.listCaptures()).length,otherAccount:0,error:null};
+      }
       if (m.kind === "capture")
         throw new Error(
           "Live page capture needs the installed extension. You can try notes and the library in this preview.",

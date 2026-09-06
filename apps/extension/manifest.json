@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Atlas Capture",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Keep screenshots, highlights, links and notes. Connect your Atlas account to sync new captures, with a local library available offline.",
   "permissions": [
     "activeTab",
@@ -36,13 +36,20 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://x.com/*", "*://twitter.com/*"],
-      "js": ["src/twitter.js"],
+      "matches": [
+        "*://x.com/*",
+        "*://twitter.com/*"
+      ],
+      "js": [
+        "src/twitter.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "externally_connectable": {
-    "matches": ["https://atlas.notpritam.in/*"]
+    "matches": [
+      "https://atlas.notpritam.in/*"
+    ]
   },
   "commands": {
     "region-screenshot": {

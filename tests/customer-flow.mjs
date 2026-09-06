@@ -49,6 +49,7 @@ test('customer signs up, connects the real extension, captures text and screensh
   });
   fixture.listen(0,'127.0.0.1');await once(fixture,'listening');
   let context;
+  const email=`qa-${Date.now()}@example.invalid`;
   try {
     await poll(async()=>{ if(backend && backend.exitCode!==null) throw new Error(backendOutput);return fetch(origin+'/healthz').then(r=>r.ok).catch(()=>false); });
     context=await chromium.launchPersistentContext(path.join(directory,'profile'),{
@@ -62,7 +63,6 @@ test('customer signs up, connects the real extension, captures text and screensh
     const account=await context.newPage();
     const errors=[]; account.on('pageerror',error=>errors.push(error.message));
     await account.goto(origin+'/auth.html');
-    const email=`qa-${Date.now()}@example.invalid`;
     await account.locator('#name').fill('Atlas customer');
     await account.locator('#email').fill(email);
     await account.locator('#password').fill('a-long-test-password-2026');
@@ -117,6 +117,17 @@ test('customer signs up, connects the real extension, captures text and screensh
     await request('DELETE','/api/account',{password:'a-long-test-password-2026'});
     assert.equal((await context.request.get(origin+'/api/me')).status(),401);
   } finally {
+    // If a live assertion fails, remove only this run's authenticated QA account.
+    // A fresh temporary profile cannot contain any existing customer session.
+    if (context && deployedOrigin) {
+      const response = await context.request.get(origin+'/api/me',{timeout:5000}).catch(()=>null);
+      if (response?.ok() && (await response.json()).account?.email === email) {
+        const cleanup = await context.request.delete(origin+'/api/account',{
+          headers:{Origin:origin},data:{password:'a-long-test-password-2026'},timeout:5000,
+        }).catch(()=>null);
+        if (!cleanup?.ok()) console.error('The disposable live QA account needs cleanup.');
+      }
+    }
     await context?.close();backend?.kill('SIGTERM');
     if(backend?.exitCode===null) await Promise.race([once(backend,'exit'),sleep(3000)]);
     if(backend?.exitCode===null) backend.kill('SIGKILL');

@@ -56,7 +56,9 @@ jobs:
         if: env.HAS_KEY == 'true'
         env:
           EXTENSION_PEM_B64: ${{ secrets.EXTENSION_PEM }}
-        run: node deploy/release-extension.mjs --no-bump
+        run: |
+          node deploy/release-extension.mjs --no-bump
+          node deploy/verify-release.mjs
 
       - name: Publish GitHub Release
         if: env.HAS_KEY == 'true'
@@ -65,13 +67,15 @@ jobs:
           tag_name: ext-v${{ steps.v.outputs.version }}
           name: Atlas extension v${{ steps.v.outputs.version }}
           body: |
-            Auto-updating Atlas browser extension.
+            Atlas customer capture: private accounts, browser connection, automatic cloud sync, and a searchable dashboard.
+
+            Get started at https://atlas.notpritam.in/signup and follow the browser setup in your dashboard.
 
             - Chrome update manifest: `updates.xml`
             - Signed extension: `atlas-extension.crx`
             - Unpacked bundle: `atlas-extension.zip`
 
-            Installs & auto-updates via the force-install policy in `deploy/policy/`.
+            Existing local captures stay local until you choose to import them. ZIP installation requires Chrome Developer mode; Chrome Web Store publication is pending. The signed build supports existing managed installations.
           files: |
             apps/web/ext/atlas-extension.crx
             apps/web/updates.xml
