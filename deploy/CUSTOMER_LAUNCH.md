@@ -35,7 +35,7 @@ Account-owned preferences control capture methods, page content and metadata, no
 1. Run `bun test`, `bun run test:extension`, `bun run test:web`, and `bun run test:customer`.
 2. Back up the live database with SQLite's backup API into a private timestamped file and run `PRAGMA integrity_check` on the backup.
 3. Deploy dual-origin backend support before changing DNS or releasing version 1.6.
-4. Register `foundkeep.app`, point apex and optional `www` DNS at the production host, install the shared Caddy blocks, and verify valid TLS. `.app` requires HTTPS.
+4. Register `foundkeep.app`, point proxied apex and `www` DNS at the production host, install the shared Caddy blocks, and verify Cloudflare edge TLS plus the encrypted Caddy origin. `.app` requires HTTPS.
 5. Verify signup, login, recovery, dashboard, privacy, downloads, canonical metadata, CSP, and both exact origin policies on Foundkeep.
 6. Publish the signed version 1.6 release, verify the unchanged ID and signature, and keep both Foundkeep and legacy artifact names.
 7. Run the disposable live account flow and delete its test account through the authenticated endpoint.

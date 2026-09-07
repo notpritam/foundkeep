@@ -22,7 +22,7 @@ systemctl status atlas-backend
 
 ## DNS and HTTPS
 
-Register `foundkeep.app` before applying DNS. Point apex `A` to `157.180.102.248` and, when IPv6 is enabled, apex `AAAA` to `2a01:4f9:3090:1055::2`. Point `www` to the apex or the same host if the redirect block will be used.
+Register `foundkeep.app` before applying DNS. Point apex `A` to `157.180.102.248` and apex `AAAA` to `2a01:4f9:3090:1055::2`. Point `www` to the apex. Production uses Cloudflare proxying: Cloudflare presents the public edge certificate and Caddy's `tls internal` certificate encrypts the origin connection. Keep Cloudflare SSL/TLS mode on Full for this configuration.
 
 Copy the Foundkeep blocks from `deploy/Caddyfile` into the shared `/etc/caddy/Caddyfile` without replacing other products, then validate and reload:
 
@@ -32,7 +32,7 @@ sudo systemctl reload caddy
 sudo journalctl -u caddy -f
 ```
 
-The backend serves `apps/web` for non-API paths. Foundkeep proxies to `127.0.0.1:8790`; the legacy hostname proxies only compatibility routes and redirects ordinary website requests. The `.app` top-level domain is HSTS-preloaded; do not publish the extension until Foundkeep HTTPS is valid.
+The backend serves `apps/web` for non-API paths. Foundkeep proxies to `127.0.0.1:8790`; the legacy hostname proxies only compatibility routes and redirects ordinary website requests. The `.app` top-level domain is HSTS-preloaded. Verify Cloudflare's public HTTPS response before publishing the extension.
 
 ## Releases and auto-update
 

@@ -31,3 +31,10 @@ Foundkeep 1.6 rebrands the shipped customer extension and private dashboard whil
 - `foundkeep-store-1.6.0.zip`: SHA-256 `c15969fc3cc5c9f34ff05e48a0a8db2a2b25d75e6a0514279e5f62062d644107`; no signing key, update URL, private key, or companion-control scripts.
 
 Production evidence will be appended after DNS, TLS, deployment, the GitHub release workflow, and the disposable live-account flow complete.
+
+## Production activation — 7 September 2026
+
+- Cloudflare edge TLS serves `foundkeep.app`; Caddy uses an internal origin certificate and proxies to the existing backend on port 8790.
+- `www.foundkeep.app` redirects permanently to the apex.
+- Human-facing `atlas.notpritam.in` paths redirect to the matching Foundkeep path; compatibility API and health routes remain available for version 1.5 clients.
+- Pre-deployment database backup: `/home/pritam/.local/share/atlas/backups/before-foundkeep-1.6.0-20260907T090923Z.sqlite`, 307,200 bytes, `PRAGMA integrity_check` returned `ok`.
