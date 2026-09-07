@@ -173,7 +173,7 @@ function methodFor(action, trigger) {
 }
 
 // ---------------------------------------------------------------------------
-// Queue drain — periodic (in case the agent was offline) + on demand.
+// Queue drain — periodic cloud retry + on demand.
 // ---------------------------------------------------------------------------
 chrome.runtime.onInstalled.addListener(() => {
   getEffectivePreferences({ refresh: true })
@@ -462,7 +462,22 @@ async function performCapture(action, { tab, info, trigger = "popup" }) {
 
 async function saveImage(srcUrl, tab, captureMethod) {
   const context = await capturePageContext(tab, { captureMethod, targetUrl: srcUrl });
-  const blob = await (await fetch(srcUrl)).blob();
+  const source = safeHttpUrl(srcUrl);
+  if (!source) throw new Error("Foundkeep can only save images from public web addresses.");
+  const response = await fetch(source, {
+    credentials: "omit",
+    redirect: "follow",
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error(`The image could not be downloaded (${response.status}).`);
+  const length = Number(response.headers.get("content-length"));
+  if (Number.isFinite(length) && length > 8 * 1024 * 1024)
+    throw new Error("This image exceeds Foundkeep's 8 MiB capture limit.");
+  const blob = await response.blob();
+  if (!blob.type.toLowerCase().startsWith("image/"))
+    throw new Error("The selected address did not return an image.");
+  if (blob.size > 8 * 1024 * 1024)
+    throw new Error("This image exceeds Foundkeep's 8 MiB capture limit.");
   return saveCapture({
     type: "image",
     blob,

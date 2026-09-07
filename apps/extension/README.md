@@ -12,7 +12,7 @@ To update an existing unpacked installation, replace its files in the existing f
 
 ## Connect your account
 
-Choose **Connect Foundkeep** in the popup, create an account or sign in at [Foundkeep](https://foundkeep.app/dashboard.html), then connect this browser from the dashboard. The website hands the extension a short-lived, one-use connection code. No developer token or companion setup is required.
+Choose **Connect Foundkeep** in the popup, create an account or sign in at [Foundkeep](https://foundkeep.app/dashboard.html), then connect this browser from the dashboard. The website hands the extension a short-lived, one-use connection code. No developer token or separate software is required.
 
 New captures made while an account is selected are saved locally and queued for that account. Foundkeep retries automatically after network failures when automatic sync is enabled. **Try sync again** requests an immediate retry; **Reconnect** appears if the browser credential expires or is revoked. Captures remain available locally throughout.
 
@@ -25,7 +25,7 @@ Existing local captures are never uploaded automatically. To include them, open 
 - **Keyboard:** `Alt+Shift+S` captures a region, `Alt+Shift+F` a full page, and `Alt+Shift+H` selected text. Change assignments at `chrome://extensions/shortcuts`.
 - **X / Twitter:** the Foundkeep button in a tweet’s action bar saves the author, text, and permalink.
 
-Page capture requires a normal web page. Chrome restricts capture on internal browser pages and certain protected pages. Notes can still be saved there. Cloud uploads allow images up to 8 MiB; larger images remain local with an actionable sync error.
+Page capture requires a normal web page. Chrome restricts capture on internal browser pages and certain protected pages. Notes can still be saved there. Saved images are limited to 8 MiB. A larger generated screenshot remains local with an actionable sync error.
 
 Saving a page keeps the useful article or main text, available headings and structured page details. Its provenance record can include the exact visited URL, canonical URL, title, description, site, authors, publication and modification dates, language, lead image, favicon, capture method and timestamps, extractor version, extraction status, and a SHA-256 content fingerprint. Saved links and images also keep the containing page separately from the target. Foundkeep does not store raw page HTML.
 
@@ -43,17 +43,7 @@ Local copies remain in IndexedDB. Deleting a local copy does not delete a synced
 
 You can also use Foundkeep without an account. Disconnected captures stay local until you explicitly import them. Disconnecting keeps existing pending captures assigned to their original account. Manage and revoke connected browsers in your account dashboard.
 
-## Optional local organization
-
-When no account is selected, **Settings → Advanced: local companion** retains the optional companion for local-only captures:
-
-```sh
-npx @notpritam/atlas-agent
-```
-
-The default address is `http://127.0.0.1:8791`. The companion uses your Claude Code connection; its model provider may process capture content remotely. Saving and keyword search work without it. Connected account captures use Foundkeep’s organization service and are never sent to this companion.
-
-The customer extension does not activate the legacy browser-control integration or request the debugger permission. This package supports Chromium browsers. Firefox and Safari builds are not currently shipped.
+The customer extension has no browser-control integration and does not request the debugger permission. This package supports Chromium browsers. Firefox and Safari builds are not currently shipped.
 
 ## Development checks
 

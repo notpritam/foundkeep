@@ -12,7 +12,6 @@ import {
   wireDialog,
 } from "./ui.js";
 import { bindConnections } from "./connections.js";
-import { getSettings } from "./storage.js";
 const state = { type: "", tag: null, category: null, q: "" };
 const types = [
   ["", "All captures", "grid"],
@@ -268,7 +267,6 @@ async function openDetail(id, opener) {
     );
   if (c.articleText) body.append(detailField("Saved page text", c.articleText));
   if (c.ocrText) body.append(detailField("Recognized text", c.ocrText));
-  const { enrichEnabled } = await getSettings();
   if (c.cloudAccountId)
     body.append(
       detailField(
@@ -277,18 +275,6 @@ async function openDetail(id, opener) {
           ? "Saved to your Foundkeep account. Open the dashboard for its organized version."
           : c.cloudError ||
               "Saved in this browser and waiting to sync to its connected account.",
-      ),
-    );
-  if (!c.cloudAccountId && enrichEnabled && c.status !== "done")
-    body.append(
-      detailField(
-        "Optional organization",
-        c.status === "failed"
-          ? "Organization needs another try. Your capture is saved. " +
-              (c.enrichError || "")
-          : c.status === "processing"
-            ? "Your companion is organizing this capture."
-            : "Saved and waiting for your companion to organize it.",
       ),
     );
   $("detailDate").textContent = new Date(c.createdAt).toLocaleString(

@@ -83,7 +83,7 @@ export async function addCapture(input) {
   const rec = {
     id,
     type: input.type,
-    status: input.cloudAccountId ? "done" : "pending",
+    status: "done",
     cloudAccountId: input.cloudAccountId || null,
     cloudClientId: id,
     cloudType: input.cloudType || null,
@@ -141,10 +141,6 @@ async function updateWhere(id, patch, allowed) {
     return rec;
   });
 }
-export function updateLocalCapture(id, patch) {
-  return updateWhere(id, patch, (record) => !record.cloudAccountId);
-}
-
 export async function deleteCapture(id) {
   return write(async (store) => {
     await reqToPromise(store.delete(id));
@@ -200,20 +196,6 @@ export async function listCaptures({
     );
   }
   return rows.slice(0, limit);
-}
-
-/** Captures awaiting enrichment (pending, or failed with attempts left). */
-export async function pendingCaptures(limit = 5) {
-  const rows = await getAll();
-  return rows
-    .filter(
-      (r) =>
-        !r.cloudAccountId &&
-        (r.status === "pending" ||
-          (r.status === "failed" && r.enrichAttempts < 4)),
-    )
-    .sort((a, b) => a.createdAt - b.createdAt)
-    .slice(0, limit);
 }
 
 export async function counts() {

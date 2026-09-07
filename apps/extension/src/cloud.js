@@ -250,19 +250,6 @@ export async function disconnectCloud() {
   return revokeCredential(previous);
 }
 
-/** Serialize the final local-only check and request dispatch with pairing and
- * import. Return the in-flight promise inside an object so the lock is released
- * immediately after dispatch, not after the companion's potentially long work. */
-export function startLocalOrganization(ids, start) {
-  return exclusive(async () => {
-    if ((await readState())?.account) return null;
-    for (const id of ids) {
-      const record = await db.getCapture(id);
-      if (!record || record.cloudAccountId) return null;
-    }
-    return { result: start() };
-  });
-}
 export async function importLocalCaptures({ confirmed, accountId } = {}) {
   if (confirmed !== true || !accountId)
     throw new Error("Confirm which account will receive these local captures.");

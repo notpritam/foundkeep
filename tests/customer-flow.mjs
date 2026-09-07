@@ -59,7 +59,6 @@ test('customer signs up, configures the real extension, captures a readable page
     const worker=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
     const id=new URL(worker.url()).host;
     assert.equal(id,'mjfcgmboaijfcaanepdipbgmipnccnpn');
-    await worker.evaluate(()=>chrome.storage.local.set({enrichEnabled:false}));
     const account=await context.newPage();
     const errors=[]; account.on('pageerror',error=>errors.push(error.message));
     await account.goto(origin+'/auth.html');

@@ -44,12 +44,7 @@ async function pageWithExtension(t, { saveFails = false, preferences = null } = 
   });
   await context.addInitScript(
     ({ saveFails, preferences }) => {
-      let settings = {
-        enrichEnabled: false,
-        relayUrl: "",
-        relayToken: "",
-        agentUrl: "http://127.0.0.1:8791",
-      };
+      let settings = {};
       window.__closed = false;
       window.close = () => { window.__closed = true; };
       window.__captureRequests = [];
@@ -310,27 +305,16 @@ test("keyboard focus survives filtering, refreshing an open detail, and closing 
     "settingsBtn",
   );
 });
-test("optional local settings persist and customer setup has no browser-control token inputs", async (t) => {
+test("customer settings expose account connection and local-library guidance only", async (t) => {
   const page = await pageWithExtension(t);
   await page.goto("http://atlas.test/src/dashboard.html");
   await page.locator("#settingsBtn").click();
   assert.equal(await page.locator("#relayUrl").count(), 0);
   assert.equal(await page.locator("#relayToken").count(), 0);
-  await page.getByText("Advanced: local companion", { exact: true }).click();
-  await page.locator("#agentUrl").fill("https://example.com/companion");
-  await page.locator("#saveSettings").click();
-  await page.waitForFunction(
-    () =>
-      document.querySelector("#settingsFeedback").textContent ===
-      "Settings saved.",
-  );
-  await page.locator("#settingsClose").click();
-  await page.locator("#settingsBtn").click();
-  assert.equal(
-    await page.locator("#agentUrl").inputValue(),
-    "https://example.com/companion",
-  );
-  assert.equal(await page.locator("#enrichEnabled").isChecked(), false);
+  assert.equal(await page.locator("#agentUrl").count(), 0);
+  assert.equal(await page.locator("#enrichEnabled").count(), 0);
+  await page.getByRole("heading", { name: "Local library" }).waitFor();
+  await page.getByText("Copies stay in this browser.", { exact: false }).waitFor();
 });
 test("popup offers real account connection and preserves a local-library fallback while offline", async (t) => {
   const page = await pageWithExtension(t);

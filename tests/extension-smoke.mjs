@@ -65,13 +65,6 @@ test(
         context.serviceWorkers()[0] ||
         (await context.waitForEvent("serviceworker"));
       const id = new URL(worker.url()).host;
-      await worker.evaluate(() =>
-        chrome.storage.local.set({
-          enrichEnabled: false,
-          relayUrl: "",
-          relayToken: "",
-        }),
-      );
       const web = await context.newPage();
       await web.goto(source);
       await web.evaluate(() => {

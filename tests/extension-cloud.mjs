@@ -472,6 +472,8 @@ test("disconnected and other-account queues remain local; quota errors are recov
   });
   const local = await save(page, "Disconnected note");
   assert.equal(local.cloudAccountId, null);
+  assert.equal(local.cloudStatus, "local");
+  assert.equal(local.status, "done");
   await pair(page, codeB);
   await page.evaluate(() => cloud.drainCloudQueue());
   assert.equal(await page.evaluate(() => uploads.size), 0);
@@ -576,88 +578,6 @@ test("aborted IndexedDB updates and deletes leave their existing capture intact 
     result.every((r) => !r.resolved && r.record.noteText === "Original"),
   );
 });
-test("pairing and importing during image conversion cannot dispatch cloud-owned content to the local companion", async (t) => {
-  const page = await fixture(t);
-  await page.evaluate(async () => {
-    const transport = fetch;
-    window.legacyRequests = [];
-    window.fetch = async (url, options) => {
-      if (url.endsWith("/health"))
-        return new Response(JSON.stringify({ ok: true, claude: true }));
-      if (url.endsWith("/enrich")) {
-        legacyRequests.push(JSON.parse(options.body));
-        return new Response(JSON.stringify({ results: [] }));
-      }
-      return transport(url, options);
-    };
-    await db.addCapture({
-      type: "image",
-      blob: new Blob(["image"], { type: "image/png" }),
-    });
-    const read = Blob.prototype.arrayBuffer;
-    Blob.prototype.arrayBuffer = async function () {
-      await new Promise((resolve) => {
-        window.releaseBlob = resolve;
-      });
-      return read.call(this);
-    };
-    const capture = await import("/src/capture.js");
-    window.localDrain = capture.drainQueue();
-  });
-  await page.waitForFunction(() => typeof releaseBlob === "function");
-  await pair(page);
-  await page.evaluate(async () => {
-    await cloud.importLocalCaptures({
-      confirmed: true,
-      accountId: "account-a",
-    });
-    releaseBlob();
-    await localDrain;
-  });
-  assert.equal(await page.evaluate(() => legacyRequests.length), 0);
-  const record = (await page.evaluate(() => db.listCaptures()))[0];
-  assert.equal(record.cloudAccountId, "account-a");
-  assert.equal(record.cloudStatus, "queued");
-  assert.equal(record.status, "done");
-});
-test("local companion results cannot overwrite a record imported after dispatch", async (t) => {
-  const page = await fixture(t);
-  await page.evaluate(async () => {
-    const transport = fetch;
-    window.fetch = async (url, options) => {
-      if (url.endsWith("/health"))
-        return new Response(JSON.stringify({ ok: true, claude: true }));
-      if (url.endsWith("/enrich")) {
-        const item = JSON.parse(options.body).items[0];
-        await new Promise((resolve) => {
-          window.releaseLegacy = resolve;
-        });
-        return new Response(
-          JSON.stringify({
-            results: [{ id: item.id, summary: "Obsolete companion result" }],
-          }),
-        );
-      }
-      return transport(url, options);
-    };
-    await db.addCapture({ type: "note", noteText: "Moving to the account" });
-    const capture = await import("/src/capture.js");
-    window.localDrain = capture.drainQueue();
-  });
-  await page.waitForFunction(() => typeof releaseLegacy === "function");
-  await pair(page);
-  await page.evaluate(async () => {
-    await cloud.importLocalCaptures({
-      confirmed: true,
-      accountId: "account-a",
-    });
-    releaseLegacy();
-    await localDrain;
-  });
-  const record = (await page.evaluate(() => db.listCaptures()))[0];
-  assert.equal(record.summary, null);
-  assert.equal(record.cloudStatus, "queued");
-});
 test("disconnect clears local credentials before revocation and reports offline revocation failure", async (t) => {
   const page = await fixture(t);
   await pair(page);
@@ -706,50 +626,5 @@ test("reconnecting the same account preserves idempotency across credential rota
         .map((r) => r.authorization),
     ),
     ["Bearer credential-account-a"],
-  );
-});
-
-test("a stalled local companion never blocks captures for a newly connected account", async (t) => {
-  const page = await fixture(t);
-  await page.evaluate(async () => {
-    const transport = fetch;
-    window.fetch = async (url, options) => {
-      if (url.endsWith("/health"))
-        return new Response(JSON.stringify({ ok: true, claude: true }));
-      if (url.endsWith("/enrich")) {
-        await new Promise((resolve) => {
-          window.releaseLegacy = resolve;
-        });
-        return new Response(JSON.stringify({ results: [] }));
-      }
-      return transport(url, options);
-    };
-    await db.addCapture({ type: "note", noteText: "Local companion work" });
-    window.capture = await import("/src/capture.js");
-    window.localDrain = capture.drainQueue();
-  });
-  await page.waitForFunction(() => typeof releaseLegacy === "function");
-  await pair(page);
-  await page.evaluate(() =>
-    capture.saveCapture({
-      type: "note",
-      noteText: "Cloud capture while local work is stalled",
-    }),
-  );
-  try {
-    await page.waitForFunction(() => uploads.size === 1, null, {
-      timeout: 2000,
-    });
-  } finally {
-    await page.evaluate(async () => {
-      releaseLegacy();
-      await localDrain;
-    });
-  }
-  assert.equal(
-    await page.evaluate(
-      () => requests.find((r) => r.url.endsWith("/api/captures")).body.noteText,
-    ),
-    "Cloud capture while local work is stalled",
   );
 });

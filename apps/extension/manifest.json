@@ -8,13 +8,10 @@
     "scripting",
     "contextMenus",
     "storage",
-    "tabs",
     "alarms"
   ],
   "host_permissions": [
-    "<all_urls>",
-    "http://localhost/*",
-    "http://127.0.0.1/*"
+    "<all_urls>"
   ],
   "icons": {
     "16": "icons/icon16.png",

@@ -173,6 +173,17 @@ test("customer copy explains readable bookmarks, source records, controls and Ch
   assert.match(copy, /Chrome, Edge, Brave, Opera/i);
 });
 
+test("privacy policy discloses capture data and Chrome Web Store Limited Use", async (t) => {
+  const page = await pageFor(t);
+  await page.goto(base + "/privacy.html");
+  const copy = await page.locator("body").textContent();
+  assert.match(copy, /readable copy/i);
+  assert.match(copy, /visited and canonical URLs/i);
+  assert.match(copy, /Chrome Web Store Limited Use/i);
+  assert.match(copy, /does not sell this data/i);
+  assert.match(copy, /User Data Policy/i);
+});
+
 test("landing page presents Foundkeep and its branded extension download", async (t) => {
   const page = await pageFor(t);
   assert.match(await page.title(), /Foundkeep/);
