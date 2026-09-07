@@ -5,10 +5,28 @@ import { promisify } from "node:util";
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import {
+  CLOUD_IMAGE_MIME_TYPES,
+  cloudImageMime,
+} from "../apps/extension/src/image-formats.js";
 
 const exec = promisify(execFile);
 const root = path.resolve(".");
 const archive = path.join(root, "deploy/dist/foundkeep-store-1.0.0.zip");
+
+test("cloud image capture accepts exactly the formats supported by the API", () => {
+  assert.deepEqual(CLOUD_IMAGE_MIME_TYPES, [
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+  ]);
+  assert.equal(cloudImageMime(new Blob([], { type: "image/PNG" })), "image/png");
+  assert.throws(
+    () => cloudImageMime(new Blob([], { type: "image/gif" })),
+    /unsupported format/i,
+  );
+  assert.throws(() => cloudImageMime(new Blob([])), /unsupported format/i);
+});
 
 test("Chrome Web Store package is a focused version 1.0.0 MV3 build", async () => {
   assert.equal(
@@ -52,7 +70,11 @@ test("Chrome Web Store package is a focused version 1.0.0 MV3 build", async () =
     "storage",
     "alarms",
   ]);
-  assert.deepEqual(manifest.host_permissions, ["<all_urls>"]);
+  assert.deepEqual(manifest.host_permissions, ["https://foundkeep.app/*"]);
+  assert.deepEqual(manifest.optional_host_permissions, [
+    "http://*/*",
+    "https://*/*",
+  ]);
   assert.equal(JSON.stringify(manifest).includes("debugger"), false);
 
   const source = (
@@ -67,7 +89,7 @@ test("Chrome Web Store package is a focused version 1.0.0 MV3 build", async () =
   assert.doesNotMatch(source, /\b(?:eval|Function)\s*\(/);
   assert.doesNotMatch(
     source,
-    /(?:local companion|atlas-agent|agentUrl|agentEnrich|relayToken|relayUrl|control-bg)/i,
+    /(?:local[\s_-]*companion|atlas-agent|agentUrl|agentEnrich|relayToken|relayUrl|control-bg)/i,
   );
   assert.doesNotMatch(source, /importScripts\s*\(\s*["']https?:\/\//i);
   assert.doesNotMatch(source, /\bimport\s*\(\s*["']https?:\/\//i);

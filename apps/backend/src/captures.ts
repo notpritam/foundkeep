@@ -39,6 +39,26 @@ interface BlobInput {
   mime: string;
 }
 
+const MAX_BLOB_BYTES = 8 * 1024 * 1024;
+const SAFE_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+function sniffImageMime(bytes: Uint8Array): string | null {
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e &&
+    bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a &&
+    bytes[6] === 0x1a && bytes[7] === 0x0a
+  ) return "image/png";
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
+    return "image/jpeg";
+  if (
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+    String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
+  ) return "image/webp";
+  return null;
+}
+
 export async function createCapture(
   db: Database,
   ingest: CaptureIngest,
@@ -313,10 +333,15 @@ async function serveBlob(
     });
   }
   const size = file.size;
+  const safeMime = SAFE_IMAGE_MIMES.has(mime) ? mime : "application/octet-stream";
   const baseHeaders: Record<string, string> = {
-    "content-type": mime,
+    "content-type": safeMime,
     "cache-control": "private, max-age=31536000, immutable",
     "accept-ranges": "bytes",
+    "content-security-policy": "default-src 'none'; sandbox",
+    "cross-origin-resource-policy": "same-origin",
+    "x-content-type-options": "nosniff",
+    "content-disposition": safeMime === mime ? "inline" : "attachment",
   };
   const m = range ? /bytes=(\d*)-(\d*)/.exec(range) : null;
   if (m) {
@@ -350,9 +375,17 @@ export function captureRoutes(db: Database): Hono<Env> {
       ingest = CaptureIngest.parse(JSON.parse(String(form.get("meta") ?? "{}")));
       const file = form.get("blob");
       if (file instanceof File) {
+        if (!["screenshot", "image"].includes(ingest.type))
+          return c.json({ error: "blob_not_allowed" }, 400);
+        if (file.size > MAX_BLOB_BYTES)
+          return c.json({ error: "blob_too_large", maxBytes: MAX_BLOB_BYTES }, 413);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const mime = sniffImageMime(bytes);
+        if (!mime || !SAFE_IMAGE_MIMES.has(file.type) || mime !== file.type)
+          return c.json({ error: "unsupported_blob_type" }, 415);
         blob = {
-          bytes: new Uint8Array(await file.arrayBuffer()),
-          mime: file.type || "application/octet-stream",
+          bytes,
+          mime,
         };
       }
     } else {

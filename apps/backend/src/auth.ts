@@ -19,16 +19,13 @@ interface DeviceRow {
   revoked_at: number | null;
 }
 
-/**
- * Validate the Bearer token (or `?token=`), attach the device, refresh
- * `last_seen_at`. 401 if missing/invalid/revoked.
- */
+/** Validate the Bearer token, attach the device, and refresh `last_seen_at`. */
 export function authMiddleware(db: Database): MiddlewareHandler<Env> {
   return async (c, next) => {
     const header = c.req.header("authorization") ?? "";
     const token = header.toLowerCase().startsWith("bearer ")
       ? header.slice(7).trim()
-      : (c.req.query("token") ?? "");
+      : "";
     if (!token) return c.json({ error: "missing_token" }, 401);
 
     const row = db

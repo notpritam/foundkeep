@@ -105,7 +105,8 @@ async function detectExtension() {
     $('#install-description').textContent = 'Use Chrome on your computer to add Foundkeep from the Chrome Web Store, then pin it in your extensions menu.';
   }
   const attempts = await Promise.allSettled(config.extensionIds.map(async id => ({ id, result: await extensionMessage({ kind: 'atlas-ping' }, id) })));
-  const success = attempts.find(attempt => attempt.status === 'fulfilled');
+  const available = attempts.filter(attempt => attempt.status === 'fulfilled');
+  const success = available.find(attempt => attempt.value.result.account?.id === state.account?.id) || available[0];
   if (state.expired) return null;
   if (success) {
     state.extension = success.value.result; state.extensionId = success.value.id;

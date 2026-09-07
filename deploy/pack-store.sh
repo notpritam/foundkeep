@@ -27,7 +27,14 @@ manifest.pop("update_url", None)
 outdir = os.path.join(root, "deploy", "dist")
 os.makedirs(outdir, exist_ok=True)
 out = os.path.join(outdir, f"foundkeep-store-{version}.zip")
-include = ["icons", "assets", "src"]  # manifest written fresh below
+include = [
+    "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png",
+    "assets/mark.svg", "assets/fonts/ClarityCity-SemiBold.woff2", "assets/fonts/geist-latin.woff2",
+    "src/background.js", "src/capture.js", "src/cloud-ui.js", "src/cloud.js", "src/connections.js",
+    "src/dashboard.css", "src/dashboard.html", "src/dashboard.js", "src/db.js", "src/image-formats.js",
+    "src/page-extractor.js", "src/popup.css", "src/popup.html", "src/popup.js", "src/preferences.js",
+    "src/product.js", "src/runtime-policy.js", "src/theme.css", "src/twitter.js", "src/ui.js",
+]
 with tempfile.TemporaryDirectory() as tmp:
     stage = os.path.join(tmp, "foundkeep")
     os.makedirs(stage)
@@ -35,16 +42,11 @@ with tempfile.TemporaryDirectory() as tmp:
         json.dump(manifest, manifest_file, indent=2)
         manifest_file.write("\n")
     for item in include:
-        s, d = os.path.join(src, item), os.path.join(stage, item)
-        if os.path.isdir(s):
-            shutil.copytree(s, d)
-        elif os.path.exists(s):
-            shutil.copy2(s, d)
-    # Belt & braces: never ship a private key.
-    for r, _, fs in os.walk(stage):
-        for f in fs:
-            if f.endswith(".pem") or f.endswith(".key"):
-                os.remove(os.path.join(r, f))
+        source, destination = os.path.join(src, item), os.path.join(stage, item)
+        if not os.path.isfile(source):
+            raise SystemExit(f"missing required extension file: {item}")
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        shutil.copy2(source, destination)
     with zipfile.ZipFile(out, "w") as z:
         for r, ds, fs in os.walk(stage):
             ds.sort()

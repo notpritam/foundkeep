@@ -221,7 +221,7 @@ describe("customer account security", () => {
     expect(await response.json()).toEqual({ ok: true });
     expect((await request("/me", "GET", undefined, first.bearer)).status).toBe(401);
     expect((await request("/connections/disconnect", "POST", {}, first.bearer, EXTENSION)).status).toBe(401);
-    expect((await request("/me", "GET", undefined, second.bearer)).status).toBe(200);
+    expect((await request("/me", "GET", undefined, second.bearer)).status).toBe(403);
     expect((await request("/me", "GET", undefined, a.cookie)).status).toBe(200);
   });
 
@@ -258,8 +258,7 @@ describe("customer account security", () => {
     expect(own.status).toBe(201);
     const browser = await connect(b.cookie);
     const bearer = await app.request(`${ORIGIN}/api/me`, { headers: { authorization: browser.bearer, "X-Atlas-Account": a.account.id } });
-    expect(bearer.status).toBe(200);
-    expect((await bearer.json() as any).account.id).toBe(b.account.id);
+    expect(bearer.status).toBe(403);
     db.query("UPDATE customer_sessions SET expires_at=0 WHERE account_id=?").run(b.account.id);
     const expired = await app.request(`${ORIGIN}/api/auth/logout`, { method: "POST", headers: { origin: ORIGIN, cookie: b.cookie, "X-Atlas-Account": a.account.id } });
     expect(expired.status).toBe(200);
@@ -501,7 +500,16 @@ describe("private customer captures", () => {
     }
     for (const path of [`/captures/${item.id}`, `/captures/${item.id}/blob`]) expect((await request(path, "GET", undefined, b.cookie)).status).toBe(404);
     expect((await request(`/captures/${item.id}`, "DELETE", {}, b.cookie)).status).toBe(404);
-    const blob = await request(`/captures/${item.id}/blob`, "GET", undefined, device.bearer);
+    for (const [path, method] of [
+      ["/me", "GET"],
+      ["/captures", "GET"],
+      [`/captures/${item.id}`, "GET"],
+      [`/captures/${item.id}/blob`, "GET"],
+      [`/captures/${item.id}`, "DELETE"],
+    ] as const) {
+      expect((await request(path, method, method === "DELETE" ? {} : undefined, device.bearer, EXTENSION)).status).toBe(403);
+    }
+    const blob = await request(`/captures/${item.id}/blob`, "GET", undefined, a.cookie);
     expect(blob.status).toBe(200);
     expect(blob.headers.get("content-type")).toBe("image/png");
     expect(blob.headers.get("cache-control")).toContain("no-store");
@@ -540,7 +548,7 @@ describe("private customer captures", () => {
     const a = await register();
     for (const invalid of [
       { type: "script" }, { sourceUrl: "javascript:alert(1)" },
-      { noteText: "a".repeat(50001) }, { selectionText: "a".repeat(50001) }, { articleText: "a".repeat(100001) },
+      { noteText: "a".repeat(50001) }, { selectionText: "a".repeat(50001) }, { articleText: "a".repeat(500001) },
       { dataUrl: "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=" }, { dataUrl: "data:image/png;base64,PHNjcmlwdD4=" },
       { dataUrl: PNG.replace("image/png", "image/jpeg") }, { capturedAt: "yesterday" },
     ]) expect((await capture(a.cookie, invalid)).status).toBe(400);

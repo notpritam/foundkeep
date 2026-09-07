@@ -45,9 +45,15 @@ test("rejects requests with no token", async () => {
   expect(res.status).toBe(401);
 });
 
+test("rejects query-string tokens", async () => {
+  const res = await call("GET", `/v1/health?token=${encodeURIComponent(full)}`);
+  expect(res.status).toBe(401);
+});
+
 test("health works with a valid token", async () => {
   const res = await call("GET", "/v1/health", { token: full });
   expect(res.status).toBe(200);
+  expect(res.headers.get("strict-transport-security")).toBe("max-age=31536000");
   const body = await res.json();
   expect(body.ok).toBe(true);
   expect(body.service).toBe("atlas");
@@ -112,7 +118,24 @@ test("multipart image capture stores and serves a blob", async () => {
   });
   expect(blob.status).toBe(200);
   expect(blob.headers.get("content-type")).toBe("image/png");
+  expect(blob.headers.get("content-security-policy")).toContain("sandbox");
+  expect(blob.headers.get("cross-origin-resource-policy")).toBe("same-origin");
+  expect(blob.headers.get("x-content-type-options")).toBe("nosniff");
   expect((await blob.arrayBuffer()).byteLength).toBe(png.byteLength);
+});
+
+test("rejects executable and mislabeled multipart blobs", async () => {
+  for (const [name, type, contents] of [
+    ["capture.html", "text/html", "<script>parent.postMessage(document.cookie,'*')</script>"],
+    ["capture.svg", "image/svg+xml", "<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"],
+    ["fake.png", "image/png", "not a png"],
+  ] as const) {
+    const fd = new FormData();
+    fd.set("meta", JSON.stringify({ type: "image", sourceTitle: name }));
+    fd.set("blob", new File([contents], name, { type }));
+    const response = await call("POST", "/v1/captures", { token: full, body: fd });
+    expect(response.status).toBe(415);
+  }
 });
 
 test("claim → enrichment queue lifecycle", async () => {

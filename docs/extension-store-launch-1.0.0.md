@@ -2,7 +2,7 @@
 
 ## Release channels
 
-The Chrome Web Store launch starts at `1.0.0`, sourced from `deploy/store-version.txt`. The existing self-hosted signed channel remains at `1.6.0`; it has a separate version history and cannot accept a lower-version update. The Web Store assigns a new extension ID on the first upload.
+The Chrome Web Store launch starts at `1.0.0`, sourced from `deploy/store-version.txt`. The existing self-hosted signed channel is `1.6.1`; it has a separate version history and cannot accept a lower-version update. The Web Store assigns a new extension ID on the first upload.
 
 ## Customer flow
 
@@ -36,9 +36,13 @@ Upload `deploy/dist/foundkeep-store-1.0.0.zip`. The package is deterministic, ha
 - `storage`
 - `alarms`
 
-`<all_urls>` is required to capture on arbitrary customer-selected pages and retrieve the original bytes of a selected cross-origin image. The extension does not read pages in the background.
+Persistent host access is limited to `https://foundkeep.app/*` for account settings, data-only runtime policy, and capture sync. HTTP(S) host access is optional and requested only for the selected image's exact origin after the customer invokes **Save image**. Active-tab access covers explicit current-page capture, and the extension does not read pages in the background.
 
 The required and optional listing images are generated under `deploy/dist/store-assets`. Store copy, privacy answers, permission justifications, data disclosures, distribution choices and reviewer instructions are in `deploy/STORE_LISTING.md`.
+
+## Moving from the manual build
+
+The Chrome Web Store assigns a new extension ID, so Chrome gives it a separate IndexedDB and extension-storage area. Before removing the manual build, connect it to the intended Foundkeep account, explicitly import any wanted local-only captures, and wait until its pending count reaches zero. Then install and connect the store build. Cloud captures appear in the same dashboard; unsynced local-only records cannot move automatically between extension IDs. During an overlap, the dashboard prefers the installed build already connected to the signed-in account.
 
 ## Validation
 

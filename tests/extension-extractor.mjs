@@ -67,7 +67,7 @@ test("extracts readable article text and traceable structured provenance", async
   assert.doesNotMatch(result.articleText, /Subscribe now|Advertisement|Newsletter/);
   assert.doesNotMatch(result.articleText, /subscriber identifier|account details|invisible text|tracking copy/i);
   assert.deepEqual(result.provenance.headings, ["A useful article", "What changed"]);
-  assert.match(result.provenance.contentHash, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(result.provenance.contentHash, null, "the extension worker hashes extracted text after leaving the page context");
   assert.equal(result.provenance.extractionStatus, "complete");
 });
 
@@ -85,7 +85,16 @@ test("falls back to visible page text and rejects unsafe source metadata", async
   assert.equal(result.provenance.leadImageUrl, null);
   assert.match(result.articleText, /useful visible content/);
   assert.doesNotMatch(result.articleText, /never collect this/);
-  assert.ok(result.articleText.length <= 100_000);
+  assert.ok(result.articleText.length <= 500_000);
+});
+
+test("marks an intentionally bounded article copy as partial instead of silently complete", async (t) => {
+  const result = await extract(t, `<article><h1>Long reference</h1><p>${"useful text ".repeat(1500)}</p></article>`, "/long", {
+    maxArticleCharacters: 10_000,
+  });
+  assert.equal(result.articleText.length, 10_000);
+  assert.equal(result.provenance.extractionStatus, "partial");
+  assert.match(result.provenance.extractionError, /truncated/i);
 });
 
 test("respects bookmark content preferences while retaining origin fields", async (t) => {

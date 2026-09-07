@@ -250,7 +250,6 @@ export function customerRoutes(db: Database) {
   function auth(c: C, cookieOnly = false, countRequest = true): Auth {
     const authorization = c.req.header("authorization");
     const kind = authorization ? "connection" : "session";
-    if (cookieOnly && kind !== "session") fail(403, "website_session_required", "Use your signed-in Foundkeep website for this action.");
     const token = authorization ? /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization)?.[1] : getCookie(c, cookieName);
     if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) fail(401, "unauthorized", "Sign in or reconnect your extension.");
     const table = kind === "session" ? "customer_sessions" : "customer_connections";
@@ -258,6 +257,7 @@ export function customerRoutes(db: Database) {
     if (!credential || credential.expires_at <= Date.now()) fail(401, "unauthorized", "Your session expired. Sign in or reconnect your extension.");
     const owner = account(credential.account_id);
     if (!owner) fail(401, "unauthorized", "Sign in or reconnect your extension.");
+    if (cookieOnly && kind !== "session") fail(403, "website_session_required", "Use your signed-in Foundkeep website for this action.");
     // This optional header expresses the page's existing account context. It
     // can reject a cookie changed in another tab; it never grants authority.
     if (kind === "session") accountIntent(c, owner.id);
@@ -397,7 +397,7 @@ export function customerRoutes(db: Database) {
   });
 
   app.get("/me", (c) => {
-    const { account: owner } = auth(c);
+    const { account: owner } = auth(c, true);
     const connections = db.query("SELECT id,account_id,name,created_at,last_seen_at,expires_at FROM customer_connections WHERE account_id = ? AND expires_at > ? ORDER BY created_at DESC").all(owner.id, Date.now()) as ConnectionRow[];
     return c.json({ account: accountDto(owner), connections: connections.map(connectionDto), usage: usage(owner.id) });
   });
@@ -552,7 +552,7 @@ export function customerRoutes(db: Database) {
   });
 
   app.get("/captures", (c) => {
-    const current = auth(c);
+    const current = auth(c, true);
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
     if (search.length > 200 || (type && !TYPES.has(type))) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
@@ -602,7 +602,7 @@ export function customerRoutes(db: Database) {
     const sourceTitle = textField(body, "sourceTitle", 1000);
     const selectionText = textField(body, "selectionText", 50_000);
     const noteText = textField(body, "noteText", 50_000);
-    const articleText = textField(body, "articleText", 100_000);
+    const articleText = textField(body, "articleText", 500_000);
     const image = decodeImage(body.dataUrl);
     function dimension(key: string) {
       const value = body[key];
@@ -644,7 +644,7 @@ export function customerRoutes(db: Database) {
   });
 
   app.get("/captures/:id/blob", (c) => {
-    const current = auth(c);
+    const current = auth(c, true);
     const row = db.query("SELECT blob_data,blob_mime FROM customer_captures WHERE id = ? AND account_id = ?").get(c.req.param("id"), current.account.id) as { blob_data: Uint8Array | null; blob_mime: string | null } | null;
     if (!row?.blob_data || !row.blob_mime || !["image/png", "image/jpeg", "image/webp"].includes(row.blob_mime)) fail(404, "not_found", "Image not found.");
     c.header("Content-Type", row.blob_mime);
@@ -654,11 +654,11 @@ export function customerRoutes(db: Database) {
   });
 
   app.get("/captures/:id", (c) => {
-    const current = auth(c);
+    const current = auth(c, true);
     return c.json({ capture: customerCaptureDto(findCapture(c.req.param("id"), current.account.id)) });
   });
   app.delete("/captures/:id", (c) => {
-    const current = auth(c);
+    const current = auth(c, true);
     const deleted = db.query("DELETE FROM customer_captures WHERE id = ? AND account_id = ?").run(c.req.param("id"), current.account.id);
     if (!deleted.changes) fail(404, "not_found", "Capture not found.");
     return c.json({ ok: true });

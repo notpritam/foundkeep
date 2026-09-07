@@ -38,6 +38,10 @@ test('customer signs up, configures the real extension, captures a readable page
   await rewrite(extension,origin);
   const manifest=JSON.parse(await readFile(path.join(extension,'manifest.json'),'utf8'));
   manifest.externally_connectable={matches:[`${new URL(origin).protocol}//${new URL(origin).hostname}/*`]};
+  // Headless Chromium cannot invoke the toolbar action that grants activeTab.
+  // This permission exists only in the disposable test copy so captureVisibleTab
+  // and scripting can exercise the same code path against the fixture origin.
+  manifest.host_permissions.push('<all_urls>');
   await writeFile(path.join(extension,'manifest.json'),JSON.stringify(manifest));
   const backend=deployedOrigin ? null : spawn(process.env.BUN_BIN || 'bun',['run','apps/backend/src/index.ts'],{
     cwd:process.cwd(),env:{...process.env,ATLAS_PORT:String(port),ATLAS_CUSTOMER_ORIGIN:origin,ATLAS_DATA_DIR:path.join(directory,'data')},stdio:['ignore','pipe','pipe'],

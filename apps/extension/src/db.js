@@ -4,7 +4,7 @@
 // and the dashboard (both run in the extension context, same origin => same DB).
 
 const DB_NAME = "atlas";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = "captures";
 
 let dbPromise = null;
@@ -15,12 +15,19 @@ function open() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
+      let store;
       if (!db.objectStoreNames.contains(STORE)) {
-        const s = db.createObjectStore(STORE, { keyPath: "id" });
-        s.createIndex("by_status", "status");
-        s.createIndex("by_type", "type");
-        s.createIndex("by_created", "createdAt");
+        store = db.createObjectStore(STORE, { keyPath: "id" });
+      } else {
+        store = req.transaction.objectStore(STORE);
       }
+      if (!store.indexNames.contains("by_status")) store.createIndex("by_status", "status");
+      if (!store.indexNames.contains("by_type")) store.createIndex("by_type", "type");
+      if (!store.indexNames.contains("by_created")) store.createIndex("by_created", "createdAt");
+      if (!store.indexNames.contains("by_cloud_status")) store.createIndex("by_cloud_status", "cloudStatus");
+      if (!store.indexNames.contains("by_cloud_account")) store.createIndex("by_cloud_account", "cloudAccountId");
+      if (!store.indexNames.contains("by_cloud_account_status"))
+        store.createIndex("by_cloud_account_status", ["cloudAccountId", "cloudStatus"]);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -160,8 +167,62 @@ async function getAll() {
   return reqToPromise(store.getAll());
 }
 
-/** List with in-memory filtering (fine at personal scale; no server FTS needed). */
-export async function listCaptures({
+export async function recentCaptures(limit = 3) {
+  if (!Number.isSafeInteger(limit) || limit <= 0) return [];
+  const store = await tx("readonly");
+  const request = store.index("by_created").openCursor(null, "prev");
+  return new Promise((resolve, reject) => {
+    const rows = [];
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor || rows.length >= limit) return resolve(rows);
+      rows.push(cursor.value);
+      cursor.continue();
+    };
+  });
+}
+
+export async function listCloudQueue(accountId, statuses = ["queued"]) {
+  if (!accountId) return [];
+  const store = await tx("readonly");
+  const index = store.index("by_cloud_account_status");
+  const groups = await Promise.all(
+    statuses.map((status) => reqToPromise(index.getAll([accountId, status]))),
+  );
+  return groups.flat()
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function cloudMetrics(accountId) {
+  const store = await tx("readonly");
+  const accounts = store.index("by_cloud_account");
+  const accountStatuses = store.index("by_cloud_account_status");
+  const ownCount = accountId ? accounts.count(accountId) : null;
+  const ownQueued = accountId ? accountStatuses.count([accountId, "queued"]) : null;
+  const ownFailed = accountId ? accountStatuses.count([accountId, "failed"]) : null;
+  const ownSynced = accountId ? accountStatuses.count([accountId, "synced"]) : null;
+  const firstFailure = accountId ? accountStatuses.get([accountId, "failed"]) : null;
+  const [total, bound, own, pending, failed, synced, failedRecord] = await Promise.all([
+    reqToPromise(store.count()),
+    reqToPromise(accounts.count()),
+    ownCount ? reqToPromise(ownCount) : 0,
+    ownQueued ? reqToPromise(ownQueued) : 0,
+    ownFailed ? reqToPromise(ownFailed) : 0,
+    ownSynced ? reqToPromise(ownSynced) : 0,
+    firstFailure ? reqToPromise(firstFailure) : null,
+  ]);
+  return {
+    pending,
+    failed,
+    synced,
+    localOnly: total - bound,
+    otherAccount: bound - own,
+    error: failedRecord?.cloudError || null,
+  };
+}
+
+export function filterCaptureRows(input, {
   type,
   status,
   tag,
@@ -169,8 +230,7 @@ export async function listCaptures({
   q,
   limit = 500,
 } = {}) {
-  let rows = await getAll();
-  rows.sort((a, b) => b.createdAt - a.createdAt);
+  let rows = [...input].sort((a, b) => b.createdAt - a.createdAt);
   if (type) rows = rows.filter((r) => r.type === type);
   if (status) rows = rows.filter((r) => r.status === status);
   if (tag) rows = rows.filter((r) => (r.tags || []).includes(tag));
@@ -198,21 +258,32 @@ export async function listCaptures({
   return rows.slice(0, limit);
 }
 
-export async function counts() {
-  const rows = await getAll();
-  const by = {
-    total: rows.length,
-    pending: 0,
-    processing: 0,
-    done: 0,
-    failed: 0,
-  };
-  for (const r of rows) by[r.status] = (by[r.status] || 0) + 1;
-  return by;
+/** List with in-memory filtering (fine at personal scale; no server FTS needed). */
+export async function listCaptures({
+  type,
+  status,
+  tag,
+  category,
+  q,
+  limit = 500,
+} = {}) {
+  return filterCaptureRows(await getAll(), { type, status, tag, category, q, limit });
 }
 
-export async function facets() {
-  const rows = await getAll();
+export async function counts() {
+  const store = await tx("readonly");
+  const status = store.index("by_status");
+  const [total, pending, processing, done, failed] = await Promise.all([
+    reqToPromise(store.count()),
+    reqToPromise(status.count("pending")),
+    reqToPromise(status.count("processing")),
+    reqToPromise(status.count("done")),
+    reqToPromise(status.count("failed")),
+  ]);
+  return { total, pending, processing, done, failed };
+}
+
+export function facetsFrom(rows) {
   const tags = new Map();
   const cats = new Map();
   for (const r of rows) {
@@ -224,4 +295,8 @@ export async function facets() {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
   return { tags: sort(tags), categories: sort(cats) };
+}
+
+export async function facets() {
+  return facetsFrom(await getAll());
 }

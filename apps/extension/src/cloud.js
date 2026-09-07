@@ -3,6 +3,7 @@
 import * as db from "./db.js";
 import { clearPreferenceCache, getEffectivePreferences } from "./preferences.js";
 import { CUSTOMER_ORIGIN, CUSTOMER_ORIGINS } from "./product.js";
+import { cloudImageMime } from "./image-formats.js";
 
 export { CUSTOMER_ORIGIN } from "./product.js";
 const STATE_KEY = "atlasCustomer";
@@ -216,26 +217,13 @@ export async function captureBinding() {
   };
 }
 export async function getCloudStatus() {
-  const [state, records] = await Promise.all([
-    readState(),
-    db.listCaptures({ limit: Infinity }),
-  ]);
-  const own = records.filter(
-    (r) => r.cloudAccountId && r.cloudAccountId === state?.account?.id,
-  );
-  const pending = own.filter((r) => r.cloudStatus === "queued").length;
-  const failed = own.filter((r) => r.cloudStatus === "failed");
+  const state = await readState();
+  const metrics = await db.cloudMetrics(state?.account?.id);
   return {
     account: publicAccount(state?.account),
     status: state?.status || "disconnected",
-    pending,
-    failed: failed.length,
-    synced: own.filter((r) => r.cloudStatus === "synced").length,
-    localOnly: records.filter((r) => !r.cloudAccountId).length,
-    otherAccount: records.filter(
-      (r) => r.cloudAccountId && r.cloudAccountId !== state?.account?.id,
-    ).length,
-    error: state?.error || failed[0]?.cloudError || null,
+    ...metrics,
+    error: state?.error || metrics.error,
     notice: state?.notice || null,
   };
 }
@@ -310,15 +298,16 @@ async function uploadBody(record) {
       throw new Error(
         "This image exceeds the 8 MiB upload limit. It is still saved in this browser.",
       );
+    const mime = cloudImageMime(record.blob);
     const bytes = new Uint8Array(await record.blob.arrayBuffer());
     let text = "";
     for (let i = 0; i < bytes.length; i += 0x8000)
       text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    body.dataUrl = `data:${record.blob.type || record.blobMime || "image/png"};base64,${btoa(text)}`;
+    body.dataUrl = `data:${mime};base64,${btoa(text)}`;
   }
   return body;
 }
-async function drain() {
+async function drain({ force = false } = {}) {
   // Serial uploads bound memory and make retries/restarts safe. A persisted
   // record remains queued until acknowledgement, so an interrupted request
   // always retries the same account/clientId pair.
@@ -326,11 +315,9 @@ async function drain() {
     const connection = await readState();
     if (!connection?.token || connection.status === "reconnect") return;
     const preferenceState = await getEffectivePreferences();
-    if (!preferenceState.preferences.sync.automatic) return;
-    const records = await db.listCaptures({ limit: Infinity });
-    const record = records
-      .reverse()
-      .find(
+    if (!force && !preferenceState.preferences.sync.automatic) return;
+    const records = await db.listCloudQueue(connection.account.id);
+    const record = records.find(
         (r) =>
           r.cloudAccountId === connection.account.id &&
           r.cloudStatus === "queued" &&
@@ -419,9 +406,11 @@ async function drain() {
     }
   }
 }
-export function drainCloudQueue() {
+export function drainCloudQueue({ force = false } = {}) {
+  if (force && draining)
+    return draining.then(() => drainCloudQueue({ force: true }));
   if (!draining)
-    draining = drain().finally(() => {
+    draining = drain({ force }).finally(() => {
       draining = null;
     });
   return draining;
@@ -429,7 +418,7 @@ export function drainCloudQueue() {
 export async function retryCloudSync() {
   const connection = await readState();
   if (!connection?.token) return;
-  for (const record of await db.listCaptures({ limit: Infinity })) {
+  for (const record of await db.listCloudQueue(connection.account.id, ["queued", "failed"])) {
     if (
       record.cloudAccountId === connection.account.id &&
       ["queued", "failed"].includes(record.cloudStatus)
@@ -441,5 +430,5 @@ export async function retryCloudSync() {
       });
     }
   }
-  return drainCloudQueue();
+  return drainCloudQueue({ force: true });
 }

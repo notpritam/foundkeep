@@ -86,6 +86,7 @@ function makeButton() {
   });
 
   btn.addEventListener("click", (e) => {
+    if (!e.isTrusted) return;
     e.preventDefault();
     e.stopPropagation();
     const article = btn.closest('article[data-testid="tweet"]');

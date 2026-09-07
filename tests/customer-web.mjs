@@ -41,7 +41,7 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.kill(); await rm(dataDir, { recursive: true, force: true }); });
 
-async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAccount = null, extensionInstalled = true, extensionPreferenceRevision = 1, width = 1440, handler } = {}) {
+async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAccount = null, extensionAccountsById = null, extensionIds = ['mjfcgmboaijfcaanepdipbgmipnccnpn'], storeUrl = null, extensionInstalled = true, extensionPreferenceRevision = 1, width = 1440, handler } = {}) {
   const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce', acceptDownloads: true });
   t.after(() => context.close());
   const requests = []; const model = { account, captures: [...captures], connections: extensionAccount?.id === account.id ? [{ id: 'connected-browser', name: 'Chrome', createdAt: now, lastSeenAt: now }] : [], usage: null, preferences: structuredClone(defaultPreferences), preferenceRevision: 0 };
@@ -74,18 +74,18 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
     if (url.pathname.startsWith('/api/connections/')) { model.connections = []; return json({ ok: true }); }
     return json({ ok: true });
   });
-  await context.route('**/customer-config.json', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ extensionIds: ['mjfcgmboaijfcaanepdipbgmipnccnpn'], storeUrl: null }) }));
-  await context.addInitScript(({ extensionAccount, extensionInstalled, extensionPreferenceRevision, account }) => {
+  await context.route('**/customer-config.json', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ extensionIds, storeUrl }) }));
+  await context.addInitScript(({ extensionAccount, extensionAccountsById, extensionInstalled, extensionPreferenceRevision, account }) => {
     window.__extensionMessages = [];
     if (!extensionInstalled) return;
     let connected = extensionAccount;
     window.chrome = { runtime: { sendMessage(id, message, callback) {
       window.__extensionMessages.push({ id, message });
-      if (message.kind === 'atlas-ping') callback({ ok: true, version: '1.5.0', account: connected });
+      if (message.kind === 'atlas-ping') callback({ ok: true, version: '1.5.0', account: extensionAccountsById ? extensionAccountsById[id] || null : connected });
       if (message.kind === 'atlas-connect') { connected = account; callback({ ok: true, account }); }
       if (message.kind === 'atlas-refresh-preferences') callback({ ok: true, revision: extensionPreferenceRevision });
     } } };
-  }, { extensionAccount, extensionInstalled, extensionPreferenceRevision, account });
+  }, { extensionAccount, extensionAccountsById, extensionInstalled, extensionPreferenceRevision, account });
   const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
   t.after(() => assert.deepEqual(errors, [], 'No unhandled browser errors'));
   return { page, requests, model, context };
@@ -214,6 +214,26 @@ test('customer controls every extension feature and refreshes the connected brow
   if (process.env.ATLAS_SETTINGS_SCREENSHOT) await page.screenshot({ path: process.env.ATLAS_SETTINGS_SCREENSHOT, fullPage: false });
 });
 
+test('dashboard prefers the installed build already connected to the signed-in account', async t => {
+  const oldId = 'mjfcgmboaijfcaanepdipbgmipnccnpn';
+  const storeId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const { page } = await pageFor(t, {
+    captures: [],
+    extensionIds: [oldId, storeId],
+    extensionAccountsById: {
+      [oldId]: { id: 'different-account', email: 'other@example.test' },
+      [storeId]: account,
+    },
+  });
+  await openLibrary(page);
+  await page.locator('#open-account').click();
+  await page.locator('#preference-form[data-ready="true"]').waitFor();
+  await page.locator('#save-preferences').click();
+  await page.waitForFunction(() => document.querySelector('#preference-message').textContent.includes('Saved'));
+  const refresh = await page.evaluate(() => window.__extensionMessages.find(item => item.message.kind === 'atlas-refresh-preferences'));
+  assert.equal(refresh.id, storeId);
+});
+
 test('library notes preserve their origin and active processing choices', async t => {
   const { page, model, requests } = await pageFor(t, { captures: [] });
   model.preferences.organization = { ocr: false, summaries: true, tags: false };
@@ -299,7 +319,10 @@ test('library pagination retries without dropping loaded captures', async t => {
 });
 
 test('customer screens fit phone and desktop; save visual review evidence', async t => {
-  const { page, model } = await pageFor(t, { extensionAccount: account });
+  const { page, model } = await pageFor(t, {
+    extensionAccount: account,
+    storeUrl: 'https://chromewebstore.google.com/detail/foundkeep/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
   await mkdir('.impeccable/review', { recursive: true });
   for (const [surface, route] of [['auth', '/auth.html?mode=signup'], ['dashboard', '/dashboard.html']]) {
     for (const width of [1440, 390, 320]) {

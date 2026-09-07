@@ -44,7 +44,8 @@ Cloud accounts include up to 1,000 captures and 200 MiB of content. Customers sa
 Foundkeep's single purpose is saving customer-selected web content into a private local or connected library so it can be found and used again.
 
 - `activeTab`, `scripting`: read or capture the active page after an explicit customer action. Full-page screenshots scroll and stitch the page.
-- `<all_urls>` host access: support capture actions on eligible sites and upload connected captures to Foundkeep.
+- `https://foundkeep.app/*` host access: load account preferences, operator policy, and sync only customer-selected captures with Foundkeep.
+- Optional HTTP(S) host access: requested only for the selected image's exact origin when the customer invokes **Save image**, so Foundkeep can retrieve the original file without permanent all-sites access.
 - `storage`: protect account connection state, preference cache, and durable upload queue.
 - `contextMenus`: provide explicit right-click save actions for text, pages, links, and images.
 - `alarms`: retry pending uploads and refresh account preferences.
@@ -63,7 +64,8 @@ The customer extension has no debugger permission, browser-control overlay, adve
 - `contextMenus`: Offer explicit right-click actions for saving the selected text, page, link or image and taking a screenshot.
 - `storage`: Keep protected account connection state and an account-bound preference cache. Capture content itself is stored in extension IndexedDB.
 - `alarms`: Retry customer-selected cloud uploads and refresh account preferences after browser restarts or temporary network failures.
-- `<all_urls>`: Let explicit capture actions work on arbitrary eligible web pages and retrieve the original file for an image the customer selects, including images hosted on a different domain from the page. Foundkeep does not read pages in the background or collect general browsing history. Chrome still blocks protected browser pages.
+- `https://foundkeep.app/*`: Read data-only account preferences and operator safety policy, connect the browser, and upload captures the customer explicitly selected. It never loads executable code.
+- Optional HTTP(S) hosts: Request access to the selected image's exact origin only after the customer chooses **Save image**. This is needed when the image lives on a different origin from its page. Foundkeep does not request permanent access to unrelated sites, read pages in the background, or collect general browsing history.
 - External messaging: Let only `https://foundkeep.app` and the temporary exact legacy migration origin detect, pair or refresh Foundkeep. Pairing uses a short-lived one-use code, and pages cannot read extension credentials.
 
 **Remote code:** Select **No, I am not using remote code**. The package executes only bundled JavaScript. Network requests carry customer account, preference and capture data; they never load executable code.
@@ -88,7 +90,7 @@ The cloud product processes account name/email, capture preferences, customer-sa
 - Pricing: **Free**.
 - Regions: all supported Chrome Web Store regions.
 - Publishing: publish automatically after review approval.
-- Test instructions: No pre-created credential is required. Install the extension, open any ordinary HTTPS article, click Foundkeep, choose **Save page**, then choose **Open library** to verify the local flow. To verify cloud sync, create a temporary account at `https://foundkeep.app/auth.html?mode=signup` (no email verification is required), save the shown recovery code, continue to the dashboard, choose **Connect Foundkeep**, and approve the one-use connection. Save another page and open the dashboard to see the synced capture and its source record. The reviewer can delete the temporary account from Account settings.
+- Test instructions: use the dedicated reviewer credential from the private release artifact. Install the extension, sign in at `https://foundkeep.app/auth.html?mode=login`, choose **Connect this browser**, then open any ordinary HTTP(S) article and choose **Save page**. Open the dashboard to verify the synced capture, stored article details and original-source record. The pre-seeded account contains three harmless samples and no administrative access.
 
 ## Submission assets and verification
 
@@ -100,5 +102,7 @@ The cloud product processes account name/email, capture preferences, customer-sa
 - Marquee promo tile: `deploy/dist/store-assets/promo-marquee.png` (optional)
 - Verify the archive reports version `1.0.0` and contains no `.pem`, `.key`, `key`, `update_url`, browser-control, agent, relay, companion, or development-only files.
 - Test signup, pairing, readable-page capture, sync, provenance, preference refresh, export, revoke, and deletion from the final store build after its assigned ID is allowed.
+- Paste the dedicated account from the private `REVIEWER-CREDENTIALS-1.0.0.md` launch artifact into **Test instructions**; follow `deploy/STORE_REVIEWER_GUIDE.md` for the exact review path.
+- Keep executable changes on the reviewed store channel. Foundkeep fetches validated JSON preferences only and never downloads or executes remote code; see `docs/extension-configuration-and-updates.md`.
 
 Until Google approves the listing, public onboarding must continue to label the ZIP as a manual Developer mode installation.

@@ -1,4 +1,5 @@
 import { CUSTOMER_ORIGIN } from "./product.js";
+import { applyRuntimePolicy, getRuntimePolicy } from "./runtime-policy.js";
 const CONNECTION_KEY = "atlasCustomer";
 const CACHE_KEY = "atlasPreferenceCache";
 const MAX_AGE_MS = 5 * 60 * 1000;
@@ -122,12 +123,13 @@ export async function clearPreferenceCache() {
   else await chrome.storage.local.set({ [CACHE_KEY]: null });
 }
 
-export async function getEffectivePreferences({ refresh = false, now = Date.now() } = {}) {
+async function getAccountPreferences({ refresh = false, now = Date.now() } = {}) {
   const { state, cache } = await stateAndCache();
   const accountId = state?.account?.id;
   const usableCache = validCache(cache, accountId);
   if (!connectionKey(state)) {
     if (refresh) throw new Error("Connect Foundkeep before refreshing preferences.");
+    if (accountId && usableCache) return cacheResult(usableCache, "stale-cache");
     return { preferences: cloneDefaults(), revision: 0, updatedAt: null, source: "default" };
   }
   if (!refresh && usableCache && now - usableCache.fetchedAt < MAX_AGE_MS) {
@@ -142,6 +144,19 @@ export async function getEffectivePreferences({ refresh = false, now = Date.now(
     }
     return { preferences: cloneDefaults(), revision: 0, updatedAt: null, source: "default" };
   }
+}
+
+export async function getEffectivePreferences({ refresh = false, now = Date.now() } = {}) {
+  const [account, runtime] = await Promise.all([
+    getAccountPreferences({ refresh, now }),
+    getRuntimePolicy({ refresh, now }),
+  ]);
+  return {
+    ...account,
+    preferences: applyRuntimePolicy(account.preferences, runtime.policy),
+    policy: runtime.policy,
+    policySource: runtime.source,
+  };
 }
 
 export function refreshPreferences(options = {}) {

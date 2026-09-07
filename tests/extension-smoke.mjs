@@ -1,8 +1,7 @@
 // Exercise the real MV3 background worker and IndexedDB in a temporary profile.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import http from "node:http";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 const { chromium } = await import(
@@ -40,15 +39,18 @@ test(
     const profile = await mkdtemp(
       path.join(os.tmpdir(), "atlas-extension-test-"),
     );
-    const extension = path.resolve("apps/extension");
-    const server = http.createServer((req, res) => {
-      res.writeHead(200, { "Content-Type": "text/html" });
-      res.end(
-        '<!doctype html><html lang="en"><head><title>Capture fixture</title><link rel="canonical" href="/original"/><meta name="author" content="Mina Rao"/><meta name="description" content="A fixture worth preserving."/><style>body{margin:40px;background:#f3f3f0;font:24px system-ui}article{height:400px}</style></head><body><article><h1>Good things worth keeping</h1><p id="selection">A good collection starts with noticing.</p></article></body></html>',
-      );
-    });
-    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-    const source = `http://127.0.0.1:${server.address().port}/`;
+    // Headless Chromium cannot click the browser toolbar action that grants
+    // activeTab. Use a byte-for-byte source copy with only the equivalent
+    // captureVisibleTab test permission added; the real manifest is checked
+    // separately and keeps its narrow production permissions.
+    const extension = await mkdtemp(path.join(os.tmpdir(), "foundkeep-smoke-build-"));
+    await cp(path.resolve("apps/extension"), extension, { recursive: true });
+    const testManifestPath = path.join(extension, "manifest.json");
+    const testManifest = JSON.parse(await readFile(testManifestPath, "utf8"));
+    testManifest.host_permissions.push("<all_urls>");
+    await writeFile(testManifestPath, JSON.stringify(testManifest));
+    const source = "https://foundkeep.app/__extension-test-fixture";
+    const fixture = '<!doctype html><html lang="en"><head><title>Capture fixture</title><link rel="canonical" href="/original"/><meta name="author" content="Mina Rao"/><meta name="description" content="A fixture worth preserving."/><style>body{margin:40px;background:#f3f3f0;font:24px system-ui}article{height:400px}</style></head><body><article><h1>Good things worth keeping</h1><p id="selection">A good collection starts with noticing.</p></article></body></html>';
     let context;
     try {
       context = await chromium.launchPersistentContext(profile, {
@@ -61,6 +63,11 @@ test(
           `--load-extension=${extension}`,
         ],
       });
+      await context.route(source, (route) => route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: fixture,
+      }));
       const worker =
         context.serviceWorkers()[0] ||
         (await context.waitForEvent("serviceworker"));
@@ -111,7 +118,7 @@ test(
       const bookmark = captures.find((capture) => capture.type === "bookmark");
       assert.match(bookmark.articleText, /Good things worth keeping/);
       assert.equal(bookmark.provenance.pageUrl, source);
-      assert.equal(bookmark.provenance.canonicalUrl, source + "original");
+      assert.equal(bookmark.provenance.canonicalUrl, "https://foundkeep.app/original");
       assert.deepEqual(bookmark.provenance.authors, ["Mina Rao"]);
       assert.match(bookmark.provenance.contentHash, /^[A-Za-z0-9_-]{43}$/);
       const highlight = captures.find((capture) => capture.type === "highlight");
@@ -206,8 +213,8 @@ test(
       assert.ok(finalCaptures.every((capture) => capture.provenance?.pageUrl === source));
     } finally {
       await context?.close();
-      await new Promise((resolve) => server.close(resolve));
       await rm(profile, { recursive: true, force: true });
+      await rm(extension, { recursive: true, force: true });
     }
   },
 );

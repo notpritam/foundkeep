@@ -33,6 +33,8 @@ Saving a page keeps the useful article or main text, available headings and stru
 
 Open **Account & settings → Browser capture** in the Foundkeep dashboard to control capture methods, readable bookmark content, note source attachment, popup action order and recent items, right-click actions, automatic sync, OCR, summaries, tags, and success feedback. The policy belongs to the customer account and is shared by its connected Chromium browsers. Saving it asks the installed extension to refresh immediately; the extension also refreshes on startup and keeps a brief account-bound cache for offline use.
 
+Foundkeep also reads a validated data-only operator policy. It can globally disable an existing capture or sync feature and lower packaged size limits without downloading executable code. A cached or bundled safe policy is applied immediately so an offline capture never waits for the network. JavaScript, UI, permissions, origins, schemas, and capture algorithms still require a reviewed extension update.
+
 Changing these settings does not require an extension update. Manifest permissions, capture engine changes, security fixes, or new extension code still require an updated extension build.
 
 ## Your libraries

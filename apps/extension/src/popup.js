@@ -45,7 +45,7 @@ async function openLibrary(id) {
 async function renderRecent() {
   const limit = preferences.popup.showRecent ? preferences.popup.recentCount : 0;
   const [rows, counts] = await Promise.all([
-    limit ? db.listCaptures({ limit }) : Promise.resolve([]),
+    limit ? db.recentCaptures(limit) : Promise.resolve([]),
     db.counts(),
   ]);
   blobUrls.forEach(URL.revokeObjectURL);

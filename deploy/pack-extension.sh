@@ -8,21 +8,31 @@ python3 - "$ROOT" <<'PY'
 import zipfile, os, sys, shutil, tempfile
 root = sys.argv[1]
 src = os.path.join(root, "apps", "extension")
-include = ["manifest.json", "icons", "assets", "src", "README.md"]
+include = [
+    "manifest.json", "README.md",
+    "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png",
+    "assets/mark.svg", "assets/fonts/ClarityCity-SemiBold.woff2", "assets/fonts/geist-latin.woff2",
+    "src/background.js", "src/capture.js", "src/cloud-ui.js", "src/cloud.js", "src/connections.js",
+    "src/dashboard.css", "src/dashboard.html", "src/dashboard.js", "src/db.js", "src/image-formats.js",
+    "src/page-extractor.js", "src/popup.css", "src/popup.html", "src/popup.js", "src/preferences.js",
+    "src/product.js", "src/runtime-policy.js", "src/theme.css", "src/twitter.js", "src/ui.js",
+]
 for archive, folder in [("foundkeep-extension.zip", "foundkeep-extension"), ("atlas-extension.zip", "atlas-extension")]:
     out = os.path.join(root, "apps", "web", archive)
     with tempfile.TemporaryDirectory() as tmp:
         stage = os.path.join(tmp, folder)
         os.makedirs(stage)
         for item in include:
-            s, d = os.path.join(src, item), os.path.join(stage, item)
-            shutil.copytree(s, d) if os.path.isdir(s) else shutil.copy2(s, d)
+            source, destination = os.path.join(src, item), os.path.join(stage, item)
+            if not os.path.isfile(source):
+                raise SystemExit(f"missing required extension file: {item}")
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            shutil.copy2(source, destination)
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-            for r, _, fs in os.walk(stage):
-                for f in fs:
+            for r, directories, fs in os.walk(stage):
+                directories.sort()
+                for f in sorted(fs):
                     full = os.path.join(r, f)
-                    if f in ('control-bg.js', 'agent-control.js') or f.endswith(('.pem', '.key')):
-                        continue
                     z.write(full, os.path.relpath(full, tmp))
     print("wrote", out, os.path.getsize(out), "bytes")
 PY

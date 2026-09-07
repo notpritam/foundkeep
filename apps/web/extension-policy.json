@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "cacheSeconds": 60,
+  "capture": {
+    "region": true,
+    "fullPage": true,
+    "highlight": true,
+    "bookmark": true,
+    "image": true,
+    "tweet": true,
+    "note": true
+  },
+  "sync": true,
+  "contextMenus": true,
+  "limits": {
+    "articleCharacters": 500000,
+    "selectionCharacters": 50000,
+    "imageBytes": 8388608,
+    "fullPagePixels": 32000000,
+    "fullPageCssHeight": 15000
+  }
+}

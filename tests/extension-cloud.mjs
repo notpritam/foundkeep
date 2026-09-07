@@ -8,6 +8,7 @@ import { chromium } from "playwright-core";
 const PRIMARY_ORIGIN = "https://foundkeep.app";
 const LEGACY_ORIGIN = "https://atlas.notpritam.in";
 let browser;
+const runtimePolicy = JSON.parse(await readFile("apps/web/extension-policy.json", "utf8"));
 before(async () => {
   browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 });
@@ -35,7 +36,7 @@ async function fixture(t) {
   });
   const page = await context.newPage();
   await page.goto("http://atlas.test/");
-  await page.evaluate(() => {
+  await page.evaluate((runtimePolicy) => {
     const values = {};
     window.chrome = {
       storage: {
@@ -59,6 +60,7 @@ async function fixture(t) {
     window.requests = [];
     window.uploads = new Map();
     window.mode = "online";
+    window.runtimePolicy = runtimePolicy;
     window.preferenceEnvelope = {
       preferences: {
         version: 1,
@@ -82,6 +84,8 @@ async function fixture(t) {
         body,
         authorization: options.headers?.Authorization,
       });
+      if (url.endsWith("/extension-policy.json"))
+        return new Response(JSON.stringify(runtimePolicy), { status: 200 });
       if (url.endsWith("/api/preferences"))
         return new Response(JSON.stringify(preferenceEnvelope), { status: 200 });
       if (url.endsWith("/api/pairing/claim")) {
@@ -159,7 +163,7 @@ async function fixture(t) {
         status: 200,
       });
     };
-  });
+  }, runtimePolicy);
   await page.evaluate(async () => {
     window.cloud = await import("/src/cloud.js");
     window.db = await import("/src/db.js");
@@ -288,6 +292,9 @@ test("automatic upload and organization choices follow the connected account pre
   await page.evaluate(() => cloud.drainCloudQueue());
   assert.equal(await page.evaluate(() => uploads.size), 0);
   assert.equal((await page.evaluate((id) => db.getCapture(id), record.id)).cloudStatus, "queued");
+
+  await page.evaluate(() => cloud.retryCloudSync());
+  assert.equal(await page.evaluate(() => uploads.size), 1);
 
   await page.evaluate(async () => {
     preferenceEnvelope.preferences.sync.automatic = true;

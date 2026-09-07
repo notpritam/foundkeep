@@ -192,7 +192,7 @@ test("landing page presents Foundkeep and its branded extension download", async
   assert.doesNotMatch(copy, /\bAtlas\b/);
   assert.equal(
     await page.locator('a[download="foundkeep-extension.zip"]').getAttribute("href"),
-    "foundkeep-extension.zip?build=store-ready",
+    "foundkeep-extension.zip?build=1.6.1",
   );
   assert.equal(
     await page.locator('meta[property="og:image"]').getAttribute("content"),

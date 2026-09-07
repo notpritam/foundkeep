@@ -39,7 +39,7 @@ import('./customer.js?v=1.5.0').then(({ customerConfig }) => customerConfig()).t
   install.textContent = 'Add to Chrome';
   document.querySelector('.download-note').textContent = 'Chrome on your computer · Chrome Web Store · Manual ZIP installation also available below';
   const manual = document.createElement('a');
-  manual.href = 'foundkeep-extension.zip'; manual.download = 'foundkeep-extension.zip';
+  manual.href = 'foundkeep-extension.zip?build=1.6.1'; manual.download = 'foundkeep-extension.zip';
   manual.className = 'text-link local-install-choice'; manual.textContent = 'Download ZIP for manual installation';
   install.after(manual);
 }).catch(() => { /* Manual ZIP installation remains available without configuration. */ });

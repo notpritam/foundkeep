@@ -67,8 +67,15 @@ export async function extractPageDocument(options = {}) {
     .sort((a, b) => (b.innerText || "").length - (a.innerText || "").length)[0] || document.body;
   const clone = root?.cloneNode(true);
   if (clone?.querySelectorAll) {
-    const liveNodes = [root, ...root.querySelectorAll("*")];
-    const clonedNodes = [clone, ...clone.querySelectorAll("*")];
+    const liveNodes = [root];
+    const clonedNodes = [clone];
+    const liveDescendants = root.querySelectorAll("*");
+    const clonedDescendants = clone.querySelectorAll("*");
+    const styleCount = Math.min(25_000, liveDescendants.length, clonedDescendants.length);
+    for (let index = 0; index < styleCount; index++) {
+      liveNodes.push(liveDescendants[index]);
+      clonedNodes.push(clonedDescendants[index]);
+    }
     liveNodes.forEach((node, index) => {
       const style = getComputedStyle(node);
       if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" ||
@@ -85,9 +92,14 @@ export async function extractPageDocument(options = {}) {
       if (/(^|[\s_-])(advert|ads?|newsletter|subscribe|cookie|promo|social|share|related)([\s_-]|$)/i.test(marker)) node.remove();
     });
   }
-  const articleText = options.readableText === false
-    ? null
-    : normalize(clone?.innerText || clone?.textContent || "", 100_000);
+  const articleLimit = Number.isSafeInteger(options.maxArticleCharacters)
+    ? Math.max(10_000, Math.min(500_000, options.maxArticleCharacters))
+    : 500_000;
+  const rawArticleText = options.readableText === false
+    ? ""
+    : (clone?.innerText || clone?.textContent || "").replace(/\s+/g, " ").trim();
+  const articleWasTruncated = rawArticleText.length > articleLimit;
+  const articleText = rawArticleText ? rawArticleText.slice(0, articleLimit) : null;
   const headings = options.headings === false || !clone?.querySelectorAll
     ? []
     : [...clone.querySelectorAll("h1,h2,h3")]
@@ -95,13 +107,6 @@ export async function extractPageDocument(options = {}) {
         .filter(Boolean)
         .filter((value, index, values) => values.indexOf(value) === index)
         .slice(0, 20);
-  let contentHash = null;
-  if (articleText) {
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(articleText));
-    let binary = "";
-    for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
-    contentHash = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
   const extended = options.extendedMetadata !== false;
   const pageTitle = normalize(
     structured.headline || meta('meta[property="og:title"]', 'meta[name="twitter:title"]') || document.title,
@@ -133,9 +138,15 @@ export async function extractPageDocument(options = {}) {
     capturedAt,
     extractedAt: Date.now(),
     extractorVersion: 1,
-    contentHash,
-    extractionStatus: articleText ? "complete" : "partial",
-    extractionError: articleText ? null : "Readable page text was not requested or unavailable.",
+    // The extension worker computes this after extraction. Web Crypto is not
+    // available to injected functions on every ordinary HTTP page.
+    contentHash: null,
+    extractionStatus: articleText && !articleWasTruncated ? "complete" : "partial",
+    extractionError: articleWasTruncated
+      ? `Readable page text exceeded ${articleLimit.toLocaleString("en-US")} characters and was truncated.`
+      : articleText
+        ? null
+        : "Readable page text was not requested or unavailable.",
   };
   return { articleText, provenance };
 }

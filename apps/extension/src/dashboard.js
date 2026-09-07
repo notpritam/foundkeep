@@ -178,11 +178,9 @@ function showError(error) {
 async function load() {
   const sequence = ++loadSequence;
   try {
-    const [rows, all, facets] = await Promise.all([
-      db.listCaptures({ ...state, limit: 100000 }),
-      db.listCaptures({ limit: 100000 }),
-      db.facets(),
-    ]);
+    const all = await db.listCaptures({ limit: 100000 });
+    const rows = db.filterCaptureRows(all, { ...state, limit: 100000 });
+    const facets = db.facetsFrom(all);
     if (sequence !== loadSequence) return;
     if ($("sort").value === "oldest") rows.reverse();
     const focused = document.activeElement,

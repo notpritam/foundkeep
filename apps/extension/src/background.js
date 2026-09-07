@@ -14,6 +14,7 @@ import {
   getEffectivePreferences,
   refreshPreferences,
 } from "./preferences.js";
+import { cloudImageMime } from "./image-formats.js";
 
 protectCloudStorage().catch(() => {});
 chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
@@ -104,6 +105,55 @@ function safeHttpUrl(value) {
   }
 }
 
+function obviousPrivateHost(hostname) {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (host.includes(":")) {
+    return host === "::" || host === "::1" || host.startsWith("fc") || host.startsWith("fd") ||
+      /^fe[89ab]/.test(host) || host.startsWith("ff") || host.startsWith("::ffff:127.") ||
+      host.startsWith("::ffff:10.") || host.startsWith("::ffff:192.168.");
+  }
+  const parts = host.split(".");
+  if (parts.length !== 4 || parts.some((part) => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return false;
+  const [a, b] = parts.map(Number);
+  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) || a >= 224;
+}
+
+function publicHttpUrl(value) {
+  const safe = safeHttpUrl(value);
+  if (!safe) return null;
+  return obviousPrivateHost(new URL(safe).hostname) ? null : safe;
+}
+
+async function requestImageHostAccess(value) {
+  const source = publicHttpUrl(value);
+  if (!source) throw new Error("Foundkeep can only save images from public web addresses outside private networks.");
+  const origin = new URL(source).origin + "/*";
+  if (await chrome.permissions.contains({ origins: [origin] })) return;
+  const granted = await chrome.permissions.request({ origins: [origin] });
+  if (!granted) throw new Error("Allow access to this image's site to save its original file.");
+}
+
+async function contentHash(text) {
+  if (!text) return null;
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    let binary = "";
+    for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function boundedText(value, maximum, label) {
+  if (typeof value !== "string") return value;
+  if (value.length > maximum) throw new Error(`${label} must be ${maximum.toLocaleString("en-US")} characters or fewer.`);
+  return value;
+}
+
 function fallbackProvenance(tab, captureMethod, capturedAt, targetUrl = null, error = null) {
   return {
     schemaVersion: 1,
@@ -135,6 +185,7 @@ async function capturePageContext(tab, {
   readableText = false,
   extendedMetadata = true,
   headings = false,
+  maxArticleCharacters = 500_000,
   targetUrl = null,
 } = {}) {
   const capturedAt = Date.now();
@@ -145,9 +196,10 @@ async function capturePageContext(tab, {
     const [{ result }] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: extractPageDocument,
-      args: [{ captureMethod, capturedAt, readableText, extendedMetadata, headings }],
+      args: [{ captureMethod, capturedAt, readableText, extendedMetadata, headings, maxArticleCharacters }],
     });
     if (!result?.provenance) throw new Error("No page context returned");
+    result.provenance.contentHash = await contentHash(result.articleText);
     result.provenance.targetUrl = safeHttpUrl(targetUrl);
     if (!readableText) {
       result.provenance.extractionStatus = "complete";
@@ -226,6 +278,7 @@ async function reconcileContextMenus(preferences) {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
+    if (info.menuItemId === "save-image") await requestImageHostAccess(info.srcUrl);
     await performCapture(info.menuItemId, { tab, info, trigger: "context" });
     configuredFlash(true);
   } catch (e) {
@@ -343,6 +396,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const preferenceState = await getEffectivePreferences();
         if (!preferenceState.preferences.capture.tweet) throw new Error("Tweet capture is disabled in your Foundkeep preferences.");
         const p = msg.payload;
+        boundedText(p.text, preferenceState.policy.limits.selectionCharacters, "Post text");
         const capturedAt = Date.now();
         await saveCapture({
           type: "highlight",
@@ -404,21 +458,23 @@ async function performCapture(action, { tab, info, trigger = "popup" }) {
   const captureMethod = methodFor(action, trigger);
   const preferenceState = await getEffectivePreferences();
   const preferences = preferenceState.preferences;
+  const limits = preferenceState.policy.limits;
   const feature = capturePreferenceKey(action);
   if (!preferences.capture[feature]) throw new Error(`${feature === "fullPage" ? "Full-page screenshot" : feature[0].toUpperCase() + feature.slice(1)} capture is disabled in your Foundkeep preferences.`);
   switch (action) {
     case "region":
-      return regionScreenshot(tab, captureMethod);
+      return regionScreenshot(tab, captureMethod, limits);
     case "fullpage":
-      return fullPageScreenshot(tab, captureMethod);
+      return fullPageScreenshot(tab, captureMethod, limits);
     case "highlight":
-      return saveHighlight(tab, captureMethod);
+      return saveHighlight(tab, captureMethod, limits);
     case "savepage": {
       const context = await capturePageContext(tab, {
         captureMethod,
         readableText: preferences.bookmark.readableText,
         extendedMetadata: preferences.bookmark.extendedMetadata,
         headings: preferences.bookmark.headings,
+        maxArticleCharacters: limits.articleCharacters,
       });
       return saveCapture({
         type: "bookmark",
@@ -437,7 +493,7 @@ async function performCapture(action, { tab, info, trigger = "popup" }) {
         sourceUrl: context.provenance.pageUrl,
         sourceTitle: context.provenance.pageTitle,
         faviconUrl: context.provenance.faviconUrl,
-        selectionText: info.selectionText,
+        selectionText: boundedText(info.selectionText, limits.selectionCharacters, "Selected text"),
         capturedAt: context.provenance.capturedAt,
         provenance: context.provenance,
       });
@@ -447,37 +503,56 @@ async function performCapture(action, { tab, info, trigger = "popup" }) {
       return saveCapture({
         type: "bookmark",
         sourceUrl: info.linkUrl,
-        sourceTitle: info.linkText || info.linkUrl,
+        sourceTitle: (info.linkText || info.linkUrl || "").slice(0, 1000),
         faviconUrl: context.provenance.faviconUrl,
         capturedAt: context.provenance.capturedAt,
         provenance: context.provenance,
       });
     }
     case "save-image":
-      return saveImage(info.srcUrl, tab, captureMethod);
+      return saveImage(info.srcUrl, tab, captureMethod, limits);
     default:
       return null;
   }
 }
 
-async function saveImage(srcUrl, tab, captureMethod) {
+async function saveImage(srcUrl, tab, captureMethod, limits) {
   const context = await capturePageContext(tab, { captureMethod, targetUrl: srcUrl });
-  const source = safeHttpUrl(srcUrl);
-  if (!source) throw new Error("Foundkeep can only save images from public web addresses.");
+  const source = publicHttpUrl(srcUrl);
+  if (!source) throw new Error("Foundkeep can only save images from public web addresses outside private networks.");
   const response = await fetch(source, {
     credentials: "omit",
-    redirect: "follow",
+    redirect: "error",
     signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) throw new Error(`The image could not be downloaded (${response.status}).`);
   const length = Number(response.headers.get("content-length"));
-  if (Number.isFinite(length) && length > 8 * 1024 * 1024)
-    throw new Error("This image exceeds Foundkeep's 8 MiB capture limit.");
-  const blob = await response.blob();
-  if (!blob.type.toLowerCase().startsWith("image/"))
+  if (Number.isFinite(length) && length > limits.imageBytes)
+    throw new Error(`This image exceeds Foundkeep's ${Math.floor(limits.imageBytes / 1048576)} MiB capture limit.`);
+  const mime = (response.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  if (!mime.startsWith("image/"))
     throw new Error("The selected address did not return an image.");
-  if (blob.size > 8 * 1024 * 1024)
-    throw new Error("This image exceeds Foundkeep's 8 MiB capture limit.");
+  cloudImageMime(new Blob([], { type: mime }));
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("The selected image returned no data.");
+  const chunks = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > limits.imageBytes) {
+        await reader.cancel();
+        throw new Error(`This image exceeds Foundkeep's ${Math.floor(limits.imageBytes / 1048576)} MiB capture limit.`);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const blob = new Blob(chunks, { type: mime });
+  cloudImageMime(blob);
   return saveCapture({
     type: "image",
     blob,
@@ -489,7 +564,7 @@ async function saveImage(srcUrl, tab, captureMethod) {
   });
 }
 
-async function saveHighlight(tab, captureMethod) {
+async function saveHighlight(tab, captureMethod, limits) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: () => {
@@ -507,6 +582,7 @@ async function saveHighlight(tab, captureMethod) {
     },
   });
   if (!result?.text) throw new Error("no text selected");
+  boundedText(result.text, limits.selectionCharacters, "Selected text");
   const context = await capturePageContext(tab, { captureMethod });
   return saveCapture(
     {
@@ -525,7 +601,7 @@ async function saveHighlight(tab, captureMethod) {
 // ---------------------------------------------------------------------------
 // Region screenshot
 // ---------------------------------------------------------------------------
-async function regionScreenshot(tab, captureMethod) {
+async function regionScreenshot(tab, captureMethod, limits) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: regionSelectInPage,
@@ -535,7 +611,7 @@ async function regionScreenshot(tab, captureMethod) {
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
     format: "png",
   });
-  const blob = await cropDataUrl(dataUrl, rect, dpr);
+  const encoded = await cropDataUrl(dataUrl, rect, dpr, limits.imageBytes);
   const context = await capturePageContext(tab, { captureMethod });
   return saveCapture(
     {
@@ -543,9 +619,9 @@ async function regionScreenshot(tab, captureMethod) {
       sourceUrl: context.provenance.pageUrl,
       sourceTitle: context.provenance.pageTitle,
       faviconUrl: context.provenance.faviconUrl,
-      width: Math.round(rect.w * dpr),
-      height: Math.round(rect.h * dpr),
-      blob,
+      width: encoded.width,
+      height: encoded.height,
+      blob: encoded.blob,
       capturedAt: context.provenance.capturedAt,
       provenance: context.provenance,
     },
@@ -611,7 +687,7 @@ function regionSelectInPage() {
   });
 }
 
-async function cropDataUrl(dataUrl, rect, dpr) {
+async function cropDataUrl(dataUrl, rect, dpr, maxBytes) {
   const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
   const w = Math.round(rect.w * dpr),
     h = Math.round(rect.h * dpr);
@@ -629,20 +705,33 @@ async function cropDataUrl(dataUrl, rect, dpr) {
       w,
       h,
     );
-  return canvas.convertToBlob({ type: "image/webp", quality: 0.92 });
+  return encodeCanvas(canvas, [0.92, 0.8, 0.65, 0.5], maxBytes);
 }
 
 // ---------------------------------------------------------------------------
 // Full-page screenshot
 // ---------------------------------------------------------------------------
 const MAX_PAGE_PX = 15000;
+const MAX_PAGE_PIXELS = 32_000_000;
+const MAX_IMAGE_DIMENSION = 32_768;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-async function fullPageScreenshot(tab, captureMethod) {
+async function fullPageScreenshot(tab, captureMethod, limits) {
   const [{ result: dims }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: prepFullPage,
   });
-  const totalH = Math.min(dims.totalHeight, MAX_PAGE_PX);
+  const dpr = Math.max(1, Number(dims.dpr) || 1);
+  const pixelWidth = Math.round(dims.viewW * dpr);
+  if (!pixelWidth || pixelWidth > MAX_IMAGE_DIMENSION) {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: restoreFullPage }).catch(() => {});
+    throw new Error("This page is too wide to capture safely at the current display scale.");
+  }
+  const pagePixels = Math.min(MAX_PAGE_PIXELS, limits.fullPagePixels);
+  const pageHeight = Math.min(MAX_PAGE_PX, limits.fullPageCssHeight);
+  const heightByArea = Math.floor(pagePixels / (dims.viewW * dpr * dpr));
+  const heightByDimension = Math.floor(MAX_IMAGE_DIMENSION / dpr);
+  const totalH = Math.max(1, Math.min(dims.totalHeight, pageHeight, heightByArea, heightByDimension));
   const shots = [];
   try {
     for (let y = 0; y < totalH; y += dims.viewH) {
@@ -667,7 +756,7 @@ async function fullPageScreenshot(tab, captureMethod) {
       func: restoreFullPage,
     });
   }
-  const blob = await stitch(shots, dims, totalH);
+  const encoded = await stitch(shots, dims, totalH, limits.imageBytes);
   const context = await capturePageContext(tab, { captureMethod });
   return saveCapture(
     {
@@ -675,9 +764,9 @@ async function fullPageScreenshot(tab, captureMethod) {
       sourceUrl: context.provenance.pageUrl,
       sourceTitle: context.provenance.pageTitle,
       faviconUrl: context.provenance.faviconUrl,
-      width: Math.round(dims.viewW * dims.dpr),
-      height: Math.round(totalH * dims.dpr),
-      blob,
+      width: encoded.width,
+      height: encoded.height,
+      blob: encoded.blob,
       capturedAt: context.provenance.capturedAt,
       provenance: context.provenance,
     },
@@ -686,7 +775,11 @@ async function fullPageScreenshot(tab, captureMethod) {
 
 function prepFullPage() {
   window.__atlasHidden = [];
-  for (const el of document.querySelectorAll("body *")) {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  let scanned = 0;
+  while (scanned++ < 50_000) {
+    const el = walker.nextNode();
+    if (!el) break;
     const pos = getComputedStyle(el).position;
     if (pos === "fixed" || pos === "sticky") {
       window.__atlasHidden.push([el, el.style.visibility]);
@@ -694,6 +787,7 @@ function prepFullPage() {
     }
   }
   window.__atlasScrollY = window.scrollY;
+  window.__atlasScrollBehavior = document.documentElement.style.scrollBehavior;
   document.documentElement.style.scrollBehavior = "auto";
   return {
     totalHeight: document.documentElement.scrollHeight,
@@ -705,12 +799,23 @@ function prepFullPage() {
 
 function restoreFullPage() {
   for (const [el, vis] of window.__atlasHidden || []) el.style.visibility = vis;
+  document.documentElement.style.scrollBehavior = window.__atlasScrollBehavior || "";
   window.scrollTo(0, window.__atlasScrollY || 0);
   delete window.__atlasHidden;
   delete window.__atlasScrollY;
+  delete window.__atlasScrollBehavior;
 }
 
-async function stitch(shots, dims, totalH) {
+async function encodeCanvas(canvas, qualities = [0.9, 0.75, 0.6, 0.45], maxBytes = MAX_IMAGE_BYTES) {
+  for (const quality of qualities) {
+    const blob = await canvas.convertToBlob({ type: "image/webp", quality });
+    if (blob.size <= Math.min(MAX_IMAGE_BYTES, maxBytes))
+      return { blob, width: canvas.width, height: canvas.height };
+  }
+  throw new Error(`This screenshot is too detailed for Foundkeep's ${Math.floor(Math.min(MAX_IMAGE_BYTES, maxBytes) / 1048576)} MiB capture limit. Capture a smaller region or reduce the page zoom.`);
+}
+
+async function stitch(shots, dims, totalH, maxBytes) {
   const canvas = new OffscreenCanvas(
     Math.round(dims.viewW * dims.dpr),
     Math.round(totalH * dims.dpr),
@@ -722,5 +827,5 @@ async function stitch(shots, dims, totalH) {
     );
     ctx.drawImage(bmp, 0, Math.round(shot.y * dims.dpr));
   }
-  return canvas.convertToBlob({ type: "image/webp", quality: 0.9 });
+  return encodeCanvas(canvas, undefined, maxBytes);
 }
