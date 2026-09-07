@@ -1,6 +1,6 @@
 # Foundkeep website
 
-The production origin is **https://foundkeep.app/**. The previous `https://atlas.notpritam.in` hostname remains connected to the same service during the extension migration.
+The production origin is **https://foundkeep.app/**. Human-facing requests to the previous `https://atlas.notpritam.in` hostname redirect to Foundkeep; compatibility routes remain connected to the same service for installed version 1.5 extensions.
 
 The `atlas-backend` systemd service keeps its internal name and serves `apps/web` directly from the production checkout. Caddy forwards both exact hostnames to port 8790. Static HTML, CSS, JavaScript, fonts, and images require no separate application build.
 

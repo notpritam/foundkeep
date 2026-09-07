@@ -2,7 +2,7 @@
 
 Foundkeep runs through the existing internal `atlas-backend` systemd service on port 8790 and the existing SQLite data directory at `/home/pritam/.local/share/atlas`. These internal names stay unchanged to protect production data and installed integrations.
 
-The primary public origin is `https://foundkeep.app`. `https://atlas.notpritam.in` remains an exact compatibility origin for version 1.5 clients during the migration.
+The primary public origin is `https://foundkeep.app`. Human-facing requests on `https://atlas.notpritam.in` redirect permanently to the matching Foundkeep path. Its API, relay, health, and package routes remain an exact compatibility origin for version 1.5 clients during the migration.
 
 ## Backend
 
@@ -32,7 +32,7 @@ sudo systemctl reload caddy
 sudo journalctl -u caddy -f
 ```
 
-The backend serves `apps/web` for non-API paths, so both hostnames proxy to `127.0.0.1:8790`. The `.app` top-level domain is HSTS-preloaded; do not publish the extension until Foundkeep HTTPS is valid.
+The backend serves `apps/web` for non-API paths. Foundkeep proxies to `127.0.0.1:8790`; the legacy hostname proxies only compatibility routes and redirects ordinary website requests. The `.app` top-level domain is HSTS-preloaded; do not publish the extension until Foundkeep HTTPS is valid.
 
 ## Releases and auto-update
 

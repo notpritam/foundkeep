@@ -1,6 +1,6 @@
 # Foundkeep customer service operations
 
-Primary customer website: `https://foundkeep.app`. Temporary compatibility website: `https://atlas.notpritam.in`. Both route to the same backend and `customer_*` SQLite records. The `/api` customer service remains separate from legacy `/v1` and browser-relay records.
+Primary customer website: `https://foundkeep.app`. Human-facing requests on `https://atlas.notpritam.in` redirect to the same Foundkeep path. The legacy hostname keeps API, relay, health, and package routes connected to the same backend for installed version 1.5 extensions. Both origins use the same `customer_*` SQLite records. The `/api` customer service remains separate from legacy `/v1` and browser-relay records.
 
 ## Runtime
 
@@ -14,7 +14,7 @@ Primary customer website: `https://foundkeep.app`. Temporary compatibility websi
 
 ## Migration behavior
 
-Version 1.5 uses the legacy hostname. Version 1.6 uses `foundkeep.app` and allows pairing messages from both exact origins. Keep both Caddy hostnames and the legacy `atlas-extension.crx` release asset available until old installations have updated.
+Version 1.5 uses the legacy hostname. Version 1.6 uses `foundkeep.app` and allows pairing messages from both exact origins. Redirect legacy website pages, but keep its compatibility route matcher and the legacy `atlas-extension.crx` release asset available until old installations have updated.
 
 Browser cookies cannot move from `notpritam.in` to `foundkeep.app`. Existing customers sign in once on the new domain; account data, cloud captures, preferences, recovery code, and browser credentials remain in the same database. Existing 1.5 extensions continue syncing through the legacy origin during the transition.
 

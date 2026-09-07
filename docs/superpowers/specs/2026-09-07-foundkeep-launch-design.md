@@ -47,7 +47,7 @@ Production deployment order:
 2. Deploy backend support for both exact customer origins while the 1.5 extension remains live.
 3. Point `foundkeep.app` DNS to the production host and verify TLS, CSP, canonical metadata, signup, login, and dashboard.
 4. Publish signed extension 1.6 with the unchanged ID and Foundkeep branding.
-5. Keep the legacy hostname and legacy release asset URLs live through the transition.
+5. Redirect human-facing legacy-hostname requests to the same Foundkeep path while keeping legacy API, relay, health, package, and release asset URLs live through the transition.
 
 ## Acceptance
 
@@ -57,4 +57,3 @@ Production deployment order:
 - A new Foundkeep account can install, pair, save a readable bookmark, sync, view provenance, change extension preferences, export, revoke, and delete.
 - Signed CRX identity remains unchanged and both legacy and Foundkeep-named release artifacts are valid.
 - Desktop Chromium layouts have no overflow at popup height and customer pages remain usable from 320px through 1440px.
-

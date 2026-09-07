@@ -16,7 +16,7 @@ Foundkeep 1.6 rebrands the shipped customer extension and private dashboard whil
 - Manifest signing key, IndexedDB, storage keys, message kinds, API routes, database tables, data directory, account header, and environment prefixes remain unchanged.
 - Existing cloud accounts and captures stay in the same SQLite database.
 - Existing website cookies cannot cross from `notpritam.in` to `foundkeep.app`; customers sign in once on the new domain.
-- The legacy hostname and GitHub asset name remain live for version 1.5 updates.
+- The legacy hostname redirects human-facing pages to Foundkeep while API and relay routes plus the legacy GitHub asset name remain live for version 1.5 clients.
 
 ## Candidate verification — 7 September 2026
 

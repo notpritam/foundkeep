@@ -22,7 +22,7 @@ Every capture can retain the visited URL, canonical URL, title, description, sit
 
 Customer queries, images, preferences, and credentials are owner scoped. Local IndexedDB, existing records, the fixed extension ID, signing key, shortcuts, storage keys, message kinds, API routes, database tables, and header names remain compatible across the Foundkeep migration.
 
-The primary origin is `https://foundkeep.app`. `https://atlas.notpritam.in` remains a temporary compatibility origin for version 1.5 clients. Cross-domain website cookies cannot migrate, so existing customers sign in once on Foundkeep; their accounts and captures remain in the same database.
+The primary origin is `https://foundkeep.app`. Human-facing requests to `https://atlas.notpritam.in` redirect to the matching Foundkeep path, while its API and relay endpoints remain a temporary compatibility origin for version 1.5 clients. Cross-domain website cookies cannot migrate, so existing customers sign in once on Foundkeep; their accounts and captures remain in the same database.
 
 There is no customer agent setup, semantic-search claim, conversational assistant, advertising tracker, or email reset delivery. Search is keyword based. Local capture remains available without an account. Cloud and local deletion are separate. Quotas are 1,000 captures and 200 MiB per account.
 

@@ -188,3 +188,12 @@ test("landing page presents Foundkeep and its branded extension download", async
     "https://foundkeep.app/assets/foundkeep-social.png",
   );
 });
+
+test("legacy website redirects while extension compatibility routes stay live", async () => {
+  const caddy = await readFile(path.resolve("deploy/Caddyfile"), "utf8");
+  assert.match(caddy, /foundkeep\.app\s*\{\s*reverse_proxy localhost:8790/s);
+  assert.match(caddy, /atlas\.notpritam\.in\s*\{/);
+  assert.match(caddy, /@extension_compat path .*\/api\/\*/);
+  assert.match(caddy, /handle @extension_compat\s*\{\s*reverse_proxy localhost:8790/s);
+  assert.match(caddy, /redir https:\/\/foundkeep\.app\{uri\} permanent/);
+});

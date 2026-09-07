@@ -1,13 +1,22 @@
 # Foundkeep block for omni's SHARED /etc/caddy/Caddyfile.
 #
-# The backend now serves BOTH the API (/v1, /admin) AND the static landing page
-# (everything else, from apps/web) on :8790 — so caddy only needs a plain proxy.
-# This also matches what the shared Caddyfile reverts to when regenerated, so the
-# site no longer breaks when another project rewrites that file.
-foundkeep.app, atlas.notpritam.in {
+# Foundkeep serves the website and API from the same backend.
+foundkeep.app {
 	reverse_proxy localhost:8790
 }
 
 www.foundkeep.app {
 	redir https://foundkeep.app{uri} permanent
+}
+
+# Redirect human-facing Atlas pages while version 1.5 extensions retain their
+# original API, relay, health, and package endpoints during migration.
+atlas.notpritam.in {
+	@extension_compat path /api /api/* /v1 /v1/* /admin /admin/* /agent /agent/* /healthz /updates.xml /atlas-extension.zip /foundkeep-extension.zip /ext/*
+	handle @extension_compat {
+		reverse_proxy localhost:8790
+	}
+	handle {
+		redir https://foundkeep.app{uri} permanent
+	}
 }
