@@ -8,8 +8,8 @@ function setDemoSaved(saved) {
   document.querySelector('#demo-selection').classList.toggle('is-saved', saved);
   saveButton.disabled = saved;
   document.querySelector('#demoStatus').textContent = saved
-    ? 'Highlight saved in this illustration. Your Atlas library has not changed.'
-    : 'Try it here. This demo does not save to your Atlas library.';
+    ? 'Highlight saved in this illustration. Your Foundkeep library has not changed.'
+    : 'Try it here. This demo does not save to your Foundkeep library.';
   // Move focus to the next useful action when its previous control disappears.
   (saved ? resetButton : saveButton).focus({ preventScroll: true });
 }
@@ -39,7 +39,7 @@ import('./customer.js?v=1.5.0').then(({ customerConfig }) => customerConfig()).t
   install.textContent = 'Add to Chrome';
   document.querySelector('.download-note').textContent = 'Chrome on your computer · Chrome Web Store · Manual ZIP installation also available below';
   const manual = document.createElement('a');
-  manual.href = 'atlas-extension.zip'; manual.download = 'atlas-extension.zip';
+  manual.href = 'foundkeep-extension.zip'; manual.download = 'foundkeep-extension.zip';
   manual.className = 'text-link local-install-choice'; manual.textContent = 'Download ZIP for manual installation';
   install.after(manual);
 }).catch(() => { /* Manual ZIP installation remains available without configuration. */ });

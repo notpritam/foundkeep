@@ -5,4 +5,4 @@ Disallow: /admin/
 Disallow: /invite/
 Disallow: /redeem
 
-Sitemap: https://atlas.notpritam.in/sitemap.xml
+Sitemap: https://foundkeep.app/sitemap.xml

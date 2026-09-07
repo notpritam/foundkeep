@@ -21,7 +21,7 @@ async function rewrite(directory, origin) {
     if(entry.isDirectory()) await rewrite(file,origin);
     else if(/\.(js|json)$/.test(entry.name)) {
       const text=await readFile(file,'utf8');
-      await writeFile(file,text.replaceAll('https://atlas.notpritam.in',origin));
+      await writeFile(file,text.replaceAll('https://foundkeep.app',origin).replaceAll('https://atlas.notpritam.in',origin));
     }
   }
 }
@@ -63,7 +63,7 @@ test('customer signs up, configures the real extension, captures a readable page
     const account=await context.newPage();
     const errors=[]; account.on('pageerror',error=>errors.push(error.message));
     await account.goto(origin+'/auth.html');
-    await account.locator('#name').fill('Atlas customer');
+    await account.locator('#name').fill('Foundkeep customer');
     await account.locator('#email').fill(email);
     await account.locator('#password').fill('a-long-test-password-2026');
     await account.locator('#auth-submit').click();

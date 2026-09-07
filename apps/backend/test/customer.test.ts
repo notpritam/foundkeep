@@ -250,7 +250,7 @@ describe("customer account security", () => {
     ] as const) {
       const response = await app.request(`${ORIGIN}/api${path}`, { method, headers: { origin: ORIGIN, cookie: b.cookie, "content-type": "application/json", "X-Atlas-Account": a.account.id }, body });
       expect(response.status).toBe(409);
-      expect(await response.json()).toEqual({ error: "account_changed", message: "Your signed-in account changed. Reload Atlas to continue." });
+      expect(await response.json()).toEqual({ error: "account_changed", message: "Your signed-in account changed. Reload Foundkeep to continue." });
     }
     expect((await request("/me", "GET", undefined, b.cookie)).status).toBe(200);
     expect((db.query("SELECT COUNT(*) n FROM customer_captures").get() as any).n).toBe(0);

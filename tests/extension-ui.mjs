@@ -222,6 +222,10 @@ test("keyword search, type/tag filters and sort preserve actual capture records"
   await page.reload();
   await page.waitForSelector(".capture-card");
   assert.equal(await page.locator(".capture-card").count(), 3);
+  if (process.env.FOUNDKEEP_LIBRARY_SCREENSHOT) {
+    await page.setViewportSize({ width: 1440, height: 1050 });
+    await page.screenshot({ path: process.env.FOUNDKEEP_LIBRARY_SCREENSHOT });
+  }
   await page.locator("#q").fill("copper");
   await page.waitForFunction(
     () => document.querySelectorAll(".capture-card").length === 2,

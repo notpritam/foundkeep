@@ -143,7 +143,7 @@ test("search and sharing metadata resolve to the production site and a real imag
     await page
       .locator('link[rel="canonical"]')
       .evaluateAll((links) => links[0]?.href),
-    "https://atlas.notpritam.in/",
+    "https://foundkeep.app/",
   );
   const preview = await page
     .locator('meta[property="og:image"]')
@@ -157,7 +157,7 @@ test("search and sharing metadata resolve to the production site and a real imag
   assert.equal(robots.status(), 200);
   assert.match(
     await robots.text(),
-    /https:\/\/atlas.notpritam.in\/sitemap.xml/,
+    /https:\/\/foundkeep.app\/sitemap.xml/,
   );
   const sitemap = await page.request.get(base + "/sitemap.xml");
   assert.equal(sitemap.status(), 200);
@@ -171,4 +171,20 @@ test("customer copy explains readable bookmarks, source records, controls and Ch
   assert.match(copy, /original source/i);
   assert.match(copy, /capture settings/i);
   assert.match(copy, /Chrome, Edge, Brave, Opera/i);
+});
+
+test("landing page presents Foundkeep and its branded extension download", async (t) => {
+  const page = await pageFor(t);
+  assert.match(await page.title(), /Foundkeep/);
+  const copy = await page.locator("body").textContent();
+  assert.match(copy, /Foundkeep/);
+  assert.doesNotMatch(copy, /\bAtlas\b/);
+  assert.equal(
+    await page.locator('a[download="foundkeep-extension.zip"]').getAttribute("href"),
+    "foundkeep-extension.zip",
+  );
+  assert.equal(
+    await page.locator('meta[property="og:image"]').getAttribute("content"),
+    "https://foundkeep.app/assets/foundkeep-social.png",
+  );
 });

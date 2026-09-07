@@ -159,7 +159,7 @@ const accountUploads = new Map<string, number>();
 function acquireUpload(accountId: string) {
   const own = accountUploads.get(accountId) || 0;
   if (own >= 2) throw new CustomerError(429, "upload_busy", "Two captures are already uploading. Please try again shortly.", 3);
-  if (activeUploads >= 8) throw new CustomerError(503, "upload_busy", "Atlas is receiving other captures. Please try again shortly.", 3);
+  if (activeUploads >= 8) throw new CustomerError(503, "upload_busy", "Foundkeep is receiving other captures. Please try again shortly.", 3);
   activeUploads++;
   accountUploads.set(accountId, own + 1);
   return () => {
@@ -239,18 +239,18 @@ export function customerRoutes(db: Database) {
   const globalMaxBytes = positiveLimit(process.env.ATLAS_CUSTOMER_GLOBAL_MAX_BYTES, 2 * 1024 * 1024 * 1024);
 
   function website(c: C) {
-    if (!websiteOrigins.has(c.req.header("origin") || "")) fail(403, "invalid_origin", "Open Atlas on its own website to continue.");
+    if (!websiteOrigins.has(c.req.header("origin") || "")) fail(403, "invalid_origin", "Open Foundkeep on its own website to continue.");
   }
   function account(id: string) { return db.query("SELECT * FROM customer_accounts WHERE id = ?").get(id) as AccountRow | null; }
   function emailAccount(email: string) { return db.query("SELECT * FROM customer_accounts WHERE email = ?").get(email) as AccountRow | null; }
   function accountIntent(c: C, accountId: string) {
     const expected = c.req.header("X-Atlas-Account");
-    if (expected !== undefined && expected !== accountId) fail(409, "account_changed", "Your signed-in account changed. Reload Atlas to continue.");
+    if (expected !== undefined && expected !== accountId) fail(409, "account_changed", "Your signed-in account changed. Reload Foundkeep to continue.");
   }
   function auth(c: C, cookieOnly = false, countRequest = true): Auth {
     const authorization = c.req.header("authorization");
     const kind = authorization ? "connection" : "session";
-    if (cookieOnly && kind !== "session") fail(403, "website_session_required", "Use your signed-in Atlas website for this action.");
+    if (cookieOnly && kind !== "session") fail(403, "website_session_required", "Use your signed-in Foundkeep website for this action.");
     const token = authorization ? /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization)?.[1] : getCookie(c, cookieName);
     if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) fail(401, "unauthorized", "Sign in or reconnect your extension.");
     const table = kind === "session" ? "customer_sessions" : "customer_connections";
@@ -303,7 +303,7 @@ export function customerRoutes(db: Database) {
       return c.json({ error: error.code, message: error.message }, error.status);
     }
     // Captured content and credentials must never be written into error logs.
-    return c.json({ error: "internal_error", message: "Atlas could not complete the request. Please try again." }, 500);
+    return c.json({ error: "internal_error", message: "Foundkeep could not complete the request. Please try again." }, 500);
   });
   app.use("*", async (c, next) => {
     c.header("Cache-Control", "private, no-store");
@@ -324,7 +324,7 @@ export function customerRoutes(db: Database) {
       }
       return c.body(null, 204);
     }
-    if (!["GET", "HEAD"].includes(c.req.method) && requestOrigin && !allowed) fail(403, "invalid_origin", "This website cannot change your Atlas account.");
+    if (!["GET", "HEAD"].includes(c.req.method) && requestOrigin && !allowed) fail(403, "invalid_origin", "This website cannot change your Foundkeep account.");
     await next();
   });
 
@@ -631,9 +631,9 @@ export function customerRoutes(db: Database) {
       const existing = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE account_id = ? AND client_id = ?`).get(current.account.id, clientId) as CustomerCaptureRow | null;
       if (existing) return { capture: customerCaptureDto(existing), duplicate: true };
       const used = usage(current.account.id);
-      if (used.captures >= MAX_CAPTURES || used.bytes + storageBytes > MAX_BYTES) fail(409, "quota_exceeded", "Your Atlas storage is full. Export or delete some captures to continue.");
+      if (used.captures >= MAX_CAPTURES || used.bytes + storageBytes > MAX_BYTES) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
       const global = db.query("SELECT COUNT(*) captures, COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures").get() as { captures: number; bytes: number };
-      if (global.captures >= globalMaxCaptures || global.bytes + storageBytes > globalMaxBytes) fail(503, "storage_unavailable", "Atlas storage is temporarily full. Your extension will keep this capture locally.");
+      if (global.captures >= globalMaxCaptures || global.bytes + storageBytes > globalMaxBytes) fail(503, "storage_unavailable", "Foundkeep storage is temporarily full. Your extension will keep this capture locally.");
       const id = crypto.randomUUID();
       const now = Date.now();
       db.query("INSERT INTO customer_captures(id,account_id,client_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,provenance_json,processing_options_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now, provenanceJson, processingOptionsJson);

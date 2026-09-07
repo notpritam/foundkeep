@@ -55,8 +55,8 @@ function updateAccount() {
   for (const connection of connections) {
     const row = textElement('li');
     const info = textElement('div');
-    info.append(textElement('strong', connection.name || 'Atlas browser'), textElement('span', `Connected ${dateLabel(connection.createdAt)} · ${connection.lastSeenAt ? `Last active ${dateLabel(connection.lastSeenAt, true)}` : 'Not used yet'}`));
-    const button = textElement('button', 'Revoke', 'subtle-button danger-text'); button.type = 'button'; button.setAttribute('aria-label', `Revoke ${connection.name || 'Atlas browser'}`);
+    info.append(textElement('strong', connection.name || 'Foundkeep browser'), textElement('span', `Connected ${dateLabel(connection.createdAt)} · ${connection.lastSeenAt ? `Last active ${dateLabel(connection.lastSeenAt, true)}` : 'Not used yet'}`));
+    const button = textElement('button', 'Revoke', 'subtle-button danger-text'); button.type = 'button'; button.setAttribute('aria-label', `Revoke ${connection.name || 'Foundkeep browser'}`);
     button.addEventListener('click', async () => {
       if (!await confirmAction('Disconnect this browser?', `${connection.name || 'This browser'} will lose access to your cloud library. Its local captures remain on that device.`, 'Revoke access')) return;
       button.disabled = true;
@@ -87,13 +87,13 @@ function updateOnboarding() {
   $('#install-marker').classList.toggle('step-done', !!state.extension);
   $('#connect-marker').classList.toggle('step-done', connected);
   $('#capture-marker').classList.toggle('step-done', !!state.usage?.captures);
-  $('#connect-extension').textContent = connected ? 'Reconnect Atlas' : state.extension?.account ? 'Switch Atlas account' : 'Connect Atlas';
+  $('#connect-extension').textContent = connected ? 'Reconnect Foundkeep' : state.extension?.account ? 'Switch Foundkeep account' : 'Connect Foundkeep';
   if (state.usage?.captures) {
     $('#first-capture-title').textContent = 'Your collection has started';
     $('#first-capture-description').textContent = 'Keep saving from the extension. Your new captures sync here when you’re online.';
   } else {
     $('#first-capture-title').textContent = 'Save your first find';
-    $('#first-capture-description').textContent = 'Open a page, click Atlas and save a screenshot, highlight or bookmark.';
+    $('#first-capture-description').textContent = 'Open a page, click Foundkeep and save a screenshot, highlight or bookmark.';
   }
 }
 async function detectExtension() {
@@ -102,7 +102,7 @@ async function detectExtension() {
     $('#install-extension').href = config.storeUrl; $('#install-extension').removeAttribute('download');
     $('#install-extension').target = '_blank'; $('#install-extension').rel = 'noopener noreferrer';
     $('#install-extension').textContent = 'Add to Chrome';
-    $('#install-description').textContent = 'Use Chrome on your computer to add Atlas from the Chrome Web Store, then pin it in your extensions menu.';
+    $('#install-description').textContent = 'Use Chrome on your computer to add Foundkeep from the Chrome Web Store, then pin it in your extensions menu.';
   }
   const attempts = await Promise.allSettled(config.extensionIds.map(async id => ({ id, result: await extensionMessage({ kind: 'atlas-ping' }, id) })));
   const success = attempts.find(attempt => attempt.status === 'fulfilled');
@@ -110,11 +110,11 @@ async function detectExtension() {
   if (success) {
     state.extension = success.value.result; state.extensionId = success.value.id;
     const account = state.extension.account;
-    $('#extension-status').textContent = account?.id === state.account?.id ? `Connected as ${account.email}. New captures sync to this library.` : account ? `This browser is connected to ${account.email}. Confirm before switching accounts.` : 'Atlas is installed. Connect it to start syncing new captures.';
+    $('#extension-status').textContent = account?.id === state.account?.id ? `Connected as ${account.email}. New captures sync to this library.` : account ? `This browser is connected to ${account.email}. Confirm before switching accounts.` : 'Foundkeep is installed. Connect it to start syncing new captures.';
     $('#extension-status').classList.toggle('connection-success', account?.id === state.account?.id);
   } else {
     state.extension = null; state.extensionId = null;
-    $('#extension-status').textContent = 'Atlas isn’t detected. Install it in a supported Chromium browser, then reload this page. If it’s already installed, reload it from the browser’s extensions page.';
+    $('#extension-status').textContent = 'Foundkeep isn’t detected. Install it in a supported Chromium browser, then reload this page. If it’s already installed, reload it from the browser’s extensions page.';
     $('#extension-status').classList.remove('connection-success');
   }
   updateOnboarding(); return state.extension;
@@ -124,9 +124,9 @@ $('#connect-extension').addEventListener('click', async () => {
   state.connecting = true; $('#connect-extension').disabled = true;
   try {
     const extension = await detectExtension();
-    if (!extension) { $('#manual-install').open = true; throw new Error('Install or reload Atlas in Chrome first. Then reload this page and connect again.'); }
+    if (!extension) { $('#manual-install').open = true; throw new Error('Install or reload Foundkeep in Chrome first. Then reload this page and connect again.'); }
     if (extension.account && extension.account.id !== state.account.id) {
-      const accepted = await confirmAction('Switch this browser’s account?', `Atlas is connected to ${extension.account.email}. New captures will sync to ${state.account.email} after switching. Captures waiting to upload for the previous account stay with that account.`, 'Switch account');
+      const accepted = await confirmAction('Switch this browser’s account?', `Foundkeep is connected to ${extension.account.email}. New captures will sync to ${state.account.email} after switching. Captures waiting to upload for the previous account stay with that account.`, 'Switch account');
       if (!accepted) return;
     }
     $('#extension-status').textContent = 'Connecting your browser…';
@@ -136,7 +136,7 @@ $('#connect-extension').addEventListener('click', async () => {
     state.extension = { ...state.extension, account: result.account };
     await refreshAccount();
     $('#extension-status').textContent = `Connected as ${result.account.email}. Your next capture will sync here.`;
-    $('#extension-status').classList.add('connection-success'); toast('Browser connected. Save your first find with Atlas.');
+    $('#extension-status').classList.add('connection-success'); toast('Browser connected. Save your first find with Foundkeep.');
   } catch (error) {
     if (!state.expired) { $('#extension-status').textContent = error.message; $('#extension-status').classList.remove('connection-success'); }
   } finally { state.connecting = false; $('#connect-extension').disabled = false; updateOnboarding(); }
@@ -179,7 +179,7 @@ function appendCaptureOrigin(body, capture) {
   const provenance = capture.provenance;
   if (!provenance || typeof provenance !== 'object') return;
   const section = textElement('section', null, 'detail-origin'); section.id = 'capture-origin';
-  section.append(textElement('h3', 'Original source'), textElement('p', 'Atlas keeps this record with the capture so you can trace it back to where it came from.', 'detail-origin-intro'));
+  section.append(textElement('h3', 'Original source'), textElement('p', 'Foundkeep keeps this record with the capture so you can trace it back to where it came from.', 'detail-origin-intro'));
   const list = textElement('dl');
   originValue(list, 'Original page', originLink(provenance.pageUrl, 'Original page'));
   if (provenance.canonicalUrl !== provenance.pageUrl) originValue(list, 'Canonical page', originLink(provenance.canonicalUrl, 'Canonical page'));
@@ -225,7 +225,7 @@ function captureCard(capture) {
   if (excerpt && excerpt !== captureTitle(capture)) body.append(textElement('p', excerpt.slice(0, 700), 'capture-excerpt'));
   const source = safeSource(capture.sourceUrl);
   const foot = textElement('div', null, 'capture-card-footer');
-  foot.append(textElement('span', source ? source.hostname.replace(/^www\./, '') : 'Saved in Atlas'));
+  foot.append(textElement('span', source ? source.hostname.replace(/^www\./, '') : 'Saved in Foundkeep'));
   if (capture.status === 'pending' || capture.status === 'processing') foot.append(textElement('span', 'Adding context', 'processing-status'));
   else if (capture.status === 'failed') foot.append(textElement('span', 'Context unavailable', 'failed-status'));
   body.append(foot); button.append(body); card.append(button);
@@ -259,7 +259,7 @@ async function loadCaptures({ append = false, silent = false } = {}) {
     $('#results-count').textContent = `${state.total.toLocaleString()} ${state.total === 1 ? 'capture' : 'captures'}${state.query ? ` for “${state.query}”` : ''}`;
     if (!state.captures.length) {
       if (state.query || state.type) showLibraryState('No finds this time.', 'Try a different keyword or clear your filters to see your collection.', { action: resetFilters, label: 'Clear filters' });
-      else showLibraryState('Your first good find goes here.', 'Capture something with the Atlas extension, or write a note to get your collection started.', { action: openNote, label: 'Write a first note' });
+      else showLibraryState('Your first good find goes here.', 'Capture something with the Foundkeep extension, or write a note to get your collection started.', { action: openNote, label: 'Write a first note' });
     }
     $('#load-more').hidden = !state.cursor; $('#load-more').textContent = 'Load more captures';
   } catch (error) {
@@ -331,7 +331,7 @@ async function openCapture(id) {
       const tags = textElement('ul', null, 'detail-tags'); tags.setAttribute('aria-label', 'Capture tags');
       tags.append(...capture.tags.map(tag => textElement('li', String(tag)))); body.append(tags);
     }
-    if (capture.status === 'pending' || capture.status === 'processing') body.append(textElement('p', 'Your capture is saved. Atlas is still adding context; reopen it in a moment to see updates.', 'detail-processing'));
+    if (capture.status === 'pending' || capture.status === 'processing') body.append(textElement('p', 'Your capture is saved. Foundkeep is still adding context; reopen it in a moment to see updates.', 'detail-processing'));
     if (capture.status === 'failed') body.append(textElement('p', 'Your capture is safe. Automatic context could not be added.', 'detail-processing'));
     if (capture.enrichError) body.append(textElement('p', capture.enrichError, 'detail-processing'));
     $('#detail-date').textContent = `Saved ${dateLabel(capture.capturedAt, true)}`; $('#detail-actions').hidden = false;
@@ -439,7 +439,7 @@ $('#preference-form').addEventListener('submit', async event => {
     state.preferences = result.preferences; state.preferenceRevision = result.revision; renderPreferences();
     let refreshed = false;
     if (state.extensionId) refreshed = await extensionMessage({ kind: 'atlas-refresh-preferences', revision: result.revision }, state.extensionId).then(response => response.revision >= result.revision).catch(() => false);
-    setMessage($('#preference-message'), refreshed ? 'Saved. Your connected browser has the new settings.' : 'Saved. Atlas will use these settings the next time the extension refreshes.', false);
+    setMessage($('#preference-message'), refreshed ? 'Saved. Your connected browser has the new settings.' : 'Saved. Foundkeep will use these settings the next time the extension refreshes.', false);
   } catch (error) { if (!state.expired) setMessage($('#preference-message'), error.message); }
   finally { $('#save-preferences').disabled = false; $('#preference-form').removeAttribute('aria-busy'); }
 });
@@ -452,12 +452,12 @@ $('#open-account').addEventListener('click', async () => {
 $('#export-account').addEventListener('click', async () => {
   if (!await confirmAction('Export your cloud library?', 'Download a JSON file containing your saved captures, text and images. The file may contain private information. Large libraries can take a moment.', 'Download export')) return;
   $('#export-account').disabled = true; $('#export-account').textContent = 'Preparing export…'; setMessage($('#account-message'), '');
-  try { const blob = await api('/account/export', { download: true }); downloadBlob(blob, `atlas-export-${new Date().toISOString().slice(0, 10)}.json`); toast('Your export is ready to download.'); }
+  try { const blob = await api('/account/export', { download: true }); downloadBlob(blob, `foundkeep-export-${new Date().toISOString().slice(0, 10)}.json`); toast('Your export is ready to download.'); }
   catch (error) { if (!state.expired) setMessage($('#account-message'), error.message); }
   finally { $('#export-account').disabled = false; $('#export-account').textContent = 'Export my captures'; }
 });
 $('#logout').addEventListener('click', async () => {
-  if (!await confirmAction('Log out of Atlas?', 'This signs out this website. Connected extensions stay connected until you revoke them in account settings.', 'Log out')) return;
+  if (!await confirmAction('Log out of Foundkeep?', 'This signs out this website. Connected extensions stay connected until you revoke them in account settings.', 'Log out')) return;
   $('#logout').disabled = true;
   try { await api('/auth/logout', { method: 'POST', body: {} }); location.replace('/auth.html?mode=login'); }
   catch (error) { if (!state.expired) setMessage($('#account-message'), error.message); }
@@ -508,7 +508,7 @@ async function start() {
       openDialog('#account-dialog'); $('#extension-settings').scrollIntoView({ block: 'start' }); $('#extension-settings summary').focus();
     }
   } catch (error) {
-    if (!state.expired) showLibraryState('Atlas couldn’t open your account.', error.message, { retry: start });
+    if (!state.expired) showLibraryState('Foundkeep couldn’t open your account.', error.message, { retry: start });
   }
 }
 start();

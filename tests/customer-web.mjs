@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
@@ -29,7 +29,7 @@ const fixtureCaptures = [
 ].map((capture, index) => ({ clientId: capture.id, status: 'done', capturedAt: now - index * 86400000, ...capture }));
 before(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'atlas-customer-web-'));
-  const code = `import { createApp } from './apps/backend/src/app.ts'; import { openDb } from './apps/backend/src/db.ts'; import { config } from './apps/backend/src/config.ts'; let app; const server = Bun.serve({hostname:'127.0.0.1',port:0,fetch:req=>app.fetch(req,{clientIp:'127.0.0.1'})}); config.customerOrigin=server.url.origin; app=createApp(openDb()); console.log('READY '+server.url.origin);`;
+  const code = `import { createApp } from './apps/backend/src/app.ts'; import { openDb } from './apps/backend/src/db.ts'; import { config } from './apps/backend/src/config.ts'; let app; const server = Bun.serve({hostname:'127.0.0.1',port:0,fetch:req=>app.fetch(req,{clientIp:'127.0.0.1'})}); config.customerOrigin=server.url.origin; config.customerOrigins=[server.url.origin]; app=createApp(openDb()); console.log('READY '+server.url.origin);`;
   server = spawn(process.env.BUN_BIN || process.env.BUN_PATH || 'bun', ['--eval', code], { cwd: process.cwd(), env: { ...process.env, ATLAS_DATA_DIR: dataDir }, stdio: ['ignore', 'pipe', 'pipe'] });
   base = await new Promise((resolve, reject) => {
     let output = ''; const timeout = setTimeout(() => reject(new Error(`Customer test server timed out: ${output}`)), 10000);
@@ -92,6 +92,14 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
 }
 async function openLibrary(page) { await page.goto(`${base}/dashboard.html`); await page.locator('#new-note:not([disabled])').waitFor(); await page.locator('#capture-grid[aria-busy="false"]').waitFor({ state: 'attached' }); }
 
+test('customer pages present the Foundkeep identity', async () => {
+  for (const file of ['auth.html', 'dashboard.html', 'privacy.html', 'redeem.html']) {
+    const source = await readFile(path.resolve('apps/web', file), 'utf8');
+    assert.match(source, /Foundkeep/);
+    assert.doesNotMatch(source, />\s*Atlas(?:\s|<)/);
+  }
+});
+
 test('real API: signup, notes, logout, login, recovery and account deletion', async t => {
   const { page } = await pageFor(t, { mock: false });
   await page.goto(`${base}/auth.html?mode=signup`);
@@ -99,7 +107,7 @@ test('real API: signup, notes, logout, login, recovery and account deletion', as
   await page.locator('#auth-submit').click(); await page.locator('#recovery-save').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#continue-dashboard').isDisabled(), true);
   const originalRecovery = await page.locator('#new-recovery-code').textContent(); assert.ok(originalRecovery.length > 20);
-  const downloaded = page.waitForEvent('download'); await page.locator('#download-recovery').click(); assert.equal((await downloaded).suggestedFilename(), 'atlas-recovery-code.txt');
+  const downloaded = page.waitForEvent('download'); await page.locator('#download-recovery').click(); assert.equal((await downloaded).suggestedFilename(), 'foundkeep-recovery-code.txt');
   await page.locator('#recovery-saved').check(); await page.locator('#continue-dashboard').click(); await page.waitForURL('**/dashboard.html');
   await page.locator('#new-note:not([disabled])').click(); await page.locator('#note-text').fill('This note was saved through the real API.');
   const saved = page.waitForResponse(response => response.url().endsWith('/api/captures') && response.request().method() === 'POST');
@@ -268,7 +276,7 @@ test('account settings confirm revoke/export/logout and require saving a rotated
   await openLibrary(page); await page.locator('#open-account').click(); await page.getByRole('button', { name: 'Revoke Office Chrome' }).click();
   await page.locator('#confirm-cancel').click(); assert.equal(requests.some(request => request.path === '/api/connections/browser-1'), false);
   await page.getByRole('button', { name: 'Revoke Office Chrome' }).click(); await page.locator('#confirm-accept').click(); await page.locator('.device-empty').waitFor();
-  await page.locator('#export-account').click(); const download = page.waitForEvent('download'); await page.locator('#confirm-accept').click(); assert.match((await download).suggestedFilename(), /^atlas-export-.*\.json$/);
+  await page.locator('#export-account').click(); const download = page.waitForEvent('download'); await page.locator('#confirm-accept').click(); assert.match((await download).suggestedFilename(), /^foundkeep-export-.*\.json$/);
   await page.locator('#current-password').fill('Current-password-123'); await page.locator('#new-password').fill('New-password-123456'); await page.locator('#change-password').click(); await page.locator('#confirm-accept').click();
   await page.locator('#password-recovery-dialog').waitFor({ state: 'visible' }); assert.equal(await page.locator('#finish-password-recovery').isDisabled(), true); await page.keyboard.press('Escape'); assert.equal(await page.locator('#password-recovery-dialog').isVisible(), true);
   await page.locator('#password-recovery-saved').check(); await page.locator('#finish-password-recovery').click(); assert.equal(await page.locator('#password-recovery-code').textContent(), '');
