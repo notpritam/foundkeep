@@ -2,8 +2,8 @@ import { CUSTOMER_ORIGIN } from "./cloud.js";
 import { message } from "./ui.js";
 
 export function cloudMarkup({ compact = false } = {}) {
-  const markup = `<section class="cloud-panel ${compact ? "compact" : ""}" aria-label="Atlas account">
-    <div class="cloud-heading"><strong id="cloudAccount">Keep your finds together.</strong><button class="btn ${compact ? "secondary" : "primary"}" id="cloudAction" type="button">Connect Atlas</button></div>
+  const markup = `<section class="cloud-panel ${compact ? "compact" : ""}" aria-label="Foundkeep account">
+    <div class="cloud-heading"><strong id="cloudAccount">Keep your finds together.</strong><button class="btn ${compact ? "secondary" : "primary"}" id="cloudAction" type="button">Connect Foundkeep</button></div>
     <p id="cloudStatus" class="fine" role="status">Connect an account to sync new captures. Your local library stays available.</p>
     <div class="cloud-actions"><button class="cloud-text-button" id="cloudRetry" type="button" hidden>Try sync again</button>
     ${compact ? "" : `<button class="cloud-text-button" id="cloudImport" type="button" hidden>Import local captures</button><button class="cloud-text-button" id="cloudDisconnect" type="button" hidden>Disconnect this browser</button>`}</div>
@@ -27,7 +27,7 @@ export function bindCloud(
     if (!result?.ok)
       throw new Error(
         result?.error ||
-          "Could not read your connection. Reopen Atlas and try again.",
+          "Could not read your connection. Reopen Foundkeep and try again.",
       );
     return result;
   };
@@ -37,7 +37,7 @@ export function bindCloud(
       .catch(() =>
         message(
           field("cloudFeedback"),
-          "Could not open Atlas. Try again.",
+          "Could not open Foundkeep. Try again.",
           "error",
         ),
       );
@@ -55,7 +55,7 @@ export function bindCloud(
           ? "Reconnect"
           : state.account
             ? "Dashboard"
-            : "Connect Atlas";
+            : "Connect Foundkeep";
       const detail =
         state.status === "reconnect"
           ? "Reconnect this browser to resume syncing. Your captures are safe locally."
@@ -145,7 +145,7 @@ export function bindCloud(
     field("cloudDisconnect").onclick = async () => {
       if (
         !confirm(
-          "Disconnect this browser from Atlas? Captures stay in this browser. Unsent captures remain assigned to their current account.",
+          "Disconnect this browser from Foundkeep? Captures stay in this browser. Unsent captures remain assigned to their current account.",
         )
       )
         return;

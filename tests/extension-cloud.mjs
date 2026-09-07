@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright-core";
+const PRIMARY_ORIGIN = "https://foundkeep.app";
+const LEGACY_ORIGIN = "https://atlas.notpritam.in";
 let browser;
 before(async () => {
   browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
@@ -167,18 +169,18 @@ async function fixture(t) {
 }
 const codeA = "a".repeat(43),
   codeB = "b".repeat(43);
-async function pair(page, code = codeA) {
+async function pair(page, code = codeA, origin = PRIMARY_ORIGIN) {
   return page.evaluate(
-    (code) =>
+    ({ code, origin }) =>
       cloud.handleExternalMessage(
         { kind: "atlas-connect", code },
         {
-          url: "https://atlas.notpritam.in/dashboard.html",
-          origin: "https://atlas.notpritam.in",
+          url: origin + "/dashboard.html",
+          origin,
           frameId: 0,
         },
       ),
-    code,
+    { code, origin },
   );
 }
 async function save(page, text = "A new capture") {
@@ -196,6 +198,12 @@ test("pairing rejects other origins, nested frames and caller-supplied credentia
   const page = await fixture(t);
   const results = await page.evaluate(async (code) => {
     const senders = [
+      { url: "https://foundkeep.app.evil.test/dashboard" },
+      { url: "http://foundkeep.app/dashboard" },
+      { url: "https://foundkeep.app:444/dashboard" },
+      { url: "https://foundkeep.app/dashboard", origin: "null" },
+      { url: "https://foundkeep.app/dashboard", frameId: 1 },
+      { url: "https://foundkeep.app/dashboard", id: "another-extension" },
       { url: "https://atlas.notpritam.in.evil.test/dashboard" },
       { url: "http://atlas.notpritam.in/dashboard" },
       { url: "https://atlas.notpritam.in:444/dashboard" },
@@ -216,7 +224,7 @@ test("pairing rejects other origins, nested frames and caller-supplied credentia
           backend: "https://evil.test",
           token: "caller-token",
         },
-        { url: "https://atlas.notpritam.in/dashboard" },
+        { url: "https://foundkeep.app/dashboard" },
       ),
     );
     return { results, requests: requests.length };
@@ -225,16 +233,18 @@ test("pairing rejects other origins, nested frames and caller-supplied credentia
   assert.equal(results.requests, 0);
   const connected = await pair(page);
   assert.equal(connected.account.id, "account-a");
+  const legacyConnected = await pair(page, codeB, LEGACY_ORIGIN);
+  assert.equal(legacyConnected.account.id, "account-b");
   const ping = await page.evaluate(() =>
     cloud.handleExternalMessage(
       { kind: "atlas-ping" },
-      { url: "https://atlas.notpritam.in/dashboard" },
+      { url: "https://foundkeep.app/dashboard" },
     ),
   );
   assert.equal(ping.version, "1.3.0");
-  assert.equal(ping.account.id, "account-a");
+  assert.equal(ping.account.id, "account-b");
   assert.equal(
-    JSON.stringify([connected, ping]).includes("credential-"),
+    JSON.stringify([connected, legacyConnected, ping]).includes("credential-"),
     false,
   );
 });

@@ -14,7 +14,8 @@
     "test:extension": "node --test tests/extension-ui.mjs tests/extension-smoke.mjs tests/extension-cloud.mjs tests/extension-extractor.mjs tests/extension-preferences.mjs",
     "test:web": "node --test tests/landing-smoke.mjs",
     "test:customer": "node --test tests/customer-flow.mjs tests/customer-web.mjs",
-    "prepare:web-assets": "node scripts/prepare-web-assets.mjs"
+    "prepare:web-assets": "node scripts/prepare-web-assets.mjs",
+    "brand:assets": "node scripts/render-brand-assets.mjs"
   },
   "devDependencies": {
     "crx3": "^2.0.0",

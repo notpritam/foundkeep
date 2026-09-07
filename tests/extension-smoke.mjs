@@ -1,13 +1,38 @@
 // Exercise the real MV3 background worker and IndexedDB in a temporary profile.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE || "playwright-core"
 );
+
+test("extension presents the Foundkeep identity while preserving its signed ID", async () => {
+  const manifest = JSON.parse(await readFile("apps/extension/manifest.json", "utf8"));
+  assert.equal(manifest.name, "Foundkeep — Save what matters");
+  assert.equal(manifest.action.default_title, "Foundkeep");
+  assert.deepEqual(manifest.externally_connectable.matches, [
+    "https://foundkeep.app/*",
+    "https://atlas.notpritam.in/*",
+  ]);
+  assert.ok(Object.values(manifest.commands).every((command) => command.description.includes("Foundkeep")));
+  assert.equal(manifest.key.startsWith("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A"), true);
+
+  for (const file of ["src/popup.html", "src/dashboard.html"]) {
+    const source = await readFile(`apps/extension/${file}`, "utf8");
+    assert.match(source, /Foundkeep/);
+    assert.doesNotMatch(source, />\s*Atlas(?:\s|<)/);
+  }
+  for (const size of [16, 32, 48, 128]) {
+    const png = await readFile(`apps/extension/icons/icon${size}.png`);
+    assert.equal(png.subarray(1, 4).toString(), "PNG");
+    assert.equal(png.readUInt32BE(16), size);
+    assert.equal(png.readUInt32BE(20), size);
+  }
+});
+
 test(
   "installed extension captures selected text, a link, screenshots, and a note into its shared library",
   { timeout: 30000 },

@@ -334,7 +334,7 @@ test("popup offers real account connection and preserves a local-library fallbac
   await page.locator("#popup-cloudAction").click();
   assert.equal(
     await page.evaluate(() => window.__opened),
-    "https://atlas.notpritam.in/dashboard.html",
+    "https://foundkeep.app/dashboard.html",
   );
   await page.evaluate(() => {
     window.__cloudStatus = {

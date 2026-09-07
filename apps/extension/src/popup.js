@@ -26,7 +26,7 @@ const cloud = bindCloud($("cloudSummary"), {
       : state.pending
         ? `${state.pending} waiting`
         : state.account
-          ? "Synced to Atlas"
+          ? "Synced to Foundkeep"
           : "Saved locally";
   },
 });
@@ -96,7 +96,7 @@ function applyPreferences(next) {
   const visibleSecondary = actions.some((button) => !button.hidden);
   $("secondaryActions").hidden = !visibleSecondary;
   if ($("savePage").hidden && !visibleSecondary) {
-    message($("captureFeedback"), "Page capture is turned off in your Atlas settings.");
+    message($("captureFeedback"), "Page capture is turned off in your Foundkeep settings.");
   }
   document.body.dataset.preferencesReady = "true";
 }
@@ -156,7 +156,7 @@ async function runCapture(button) {
       window.close();
       return;
     }
-    message($("captureFeedback"), "Saved in your Atlas library.", "success");
+    message($("captureFeedback"), "Saved in your Foundkeep library.", "success");
     await renderRecent();
   } catch (error) {
     message($("captureFeedback"), error.message || "Could not start capture. Reload this page and try again.", "error");
@@ -179,7 +179,7 @@ $("save").onclick = saveNote;
 document.querySelectorAll("[data-act]").forEach((button) => { button.onclick = () => runCapture(button); });
 
 $("openLib").onclick = () => cloudState?.account
-  ? chrome.tabs.create({ url: CUSTOMER_ORIGIN + "/dashboard.html" }).then(() => window.close()).catch(() => message($("saveFeedback"), "Could not open Atlas. Your local library is still available.", "error"))
+  ? chrome.tabs.create({ url: CUSTOMER_ORIGIN + "/dashboard.html" }).then(() => window.close()).catch(() => message($("saveFeedback"), "Could not open Foundkeep. Your local library is still available.", "error"))
   : openLibrary();
 $("openLocalLib").onclick = () => openLibrary();
 $("brandLibrary").onclick = (event) => { event.preventDefault(); openLibrary(); };
@@ -222,7 +222,7 @@ async function init() {
     await Promise.all([loadPreferences(), cloud.load()]);
   } catch {
     applyPreferences(DEFAULT_PREFERENCES);
-    message($("saveFeedback"), "Could not load recent captures. Try reopening Atlas.", "error");
+    message($("saveFeedback"), "Could not load recent captures. Try reopening Foundkeep.", "error");
   }
 }
 

@@ -6,7 +6,7 @@ import { bindCloud } from "./cloud-ui.js";
 export function bindConnections(container, onSaved = () => {}) {
   container.innerHTML = `<div id="accountSettings"></div>
     <details id="localCompanion" class="setting-group"><summary>Advanced: local companion</summary>
-      <p class="fine">For captures kept only in this browser. Connected accounts use Atlas organization instead.</p>
+      <p class="fine">For captures kept only in this browser. Connected accounts use Foundkeep organization instead.</p>
       <form id="connectionForm"><div class="setting-title"><label for="enrichEnabled">Organize local captures</label><input class="toggle" id="enrichEnabled" type="checkbox" aria-label="Organize automatically"></div>
       <p class="fine">Optional summaries, tags and text recognition through your companion and its AI provider.</p>
       <div class="field"><label for="agentUrl">Companion address</label><input id="agentUrl" type="url" placeholder="http://127.0.0.1:8791" autocomplete="off"></div>

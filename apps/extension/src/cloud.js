@@ -2,8 +2,9 @@
 // worker calls mutating operations; pages ask it for a credential-free status.
 import * as db from "./db.js";
 import { clearPreferenceCache, getEffectivePreferences } from "./preferences.js";
+import { CUSTOMER_ORIGIN, CUSTOMER_ORIGINS } from "./product.js";
 
-export const CUSTOMER_ORIGIN = "https://atlas.notpritam.in";
+export { CUSTOMER_ORIGIN } from "./product.js";
 const STATE_KEY = "atlasCustomer";
 let draining = null;
 let mutations = Promise.resolve();
@@ -78,7 +79,7 @@ async function revokeCredential(previous) {
   return {
     revoked: false,
     warning:
-      "The previous browser credential could not be revoked. Remove it from Connected browsers in your Atlas dashboard.",
+      "The previous browser credential could not be revoked. Remove it from Connected browsers in your Foundkeep dashboard.",
   };
 }
 
@@ -93,8 +94,8 @@ export function trustedPairingSender(sender) {
     return (
       !sender?.id &&
       (sender.frameId === undefined || sender.frameId === 0) &&
-      new URL(sender.url).origin === CUSTOMER_ORIGIN &&
-      (sender.origin === undefined || sender.origin === CUSTOMER_ORIGIN)
+      CUSTOMER_ORIGINS.includes(new URL(sender.url).origin) &&
+      (sender.origin === undefined || CUSTOMER_ORIGINS.includes(sender.origin))
     );
   } catch {
     return false;
@@ -102,7 +103,7 @@ export function trustedPairingSender(sender) {
 }
 export async function handleExternalMessage(message, sender) {
   if (!trustedPairingSender(sender))
-    return { ok: false, error: "This page cannot connect Atlas." };
+    return { ok: false, error: "This page cannot connect Foundkeep." };
   if (message?.kind === "atlas-ping") {
     const state = await readState();
     return {
@@ -120,7 +121,7 @@ export async function handleExternalMessage(message, sender) {
     typeof message.code !== "string" ||
     !/^[a-zA-Z0-9_-]{32,256}$/.test(message.code)
   ) {
-    return { ok: false, error: "Request a new connection code from Atlas." };
+    return { ok: false, error: "Request a new connection code from Foundkeep." };
   }
   const sequence = ++pairingSequence;
   try {
@@ -151,7 +152,7 @@ export async function handleExternalMessage(message, sender) {
     ) {
       return {
         ok: false,
-        error: "Atlas returned an incomplete connection. Try again.",
+        error: "Foundkeep returned an incomplete connection. Try again.",
       };
     }
     let previous, next;
@@ -189,7 +190,7 @@ export async function handleExternalMessage(message, sender) {
   } catch {
     return {
       ok: false,
-      error: "Could not reach Atlas. Check your connection and try again.",
+      error: "Could not reach Foundkeep. Check your connection and try again.",
     };
   }
 }
@@ -390,7 +391,7 @@ async function drain() {
       if (!response.ok) {
         const error = new Error(
           result.message ||
-            `Atlas could not sync this capture (${response.status}).`,
+            `Foundkeep could not sync this capture (${response.status}).`,
         );
         error.permanent =
           response.status >= 400 &&
@@ -400,7 +401,7 @@ async function drain() {
       }
       if (!result.capture?.id)
         throw new Error(
-          "Atlas did not confirm the upload. It will be retried safely.",
+          "Foundkeep did not confirm the upload. It will be retried safely.",
         );
       await db.updateCapture(record.id, {
         cloudStatus: "synced",
@@ -415,7 +416,7 @@ async function drain() {
       const attempts = (record.cloudAttempts || 0) + 1;
       const detail = error.permanent
         ? error.message
-        : "Could not reach Atlas. Saved in this browser; sync will retry automatically.";
+        : "Could not reach Foundkeep. Saved in this browser; sync will retry automatically.";
       await db.updateCapture(record.id, {
         cloudStatus: error.permanent ? "failed" : "queued",
         cloudError: detail,

@@ -1,4 +1,4 @@
-const CUSTOMER_ORIGIN = "https://atlas.notpritam.in";
+import { CUSTOMER_ORIGIN } from "./product.js";
 const CONNECTION_KEY = "atlasCustomer";
 const CACHE_KEY = "atlasPreferenceCache";
 const MAX_AGE_MS = 5 * 60 * 1000;
@@ -76,7 +76,7 @@ function cacheResult(cache, source) {
 
 async function fetchRemotePreferences(state, now) {
   const key = connectionKey(state);
-  if (!key) throw new Error("Connect Atlas before refreshing preferences.");
+  if (!key) throw new Error("Connect Foundkeep before refreshing preferences.");
   if (pendingRemoteRefreshes.has(key)) return pendingRemoteRefreshes.get(key);
 
   const request = (async () => {
@@ -97,7 +97,7 @@ async function fetchRemotePreferences(state, now) {
         !(result.updatedAt === null || Number.isSafeInteger(result.updatedAt))) throw new Error("Invalid preferences");
 
     const latest = await stateAndCache();
-    if (connectionKey(latest.state) !== key) throw new Error("Atlas connection changed during preference refresh.");
+    if (connectionKey(latest.state) !== key) throw new Error("Foundkeep connection changed during preference refresh.");
     const latestCache = validCache(latest.cache, state.account.id);
     if (latestCache && latestCache.revision >= result.revision) {
       return cacheResult(latestCache, latestCache.revision > result.revision ? "newer-cache" : "remote");
@@ -127,7 +127,7 @@ export async function getEffectivePreferences({ refresh = false, now = Date.now(
   const accountId = state?.account?.id;
   const usableCache = validCache(cache, accountId);
   if (!connectionKey(state)) {
-    if (refresh) throw new Error("Connect Atlas before refreshing preferences.");
+    if (refresh) throw new Error("Connect Foundkeep before refreshing preferences.");
     return { preferences: cloneDefaults(), revision: 0, updatedAt: null, source: "default" };
   }
   if (!refresh && usableCache && now - usableCache.fetchedAt < MAX_AGE_MS) {

@@ -1,6 +1,6 @@
-// Injects a "Save to Atlas" button into every X / Twitter tweet action bar,
+// Injects a "Save to Foundkeep" button into every X / Twitter tweet action bar,
 // next to reply / repost / like / bookmark. Clicking it saves the tweet (author,
-// text, permalink) to Atlas as a highlight. Self-contained content script — all
+// text and permalink) to Foundkeep as a highlight. Self-contained content script — all
 // network goes through the background worker, so no token lives in the page.
 
 const MARK_SVG = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="7" x2="6.5" y2="17"/><line x1="12" y1="7" x2="17.5" y2="17"/><line x1="6.5" y1="17" x2="17.5" y2="17"/></g><g fill="currentColor"><circle cx="12" cy="6.4" r="2.5"/><circle cx="6.2" cy="17.2" r="2"/><circle cx="17.8" cy="17.2" r="2"/></g></svg>`;
@@ -39,7 +39,7 @@ function setState(btn, state) {
     btn.style.background = "rgba(198,59,35,0.12)";
     btn.style.opacity = "1";
     btn.innerHTML = CHECK_SVG;
-    btn.title = "Saved to Atlas";
+    btn.title = "Saved to Foundkeep";
   } else if (state === "error") {
     btn.style.color = "#f4212e";
     btn.style.opacity = "1";
@@ -58,7 +58,7 @@ function reset(btn) {
   btn.style.background = "transparent";
   btn.style.opacity = "1";
   btn.innerHTML = MARK_SVG;
-  btn.title = "Save to Atlas";
+  btn.title = "Save to Foundkeep";
 }
 
 function makeButton() {

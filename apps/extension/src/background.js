@@ -19,19 +19,19 @@ protectCloudStorage().catch(() => {});
 chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
   if (msg?.kind === "atlas-refresh-preferences") {
     if (!trustedPairingSender(sender)) {
-      respond({ ok: false, error: "This page cannot update Atlas." });
+      respond({ ok: false, error: "This page cannot update Foundkeep." });
       return;
     }
     refreshPreferences()
       .then(async (state) => {
         const requestedRevision = Number.isSafeInteger(msg.revision) && msg.revision >= 0 ? msg.revision : 0;
-        if (state.revision < requestedRevision) throw new Error("Atlas did not receive the saved preference revision.");
+        if (state.revision < requestedRevision) throw new Error("Foundkeep did not receive the saved preference revision.");
         await reconcileContextMenus(state.preferences);
         announcePreferenceChange();
         drainQueue().catch(() => {});
         respond({ ok: true, revision: state.revision });
       })
-      .catch(() => respond({ ok: false, error: "Atlas kept the last saved preferences." }));
+      .catch(() => respond({ ok: false, error: "Foundkeep kept the last saved preferences." }));
     return true;
   }
   handleExternalMessage(msg, sender)
@@ -50,7 +50,7 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
     .catch(() =>
       respond({
         ok: false,
-        error: "Atlas could not complete this connection. Please try again.",
+        error: "Foundkeep could not complete this connection. Please try again.",
       }),
     );
   return true;
@@ -155,7 +155,7 @@ async function capturePageContext(tab, {
     }
     return result;
   } catch {
-    return { articleText: null, provenance: fallbackProvenance(tab, captureMethod, capturedAt, targetUrl, "Atlas saved the source, but some page details were unavailable.") };
+    return { articleText: null, provenance: fallbackProvenance(tab, captureMethod, capturedAt, targetUrl, "Foundkeep saved the source, but some page details were unavailable.") };
   }
 }
 
@@ -204,14 +204,14 @@ chrome.alarms.onAlarm.addListener((a) => {
 const MENUS = [
   {
     id: "save-selection",
-    title: "Save selection to Atlas",
+    title: "Save selection to Foundkeep",
     contexts: ["selection"],
   },
-  { id: "save-link", title: "Save link to Atlas", contexts: ["link"] },
-  { id: "save-image", title: "Save image to Atlas", contexts: ["image"] },
+  { id: "save-link", title: "Save link to Foundkeep", contexts: ["link"] },
+  { id: "save-image", title: "Save image to Foundkeep", contexts: ["image"] },
   { id: "savepage", title: "Save page as bookmark", contexts: ["page"] },
-  { id: "region", title: "Screenshot region → Atlas", contexts: ["page"] },
-  { id: "fullpage", title: "Full-page screenshot → Atlas", contexts: ["page"] },
+  { id: "region", title: "Screenshot region → Foundkeep", contexts: ["page"] },
+  { id: "fullpage", title: "Full-page screenshot → Foundkeep", contexts: ["page"] },
 ];
 
 async function reconcileContextMenus(preferences) {
@@ -265,12 +265,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg?.kind === "preferences-status") {
     if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL("src/"))) {
-      sendResponse({ ok: false, error: "Open Atlas to view preferences." });
+      sendResponse({ ok: false, error: "Open Foundkeep to view preferences." });
       return;
     }
     getEffectivePreferences({ refresh: msg.refresh === true })
       .then((state) => sendResponse({ ok: true, ...state }))
-      .catch(() => sendResponse({ ok: false, error: "Atlas could not load preferences." }));
+      .catch(() => sendResponse({ ok: false, error: "Foundkeep could not load preferences." }));
     return true;
   }
   if (msg?.kind?.startsWith("cloud-")) {
@@ -282,7 +282,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     ) {
       sendResponse({
         ok: false,
-        error: "Open Atlas to manage this connection.",
+        error: "Open Foundkeep to manage this connection.",
       });
       return;
     }
@@ -306,7 +306,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg.kind === "cloud-disconnect") {
           return sendResponse({ ok: true, ...(await disconnectCloud()) });
         }
-        sendResponse({ ok: false, error: "Unknown Atlas request." });
+        sendResponse({ ok: false, error: "Unknown Foundkeep request." });
       } catch (error) {
         sendResponse({
           ok: false,
@@ -341,7 +341,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const preferenceState = await getEffectivePreferences();
-        if (!preferenceState.preferences.capture.tweet) throw new Error("Tweet capture is disabled in your Atlas preferences.");
+        if (!preferenceState.preferences.capture.tweet) throw new Error("Tweet capture is disabled in your Foundkeep preferences.");
         const p = msg.payload;
         const capturedAt = Date.now();
         await saveCapture({
@@ -369,7 +369,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       });
       try {
         const preferenceState = await getEffectivePreferences();
-        if (!preferenceState.preferences.capture.note) throw new Error("Notes are disabled in your Atlas preferences.");
+        if (!preferenceState.preferences.capture.note) throw new Error("Notes are disabled in your Foundkeep preferences.");
         const local = msg.source === "library";
         const attachSource = !local && preferenceState.preferences.notes.attachSource;
         const context = !attachSource
@@ -405,7 +405,7 @@ async function performCapture(action, { tab, info, trigger = "popup" }) {
   const preferenceState = await getEffectivePreferences();
   const preferences = preferenceState.preferences;
   const feature = capturePreferenceKey(action);
-  if (!preferences.capture[feature]) throw new Error(`${feature === "fullPage" ? "Full-page screenshot" : feature[0].toUpperCase() + feature.slice(1)} capture is disabled in your Atlas preferences.`);
+  if (!preferences.capture[feature]) throw new Error(`${feature === "fullPage" ? "Full-page screenshot" : feature[0].toUpperCase() + feature.slice(1)} capture is disabled in your Foundkeep preferences.`);
   switch (action) {
     case "region":
       return regionScreenshot(tab, captureMethod);
