@@ -65,5 +65,5 @@ http
     }
   })
   .listen(port, "0.0.0.0", () =>
-    console.log(`Atlas review preview listening on ${port}`),
+    console.log(`Foundkeep review preview listening on ${port}`),
   );

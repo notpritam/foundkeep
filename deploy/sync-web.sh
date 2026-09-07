@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Publish the landing page (and the freshly-packed extension zip) to the caddy
 # web root at /srv/atlas-web. Run after changing apps/web or the extension.
-# caddy serves atlas.notpritam.in/ from here; /home is 700 so it can't read
+# Caddy serves foundkeep.app and the legacy hostname from here; /home is 700 so it can't read
 # apps/web directly.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,4 +12,4 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 sudo mkdir -p /var/www/atlas
 sudo cp -rT "$ROOT/apps/web" /var/www/atlas
 sudo chmod -R a+rX /var/www/atlas
-echo "published $ROOT/apps/web -> /var/www/atlas  (https://atlas.notpritam.in/)"
+echo "published $ROOT/apps/web -> /var/www/atlas  (https://foundkeep.app/)"

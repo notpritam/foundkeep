@@ -1,6 +1,6 @@
 [Unit]
-Description=Atlas Browser control bridge (shared WebSocket bridge on 127.0.0.1:8792)
-Documentation=https://github.com/notpritam/atlas
+Description=Foundkeep legacy browser control bridge (shared WebSocket bridge on 127.0.0.1:8792)
+Documentation=https://github.com/notpritam/foundkeep
 After=network.target
 
 [Service]

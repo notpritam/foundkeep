@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Release the Atlas extension for self-hosted auto-update.
+// Release the Foundkeep extension for self-hosted auto-update.
 //
 // Bumps the version, signs a .crx with a stable key, writes updates.xml (the
 // Chrome update manifest), refreshes the plain .zip, and drops everything into
-// apps/web so caddy serves it at atlas.notpritam.in. Chrome, once told to trust
+// apps/web so Caddy serves it at foundkeep.app. Chrome, once told to trust
 // this extension via a one-time policy, then auto-updates silently every ~5h.
 //
 //   node deploy/release-extension.mjs            # bump patch, build, publish
@@ -32,7 +32,7 @@ const EXT_DIR = join(ROOT, "apps", "extension");
 const WEB_DIR = join(ROOT, "apps", "web");
 const KEY_PATH = join(ROOT, "deploy", "keys", "atlas-extension.pem");
 // Auto-update is served from GitHub Releases (stable "latest" asset URLs).
-const REPO = "notpritam/atlas";
+const REPO = "notpritam/foundkeep";
 const CRX_URL = `https://github.com/${REPO}/releases/latest/download/atlas-extension.crx`;
 const UPDATE_URL = `https://github.com/${REPO}/releases/latest/download/updates.xml`;
 
@@ -49,7 +49,7 @@ mkdirSync(dirname(KEY_PATH), { recursive: true });
 if (process.env.EXTENSION_PEM_B64) {
   writeFileSync(KEY_PATH, Buffer.from(process.env.EXTENSION_PEM_B64, "base64"), {mode:0o600});
 } else if (!existsSync(KEY_PATH)) {
-  throw new Error("The existing Atlas signing key is required. Refusing to create a different extension identity.");
+  throw new Error("The existing Foundkeep signing key is required. Refusing to create a different extension identity.");
 }
 
 // 2. Public key → manifest "key" (pins the extension ID) + the ID itself.
@@ -62,7 +62,7 @@ const extId = [...createHash("sha256").update(der).digest().subarray(0, 16).toSt
   .map((c) => String.fromCharCode(97 + parseInt(c, 16)))
   .join("");
 if (extId !== "mjfcgmboaijfcaanepdipbgmipnccnpn") {
-  throw new Error("Signing key does not match the existing Atlas extension identity.");
+  throw new Error("Signing key does not match the existing Foundkeep extension identity.");
 }
 
 // 3. Update manifest.json: version, key, update_url.
@@ -98,6 +98,7 @@ const files = walk(EXT_DIR)
 // 5. Sign the .crx and write updates.xml.
 mkdirSync(join(WEB_DIR, "ext"), { recursive: true });
 const crxPath = join(WEB_DIR, "ext", "atlas-extension.crx");
+const brandedCrxPath = join(WEB_DIR, "ext", "foundkeep-extension.crx");
 const xmlPath = join(WEB_DIR, "updates.xml");
 
 process.chdir(EXT_DIR);
@@ -108,8 +109,9 @@ await writeCRX3File(files, {
   crxURL: CRX_URL,
   appVersion: manifest.version,
 });
+writeFileSync(brandedCrxPath, readFileSync(crxPath));
 
-console.log(`\n  Atlas extension released`);
+console.log(`\n  Foundkeep extension released`);
 console.log(`  ────────────────────────────────`);
 console.log(`  version    : ${manifest.version}`);
 console.log(`  extension  : ${extId}`);
@@ -125,6 +127,10 @@ writeFileSync(
   join(policyDir, "atlas-extension.json"),
   JSON.stringify({ ExtensionInstallForcelist: [`${extId};${UPDATE_URL}`] }, null, 2) + "\n",
 );
+writeFileSync(
+  join(policyDir, "foundkeep-extension.json"),
+  JSON.stringify({ ExtensionInstallForcelist: [`${extId};${UPDATE_URL}`] }, null, 2) + "\n",
+);
 writeFileSync(join(policyDir, "extension-id.txt"), extId + "\n");
 
 // 7. Refresh the plain .zip so the release carries it too.
@@ -136,8 +142,8 @@ execFileSync("bash", [join(ROOT, "deploy", "pack-extension.sh")], {
 // 8. Optionally publish a GitHub Release (needs an authenticated `gh`).
 if (flag("--publish")) {
   const tag = `ext-v${manifest.version}`;
-  const title = `Atlas extension v${manifest.version}`;
-  const assets = [crxPath, xmlPath, join(WEB_DIR, "atlas-extension.zip")];
+  const title = `Foundkeep extension v${manifest.version}`;
+  const assets = [crxPath, brandedCrxPath, xmlPath, join(WEB_DIR, "atlas-extension.zip"), join(WEB_DIR, "foundkeep-extension.zip")];
   try {
     execFileSync(
       "gh",

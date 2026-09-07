@@ -1,25 +1,31 @@
-# Atlas
+# Foundkeep
 
 <!-- impeccable:product-schema 1 -->
 
 ## Platform
-web
+
+Web dashboard and Chromium browser extension.
 
 ## Purpose and operating context
-Atlas is a customer capture product: save readable pages, screenshots, highlights, bookmarks, images, posts on X and notes with traceable source records, then find them in a private library. Native HTML/CSS/JavaScript, Chromium Manifest V3 extension, Bun/Hono/SQLite backend.
 
-## Capabilities and constraints
-Customers create an email/password account, save a recovery code, install and connect the extension. New captures save locally first and upload to that account when automatic sync is enabled. Durable retries retain account ownership. Existing local captures require explicit import consent. Website sessions and extension credentials are separate and revocable. Every customer query, preference and image is owner scoped; legacy backend tables/APIs remain separate.
+Foundkeep is a customer capture product for saving readable pages, screenshots, highlights, bookmarks, images, posts on X, and notes with traceable source records, then finding them in a private library. It uses native HTML/CSS/JavaScript, a Chromium Manifest V3 extension, and a Bun/Hono/SQLite backend.
 
-Hosted organization provides optional extractive summaries, topic tags and English OCR using a bounded local processor. Customers control those choices plus capture methods, readable bookmark extraction, note sources, popup layout, context menus, sync and feedback from the dashboard. No customer agent setup is required. No semantic search, conversational assistant or email reset delivery is claimed. Search is keyword based. Local-only capture remains available. Cloud/local deletion are separate. Quotas are 1000 captures and 200 MiB per account.
+## Customer flow
 
-Preserve the existing IndexedDB database, saved records, keyboard shortcuts and signed extension key. Store readable text and structured provenance without raw HTML. Remove customer browser-control overlays, debugger permission and relay/token setup. Never silently upload local history, reuse preference caches across accounts or transfer a pending capture to a different account.
+Customers create an email/password account, save a recovery code, install the extension, and connect the browser from the dashboard. New captures save locally first and upload to that account when automatic sync is enabled. Existing local captures require explicit import consent. Website sessions and extension credentials are separate and revocable.
 
-## Confirmed brand commitment
-The user selected Atlas Studio (option04) combined with Operator (option02), then asked to avoid agent focus. Studio supplies the creative visual identity; Operator supplies useful, clear product controls. Capture, collecting and retrieval lead.
+Each customer controls capture methods, readable bookmark extraction, page metadata, note source attachment, popup order, recent items, context menus, sync, OCR, summaries, tags, and success feedback from the dashboard. Preference changes do not require an extension release. Manifest permissions and executable features still do.
 
-## Current scope
-The user explicitly requested a customer-facing extension/dashboard where customers create an account, set up the extension and captures flow automatically, extending the earlier approved redesign/launch. Deliver the account service, hosted dashboard, extension pairing/sync, truthful landing/privacy, and launch verification. Google sign-in is not assumed. Chrome Web Store publication depends on a publisher account and actual store approval; manual ZIP setup remains truthfully labeled until available.
+Every capture can retain the visited URL, canonical URL, title, description, site, authors, publication and modification dates, language, lead image, favicon, target URL, headings, capture method, capture and extraction times, extractor version, extraction status, and a content fingerprint. Raw page HTML is not stored.
+
+## Security and compatibility
+
+Customer queries, images, preferences, and credentials are owner scoped. Local IndexedDB, existing records, the fixed extension ID, signing key, shortcuts, storage keys, message kinds, API routes, database tables, and header names remain compatible across the Foundkeep migration.
+
+The primary origin is `https://foundkeep.app`. `https://atlas.notpritam.in` remains a temporary compatibility origin for version 1.5 clients. Cross-domain website cookies cannot migrate, so existing customers sign in once on Foundkeep; their accounts and captures remain in the same database.
+
+There is no customer agent setup, semantic-search claim, conversational assistant, advertising tracker, or email reset delivery. Search is keyword based. Local capture remains available without an account. Cloud and local deletion are separate. Quotas are 1,000 captures and 200 MiB per account.
 
 ## Evidence
-Implementation contract: docs/superpowers/plans/2026-09-06-customer-cloud.md. Customer backend security tests, extension queue tests and real Chromium signup/pair/capture/dashboard tests establish functionality. Synthetic demo content stays isolated from real accounts.
+
+The executable contract is in `docs/superpowers/specs/2026-09-07-foundkeep-launch-design.md`. Backend, extension, landing, and real Chromium customer-flow tests establish account security, data ownership, capture provenance, preference control, responsive UI, and upgrade compatibility.

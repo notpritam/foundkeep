@@ -32,7 +32,7 @@ jobs:
       - name: Require the existing extension signing key
         if: env.HAS_KEY != 'true'
         run: |
-          echo "The EXTENSION_PEM secret is required to publish Atlas updates."
+          echo "The EXTENSION_PEM secret is required to publish Foundkeep updates."
           exit 1
 
       - name: Install Chromium for browser checks
@@ -65,18 +65,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ext-v${{ steps.v.outputs.version }}
-          name: Atlas extension v${{ steps.v.outputs.version }}
+          name: Foundkeep extension v${{ steps.v.outputs.version }}
           body: |
-            Atlas 1.5 saves readable page copies with their original source and gives customers direct control over capture methods, popup layout, sync, OCR, summaries and tags from the dashboard.
+            Foundkeep 1.6 saves readable page copies with their original source and gives customers direct control over capture methods, popup layout, sync, OCR, summaries and tags from the dashboard.
 
-            Get started at https://atlas.notpritam.in/signup and follow the browser setup in your dashboard.
+            Get started at https://foundkeep.app/signup and follow the browser setup in your dashboard.
 
             - Chrome update manifest: `updates.xml`
-            - Signed extension: `atlas-extension.crx`
-            - Unpacked bundle: `atlas-extension.zip`
+            - Signed Foundkeep extension: `foundkeep-extension.crx`
+            - Compatibility CRX for installed clients: `atlas-extension.crx`
+            - Foundkeep unpacked bundle: `foundkeep-extension.zip`
+            - Compatibility unpacked bundle: `atlas-extension.zip`
 
             Existing local captures stay local until you choose to import them. The unpacked ZIP supports Chrome, Edge, Brave, Opera and Vivaldi on desktop. Chrome Web Store publication is pending; the signed build supports existing managed Chrome installations.
           files: |
             apps/web/ext/atlas-extension.crx
+            apps/web/ext/foundkeep-extension.crx
             apps/web/updates.xml
             apps/web/atlas-extension.zip
+            apps/web/foundkeep-extension.zip

@@ -7,7 +7,14 @@ const require=createRequire(import.meta.url),crxRequire=createRequire(require.re
 const Pbf=crxRequire('pbf').default;
 const root=process.cwd(),folder=process.env.ATLAS_RELEASE_DIR||path.join(root,'apps/web');
 const manifest=JSON.parse(readFileSync(path.join(root,'apps/extension/manifest.json')));
-const file=readFileSync(path.join(folder,process.env.ATLAS_RELEASE_DIR?'atlas-extension.crx':'ext/atlas-extension.crx'));
+assert.match(manifest.version,/^\d+\.\d+\.\d+$/);
+if(process.env.EXPECTED_EXTENSION_VERSION) assert.equal(manifest.version,process.env.EXPECTED_EXTENSION_VERSION);
+assert.equal(manifest.name,'Foundkeep — Save what matters');
+const legacyCrx=path.join(folder,process.env.ATLAS_RELEASE_DIR?'atlas-extension.crx':'ext/atlas-extension.crx');
+const brandedCrx=path.join(folder,process.env.ATLAS_RELEASE_DIR?'foundkeep-extension.crx':'ext/foundkeep-extension.crx');
+const file=readFileSync(legacyCrx);
+assert.deepEqual(readFileSync(brandedCrx),file,'Foundkeep and legacy CRX aliases must match');
+for(const archive of ['atlas-extension.zip','foundkeep-extension.zip']) assert.ok(readFileSync(path.join(folder,archive)).length>1024,`${archive} is missing or empty`);
 assert.equal(file.subarray(0,4).toString(),'Cr24');assert.equal(file.readUInt32LE(4),3);
 const size=file.readUInt32LE(8);assert.ok(size>0&&size<file.length-12);
 const reader=new Pbf(file.subarray(12,12+size));

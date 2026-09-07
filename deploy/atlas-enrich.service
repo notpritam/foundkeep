@@ -1,6 +1,6 @@
 [Unit]
-Description=Atlas server-side enrichment worker (drains the capture queue via Claude Code)
-Documentation=https://github.com/notpritam/atlas
+Description=Foundkeep server-side enrichment worker
+Documentation=https://github.com/notpritam/foundkeep
 After=network.target atlas-backend.service
 
 [Service]

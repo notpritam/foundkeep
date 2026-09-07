@@ -1,92 +1,68 @@
-# Atlas customer extension — Chrome Web Store submission
+# Foundkeep — Chrome Web Store submission
 
-Build: `bash deploy/pack-store.sh`. Upload `deploy/dist/atlas-store-1.5.0.zip`
-to the Chrome Web Store developer dashboard. The publisher account and Google
-review are required; generating this file does not publish the extension.
+Build with `bash deploy/pack-store.sh`, then upload `deploy/dist/foundkeep-store-1.6.0.zip` in the Chrome Web Store developer dashboard. Google publisher access and review are required; creating this archive does not publish it.
 
-The store package removes `key` and `update_url`. Once assigned, add the store ID
-to `apps/web/customer-config.json` and `ATLAS_CUSTOMER_EXTENSION_IDS` on the backend.
-Keep the existing self-hosted ID alongside it. Set the public `storeUrl` only
-after the approved listing is installable.
+The store archive removes the self-hosted `key` and `update_url`. Once Google assigns an ID, add it to `apps/web/customer-config.json` and `ATLAS_CUSTOMER_EXTENSION_IDS`. Keep the established self-hosted ID allowed during migration. Set `storeUrl` only after the approved listing is publicly installable.
 
 ## Listing
 
-Name: **Atlas — Save what matters**
+**Name:** Foundkeep — Save what matters
 
-Short description (under 132 characters):
-> Save readable pages, screenshots, highlights and notes with their source in a private, searchable Atlas library.
+**Category:** Productivity
+**Language:** English
 
-Category: Productivity. Language: English.
+**Short description:**
 
-Description:
+> Save readable pages, screenshots, highlights and notes with their original source in a private, searchable library.
 
-Atlas gives the good things you find on the web a place to stay.
+**Description:**
 
-- Save a readable page copy with its original source, capture a region or full page, keep highlighted text, bookmark a link, or write a quick note.
-- Create an Atlas account and connect your browser in one click after installation.
-- New captures save on your device first and sync to your private online library when automatic sync is enabled.
-- Search your library, filter by capture type, view detailed origin records and collect from multiple Chromium browsers.
-- Control capture methods, popup layout, sync, OCR, summaries and tags from the account dashboard without reinstalling the extension.
-- Cloud text extracts, topic tags and English screenshot text recognition can run automatically.
-- Offline saves wait on your device and retry when a connection is available.
-- Export your cloud library, revoke connected browsers, or delete your account from settings.
+Foundkeep gives the good things you find on the web a place to stay.
 
-An account is optional for local capture. Previous local captures stay on the
-device unless you explicitly choose to import them into your connected account.
-Local and cloud copies are separate: deleting one does not erase the other.
+- Save a readable page copy with its original source.
+- Capture a region or full page, keep highlighted text, save a link or image, and write quick notes.
+- Create a Foundkeep account and connect the browser from the dashboard.
+- Save locally first and sync new captures to a private online library when automatic sync is enabled.
+- Search and filter your library and open the original source record for a saved page.
+- Control capture methods, page details, popup layout, context menus, sync, OCR, summaries, and tags without reinstalling.
+- Keep offline saves on the device until a connection is available.
+- Export cloud captures, revoke connected browsers, change the password, or delete the account from settings.
 
-Saved pages can include readable text, headings, visited and canonical URLs,
-page metadata and a content fingerprint. Atlas does not store raw page HTML.
+An account is optional for local capture. Existing local captures stay on the device unless the customer explicitly imports them. Local and cloud copies are separate.
 
-Cloud accounts include up to 1,000 captures and 200 MiB of saved content.
-Save the recovery code provided at signup; Atlas does not send password-reset
-emails. Text recognition currently supports English. Organization produces text
-extracts and topic tags; it is not a conversational assistant.
+Saved pages can include readable text, headings, visited and canonical URLs, title, description, publisher, author, publication and modification dates, language, lead image, favicon, capture method, timestamps, extraction status, and a content fingerprint. Foundkeep does not store raw page HTML.
 
-Homepage: https://atlas.notpritam.in
-Privacy policy: https://atlas.notpritam.in/privacy.html
-Support: https://github.com/notpritam/atlas/issues
+Cloud accounts include up to 1,000 captures and 200 MiB of content. Customers save a one-time recovery code because Foundkeep does not send password-reset email. English screenshot text recognition is available when OCR is enabled.
+
+**Homepage:** https://foundkeep.app
+
+**Privacy policy:** https://foundkeep.app/privacy.html
+**Support:** https://github.com/notpritam/foundkeep/issues
 
 ## Single purpose and permissions
 
-Single purpose: save web content into the customer's private local or connected
-Atlas library so it can be found and used again.
+Foundkeep's single purpose is saving customer-selected web content into a private local or connected library so it can be found and used again.
 
-- `activeTab`, `tabs`, `scripting`: capture the user-selected page, readable
-  content and source information after an explicit action. Full-page screenshots require scrolling
-  and stitching the visible page.
-- `<all_urls>` host access: users can choose links, images and captures on any
-  eligible website; upload connected captures to Atlas. Optional local companion
-  access remains for customers using advanced local organization.
-- `storage`: account connection settings and the durable local upload queue.
-- `contextMenus`: explicit right-click save actions for text, links and images.
-- `alarms`: retry pending uploads and optional local organization.
-- External messaging: only the Atlas website may detect and connect the extension
-  with a short-lived, one-use pairing code or request a refresh of account-owned
-  capture settings. Browser credentials are never exposed to the webpage.
+- `activeTab`, `tabs`, `scripting`: read or capture the active page after an explicit customer action. Full-page screenshots scroll and stitch the page.
+- `<all_urls>` host access: support capture actions on eligible sites and upload connected captures to Foundkeep.
+- `storage`: protect account connection state, preference cache, and durable upload queue.
+- `contextMenus`: provide explicit right-click save actions for text, pages, links, and images.
+- `alarms`: retry pending uploads and refresh account preferences.
+- External messaging: only the exact Foundkeep and temporary legacy migration origins can detect, pair, or refresh the extension. Pairing uses a short-lived, one-use code. Browser credentials are never exposed to the page.
 
-There is no browser-control debugger permission or agent control overlay in the
-customer extension.
+The customer extension has no debugger permission, browser-control overlay, advertising, data sale, or cross-site behavior tracking.
 
-## Data disclosures for the publisher
+## Data-use disclosure
 
-The cloud product processes account email/name, capture preferences, user-saved
-website content, screenshots/images, selected text, notes, readable article text,
-source provenance and page metadata. These are used
-to provide the requested private library and organization. The user chooses when
-to capture and whether to connect cloud sync. No advertising, data sale or
-cross-site behavior tracking is part of Atlas. Review the live privacy policy
-against the exact submitted build when completing the store's data-use form.
+The cloud product processes account name/email, capture preferences, customer-saved page content, screenshots/images, selected text, notes, readable article text, source provenance, and page metadata only to provide the requested private library and organization features. Customers choose each capture and whether to connect cloud sync. Review the live privacy policy against the submitted build when completing Google's data-use form.
 
 ## Submission assets and verification
 
-- Icon: `apps/extension/icons/icon128.png`.
-- Prepare 1280×800 screenshots of the connected popup, the cloud library, and a
-  capture detail. Use a disposable QA account with synthetic content.
-- Test signup → connect → capture → cloud dashboard from the final store build
-  after its assigned ID has been added to the website/backend allowlists.
-- Verify the archive has no `.pem`, `.key`, `key`, or `update_url` fields, and
-  matches the final manifest permissions and privacy disclosures.
+- Icon: `apps/extension/icons/icon128.png`
+- Popup: `apps/web/assets/extension-popup.png`
+- Dashboard: `deploy/dist/store-assets/customer-dashboard.png`
+- Browser setup: `deploy/dist/store-assets/customer-browser-setup.png`
+- Verify the archive contains no `.pem`, `.key`, `key`, `update_url`, `control-bg.js`, or `agent-control.js`.
+- Test signup, pairing, readable-page capture, sync, provenance, preference refresh, export, revoke, and deletion from the final store build after its assigned ID is allowed.
 
-Do not direct ordinary customers to managed-browser force-install policies.
-Until the store listing is approved, disclose the manual ZIP installation steps.
+Until Google approves the listing, public onboarding must continue to label the ZIP as a manual Developer mode installation.

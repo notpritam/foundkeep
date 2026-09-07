@@ -1,11 +1,13 @@
-# Atlas Studio + Operator
+# Foundkeep Design System
 
-The selected direction merges Atlas Studio's graphic confidence with Operator's legible product controls. Light paper (`#f3f3f0`), near-black (`#171917`), vermilion (`#c63b23`). Dark surfaces are actual product/demo panels, not unrelated inverted page sections. Keep semantic greens for connection success and reds for failures distinguishable from the brand.
+Foundkeep combines a calm editorial identity with direct product controls. The interface uses warm paper (`#f3f3f0`), near-black (`#171917`), vermilion (`#c63b23`), and muted moss (`#6b7553`). Semantic success and error colors remain distinguishable from the brand.
 
-Use existing self-hosted Clarity City Bold/Semibold and Geist. Landing display is oversized, tightly composed and left aligned. Product labels use restrained Geist, clear hierarchy and fixed type sizes. Use 6px action radii, 12px panels, sparse 1px borders. Dense useful content inside the product; generous space between marketing stories.
+The mark is a source point inside a folded bookmark and protected dark frame. It represents a saved item whose origin stays attached. Use the same geometry from 16px extension icons through social artwork. Do not add gradients, sparkles, orbit symbols, literal religious imagery, or generic cloud and magnifying-glass marks.
 
-Landing mode: Persuade. Hero: “Found it? Keep it.” A saved architectural image and a dark library/capture composition prove the core workflow. Follow with capture, real library, automatic organization and explicit setup paths. Primary CTA creates an account; dashboard onboarding connects the installed extension. Installation links must reflect actual distribution availability.
+Use self-hosted Clarity City Bold/Semibold and Geist. Marketing display type is oversized, tightly composed, and left aligned. Product labels use restrained fixed sizes, strong hierarchy, 6px action radii, 12px panels, and sparse 1px borders. Product surfaces can be dense; marketing sections need generous space.
 
-Extension mode: Operate. Popup leads with one primary Save page action, then configurable capture actions, a compact note composer and a fixed Open Library footer. Only the main popup content scrolls within the 600px browser limit. Show local save and cloud sync status clearly. Library has navigation, search, type filters, readable cards, a focused detail dialog with source provenance, useful empty/results states and account-owned capture controls. Keep account connection primary. No developer token fields in customer setup.
+Landing mode persuades with **“Found it? Keep it.”** Real Foundkeep popup and library captures prove the workflow. The page then explains capture, source retention, the private library, automatic context, and installation. The primary CTA creates an account.
 
-Remove the customer Agent overlay and browser-control settings. Operator contributes precise dark product panels. Respect reduced motion in changed UI. No purple gradients, fake testimonials or tracking scripts.
+Extension mode operates. The popup leads with Save page, configurable secondary capture actions, a compact note composer, and a fixed Open library footer inside Chromium's 600px popup limit. Local save and cloud sync status stay explicit. Libraries provide search, type filters, readable cards, focused details, source provenance, account controls, and clear empty and error states.
+
+Customer setup asks for an account and a browser connection. It does not ask for developer tokens, relay configuration, or an agent. Respect reduced motion and keyboard navigation. Do not add tracking scripts, fake testimonials, or claims that exceed shipped behavior.

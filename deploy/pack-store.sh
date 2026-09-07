@@ -4,7 +4,7 @@
 # Unlike pack-extension.sh (self-hosted: keeps `key` + `update_url` for the
 # GitHub-releases auto-update), the store build STRIPS both — the Web Store
 # assigns the extension id and manages updates. Version is single-sourced from
-# apps/extension/manifest.json. Output: deploy/dist/atlas-store-<version>.zip
+# apps/extension/manifest.json. Output: deploy/dist/foundkeep-store-<version>.zip
 # (gitignored — it's an upload artifact, and must never contain the signing key).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,10 +21,10 @@ manifest.pop("update_url", None)
 
 outdir = os.path.join(root, "deploy", "dist")
 os.makedirs(outdir, exist_ok=True)
-out = os.path.join(outdir, f"atlas-store-{version}.zip")
+out = os.path.join(outdir, f"foundkeep-store-{version}.zip")
 include = ["icons", "assets", "src", "README.md"]  # manifest written fresh below
 with tempfile.TemporaryDirectory() as tmp:
-    stage = os.path.join(tmp, "atlas")
+    stage = os.path.join(tmp, "foundkeep")
     os.makedirs(stage)
     json.dump(manifest, open(os.path.join(stage, "manifest.json"), "w"), indent=2)
     for item in include:

@@ -1,4 +1,4 @@
-/* Atlas Studio + Operator: shared account and private library surfaces. */
+/* Foundkeep shared account and private library surfaces. */
 .customer-body { font-size:14px; }
 .customer-body [hidden] { display:none !important; }
 .customer-body input,.customer-body textarea { font:inherit; color:var(--ink); caret-color:var(--accent); }

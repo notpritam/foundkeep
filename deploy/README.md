@@ -1,151 +1,75 @@
-# Deploying Atlas on omni
+# Deploying Foundkeep on omni
 
-The backend runs as a systemd service on omni. Caddy exposes both the production
-website and service at `https://atlas.notpritam.in`, forwarding to port 8790.
-The bb plugin uses `localhost:8790` directly. The customer extension saves locally and syncs new captures to the connected account.
-See [customer service operations](CUSTOMER_LAUNCH.md) for account security, OCR,
-quotas, migration/backup and Chrome Web Store release requirements.
+Foundkeep runs through the existing internal `atlas-backend` systemd service on port 8790 and the existing SQLite data directory at `/home/pritam/.local/share/atlas`. These internal names stay unchanged to protect production data and installed integrations.
 
-## Backend service (already installed)
+The primary public origin is `https://foundkeep.app`. `https://atlas.notpritam.in` remains an exact compatibility origin for version 1.5 clients during the migration.
+
+## Backend
 
 ```bash
 sudo cp deploy/atlas-backend.service /etc/systemd/system/
+sudo mkdir -p /etc/systemd/system/atlas-backend.service.d
+sudo cp deploy/foundkeep-origin.conf /etc/systemd/system/atlas-backend.service.d/
 sudo systemctl daemon-reload
 sudo systemctl enable --now atlas-backend
 systemctl status atlas-backend
 ```
 
-- Port: `8790` (8787 is taken by the cutroom app).
-- Data: `/home/pritam/.local/share/atlas` (`atlas.db` + `blobs/`).
-- Logs: `sudo journalctl -u atlas-backend -f`.
+- Port: `8790`
+- Data: `/home/pritam/.local/share/atlas`
+- Logs: `sudo journalctl -u atlas-backend -f`
+- Customer origins: `https://foundkeep.app,https://atlas.notpritam.in`
 
-## Device tokens
+## DNS and HTTPS
 
-```bash
-cd apps/backend
-ATLAS_DATA_DIR=/home/pritam/.local/share/atlas bun run bin/atlas.ts devices add "Chrome — laptop" --scope ingest
-ATLAS_DATA_DIR=/home/pritam/.local/share/atlas bun run bin/atlas.ts devices add "bb worker" --scope read,enrich
-ATLAS_DATA_DIR=/home/pritam/.local/share/atlas bun run bin/atlas.ts devices list
-```
+Register `foundkeep.app` before applying DNS. Point apex `A` to `157.180.102.248` and, when IPv6 is enabled, apex `AAAA` to `2a01:4f9:3090:1055::2`. Point `www` to the apex or the same host if the redirect block will be used.
 
-Current tokens are in `/home/pritam/.local/share/atlas/tokens.txt` (chmod 600).
-
-## Landing page
-
-The **backend serves the static landing page** (`apps/web`) for any non-API path,
-straight from the repo — so `atlas.notpritam.in/` shows the site and `/v1`,
-`/admin` are the API, with caddy doing nothing but a plain `reverse_proxy
-localhost:8790`. Edit `apps/web/*` and it's live immediately (no build, no sync,
-no `/var/www`). Override the served dir with `ATLAS_WEB_DIR` if needed.
-(`deploy/sync-web.sh` + `/var/www/atlas` are legacy and no longer required.)
-
-## Public HTTPS — caddy + Vercel DNS (current setup)
-
-notpritam.in's DNS is on Vercel, so we point the subdomain straight at omni's
-public IP and terminate TLS with caddy (Let's Encrypt). No Cloudflare account
-needed.
-
-1. **Vercel DNS** (notpritam.in → DNS): add an **A** record
-   `atlas` → `157.180.102.248` (a specific record overrides any `*` wildcard
-   that points at Vercel). Optionally **AAAA** `atlas` → `2a01:4f9:3090:1055::2`.
-2. **Firewall:** omni's ufw already allows 80/443. If a Hetzner *cloud*
-   firewall is attached, allow inbound 80 + 443 there too.
-3. **caddy** (already installed):
-   ```bash
-   # Add only the Atlas block from deploy/Caddyfile to the shared config.
-   # Preserve blocks belonging to other services.
-   sudo caddy validate --config /etc/caddy/Caddyfile
-   sudo systemctl reload caddy
-   sudo journalctl -u caddy -f      # watch the cert get issued
-   ```
-
-Result: `https://atlas.notpritam.in` → `http://localhost:8790`. caddy retries
-issuance automatically until the A record resolves to omni.
-
-### Alternative: Cloudflare Tunnel (only if DNS moves to Cloudflare)
-
-Requires the zone's nameservers on Cloudflare (incompatible with Vercel DNS).
-Then: `cloudflared tunnel login` and `./deploy/setup-tunnel.sh` (uses
-`atlas-tunnel.service`). Advantage: no inbound ports / IP exposure.
-
-## Wiring the bb plugin (already done)
+Copy the Foundkeep blocks from `deploy/Caddyfile` into the shared `/etc/caddy/Caddyfile` without replacing other products, then validate and reload:
 
 ```bash
-bb plugin config tracker set atlasBaseUrl "http://localhost:8790"
-bb plugin config tracker set atlasDeviceToken "<read,enrich token>"
-bb plugin reload tracker
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+sudo journalctl -u caddy -f
 ```
 
-## Wiring the extension
+The backend serves `apps/web` for non-API paths, so both hostnames proxy to `127.0.0.1:8790`. The `.app` top-level domain is HSTS-preloaded; do not publish the extension until Foundkeep HTTPS is valid.
 
-Create a customer account on the website and save the recovery code. Install
-the extension and click Connect extension in the signed-in dashboard. New saves
-sync automatically. Local-only capture remains available. Do not mint legacy
-device tokens for customer accounts. The customer extension has no agent-control
-overlay or debugger permission.
-See [the extension guide](../apps/extension/README.md).
+## Releases and auto-update
 
-## Releases & auto-update (GitHub Releases)
+- Fixed extension ID: `mjfcgmboaijfcaanepdipbgmipnccnpn`
+- Update manifest: `https://github.com/notpritam/foundkeep/releases/latest/download/updates.xml`
+- Branded CRX: `https://github.com/notpritam/foundkeep/releases/latest/download/foundkeep-extension.crx`
+- Compatibility CRX: `https://github.com/notpritam/foundkeep/releases/latest/download/atlas-extension.crx`
 
-Managed installations update from **GitHub Releases** using the policy below.
-Unpacked installations are updated by replacing files in their existing folder
-and clicking Reload; do not uninstall them if you want to retain their library.
+Version 1.5 clients request the old GitHub repository path and `atlas-extension.crx`. GitHub repository redirects plus the retained asset name carry them into the Foundkeep 1.6 update. Do not remove the compatibility asset.
 
-- Extension ID: `mjfcgmboaijfcaanepdipbgmipnccnpn` (pinned by the signing key).
-- Update manifest: `https://github.com/notpritam/atlas/releases/latest/download/updates.xml`
-- Signed build: `.../releases/latest/download/atlas-extension.crx`
+Automatic release runs on extension changes pushed to `main`. CI runs backend, extension, landing, and customer flows, builds the CRX with the existing `EXTENSION_PEM` secret, checks the fixed ID/signature, and publishes `ext-v<version>`.
 
-### Cutting a release
+Manual build and verification on omni:
 
-Automatic: bump `apps/extension/manifest.json` `version`, push to `main`, and the
-**Release extension** GitHub Action first runs backend, installed-extension,
-and landing browser checks. It then signs the `.crx`, writes `updates.xml`, and
-publishes an `ext-v<version>` release. A missing signing secret fails the job. Managed Chrome installations check for updates periodically (or via
-`chrome://extensions` → Update).
+```bash
+node deploy/release-extension.mjs --no-bump
+node deploy/verify-release.mjs
+bash deploy/pack-store.sh
+```
 
-Manual from omni (needs `gh auth login` once):
+Manual publishing requires an authenticated `gh` session:
 
 ```bash
 node deploy/release-extension.mjs --no-bump --publish
-# Set the intended manifest version and push its commit before publishing.
 ```
 
-### One-time setup
+The local key remains at the gitignored `deploy/keys/atlas-extension.pem`; its filename is a compatibility detail. Never create a replacement key. A different key changes the extension ID and disconnects the update path.
 
-1. **CI signing key** — the Action needs the signing key as a secret so every
-   build keeps the same extension ID:
-   ```bash
-   gh secret set EXTENSION_PEM --repo notpritam/atlas < deploy/keys/atlas-extension.pem.b64
-   ```
-   (The key lives only in `deploy/keys/` on omni — gitignored — and in the secret.)
+## Deploying a tested revision
 
-2. **Force-install + auto-update policy** on each browser machine (this is what
-   lets an off-store extension install and silently update):
-   - **Linux (Chrome):** copy `deploy/policy/atlas-extension.json` to
-     `/etc/opt/chrome/policies/managed/` (Chromium: `/etc/chromium/...`), restart Chrome.
-   - **macOS (Chrome):**
-     ```bash
-     defaults write com.google.Chrome ExtensionInstallForcelist -array \
-       "mjfcgmboaijfcaanepdipbgmipnccnpn;https://github.com/notpritam/atlas/releases/latest/download/updates.xml"
-     ```
-     then fully quit + reopen Chrome.
+1. Verify the feature worktree and review its diff.
+2. Back up and integrity-check the SQLite database.
+3. Fast-forward `/home/pritam/personal/apps/atlas` on `main` to the tested commit and push.
+4. Install the dual-origin systemd override and restart the backend before enabling the new domain.
+5. Add/validate the shared Caddy blocks after DNS resolves.
+6. Verify `/`, `/privacy.html`, `/foundkeep-extension.zip`, `/healthz`, `/signup`, `/login`, and `/dashboard` on `foundkeep.app`.
+7. Wait for the GitHub release workflow, then verify the downloaded CRX, update XML, version, signature, ID, and both artifact aliases.
+8. Run `ATLAS_SITE_URL=https://foundkeep.app bun run test:web` and the disposable live customer flow.
 
-   Verify at `chrome://policy` (Reload policies) and `chrome://extensions` — Atlas
-   installs itself and can't be removed by hand. That's the "force update" behavior.
-
-## Deploying a tested site revision
-
-The production checkout is `/home/pritam/personal/apps/atlas` on `main`. Keep it
-clean, record its current commit, verify the release branch, then fast-forward
-main to that branch and push it. Static files are served directly; no backend or
-Caddy restart is needed for website changes. Preserve the runtime data directory.
-
-Verify `/`, `/privacy.html`, `/atlas-extension.zip`, `/healthz`, and
-`/assets/atlas-social.png` over public HTTPS after deployment. Wait for the
-GitHub release job, then check the released update manifest has the intended
-version and extension ID. Local signed builds also refresh the legacy direct
-`/ext/atlas-extension.crx` and `/updates.xml` routes.
-
-Run `ATLAS_SITE_URL=https://atlas.notpritam.in bun run test:web` to exercise the
-public landing demo, download, artwork, metadata, and mobile layout. These
-checks never access private captures or account APIs.
+See [customer operations](CUSTOMER_LAUNCH.md) for account security, migration behavior, backups, and Chrome Web Store steps.

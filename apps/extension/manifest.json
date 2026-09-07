@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Foundkeep — Save what matters",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Save readable pages, screenshots, highlights, images and notes with their original source. Sync them to your private Foundkeep library.",
   "permissions": [
     "activeTab",
@@ -73,5 +73,5 @@
     }
   },
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqILS+S3S7ToAYHnzzU+XWnbP2yTzIiB1hpHtLKtlYYY4dd4xnPI+NnJdU1BhiyK9CC2zfFlHqccBNy4likUFKniGGXuk0gkITT33xoq7sRfy4gVlb/tKO2G0GxhqKeUpgSZLG7x19lof7Xvm7jPJy8U5IfCUyPasmVN0CaqllobUR9OGI/ZvHrkPJDfCzonoQJcLMcae8wPtX+3fBANBYXN6sroCxigzUhEhsGbt85EPrqv2zTy/zChDWxoL1fjOgz2kKlEg35HUmm3W4hoZL/WN4lm71kRY53OAgwBNZCLkxrUD/6/M34hBK/FI4NrxwGzR7pm78G7MRgqXYOqorQIDAQAB",
-  "update_url": "https://github.com/notpritam/atlas/releases/latest/download/updates.xml"
+  "update_url": "https://github.com/notpritam/foundkeep/releases/latest/download/updates.xml"
 }

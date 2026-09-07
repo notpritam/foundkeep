@@ -1,5 +1,5 @@
 [Unit]
-Description=Atlas capture backend (Bun + bun:sqlite)
+Description=Foundkeep capture backend (Bun + bun:sqlite)
 After=network.target
 
 [Service]

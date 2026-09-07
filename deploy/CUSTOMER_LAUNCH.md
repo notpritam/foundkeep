@@ -1,95 +1,49 @@
-# Customer service operations
+# Foundkeep customer service operations
 
-Customer website: https://atlas.notpritam.in. Signup and dashboard use `/api`,
-separate from the legacy `/v1` backend and browser relay. Customer records are
-in `customer_*` SQLite tables. Never mint legacy device tokens for customers.
+Primary customer website: `https://foundkeep.app`. Temporary compatibility website: `https://atlas.notpritam.in`. Both route to the same backend and `customer_*` SQLite records. The `/api` customer service remains separate from legacy `/v1` and browser-relay records.
 
 ## Runtime
 
-- Bun, SQLite, the existing `atlas-backend` service and Caddy TLS.
-- Keep the runtime data directory mode 0700 and SQLite files mode 0600. The
-  service uses `UMask=0077`; existing installations can apply that setting with
-  a systemd service drop-in without replacing their other configuration.
-- Install `tesseract`, English trained data and `prlimit` (util-linux).
-  Arch: `sudo pacman -S --needed tesseract tesseract-data-eng util-linux`.
-  Debian/Ubuntu: `sudo apt-get install tesseract-ocr tesseract-ocr-eng util-linux`.
-- Customer text organization and English OCR run in the backend when the choices
-  saved with a capture enable them. Customers control OCR, summaries and tags in
-  the dashboard; disabling a choice does not remove earlier derived content.
-  Content is processed as data, without a model, local agent tools or arbitrary
-  URL fetching. OCR is bounded by CPU, memory, execution time and output size.
-  If recognition fails, the original capture remains available.
-- `ATLAS_CUSTOMER_ORIGIN` defaults to `https://atlas.notpritam.in` and must exactly
-  match the public origin. `ATLAS_HOST` defaults to loopback. Only Caddy should
-  reach the service from outside the host. Caddy supplies the client address for
-  abuse controls; forwarding headers from non-loopback peers are ignored.
-- Per-account limits: 1,000 captures and 200 MiB (image and text storage).
-  Global protection defaults: 10,000 captures and 2 GiB. Adjust
-  `ATLAS_CUSTOMER_GLOBAL_MAX_CAPTURES` and `ATLAS_CUSTOMER_GLOBAL_MAX_BYTES`
-  deliberately as storage/capacity grows.
+- Bun, SQLite, the existing internal `atlas-backend` service, and Caddy TLS.
+- Runtime data stays at `/home/pritam/.local/share/atlas` with directory mode 0700 and SQLite/backups mode 0600. Renaming this path would risk production data and provides no customer benefit.
+- The service uses `UMask=0077`.
+- `ATLAS_CUSTOMER_ORIGINS` must be `https://foundkeep.app,https://atlas.notpritam.in` during migration. The singular `ATLAS_CUSTOMER_ORIGIN` remains supported for local tests and older deployments.
+- `ATLAS_HOST` stays on loopback. Caddy is the only public entry point.
+- Install Tesseract English OCR and `prlimit` from util-linux for bounded image text recognition.
+- Per-account limits are 1,000 captures and 200 MiB. Global defaults are 10,000 captures and 2 GiB.
 
-## Accounts and recovery
+## Migration behavior
 
-Native email/password sign-in does not imply ownership of an email address.
-There is no mail sender configured. Customers save a one-time recovery code
-during signup, or when rotating their password. Recovery rotates that code and
-revokes old sessions/browser connections. Do not claim to send password-reset
-email or enable email-based sharing until verified email delivery is implemented.
+Version 1.5 uses the legacy hostname. Version 1.6 uses `foundkeep.app` and allows pairing messages from both exact origins. Keep both Caddy hostnames and the legacy `atlas-extension.crx` release asset available until old installations have updated.
 
-Website sessions use secure HttpOnly cookies. Extension connections use hashed,
-revocable credentials claimed with a short-lived code from the authenticated
-website. No credentials belong in URLs, application logs or support screenshots.
+Browser cookies cannot move from `notpritam.in` to `foundkeep.app`. Existing customers sign in once on the new domain; account data, cloud captures, preferences, recovery code, and browser credentials remain in the same database. Existing 1.5 extensions continue syncing through the legacy origin during the transition.
 
-Connecting a browser only uploads new captures. Customers can explicitly import
-their previous local library. Queued captures retain their original account
-owner across disconnects, retries and account switches.
+The extension ID remains `mjfcgmboaijfcaanepdipbgmipnccnpn`. Preserve its manifest key and private signing key. Preserve internal IndexedDB names, storage keys, message kinds, `X-Atlas-Account`, database tables, data paths, API routes, and environment-variable prefixes.
 
-Capture preferences are stored per customer account and read by every connected
-browser. They control capture methods, readable page extraction, note source
-attachment, popup layout, right-click menus, sync and automatic organization.
-Preference-only changes do not need an extension release. Manifest permissions,
-new capture code and security fixes do. The extension keeps a five-minute,
-account-bound cache so malformed or offline responses cannot cross accounts.
+## Accounts and captures
 
-Saved pages include bounded readable text and an immutable provenance document,
-not raw HTML. The record carries available origin URLs, metadata, headings,
-timestamps, extraction status and a content hash. The visited page remains the
-source even when a different canonical URL is advertised. The dashboard and
-account export expose this origin record.
+Website sessions use Secure HttpOnly SameSite=Lax cookies. Extension connections use separate hashed, revocable credentials claimed through a short-lived pairing code. Credentials never belong in URLs, logs, support screenshots, or exports.
 
-The current package targets Chromium MV3 and can be loaded in Chrome, Edge,
-Brave, Opera and Vivaldi. Release verification uses Chromium. Firefox and Safari
-need separate packages and are not currently advertised as supported builds.
+Connecting a browser uploads only new captures. Importing earlier local records requires explicit account-bound confirmation. Pending captures retain their original account through disconnects, retries, and account switches.
 
-## Release and rollback
+Saved pages keep bounded readable text and structured provenance rather than raw HTML. Origin metadata includes the exact visited page even when a different canonical URL is declared. Customers can view it in capture detail and account exports.
 
-1. Run `bun test`, `bun run test:extension`, `bun run test:web`, and
-   `bun run test:customer`. The customer integration test uses a temporary DB,
-   profile and extension copy; it never touches production accounts.
-2. Use SQLite's backup API to snapshot the live DB into a private dated backup
-   directory. Copy legacy blobs if changing their layout (this release does not).
-   Preserve the signing key and existing extension ID.
-3. Fast-forward the clean production checkout to the tested commit, restart
-   `atlas-backend`, check `/healthz`, signup/login and `/api/me` through HTTPS.
-4. Verify one disposable QA account and delete it through its authenticated
-   account endpoint. Do not inspect real customer captures while checking health.
-5. Publish the signed version and verify the unchanged ID and download artifacts.
+Account-owned preferences control capture methods, page content and metadata, note sources, popup order, recent items, context menus, automatic sync, OCR, summaries, tags, and success feedback. Preference changes do not require reinstalling the extension.
 
-Migrations are append-only. Preferences and provenance use migrations 5 and 6.
-For a code rollback, point the service at the previous
-commit; customer tables can remain. Restoring a pre-release DB discards captures
-created since that backup, so stop writes and preserve a fresh backup before any
-data restore. Backups contain private customer data and must have mode 0600.
+## Release order
+
+1. Run `bun test`, `bun run test:extension`, `bun run test:web`, and `bun run test:customer`.
+2. Back up the live database with SQLite's backup API into a private timestamped file and run `PRAGMA integrity_check` on the backup.
+3. Deploy dual-origin backend support before changing DNS or releasing version 1.6.
+4. Register `foundkeep.app`, point apex and optional `www` DNS at the production host, install the shared Caddy blocks, and verify valid TLS. `.app` requires HTTPS.
+5. Verify signup, login, recovery, dashboard, privacy, downloads, canonical metadata, CSP, and both exact origin policies on Foundkeep.
+6. Publish the signed version 1.6 release, verify the unchanged ID and signature, and keep both Foundkeep and legacy artifact names.
+7. Run the disposable live account flow and delete its test account through the authenticated endpoint.
+
+## Rollback
+
+Code and database migrations are additive. A code rollback can point the service at the previous commit while customer tables remain. Restoring a database backup discards captures created after that backup, so stop writes and take a new private backup before any restore.
 
 ## Chrome Web Store
 
-`bash deploy/pack-store.sh` builds a separate store upload. It has no self-hosted
-update URL or key. The Web Store assigns its own ID, so after creating the listing,
-add its ID to `apps/web/customer-config.json` alongside the existing self-hosted
-ID, and set `ATLAS_CUSTOMER_EXTENSION_IDS` to the store ID in the backend service
-environment, then restart it (the signed ID remains allowed). Set `storeUrl` to the approved listing's `https://chromewebstore.google.com/…`
-URL only once customers can install it. The dashboard then uses that install link.
-
-Until a publisher submits it and Google approves it, onboarding accurately offers
-the ZIP and manual Chrome setup. A signed CRX on GitHub does not provide ordinary
-customers with a one-click Chrome Web Store installation.
+`bash deploy/pack-store.sh` creates a key-free store upload. Google assigns a different store ID; add it to the website and backend allowlists only after creating the listing. Set the public store URL only when the approved listing is installable. Until then, onboarding offers a truthful manual ZIP flow.

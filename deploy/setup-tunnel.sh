@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Bring up the atlas.notpritam.in Cloudflare tunnel on omni.
+# Bring up the optional foundkeep.app Cloudflare tunnel on omni.
 #
 # PREREQUISITE (interactive, run once): authorize cloudflared for the
-# notpritam.in zone — opens a browser URL, pick the zone:
+# foundkeep.app zone — opens a browser URL, pick the zone:
 #
 #     cloudflared tunnel login
 #
 # Then run this script. It is idempotent.
 set -euo pipefail
 
-TUNNEL=atlas
-HOSTNAME=atlas.notpritam.in
+TUNNEL=foundkeep
+HOSTNAME=foundkeep.app
 PORT=8790
 CFDIR="$HOME/.cloudflared"
 
