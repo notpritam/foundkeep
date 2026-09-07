@@ -4,6 +4,8 @@ import { openDb } from "../src/db.ts";
 import { createApp } from "../src/app.ts";
 
 const ORIGIN = process.env.ATLAS_CUSTOMER_ORIGIN || "https://atlas.notpritam.in";
+const PRIMARY_ORIGIN = "https://foundkeep.app";
+const LEGACY_ORIGIN = "https://atlas.notpritam.in";
 const EXTENSION = "chrome-extension://mjfcgmboaijfcaanepdipbgmipnccnpn";
 const PASSWORD = "a correct horse battery staple";
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j1ioAAAAASUVORK5CYII=";
@@ -50,6 +52,41 @@ function heldUpload(cookie: string, target = app) {
 }
 
 describe("customer account security", () => {
+  test("accepts both exact Foundkeep website origins and rejects lookalikes", async () => {
+    for (const [index, origin] of [PRIMARY_ORIGIN, LEGACY_ORIGIN].entries()) {
+      const response = await app.request(`${origin}/api/auth/register`, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify({
+          email: `origin-${index}-${++sequence}@example.com`,
+          name: "Origin test",
+          password: PASSWORD,
+        }),
+      });
+      expect(response.status).toBe(201);
+      expect(response.headers.get("access-control-allow-origin")).toBe(origin);
+      expect(response.headers.get("access-control-allow-credentials")).toBe("true");
+    }
+
+    for (const origin of [
+      "https://foundkeep.app.evil.example",
+      "http://foundkeep.app",
+      "https://foundkeep.app:444",
+    ]) {
+      const response = await app.request(`${PRIMARY_ORIGIN}/api/auth/register`, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify({
+          email: `blocked-${++sequence}@example.com`,
+          name: "Blocked origin",
+          password: PASSWORD,
+        }),
+      });
+      expect(response.status).toBe(403);
+      expect(response.headers.get("access-control-allow-origin")).toBeNull();
+    }
+  });
+
   test("register hashes secrets, sets a protected cookie and persists a private account", async () => {
     const a = await register("Case@EXAMPLE.COM");
     expect(a.account.email).toBe("case@example.com");

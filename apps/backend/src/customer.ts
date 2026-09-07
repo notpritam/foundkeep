@@ -228,6 +228,7 @@ function decodeImage(raw: unknown): { data: Buffer | null; mime: string | null; 
 export function customerRoutes(db: Database) {
   const app = new Hono<CustomerEnv>();
   const origin = config.customerOrigin;
+  const websiteOrigins = new Set(config.customerOrigins);
   const extensionOrigins = new Set(config.customerExtensionIds.map((id) => `chrome-extension://${id}`));
   const secure = origin.startsWith("https://");
   const cookieName = secure ? "__Host-atlas_session" : "atlas_session";
@@ -238,7 +239,7 @@ export function customerRoutes(db: Database) {
   const globalMaxBytes = positiveLimit(process.env.ATLAS_CUSTOMER_GLOBAL_MAX_BYTES, 2 * 1024 * 1024 * 1024);
 
   function website(c: C) {
-    if (c.req.header("origin") !== origin) fail(403, "invalid_origin", "Open Atlas on its own website to continue.");
+    if (!websiteOrigins.has(c.req.header("origin") || "")) fail(403, "invalid_origin", "Open Atlas on its own website to continue.");
   }
   function account(id: string) { return db.query("SELECT * FROM customer_accounts WHERE id = ?").get(id) as AccountRow | null; }
   function emailAccount(email: string) { return db.query("SELECT * FROM customer_accounts WHERE email = ?").get(email) as AccountRow | null; }
@@ -309,14 +310,15 @@ export function customerRoutes(db: Database) {
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Vary", "Origin");
     const requestOrigin = c.req.header("origin");
-    const allowed = requestOrigin === origin || extensionOrigins.has(requestOrigin || "");
+    const websiteOrigin = websiteOrigins.has(requestOrigin || "");
+    const allowed = websiteOrigin || extensionOrigins.has(requestOrigin || "");
     if (allowed) {
       c.header("Access-Control-Allow-Origin", requestOrigin!);
-      if (requestOrigin === origin) c.header("Access-Control-Allow-Credentials", "true");
+      if (websiteOrigin) c.header("Access-Control-Allow-Credentials", "true");
     }
     if (c.req.method === "OPTIONS") {
       if (allowed) {
-        c.header("Access-Control-Allow-Headers", "Authorization, Content-Type" + (requestOrigin === origin ? ", X-Atlas-Account" : ""));
+        c.header("Access-Control-Allow-Headers", "Authorization, Content-Type" + (websiteOrigin ? ", X-Atlas-Account" : ""));
         c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         c.header("Access-Control-Max-Age", "600");
       }

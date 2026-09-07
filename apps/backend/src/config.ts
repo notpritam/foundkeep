@@ -1,12 +1,36 @@
 import { join } from "node:path";
 
+function customerOrigins() {
+  const configured =
+    process.env.ATLAS_CUSTOMER_ORIGINS ??
+    process.env.ATLAS_CUSTOMER_ORIGIN ??
+    "https://foundkeep.app,https://atlas.notpritam.in";
+  const origins = [...new Set(configured.split(",").map((value) => value.trim()).filter(Boolean))];
+  if (!origins.length) throw new Error("At least one customer website origin is required.");
+  for (const origin of origins) {
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw new Error(`Invalid customer website origin: ${origin}`);
+    }
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.origin !== origin)
+      throw new Error(`Customer website origins must be exact HTTP(S) origins: ${origin}`);
+  }
+  return origins;
+}
+
+const configuredCustomerOrigins = customerOrigins();
+
 /** Runtime configuration, all overridable via env for the systemd unit on omni. */
 export const config = {
   port: Number(process.env.ATLAS_PORT ?? 8787),
   /** Service version, surfaced by the public /healthz probe. */
   version: process.env.ATLAS_VERSION ?? "1.0.0",
-  /** Origin used for customer cookie/CSRF checks and extension pairing. */
-  customerOrigin: process.env.ATLAS_CUSTOMER_ORIGIN ?? "https://atlas.notpritam.in",
+  /** Ordered exact origins used for customer cookie/CSRF checks and extension pairing. */
+  customerOrigins: configuredCustomerOrigins,
+  /** Primary origin retained as a compatibility accessor for URLs and secure-cookie mode. */
+  customerOrigin: configuredCustomerOrigins[0]!,
   customerExtensionIds: [...new Set([
     "mjfcgmboaijfcaanepdipbgmipnccnpn",
     ...(process.env.ATLAS_CUSTOMER_EXTENSION_IDS ?? "").split(",").map(value => value.trim()).filter(value => /^[a-p]{32}$/.test(value)),
