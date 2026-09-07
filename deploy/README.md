@@ -68,7 +68,7 @@ The local key remains at the gitignored `deploy/keys/atlas-extension.pem`; its f
 3. Fast-forward `/home/pritam/personal/apps/atlas` on `main` to the tested commit and push.
 4. Install the dual-origin systemd override and restart the backend before enabling the new domain.
 5. Add/validate the shared Caddy blocks after DNS resolves.
-6. Verify `/`, `/privacy.html`, `/foundkeep-extension.zip`, `/healthz`, `/signup`, `/login`, and `/dashboard` on `foundkeep.app`.
+6. Verify `/`, `/support.html`, `/privacy.html`, `/foundkeep-extension.zip`, `/healthz`, `/signup`, `/login`, and `/dashboard` on `foundkeep.app`.
 7. Wait for the GitHub release workflow, then verify the downloaded CRX, update XML, version, signature, ID, and both artifact aliases.
 8. Run `ATLAS_SITE_URL=https://foundkeep.app bun run test:web` and the disposable live customer flow.
 

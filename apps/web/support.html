@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Support — Foundkeep</title>
+  <meta name="description" content="Get help installing Foundkeep, connecting your account, saving captures, syncing your library, and recovering access." />
+  <link rel="canonical" href="https://foundkeep.app/support.html" />
+  <meta name="theme-color" content="#f3f3f0" />
+  <link rel="icon" href="assets/studio-mark.svg" type="image/svg+xml" />
+  <link rel="preload" as="font" type="font/woff2" href="assets/fonts/ClarityCity-Bold.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="assets/fonts/geist-latin.woff2" crossorigin />
+  <link rel="stylesheet" href="styles.css?v=1.6.2" />
+</head>
+<body>
+  <!--
+    THESIS: Support follows a saved item from browser to library so customers can locate a break quickly.
+    OWN-WORLD: Warm paper, ink, vermilion, moss, editorial type, fine rules, and functional 6px controls.
+    STORY: Identify the symptom, follow a short recovery path, and return to capturing with the source intact.
+    FIRST VIEWPORT: A direct help headline sits beside a compact save-to-sync route and four symptom links.
+    FORM: An editorial field guide extending Foundkeep's established world; support-field-guide-2026-09-07.
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+  -->
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header privacy-header wrap">
+    <a class="brand" href="index.html"><img src="assets/studio-mark.svg" width="36" height="36" alt="" /><span>Foundkeep</span></a>
+    <nav class="support-header-nav" aria-label="Support navigation"><a href="dashboard.html">Open library</a><a class="text-link" href="index.html">Back to Foundkeep</a></nav>
+  </header>
+
+  <main class="support-page" id="main">
+    <section class="support-hero" aria-labelledby="support-title">
+      <div class="support-intro">
+        <h1 id="support-title">Help, from save to sync.</h1>
+        <p>Find the point where something stopped, follow the checks, and get back to your collection. Foundkeep keeps local captures available even when cloud sync is interrupted.</p>
+        <div class="support-actions"><a class="button" href="#start">Start with the symptom <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14m-6-6 6 6 6-6" /></svg></a><a class="text-link" href="privacy.html">Privacy &amp; data</a></div>
+      </div>
+      <ol class="support-route" aria-label="Foundkeep capture route">
+        <li><span>1</span><div><strong>Capture</strong><p>The extension saves to its local browser library first.</p></div></li>
+        <li><span>2</span><div><strong>Queue</strong><p>Connected captures wait safely if your browser is offline.</p></div></li>
+        <li><span>3</span><div><strong>Sync</strong><p>New items upload to the account connected in this browser.</p></div></li>
+        <li><span>4</span><div><strong>Find</strong><p>Your dashboard reads that account’s private cloud library.</p></div></li>
+      </ol>
+    </section>
+
+    <nav class="support-index" id="start" aria-label="Choose a support topic">
+      <a href="#install"><span>Installation</span><strong>The extension will not load</strong><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a>
+      <a href="#connect"><span>Connection</span><strong>The browser is not connected</strong><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a>
+      <a href="#capture"><span>Capture</span><strong>An item did not save correctly</strong><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a>
+      <a href="#sync"><span>Sync</span><strong>A capture is missing online</strong><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a>
+    </nav>
+
+    <section class="support-section" id="install" aria-labelledby="install-support-title">
+      <div class="support-section-heading"><h2 id="install-support-title">Install Foundkeep in the browser.</h2></div>
+      <div class="support-answer">
+        <ol>
+          <li><strong>Use a supported desktop browser.</strong> Foundkeep supports Chrome, Edge, Brave, Opera and Vivaldi. Mobile browsers are not supported.</li>
+          <li><strong>For the manual ZIP, extract it first.</strong> Keep the extracted folder in a permanent location. Loading the ZIP file itself will fail.</li>
+          <li><strong>Open the browser’s extensions page.</strong> Use <code>chrome://extensions</code>, <code>edge://extensions</code>, or the equivalent, enable Developer mode, choose <em>Load unpacked</em>, then select the extracted folder.</li>
+          <li><strong>Pin Foundkeep.</strong> Open the browser’s extension menu and pin Foundkeep so the save controls stay within reach.</li>
+        </ol>
+        <p class="support-note"><strong>Updating an unpacked copy:</strong> replace the files in the same folder and choose <em>Reload</em> on the extensions page. Store installs receive browser-managed updates.</p>
+      </div>
+    </section>
+
+    <section class="support-section" id="connect" aria-labelledby="connect-support-title">
+      <div class="support-section-heading"><h2 id="connect-support-title">Connect the right browser to the right account.</h2></div>
+      <div class="support-answer">
+        <ol>
+          <li>Sign in at <a href="auth.html?mode=login">foundkeep.app</a> in the browser where the extension is installed.</li>
+          <li>Open <a href="dashboard.html">your dashboard</a>, enter Account &amp; settings, and choose <strong>Connect Foundkeep</strong>.</li>
+          <li>Approve the connection in the extension window. Its status should show the same account email as the dashboard.</li>
+          <li>If it still shows another account, revoke that browser in account settings and connect it again.</li>
+        </ol>
+        <p class="support-note">Website sign-in and the extension connection are separate. Logging out of the website does not disconnect the extension, and revoking the extension does not delete its local captures.</p>
+      </div>
+    </section>
+
+    <section class="support-section" id="capture" aria-labelledby="capture-support-title">
+      <div class="support-section-heading"><h2 id="capture-support-title">Capture what the page allows Foundkeep to keep.</h2></div>
+      <div class="support-answer">
+        <ul>
+          <li><strong>Protected browser pages:</strong> browsers block extensions on pages such as <code>chrome://</code>, extension stores, and some built-in PDF viewers. Open the original website and capture there.</li>
+          <li><strong>Readable page:</strong> wait for the article to finish loading, then save it again. Foundkeep stores the useful text and available page metadata; sites may omit author, dates, images, or canonical URLs.</li>
+          <li><strong>Highlight:</strong> select text on the page before choosing Save highlight. If the page replaces the selection, use Save page or add a note instead.</li>
+          <li><strong>Image:</strong> allow the one-time site access prompt when Foundkeep needs to fetch the original image. Denying it prevents that image from being saved.</li>
+          <li><strong>Screenshot:</strong> keep the page tab active until capture finishes. Very tall or animated pages can change while a full-page screenshot is assembled.</li>
+        </ul>
+        <p class="support-note">Every saved item keeps the strongest source record available, including the visited URL, canonical URL, title, site, capture method and capture time. Open the item details to return to its origin.</p>
+      </div>
+    </section>
+
+    <section class="support-section" id="sync" aria-labelledby="sync-support-title">
+      <div class="support-section-heading"><h2 id="sync-support-title">Sync a missing capture without losing the local copy.</h2></div>
+      <div class="support-answer">
+        <ol>
+          <li>Open Foundkeep and confirm the capture appears in the extension’s local library.</li>
+          <li>Check that the extension says <strong>Connected</strong> and that automatic sync is enabled in Capture settings.</li>
+          <li>Leave the browser online for a moment. Pending uploads retry automatically after a connection returns.</li>
+          <li>Refresh the web dashboard and confirm its signed-in email matches the extension.</li>
+          <li>If the item predates the account connection, use the extension’s explicit import action. Older local captures are never uploaded without that choice.</li>
+        </ol>
+        <p class="support-note"><strong>Deletion is separate:</strong> deleting a cloud item does not remove its local browser copy, and removing a local copy does not delete an item already synced to the cloud.</p>
+      </div>
+    </section>
+
+    <section class="support-section" id="account" aria-labelledby="account-support-title">
+      <div class="support-section-heading"><h2 id="account-support-title">Recover account access with the code you saved.</h2></div>
+      <div class="support-answer">
+        <p>Choose <strong>Forgot password</strong> on the <a href="auth.html?mode=login">sign-in page</a>, then enter your account email and recovery code. Foundkeep shows the recovery code once when you create the account or change the password. It does not send password-reset emails.</p>
+        <p>Changing the password or using recovery revokes other website sessions and connected browsers. Sign in again, then reconnect each browser you still use.</p>
+      </div>
+    </section>
+
+    <section class="support-section" id="settings" aria-labelledby="settings-support-title">
+      <div class="support-section-heading"><h2 id="settings-support-title">Change capture behavior from your dashboard.</h2></div>
+      <div class="support-answer">
+        <p>Open Account &amp; settings to control capture methods, readable page extraction, metadata, note source attachment, popup order, automatic sync, OCR, summaries, and tags. Connected browsers refresh the data-only policy and account preferences without a Store release.</p>
+        <p>Browser permissions, executable extension code, and other manifest changes still arrive through a signed extension update. Foundkeep does not download or execute remote code.</p>
+      </div>
+    </section>
+
+    <section class="support-close" aria-labelledby="more-help-title">
+      <div><h2 id="more-help-title">Still stuck?</h2><p>Check the public issue list for a known problem or open a report with the browser name, Foundkeep version, the capture type, what you expected, and what happened. Never include a password, recovery code, connection credential, private capture, or private page URL.</p></div>
+      <div class="support-close-actions"><a class="button" href="https://github.com/notpritam/foundkeep/issues/new" target="_blank" rel="noreferrer">Report a technical issue <span aria-hidden="true">↗</span></a><a class="text-link" href="https://github.com/notpritam/foundkeep/issues" target="_blank" rel="noreferrer">View known issues</a></div>
+    </section>
+
+    <footer class="privacy-footer">Foundkeep support · Chrome Web Store release 1.0.0 · <a href="privacy.html">Privacy &amp; data</a> · <a href="index.html#get">Get Foundkeep</a></footer>
+  </main>
+</body>
+</html>

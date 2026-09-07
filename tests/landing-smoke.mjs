@@ -184,6 +184,26 @@ test("privacy policy discloses capture data and Chrome Web Store Limited Use", a
   assert.match(copy, /User Data Policy/i);
 });
 
+test("customer support is hosted on Foundkeep and covers the full capture path", async (t) => {
+  const page = await pageFor(t, 390);
+  await page.goto(base + "/support.html");
+  assert.equal(
+    await page.locator('link[rel="canonical"]').getAttribute("href"),
+    "https://foundkeep.app/support.html",
+  );
+  const copy = await page.locator("body").textContent();
+  assert.match(copy, /installation/i);
+  assert.match(copy, /Connect Foundkeep/i);
+  assert.match(copy, /local library/i);
+  assert.match(copy, /Pending uploads retry automatically/i);
+  assert.match(copy, /recovery code/i);
+  assert.match(copy, /Chrome Web Store release 1\.0\.0/i);
+  assert.equal(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    true,
+  );
+});
+
 test("landing page presents Foundkeep and its branded extension download", async (t) => {
   const page = await pageFor(t);
   assert.match(await page.title(), /Foundkeep/);

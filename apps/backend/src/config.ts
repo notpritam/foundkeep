@@ -32,6 +32,7 @@ export const config = {
   /** Primary origin retained as a compatibility accessor for URLs and secure-cookie mode. */
   customerOrigin: configuredCustomerOrigins[0]!,
   customerExtensionIds: [...new Set([
+    "cficnecbdbiddngllpfbacabgbcjinmk",
     "mjfcgmboaijfcaanepdipbgmipnccnpn",
     ...(process.env.ATLAS_CUSTOMER_EXTENSION_IDS ?? "").split(",").map(value => value.trim()).filter(value => /^[a-p]{32}$/.test(value)),
   ])],

@@ -2,7 +2,7 @@
 
 Build with `bash deploy/pack-store.sh`, then upload `deploy/dist/foundkeep-store-1.0.0.zip` in the Chrome Web Store developer dashboard. Google publisher access and review are required; creating this archive does not publish it.
 
-The store archive removes the self-hosted `key` and `update_url`. Once Google assigns an ID, add it to `apps/web/customer-config.json` and `ATLAS_CUSTOMER_EXTENSION_IDS`. Keep the established self-hosted ID allowed during migration. Set `storeUrl` only after the approved listing is publicly installable.
+The store archive removes the self-hosted `key` and `update_url`. Google assigned Store extension ID `cficnecbdbiddngllpfbacabgbcjinmk`; it is allowed by the dashboard and backend alongside the established self-hosted ID during migration. Keep `storeUrl` unset until the approved listing is publicly installable, then use its final public Chrome Web Store URL.
 
 ## Listing
 
@@ -37,7 +37,7 @@ Cloud accounts include up to 1,000 captures and 200 MiB of content. Customers sa
 **Homepage:** https://foundkeep.app
 
 **Privacy policy:** https://foundkeep.app/privacy.html
-**Support:** https://github.com/notpritam/foundkeep/issues
+**Support:** https://foundkeep.app/support.html
 
 ## Single purpose and permissions
 
@@ -55,28 +55,29 @@ The customer extension has no debugger permission, browser-control overlay, adve
 
 ### Privacy-tab answers
 
-**Single purpose:** Save web content that the customer explicitly chooses into a private local library and, when the customer connects a Foundkeep account, sync those chosen captures to their private dashboard.
+**Single purpose:** Foundkeep saves web content that the customer explicitly chooses—readable pages, screenshots, highlighted text, links, images, posts and notes—into a private local library and, when the customer connects an account, syncs those chosen captures to their private Foundkeep dashboard for search and retrieval.
 
 **Permission justifications:**
 
-- `activeTab`: Temporarily access the current page only after the customer invokes Foundkeep so it can read source details and capture visible pixels. It also permits screenshots of eligible pages that persistent host access cannot reach.
-- `scripting`: Run the bundled readable-text, metadata and region-selection code in the active page after a customer capture action.
-- `contextMenus`: Offer explicit right-click actions for saving the selected text, page, link or image and taking a screenshot.
-- `storage`: Keep protected account connection state and an account-bound preference cache. Capture content itself is stored in extension IndexedDB.
+- `activeTab`: Temporarily access the active tab only after the customer invokes Foundkeep. This lets the extension read source metadata and selected content, capture visible pixels, and start a region or full-page screenshot on eligible pages.
+- `scripting`: Inject Foundkeep's bundled capture code into the active tab only after the customer chooses a capture action. It extracts readable text and metadata or provides the region-selection interface.
+- `contextMenus`: Offer explicit right-click actions for saving selected text, the current page, a link or an image, and for taking a screenshot.
+- `storage`: Store the Foundkeep account connection credential, data-only preferences and policy caches, and durable upload-queue state. Capture content is stored separately in extension IndexedDB.
 - `alarms`: Retry customer-selected cloud uploads and refresh account preferences after browser restarts or temporary network failures.
-- `https://foundkeep.app/*`: Read data-only account preferences and operator safety policy, connect the browser, and upload captures the customer explicitly selected. It never loads executable code.
+- Host permissions: Use `https://foundkeep.app/*` to connect the browser to the customer's account, receive data-only preferences and policy, and sync selected captures. On `x.com` and `twitter.com`, a bundled content script adds a Foundkeep save button and extracts a post only when the customer clicks it. Optional HTTP(S) access is requested only for the exact origin of an image the customer chooses to save so the original file can be fetched. Foundkeep does not read general browsing activity in the background or load remote code.
 - Optional HTTP(S) hosts: Request access to the selected image's exact origin only after the customer chooses **Save image**. This is needed when the image lives on a different origin from its page. Foundkeep does not request permanent access to unrelated sites, read pages in the background, or collect general browsing history.
 - External messaging: Let only `https://foundkeep.app` and the temporary exact legacy migration origin detect, pair or refresh Foundkeep. Pairing uses a short-lived one-use code, and pages cannot read extension credentials.
 
-**Remote code:** Select **No, I am not using remote code**. The package executes only bundled JavaScript. Network requests carry customer account, preference and capture data; they never load executable code.
+**Remote code:** Select **No, I am not using remote code**. If the justification field remains visible, paste: Foundkeep executes only JavaScript and assets included in the submitted extension package. It fetches JSON account preferences and a validated data-only runtime policy from foundkeep.app and uploads customer-selected captures; no response is evaluated or executed as code.
 
 **User-data disclosures:**
 
-- Personally identifiable information: account name and email when the customer chooses to connect.
-- Authentication information: a Foundkeep browser connection credential stored in trusted extension storage and sent only to Foundkeep over HTTPS.
-- Web history: the URL, title and source metadata of a page only when the customer explicitly saves or captures it.
-- Website content: customer-selected readable page text, screenshots, images, highlights and notes.
-- Do not select financial/payment, health, location or general user-activity tracking; Foundkeep does not collect them.
+- Select **Personally identifiable information**: account name and email when the customer chooses to connect.
+- Select **Authentication information**: a Foundkeep browser connection credential stored in extension storage and sent only to Foundkeep over HTTPS.
+- Select **Location**: the request IP address is used only in a short-lived in-memory rate-limit key to protect account and upload endpoints. Foundkeep does not request device location.
+- Select **Web history**: the URL, title and source metadata of a page only when the customer explicitly saves or captures it.
+- Select **Website content**: customer-selected readable page text, screenshots, images, highlights and notes.
+- Do not select financial/payment information, health information, personal communications or user activity; Foundkeep does not collect them as separate data categories or monitor browsing behavior.
 
 Certify all Limited Use statements. Privacy policy URL: `https://foundkeep.app/privacy.html`.
 

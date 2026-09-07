@@ -99,3 +99,20 @@ test("Chrome Web Store package is a focused version 1.0.0 MV3 build", async () =
   assert.doesNotMatch(source, /\bimport\s*\(\s*["']https?:\/\//i);
   assert.doesNotMatch(source, /<script[^>]+src=["']https?:\/\//i);
 });
+
+test("the assigned Store extension is pre-authorized without replacing the migration build", async () => {
+  const storeId = "cficnecbdbiddngllpfbacabgbcjinmk";
+  const migrationId = "mjfcgmboaijfcaanepdipbgmipnccnpn";
+  const customerConfig = JSON.parse(
+    await readFile("apps/web/customer-config.json", "utf8"),
+  );
+  assert.deepEqual(customerConfig.extensionIds, [storeId, migrationId]);
+  assert.equal(
+    customerConfig.storeUrl,
+    null,
+    "Do not send customers to the Store until the listing is public",
+  );
+  const backendConfig = await readFile("apps/backend/src/config.ts", "utf8");
+  assert.match(backendConfig, new RegExp(storeId));
+  assert.match(backendConfig, new RegExp(migrationId));
+});

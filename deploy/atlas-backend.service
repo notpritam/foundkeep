@@ -9,6 +9,7 @@ UMask=0077
 WorkingDirectory=/home/pritam/personal/apps/atlas/apps/backend
 Environment=ATLAS_PORT=8790
 Environment=ATLAS_DATA_DIR=/home/pritam/.local/share/atlas
+Environment=ATLAS_CUSTOMER_EXTENSION_IDS=cficnecbdbiddngllpfbacabgbcjinmk
 # Comma-separated web origins for CORS (the future website). chrome-extension
 # origins are always allowed.
 Environment=ATLAS_ALLOWED_ORIGINS=
