@@ -18,6 +18,13 @@ manifest = json.load(open(os.path.join(src, "manifest.json")))
 version = open(os.path.join(root, "deploy", "store-version.txt")).read().strip()
 if not re.fullmatch(r"(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){0,3}", version):
     raise SystemExit(f"invalid Chrome Web Store version: {version!r}")
+description = manifest.get("description")
+if not isinstance(description, str) or not description.strip():
+    raise SystemExit("Chrome Web Store manifest description is required")
+if len(description) > 132:
+    raise SystemExit(
+        f"Chrome Web Store manifest description is {len(description)} characters; maximum is 132"
+    )
 
 # Store manifest = source manifest minus self-hosting fields.
 manifest["version"] = version

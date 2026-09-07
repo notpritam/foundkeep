@@ -61,6 +61,10 @@ test("Chrome Web Store package is a focused version 1.0.0 MV3 build", async () =
   const manifest = JSON.parse(manifestText);
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.version, "1.0.0");
+  assert.ok(
+    [...manifest.description].length <= 132,
+    `manifest description is ${[...manifest.description].length} characters; Chrome Web Store allows 132`,
+  );
   assert.equal(manifest.key, undefined);
   assert.equal(manifest.update_url, undefined);
   assert.deepEqual(manifest.permissions, [

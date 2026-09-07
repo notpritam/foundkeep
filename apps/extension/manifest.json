@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Foundkeep — Save what matters",
   "version": "1.6.1",
-  "description": "Save readable pages, screenshots, highlights, images and notes with their original source. Sync them to your private Foundkeep library.",
+  "description": "Save readable pages, screenshots, highlights, images and notes with original source details in a private, searchable library.",
   "permissions": [
     "activeTab",
     "scripting",
