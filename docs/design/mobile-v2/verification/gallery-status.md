@@ -22,7 +22,7 @@ Native verification on the enrolled Mac:
 Production backend:
 - Deployed the Gallery API and organization migration on September 8, 2026 after an online SQLite backup and integrity check.
 - Live health check and 12 smoke checks pass: registration, starter organization, create folder, organized save, folder/tag filtering, edit preservation, image save, private preview, unauthenticated denial, folder deletion, content/tag preservation, and disposable account cleanup.
-- Existing account data is preserved. Mobile UI distribution is awaiting the new TestFlight binary.
+- Existing account data is preserved. Mobile UI is available in TestFlight as 1.0.0 (14).
 
 Known pre-existing check limitation: backend TypeScript reports errors in `src/captures.ts` and `test/backend.test.ts`; new customer API/organization code has no reported TypeScript errors.
 
@@ -39,7 +39,7 @@ xcrun swiftc -parse-as-library share-extension/ShareItemLoader.swift share-exten
 /tmp/foundkeep-loader-tests
 ```
 
-Release worktree: `/Users/notpritamm/Developer/foundkeep-gallery-review`. Final Simulator build log: `/tmp/foundkeep-share-fixed-build.log`. Builds 9–13 were not submitted. Build 12 failed because a dependency symlink outside the temporary checkout changed the local Expo runtime fingerprint. Replaced the symlink with a frozen-lockfile dependency installation; runtime compatibility enforcement remains enabled. The corrected version remains 1.0.0 and requires a replacement binary. Disposable QA credentials stay outside the checkout and are not reviewer access.
+Release worktree: `/Users/notpritamm/Developer/foundkeep-gallery-review`. Final Simulator build log: `/tmp/foundkeep-share-fixed-build.log`. Builds 9–13 were not submitted. Build 12 failed because a dependency symlink outside the temporary checkout changed the local Expo runtime fingerprint. Replaced the symlink with a frozen-lockfile dependency installation; runtime compatibility enforcement remains enabled. The released beta version remains 1.0.0. Disposable QA credentials stay outside the checkout and are not reviewer access.
 
 Native Simulator evidence from the disposable QA account:
 - [Safari share with Reading folder and Work tag](native-safari-share.jpg)
@@ -54,4 +54,12 @@ The disposable native QA account and its credentials were deleted after verifica
 
 Independent review of `d81543a`: **disposition: ship** for the fingerprint configuration and regression. The reviewer independently verified all seven file cases.
 
-Release candidate: EAS build `55a3b3d6-2656-4d7e-8e2d-3cbba98a6ea4`, version **1.0.0 (14)**, source `d81543a`. The cloud production archive completed successfully. TestFlight upload and group availability are still being verified.
+Release candidate: EAS build `55a3b3d6-2656-4d7e-8e2d-3cbba98a6ea4`, version **1.0.0 (14)**, source `d81543a`. The cloud production archive completed successfully. Inspected the release IPA: both bundle IDs, both 1.0.0 (14) version values, bundled Safari fix, native mark, production update channel and embedded runtime `e9e5b5409ee2413aba0d29e723045cc0b58d74fa` are correct. The 17,262,758-byte IPA was uploaded directly with Apple’s altool and the existing API key; Apple reported no upload errors (delivery `c4ec4541-c4f3-4dff-954b-bcebfe1104fc`). Apple processing is **VALID**; build 14 is assigned to **Foundkeep Internal**, with internal state **IN_BETA_TESTING** and test notes saved in en-US. Public App Store review has not been submitted for this iteration.
+
+Submission fallback: EAS requires Enterprise to attach test notes through its submission parameter. The standard EAS upload remained queued, so it was canceled (`064f67b9-55b9-45fa-86ac-5ac6a6de14ef`, verified CANCELED) before direct Apple upload. A temporary launchd job kept the uploader independent of Mac remote-session restarts.
+
+## TestFlight release
+
+Verified on September 8, 2026 through App Store Connect API: **Foundkeep 1.0.0 (14)**, Apple build ID `c4ec4541-c4f3-4dff-954b-bcebfe1104fc`, internal testing state **IN_BETA_TESTING**, assigned to the existing **Foundkeep Internal** group. Open TestFlight → Foundkeep → Update, then follow the [iPhone test guide](iphone-test-guide.md). No new invitation or Apple ID password is needed for the already accepted internal tester.
+
+The release source is on `main` (code `d81543a`; native evidence and guide `beaaec9`). [GitHub’s clean-runner iOS verification](https://github.com/notpritam/foundkeep/actions/runs/34265762252) has passed tests, TypeScript and prebuild; its additional Simulator compilation is still running. The EAS production archive and local signed Simulator builds already passed.

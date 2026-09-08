@@ -2,7 +2,7 @@
 
 # Foundkeep mobile: UX, authentication, and performance audit
 
-Date: 2026-09-08. Baseline: the working Foundkeep 1.0.0 TestFlight app. This packet contains **interactive design concepts, verified local loading fixes, and an implementation specification**. OAuth, the new native UI, and disk-based offline reading are not yet shipped.
+Date: 2026-09-08. Baseline: the working Foundkeep 1.0.0 TestFlight app. This packet contains **interactive design concepts, implementation notes, and native verification evidence**. The selected Gallery UI is available in **TestFlight 1.0.0 (14)**; see the [release record](verification/gallery-status.md) and [iPhone test guide](verification/iphone-test-guide.md). OAuth and disk-based offline reading remain outstanding.
 
 ## Archived comparison: Gallery selected
 

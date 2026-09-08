@@ -1,0 +1,15 @@
+{
+  "appleBuildId": "c4ec4541-c4f3-4dff-954b-bcebfe1104fc",
+  "version": "1.0.0",
+  "build": "14",
+  "processingState": "VALID",
+  "group": "Foundkeep Internal",
+  "autoNotifyEnabled": true,
+  "internalBuildState": "IN_BETA_TESTING",
+  "externalBuildState": "READY_FOR_BETA_SUBMISSION",
+  "easBuildId": "55a3b3d6-2656-4d7e-8e2d-3cbba98a6ea4",
+  "sourceCommit": "d81543a9df36f235166ab7a1ab1df7ff25af8d4d",
+  "runtime": "e9e5b5409ee2413aba0d29e723045cc0b58d74fa",
+  "channel": "production",
+  "ipaBytes": 17262758
+}

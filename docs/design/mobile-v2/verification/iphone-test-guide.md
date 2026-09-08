@@ -1,6 +1,6 @@
 # Foundkeep Gallery: iPhone test guide
 
-This guide covers the Gallery iteration of Foundkeep 1.0.0. The release record and verified build number are in [gallery-status.md](gallery-status.md).
+This guide covers the Gallery iteration of Foundkeep 1.0.0. Install **1.0.0 (14)** from Foundkeep Internal in TestFlight. The release record is in [gallery-status.md](gallery-status.md).
 
 ## Install
 
