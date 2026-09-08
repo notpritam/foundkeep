@@ -5,5 +5,9 @@
     "preview": { "bun": "1.4.2", "distribution": "internal", "channel": "preview" },
     "production": { "bun": "1.4.2", "channel": "production", "autoIncrement": true }
   },
-  "submit": { "production": {} }
+  "submit": {
+    "production": {
+      "ios": { "ascAppId": "6809771188" }
+    }
+  }
 }

@@ -44,4 +44,5 @@ test('EAS profiles separate development, preview and production update channels'
   assert.equal(eas.build.production.bun, '1.4.2');
   assert.equal(eas.build.production.channel, 'production');
   assert.equal(eas.build.production.autoIncrement, true);
+  assert.equal(eas.submit.production.ios.ascAppId, '6809771188');
 });
