@@ -9,8 +9,10 @@
     "start": "expo start --dev-client",
     "ios": "expo run:ios",
     "prebuild": "expo prebuild --platform ios",
+    "verify:ios": "node scripts/verify-ios-project.mjs",
+    "store:screenshots": "expo export --platform web --output-dir dist-store-preview && node scripts/render-store-screenshots.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test scripts/config.test.mjs src/api/client.test.ts src/collection/model.test.ts"
+    "test": "node --test scripts/config.test.mjs src/api/client.test.ts src/collection/model.test.ts src/policy/mobilePolicy.test.ts src/share/queue.test.ts src/share/safariPreprocessor.test.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -22,15 +24,17 @@
     "expo-font": "~57.0.3",
     "expo-linking": "~57.0.9",
     "expo-router": "~57.0.19",
-    "expo-secure-store": "~57.0.3",
+    "expo-sharing": "~57.0.18",
     "expo-splash-screen": "~57.0.8",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.3",
     "expo-updates": "~57.0.18",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0"
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/node": "^26.5.0",

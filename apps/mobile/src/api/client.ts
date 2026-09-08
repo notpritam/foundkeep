@@ -44,7 +44,7 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     } finally { clearTimeout(timer); }
   }
 
-  const devicePayload = <T extends object>(value: T) => ({ ...value, deviceName: 'iPhone' });
+  const devicePayload = <T extends { deviceName?: string }>(value: T) => ({ ...value, deviceName: value.deviceName?.trim() || 'iPhone' });
   return {
     register(value: { email: string; name: string; password: string; deviceName?: string }) {
       return json<NativeSession>('/api/mobile/register', { method: 'POST', body: devicePayload(value), authenticated: false });
@@ -57,10 +57,12 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     },
     me: () => json<{ account: Account; connectionId: string; usage: Usage }>('/api/mobile/me'),
     logout: () => json<{ ok: true }>('/api/mobile/logout', { method: 'POST' }),
-    listCaptures(filters: { q?: string; type?: string }) {
+    deleteAccount: (password: string) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: { password } }),
+    listCaptures(filters: { q?: string; type?: string; cursor?: string }) {
       const query = new URLSearchParams();
       if (filters.q) query.set('q', filters.q);
       if (filters.type) query.set('type', filters.type);
+      if (filters.cursor) query.set('cursor', filters.cursor);
       return json<CaptureList>(`/api/mobile/captures${query.size ? `?${query}` : ''}`);
     },
     createNote(value: { clientId: string; noteText: string; capturedAt: number }) {

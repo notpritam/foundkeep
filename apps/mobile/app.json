@@ -7,29 +7,96 @@
     "icon": "./assets/images/icon.png",
     "scheme": "foundkeep",
     "userInterfaceStyle": "automatic",
-    "runtimeVersion": { "policy": "fingerprint" },
-    "updates": { "checkAutomatically": "ON_LOAD", "fallbackToCacheTimeout": 0 },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "bundleIdentifier": "app.foundkeep.ios",
       "buildNumber": "1",
-      "supportsTablet": true,
+      "supportsTablet": false,
       "usesAppleSignIn": false,
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.app.foundkeep.ios"
+        ],
+        "keychain-access-groups": [
+          "$(AppIdentifierPrefix)app.foundkeep.shared"
+        ]
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Foundkeep reads only the photos you explicitly choose to save.",
-        "NSPhotoLibraryAddUsageDescription": "Foundkeep can save an exported copy when you choose that action."
+        "FoundkeepKeychainAccessGroup": "$(AppIdentifierPrefix)app.foundkeep.shared"
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["1C8F.1"]
+          }
+        ],
+        "NSPrivacyCollectedDataTypes": [
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeName", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhotosorVideos", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeAudioData", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeBrowsingHistory", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeDeviceID", "NSPrivacyCollectedDataTypeLinked": false, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData", "NSPrivacyCollectedDataTypeLinked": false, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherDiagnosticData", "NSPrivacyCollectedDataTypeLinked": false, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] }
+        ]
       }
     },
     "plugins": [
       "expo-router",
       "expo-updates",
-      ["expo-splash-screen", {
-        "backgroundColor": "#f3f3f0",
-        "image": "./assets/images/splash-icon.png",
-        "imageWidth": 92,
-        "dark": { "backgroundColor": "#171917" }
-      }]
+      "./plugins/withFoundkeepShareExtension.cjs",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#f3f3f0",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 92,
+          "dark": {
+            "backgroundColor": "#171917"
+          }
+        }
+      ],
+      "expo-sharing"
     ],
-    "experiments": { "typedRoutes": true, "reactCompiler": true }
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "FoundkeepShare",
+                  "bundleIdentifier": "app.foundkeep.ios.ShareExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.app.foundkeep.ios"
+                    ],
+                    "keychain-access-groups": [
+                      "$(AppIdentifierPrefix)app.foundkeep.shared"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
   }
 }

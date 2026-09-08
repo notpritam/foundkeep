@@ -15,8 +15,8 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   return <View style={styles.brand}><Mark size={compact ? 32 : 40} /><Text style={[styles.brandName, compact && { fontSize: 23 }]}>Foundkeep</Text></View>;
 }
 
-export function Button({ label, onPress, loading = false, disabled = false, secondary = false }: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean; secondary?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, pressed && styles.buttonPressed, (disabled || loading) && styles.buttonDisabled]}>{loading ? <ActivityIndicator color={secondary ? colors.ink : colors.white} /> : <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{label}</Text>}</Pressable>;
+export function Button({ label, onPress, loading = false, disabled = false, secondary = false, danger = false }: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean; secondary?: boolean; danger?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, danger && styles.buttonDanger, pressed && styles.buttonPressed, (disabled || loading) && styles.buttonDisabled]}>{loading ? <ActivityIndicator color={secondary && !danger ? colors.ink : colors.white} /> : <Text style={[styles.buttonText, secondary && !danger && styles.buttonTextSecondary]}>{label}</Text>}</Pressable>;
 }
 
 export function Field({ label, help, ...props }: TextInputProps & { label: string; help?: string }) {
@@ -37,6 +37,7 @@ const styles = StyleSheet.create({
   point: { position: 'absolute', backgroundColor: colors.accent, bottom: '18%', right: '22%' },
   button: { minHeight: 52, borderRadius: 8, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent },
   buttonSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  buttonDanger: { backgroundColor: colors.error },
   buttonPressed: { opacity: .78 },
   buttonDisabled: { opacity: .46 },
   buttonText: { color: colors.white, fontSize: 15, fontWeight: '700' },

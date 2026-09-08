@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { access, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+const root = new URL('../', import.meta.url).pathname;
+const ios = join(root, 'ios');
+const exists = async path => { try { await access(path); return true; } catch { return false; } };
+const projectDirectories = ['Foundkeep.xcodeproj', 'foundkeep.xcodeproj'];
+const projectDirectory = (await Promise.all(projectDirectories.map(async name => [name, await exists(join(ios, name))]))).find(([, present]) => present)?.[0];
+assert.ok(projectDirectory, 'Generated Foundkeep Xcode project is missing.');
+const project = await readFile(join(ios, projectDirectory, 'project.pbxproj'), 'utf8');
+assert.match(project, /FoundkeepShare/);
+assert.match(project, /app\.foundkeep\.ios\.ShareExtension/);
+assert.match(project, /ShareViewController\.swift in Sources/);
+assert.match(project, /ShareItemLoader\.swift in Sources/);
+assert.match(project, /ShareUploader\.swift in Sources/);
+assert.match(project, /SharePolicy\.swift in Sources/);
+assert.match(project, /Embed.*Extensions|Copy Files/);
+
+const shareDirectory = join(ios, 'FoundkeepShare');
+for (const file of ['Info.plist', 'FoundkeepShare.entitlements', 'PrivacyInfo.xcprivacy', 'ShareViewController.swift', 'ShareItemLoader.swift', 'ShareUploader.swift', 'SharePolicy.swift', 'SafariPreprocessor.js']) {
+  assert.ok(await exists(join(shareDirectory, file)), `${file} was not copied into the Share Extension target.`);
+}
+const info = await readFile(join(shareDirectory, 'Info.plist'), 'utf8');
+assert.match(info, /com\.apple\.share-services/);
+assert.match(info, /NSExtensionActivationSupportsWebURLWithMaxCount/);
+assert.match(info, /NSExtensionActivationSupportsText/);
+assert.match(info, /NSExtensionActivationSupportsImageWithMaxCount/);
+assert.match(info, /NSExtensionActivationSupportsMovieWithMaxCount/);
+assert.match(info, /NSExtensionActivationSupportsFileWithMaxCount/);
+assert.match(info, /SafariPreprocessor/);
+const entitlements = await readFile(join(shareDirectory, 'FoundkeepShare.entitlements'), 'utf8');
+assert.match(entitlements, /group\.app\.foundkeep\.ios/);
+assert.match(entitlements, /app\.foundkeep\.shared/);
+const sharePrivacy = await readFile(join(shareDirectory, 'PrivacyInfo.xcprivacy'), 'utf8');
+assert.match(sharePrivacy, /NSPrivacyAccessedAPICategoryUserDefaults/);
+assert.match(sharePrivacy, /1C8F\.1/);
+assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
+const mainEntitlements = await readFile(join(ios, 'Foundkeep', 'Foundkeep.entitlements'), 'utf8');
+assert.match(mainEntitlements, /group\.app\.foundkeep\.ios/);
+assert.match(mainEntitlements, /app\.foundkeep\.shared/);
+console.log('Foundkeep iOS project includes the native Share Extension and shared security groups.');

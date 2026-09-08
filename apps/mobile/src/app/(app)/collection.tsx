@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Capture, CaptureType } from '../../api/types.ts';
 import { Brand, Message, Screen } from '../../components/ui.tsx';
@@ -26,23 +26,36 @@ function CaptureCard({ capture, groupCount }: { capture: Capture; groupCount: nu
 }
 
 export default function CollectionScreen() {
-  const { client, account, refresh: refreshAccount } = useSession();
+  const { client, account, policy, updateRequired, refresh: refreshAccount } = useSession();
   const [captures, setCaptures] = useState<Capture[]>([]); const [query, setQuery] = useState(''); const [type, setType] = useState<CaptureType | null>(null);
-  const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState('');
-  const load = useCallback(async (manual = false) => {
-    manual ? setRefreshing(true) : setLoading(true); setError('');
-    try { const result = await client.listCaptures({}); setCaptures(result.captures); await refreshAccount(); }
+  const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [loadingMore, setLoadingMore] = useState(false); const [total, setTotal] = useState(0); const [error, setError] = useState('');
+  const cursorRef = useRef<string | null>(null); const loadingMoreRef = useRef(false);
+  const requestKey = `${query.trim()}|${type || ''}`; const latestKey = useRef(requestKey); latestKey.current = requestKey;
+  const load = useCallback(async (manual = false, more = false) => {
+    if (more && (!cursorRef.current || loadingMoreRef.current)) return;
+    const key = `${query.trim()}|${type || ''}`;
+    if (more) { loadingMoreRef.current = true; setLoadingMore(true); } else if (manual) setRefreshing(true); else setLoading(true);
+    setError('');
+    try {
+      const result = await client.listCaptures({ q: query.trim() || undefined, type: type || undefined, cursor: more ? cursorRef.current || undefined : undefined });
+      if (latestKey.current !== key) return;
+      setCaptures(current => more ? [...current, ...result.captures.filter(item => !current.some(existing => existing.id === item.id))] : result.captures);
+      cursorRef.current = result.nextCursor; setTotal(result.total);
+      if (!more) await refreshAccount();
+    }
     catch (value) { setError((value as Error).message); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, [client, refreshAccount]);
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+    finally { loadingMoreRef.current = false; setLoading(false); setRefreshing(false); setLoadingMore(false); }
+  }, [client, refreshAccount, query, type]);
+  useFocusEffect(useCallback(() => { cursorRef.current = null; void load(); }, [load]));
   const groups = useMemo(() => groupCaptures(filterCaptures(captures, query, type)), [captures, query, type]);
   return <Screen><FlatList
     data={groups} keyExtractor={group => group.key} contentContainerStyle={[styles.list, !groups.length && { flexGrow: 1 }]}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={colors.accent} />}
-    ListHeaderComponent={<View style={styles.header}><Brand compact /><View style={styles.titleRow}><View><Text style={typography.title}>Your collection.</Text><Text style={typography.small}>{account?.name ? `Good to see you, ${account.name}.` : 'Everything worth coming back to.'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Write a new note" onPress={() => router.push('/(app)/new-note')} style={styles.add}><Ionicons name="add" size={26} color={colors.white} /></Pressable></View><View style={styles.search}><Ionicons name="search" size={18} color={colors.muted} /><TextInput value={query} onChangeText={setQuery} placeholder="Find something you saved…" placeholderTextColor="#878D84" style={styles.searchInput} returnKeyType="search" /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{filters.map(filter => <Pressable key={filter.label} onPress={() => setType(filter.type)} style={[styles.filter, type === filter.type && styles.filterActive]}><Text style={[styles.filterText, type === filter.type && styles.filterTextActive]}>{filter.label}</Text></Pressable>)}</ScrollView><Message error>{error}</Message></View>}
+    onEndReached={() => void load(false, true)} onEndReachedThreshold={0.35}
+    ListHeaderComponent={<View style={styles.header}><Brand compact /><View style={styles.titleRow}><View><Text style={typography.title}>Your collection.</Text><Text style={typography.small}>{account?.name ? `Good to see you, ${account.name}.` : 'Everything worth coming back to.'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Write a new note" disabled={!policy.capture.note || updateRequired} onPress={() => router.push('/(app)/new-note')} style={[styles.add, (!policy.capture.note || updateRequired) && { opacity: .4 }]}><Ionicons name="add" size={26} color={colors.white} /></Pressable></View>{updateRequired ? <Message error>A newer App Store version is required before saving more items.</Message> : <Message>{policy.notice}</Message>}<View style={styles.search}><Ionicons name="search" size={18} color={colors.muted} /><TextInput value={query} onChangeText={setQuery} placeholder="Find something you saved…" placeholderTextColor="#878D84" style={styles.searchInput} returnKeyType="search" /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{filters.map(filter => <Pressable key={filter.label} onPress={() => setType(filter.type)} style={[styles.filter, type === filter.type && styles.filterActive]}><Text style={[styles.filterText, type === filter.type && styles.filterTextActive]}>{filter.label}</Text></Pressable>)}</ScrollView><Message error>{error}</Message></View>}
     renderItem={({ item }) => <CaptureCard capture={item.items[0]!} groupCount={item.items.length} />}
     ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+    ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 22 }} color={colors.accent} /> : captures.length && captures.length < total ? <Text style={[typography.small, { textAlign: 'center', margin: 22 }]}>Scroll for more</Text> : null}
     ListEmptyComponent={loading ? <View style={styles.empty}><ActivityIndicator color={colors.accent} /><Text style={typography.small}>Opening your collection…</Text></View> : <View style={styles.empty}><Ionicons name="bookmark-outline" size={34} color={colors.moss} /><Text style={typography.heading}>{query || type ? 'No finds this time.' : 'Your first good find goes here.'}</Text><Text style={[typography.body, { textAlign: 'center', color: colors.muted }]}>{query || type ? 'Try another word or choose Everything.' : 'Share something to Foundkeep from Safari, Photos, Files, or any app.'}</Text></View>}
   /></Screen>;
 }
