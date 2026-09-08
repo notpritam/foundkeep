@@ -26,7 +26,7 @@ enum FoundkeepItemError: LocalizedError {
   }
 }
 
-final class ShareItemLoader {
+final class ShareItemLoader: @unchecked Sendable {
   private let manager = FileManager.default
   private let policy = FoundkeepSharePolicy.current
   private let container: URL
@@ -57,7 +57,12 @@ final class ShareItemLoader {
   }
 
   private func load(_ provider: NSItemProvider, title: String?, sharedContext: [String: Any]?) async throws -> FoundkeepShareItem? {
-    let context = sharedContext ?? (try await webpageContext(provider))
+    let context: [String: Any]?
+    if let sharedContext {
+      context = sharedContext
+    } else {
+      context = try await webpageContext(provider)
+    }
     if provider.hasItemConformingToTypeIdentifier(UTType.propertyList.identifier) && provider.registeredTypeIdentifiers.allSatisfy({ $0 == UTType.propertyList.identifier }) { return nil }
     if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier), let url = try await value(provider, type: .url) as? URL {
       guard policy.allows("bookmark") else { throw FoundkeepItemError.disabled }
@@ -104,7 +109,7 @@ final class ShareItemLoader {
   private func value(_ provider: NSItemProvider, type: UTType) async throws -> NSSecureCoding? {
     try await withCheckedThrowingContinuation { continuation in
       provider.loadItem(forTypeIdentifier: type.identifier, options: nil) { value, error in
-        if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: value as? NSSecureCoding) }
+        if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: value) }
       }
     }
   }
