@@ -4,7 +4,7 @@ import {
   closeSync, createWriteStream, mkdirSync, openSync, readSync, renameSync,
   rmSync, statSync,
 } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 export const MAX_CUSTOMER_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_METADATA_HEADER = 16 * 1024;

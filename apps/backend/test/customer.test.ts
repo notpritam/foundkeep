@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
+import { existsSync } from "node:fs";
 import { openDb } from "../src/db.ts";
 import { createApp } from "../src/app.ts";
 
@@ -95,6 +96,20 @@ describe("customer account security", () => {
     expect((await mobile("/register", "POST", { email, name: "Mobile", password: PASSWORD, deviceName: "iPhone" })).status).toBe(409);
     expect((await mobile("/login", "POST", { email, password: "incorrect password", deviceName: "iPhone" })).status).toBe(401);
     expect((await mobile("/me")).status).toBe(401);
+  });
+
+  test("mobile account deletion requires the password and revokes the device", async () => {
+    const email = `mobile-delete-${++sequence}@example.com`;
+    const registered = await mobile("/register", "POST", { email, name: "Delete Mobile", password: PASSWORD, deviceName: "iPhone" });
+    const session = await registered.json();
+    const bearer = `Bearer ${session.token}`;
+    expect((await capture(bearer)).status).toBe(201);
+    expect((await mobile("/account", "DELETE", { password: "wrong password" }, bearer)).status).toBe(401);
+    expect((await mobile("/me", "GET", undefined, bearer)).status).toBe(200);
+    expect((await mobile("/account", "DELETE", { password: PASSWORD }, bearer)).status).toBe(200);
+    expect((await mobile("/me", "GET", undefined, bearer)).status).toBe(401);
+    expect((db.query("SELECT COUNT(*) n FROM customer_accounts WHERE id=?").get(session.account.id) as any).n).toBe(0);
+    expect((db.query("SELECT COUNT(*) n FROM customer_captures WHERE account_id=?").get(session.account.id) as any).n).toBe(0);
   });
 
   test("accepts both exact Foundkeep website origins and rejects lookalikes", async () => {
@@ -201,6 +216,21 @@ describe("customer account security", () => {
     const device = await connect(a.cookie);
     await capture(a.cookie);
     await capture(b.cookie);
+    const file = Buffer.from("Foundkeep account deletion file");
+    const fileMetadata = { clientId: crypto.randomUUID(), type: "file", fileName: "delete-me.txt", capturedAt: Date.now() };
+    expect((await app.request(`${ORIGIN}/api/mobile/captures/file`, {
+      method: "POST",
+      headers: {
+        authorization: device.bearer,
+        "content-type": "text/plain",
+        "content-length": String(file.length),
+        "x-foundkeep-capture": Buffer.from(JSON.stringify(fileMetadata)).toString("base64url"),
+      },
+      body: file,
+    })).status).toBe(201);
+    const storedFile = (db.query("SELECT file_path FROM customer_captures WHERE account_id=? AND file_path IS NOT NULL").get(a.account.id) as any).file_path;
+    const absoluteFile = `${process.env.ATLAS_DATA_DIR || new URL("../data", import.meta.url).pathname}/${storedFile}`;
+    expect(existsSync(absoluteFile)).toBe(true);
     const login = await request("/auth/login", "POST", { email: a.email, password: PASSWORD });
     const otherCookie = login.headers.get("set-cookie")!.split(";")[0]!;
     const change = await request("/auth/password", "POST", { currentPassword: PASSWORD, password: "replacement password 123" }, a.cookie);
@@ -213,6 +243,7 @@ describe("customer account security", () => {
     expect((await request("/account", "DELETE", { password: "replacement password 123" }, a.cookie)).status).toBe(200);
     expect((await request("/me", "GET", undefined, a.cookie)).status).toBe(401);
     expect((db.query("SELECT COUNT(*) n FROM customer_captures").get() as any).n).toBe(1);
+    expect(existsSync(absoluteFile)).toBe(false);
     expect((await request("/me", "GET", undefined, b.cookie)).status).toBe(200);
   });
 
@@ -456,6 +487,28 @@ describe("private customer captures", () => {
     expect(Buffer.from(await file.arrayBuffer())).toEqual(pdf);
     expect((await mobile(`/captures/${first.capture.id}`, "DELETE", undefined, bearer)).status).toBe(200);
     expect((await mobile(`/captures/${first.capture.id}/file`, "GET", undefined, bearer)).status).toBe(404);
+  });
+
+  test("mobile collection pagination returns every item once with a bounded cursor", async () => {
+    const registered = await mobile("/register", "POST", {
+      email: `pages-${++sequence}@example.com`, name: "Paged Owner", password: PASSWORD, deviceName: "iPhone",
+    });
+    const session = await registered.json();
+    const bearer = `Bearer ${session.token}`;
+    for (let index = 0; index < 105; index += 1) {
+      expect((await capture(bearer, { clientId: `page-${index}`, noteText: `Page ${index}`, capturedAt: 2_000_000 - index })).status).toBe(201);
+    }
+    const first = await (await mobile("/captures", "GET", undefined, bearer)).json() as any;
+    expect(first.captures).toHaveLength(50);
+    expect(first.total).toBe(105);
+    expect(first.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
+    const second = await (await mobile(`/captures?cursor=${first.nextCursor}`, "GET", undefined, bearer)).json() as any;
+    const third = await (await mobile(`/captures?cursor=${second.nextCursor}`, "GET", undefined, bearer)).json() as any;
+    expect(second.captures).toHaveLength(50);
+    expect(third.captures).toHaveLength(5);
+    expect(third.nextCursor).toBeNull();
+    expect(new Set([...first.captures, ...second.captures, ...third.captures].map(item => item.id)).size).toBe(105);
+    expect((await mobile("/captures?cursor=not-a-cursor", "GET", undefined, bearer)).status).toBe(400);
   });
 
   test("models universal mobile items and preserves multi-share provenance", async () => {

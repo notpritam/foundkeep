@@ -61,6 +61,22 @@ class CustomerError extends Error {
 function fail(status: CustomerError["status"], code: string, message: string): never { throw new CustomerError(status, code, message); }
 function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
 function secret() { return randomBytes(32).toString("base64url"); }
+function mobileCursor(raw: string): { capturedAt: number; id: string } | null {
+  if (!raw) return null;
+  if (raw.length > 256 || !/^[A-Za-z0-9_-]+$/.test(raw)) fail(400, "invalid_cursor", "Refresh the collection and try again.");
+  try {
+    const data = Buffer.from(raw, "base64url");
+    if (data.toString("base64url") !== raw) throw new Error();
+    const value = JSON.parse(data.toString("utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 2 ||
+        !Number.isSafeInteger(value.capturedAt) || value.capturedAt < 0 ||
+        typeof value.id !== "string" || !/^[A-Za-z0-9-]{1,80}$/.test(value.id)) throw new Error();
+    return value;
+  } catch { fail(400, "invalid_cursor", "Refresh the collection and try again."); }
+}
+function encodeMobileCursor(row: CustomerCaptureRow) {
+  return Buffer.from(JSON.stringify({ capturedAt: row.captured_at, id: row.id })).toString("base64url");
+}
 function accountDto(row: AccountRow) { return { id: row.id, email: row.email, name: row.name, createdAt: row.created_at }; }
 function connectionDto(row: ConnectionRow) { return { id: row.id, name: row.name, createdAt: row.created_at, lastSeenAt: row.last_seen_at }; }
 export function customerCaptureDto(row: CustomerCaptureRow) {
@@ -306,6 +322,23 @@ export function customerRoutes(db: Database) {
       .run(connection.id, accountId, name, hash(token), connection.created_at, null, connection.expires_at);
     return { token, connection: connectionDto(connection) };
   }
+  async function destroyAccount(c: C, current: Auth) {
+    rates.take(`sensitive:${current.account.id}`, 10, 15 * 60_000);
+    const body = await jsonBody(c);
+    if (!(await verifyPassword(passwordField(body, "password", false), current.account.password_hash))) fail(401, "invalid_credentials", "The password is incorrect.");
+    const ownedFiles = db.query("SELECT file_path FROM customer_captures WHERE account_id = ? AND file_path IS NOT NULL").all(current.account.id) as { file_path: string }[];
+    db.transaction(() => {
+      const latest = auth(c, current.kind === "session");
+      if (latest.kind !== current.kind || latest.credentialId !== current.credentialId || latest.account.password_hash !== current.account.password_hash) {
+        fail(401, "invalid_credentials", "Your account access changed. Sign in again.");
+      }
+      revoke(current.account.id);
+      db.query("DELETE FROM customer_preferences WHERE account_id = ?").run(current.account.id);
+      db.query("DELETE FROM customer_captures WHERE account_id = ?").run(current.account.id);
+      db.query("DELETE FROM customer_accounts WHERE id = ?").run(current.account.id);
+    })();
+    for (const file of ownedFiles) removeCustomerFile(config.dataDir, file.file_path);
+  }
   function revoke(accountId: string, keepSession?: string) {
     if (keepSession) db.query("DELETE FROM customer_sessions WHERE account_id = ? AND id != ?").run(accountId, keepSession);
     else db.query("DELETE FROM customer_sessions WHERE account_id = ?").run(accountId);
@@ -431,6 +464,13 @@ export function customerRoutes(db: Database) {
     return c.json({ ok: true });
   });
 
+  app.delete("/mobile/account", async (c) => {
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    await destroyAccount(c, current);
+    return c.json({ ok: true });
+  });
+
   app.post("/auth/register", async (c) => {
     website(c);
     publicRate(c, "register");
@@ -526,18 +566,7 @@ export function customerRoutes(db: Database) {
 
   app.delete("/account", async (c) => {
     const current = auth(c, true);
-    rates.take(`sensitive:${current.account.id}`, 10, 15 * 60_000);
-    const body = await jsonBody(c);
-    if (!(await verifyPassword(passwordField(body, "password", false), current.account.password_hash))) fail(401, "invalid_credentials", "The password is incorrect.");
-    db.transaction(() => {
-      const latest = auth(c, true);
-      if (latest.account.password_hash !== current.account.password_hash) fail(401, "invalid_credentials", "Your password changed. Sign in again.");
-      // Explicit deletes also protect installations opened without FK enforcement.
-      revoke(current.account.id);
-      db.query("DELETE FROM customer_preferences WHERE account_id = ?").run(current.account.id);
-      db.query("DELETE FROM customer_captures WHERE account_id = ?").run(current.account.id);
-      db.query("DELETE FROM customer_accounts WHERE id = ?").run(current.account.id);
-    })();
+    await destroyAccount(c, current);
     deleteCookie(c, cookieName, cookieOptions);
     return c.json({ ok: true });
   });
@@ -831,6 +860,7 @@ export function customerRoutes(db: Database) {
     if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
+    const cursor = mobileCursor(c.req.query("cursor") || "");
     if (search.length > 200 || (type && !TYPES.has(type))) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
     const where = ["account_id = ?"];
     const args: (string | number)[] = [current.account.id];
@@ -840,8 +870,14 @@ export function customerRoutes(db: Database) {
       where.push("(source_title LIKE ? ESCAPE '\\' OR note_text LIKE ? ESCAPE '\\' OR selection_text LIKE ? ESCAPE '\\' OR article_text LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR ocr_text LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')");
       args.push(...Array(7).fill(like));
     }
-    const rows = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC,id DESC LIMIT 101`).all(...args) as CustomerCaptureRow[];
-    return c.json({ captures: rows.slice(0, 100).map(customerCaptureDto), nextCursor: null, total: rows.length });
+    const total = (db.query(`SELECT COUNT(*) count FROM customer_captures WHERE ${where.join(" AND ")}`).get(...args) as { count: number }).count;
+    if (cursor) {
+      where.push("(captured_at < ? OR (captured_at = ? AND id < ?))");
+      args.push(cursor.capturedAt, cursor.capturedAt, cursor.id);
+    }
+    const rows = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC,id DESC LIMIT 51`).all(...args) as CustomerCaptureRow[];
+    const page = rows.slice(0, 50);
+    return c.json({ captures: page.map(customerCaptureDto), nextCursor: rows.length > 50 ? encodeMobileCursor(page.at(-1)!) : null, total });
   });
 
   function serveCustomerFile(c: C, cookieOnly: boolean) {
