@@ -2,6 +2,10 @@
 
 Use these values for the first iPhone release. Text marked **account-owner action** depends on the legal Apple Developer account and cannot be inferred from the codebase.
 
+Current submission: **1.0.0 (14)** is selected in App Store Connect, with the five Gallery screenshots processed and automatic release after approval selected. Submission is **not sent**: Apple requires the review contact phone number and published App Privacy answers. See [verified status](submission-status.json).
+
+Expo ownership is `@notpritam/foundkeep`, signed in as `notpritam` using `notpritamsharma@gmail.com`. The account has no additional members or pending invitations. The project ID is `33362145-2b45-4d86-bb08-cd10c6bfae61`.
+
 ## 1. Create the app record
 
 | App Store Connect field | Enter |
@@ -51,7 +55,7 @@ Apple should calculate the lowest general rating. Do not manually promise a nume
 | Price | Free |
 | In-App Purchases | None |
 | Availability | All intended countries/regions; omit any country where the account owner cannot meet local obligations |
-| App release | Manually release this version, so the website and announcement can be coordinated after approval |
+| App release | Automatically release after Apple approves this version (user-authorized launch) |
 | Apple silicon Mac availability | Disable for 1.0.0; the Share Extension and interface are designed and tested for iPhone |
 | Apple Vision Pro availability | Disable for 1.0.0 |
 | EU Digital Services Act trader status | **Account-owner action:** answer from the seller's legal/business status and publish the required contact details if classified as a trader |
@@ -75,13 +79,10 @@ EVERY SOURCE STAYS ATTACHED
 Foundkeep preserves the strongest origin record available: the original and canonical links, page title, site, author, dates, capture method, filename, media type, and capture time. Open a saved item to return to where it came from.
 
 ONE PRIVATE COLLECTION
-Everything you save appears in a searchable, filterable collection. Items shared together stay grouped together. The same account powers the iPhone app and your Foundkeep web dashboard.
+Browse your saves in a visual Gallery, search your collection, and filter by type. Create folders and your own tags to organize items while saving or afterward. Items shared together stay grouped together. The same account powers the iPhone app and your Foundkeep web dashboard.
 
 BUILT FOR THE SHARE MENU
-Open Foundkeep once to sign in. Then choose Foundkeep from the iOS Share menu, add an optional note, and save. If the network is unavailable, the Share Extension keeps a protected local copy and retries after you reopen Foundkeep.
-
-OPTIONAL CAPTURE ALERTS
-Turn on private capture-ready alerts from Settings. Alerts contain no saved title, text, source, file, email address, or account name. Tap an alert to open the exact item in Foundkeep.
+Open Foundkeep once to sign in. Then choose Foundkeep from the iOS Share menu, pick a folder, add tags or an optional note, and save. If the network is unavailable, the Share Extension keeps a protected local copy and retries after you reopen Foundkeep.
 
 YOU STAY IN CONTROL
 Delete captures from the app, export your cloud library from the web dashboard, or permanently delete your account. Data-only safety policy and feature settings can refresh without changing native permissions. Native capabilities arrive through signed App Store updates.
@@ -120,9 +121,11 @@ Upload the PNGs in `docs/app-store/screenshots/en-US/6.9-inch/` in filename orde
 4. `04-new-note.png`
 5. `05-settings.png`
 
-Each image is a real render of the shipped React Native interface at 1290 × 2796 pixels, RGB, with no alpha channel. The sample content is fictional and contains no private customer data. No app preview video is needed for 1.0.0.
+Each image is a browser render of the shipped React Native components at 1290 × 2796 pixels, RGB, with no alpha channel. The sample collection is fictional and contains no private customer data. The image fixture comes from the [documented design assets](../design/mobile-v2/README.md#assets); it is not bundled in the app. Separate native Simulator evidence is in `docs/design/mobile-v2/verification/`. No app preview video is needed for 1.0.0.
 
 ## 6. App privacy
+
+In App Store Connect, open **FoundKeep → App Privacy → Get Started**. Complete the categories below, then click **Publish**. Saving a draft does not satisfy Apple's submission validation. This form is not exposed by Apple's public App Store Connect API.
 
 Answer **Yes, we collect data from this app**. Foundkeep does not use data for tracking.
 
@@ -168,7 +171,10 @@ When asked whether the app uses encryption, answer based on Apple's exact flow:
 - Sign-in required: Yes
 - User name: copy it from the private reviewer-credentials artifact created during deployment
 - Password: copy it from the same private artifact
-- Contact first name / last name / phone / email: **Account-owner action:** use a monitored contact who can answer Apple during review
+- Contact first name: `Pritam`
+- Contact last name: `Sharma`
+- Contact email: `notpritamsharma@gmail.com`
+- Contact phone: **Account-owner action:** supply a reachable number with its country code. Apple rejects creation of the reviewer information record without it.
 
 ### Notes for App Review
 
@@ -179,17 +185,17 @@ Use the supplied review account to sign in. The account contains fictional sampl
 
 To test the main app:
 1. Sign in with the review credentials.
-2. The Collection tab shows the private sample collection.
+2. The Gallery tab shows the private sample collection. Search or filter by type.
 3. Open any item to see its saved source record.
-4. Use New note to save a note, then delete it from its detail screen if desired.
+4. Tap + to save a note, choose a folder, and add your own tags. Edit and organize a saved item from its detail screen.
 5. Account deletion is available in Settings → Delete account and requires the current password plus a final confirmation.
-6. In Settings, enable Capture-ready alerts. After saving a new note, the generic notification opens that exact item. Foundkeep does not put saved content or account details in the alert.
+6. Push alerts are disabled in this release while provider activation is pending. Password sign-in is the supported authentication method.
 
 To test the Share Extension:
 1. Open Safari and visit any public page.
 2. Tap Share, choose More if needed, and select Foundkeep.
-3. The extension shows the item and its source. Add an optional note and tap Save.
-4. Return to Foundkeep; the item appears in Collection. If the device was offline, opening Foundkeep retries the protected queue.
+3. The extension shows the item and its source. Choose a folder, add tags or an optional note, and tap Save.
+4. Return to Foundkeep; the item appears in Gallery. If the device was offline, opening Foundkeep retries the protected queue.
 
 The Share Extension also accepts selected text, images, video, audio, PDFs, documents, and other files up to 50 MiB each. It receives only items the reviewer explicitly shares. Source links open in the system browser. The app has no embedded unrestricted browser, advertising, social feed, messaging, purchases, or tracking.
 
@@ -201,8 +207,8 @@ Account export is available after signing in at https://foundkeep.app/dashboard.
 1. Confirm the Apple Developer account has the main App ID, Share Extension App ID, and App Group capability.
 2. Authenticate EAS CLI and link the local Expo project.
 3. Create the production iOS build from `apps/mobile`.
-4. Install the build through TestFlight and test sign-in return links, capture notifications, notes, deletion, all Share-menu types, a multi-item share, offline queue retry, and source return links on a physical iPhone.
-5. Upload/select build 1, add the screenshots and listing text, complete privacy and age-rating forms, and paste the private review credentials.
-6. Submit for review with manual release selected.
+4. Install the build through TestFlight and test sign-in return links, notes, deletion, all Share-menu types, a multi-item share, offline queue retry, and source return links on a physical iPhone.
+5. Select build 14 (version 1.0.0), add the screenshots and listing text, complete privacy and age-rating forms, and paste the private review credentials.
+6. Submit for review with automatic release after approval selected.
 
 Native code, entitlements, permissions, Share Extension changes and native dependency changes require a new App Store binary. Compatible JavaScript/interface fixes can ship through the production EAS Update channel. Foundkeep's remote mobile policy is strictly data-only and can change capture availability, bounded limits, notices and the minimum supported version without executing remote code.

@@ -32,7 +32,15 @@ const captures = [
   { ...baseCapture, id: 'video', clientId: 'video', type: 'video', sourceTitle: null, sourceUrl: null, fileName: 'Prototype walkthrough.mov', fileMime: 'video/quicktime', fileBytes: 8_641_923, fileUrl: '/api/captures/video/file', capturedAt: now - 259_200_000, provenance: { sourceApplication: 'Photos' } },
 ];
 const account = { id: 'review', email: 'review@foundkeep.app', name: 'App Review', createdAt: now - 999_999 };
-const policy = { schemaVersion: 1, revision: 2, cacheSeconds: 300, minimumVersion: '1.0.0', features: { notifications: true }, capture: { bookmark: true, selection: true, note: true, image: true, video: true, audio: true, document: true, file: true }, limits: { fileBytes: 52_428_800, textCharacters: 50_000, articleCharacters: 500_000, batchItems: 20, uploadTimeoutSeconds: 15 }, notice: null };
+const policy = JSON.parse(await readFile('../web/mobile-policy.json', 'utf8'));
+const sampleImage = await readFile('../../docs/design/mobile-v2/assets/interior.jpg');
+const reading = { id: 'reading', name: 'Reading', count: 1, createdAt: now, updatedAt: now };
+captures[0].folder = reading;
+captures[0].userTags = ['Read later'];
+captures[3].userTags = ['Inspiration'];
+// These fixture bytes are delivered through the same authenticated image route
+// as a customer's upload. They are sample content, never bundled in the app.
+captures.splice(1, 0, captures.splice(3, 1)[0]);
 
 const executablePath = process.env.CHROMIUM_PATH || '/home/pritam/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome';
 const browser = await chromium.launch({ headless: true, executablePath });
@@ -44,7 +52,8 @@ const makeContext = async signedIn => {
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (url.pathname === '/mobile-policy.json') return json(policy);
     if (url.pathname === '/api/mobile/me') return json({ account, connectionId: 'review-device', usage: { captures: captures.length, bytes: 13_081_673, maxCaptures: 1000, maxBytes: 209_715_200 } });
-    if (url.pathname === '/api/mobile/organization') return json({ folders: [], tags: [], suggestedTags: ['Read later', 'Inspiration', 'Work', 'Personal'], suggestedFolders: ['Reading', 'Projects', 'Inspiration'] });
+    if (url.pathname === '/api/mobile/organization') return json({ folders: [reading], tags: [{ name: 'Read later', count: 1 }, { name: 'Inspiration', count: 1 }], suggestedTags: ['Read later', 'Inspiration', 'Work', 'Personal'], suggestedFolders: ['Reading', 'Projects', 'Inspiration'] });
+    if (url.pathname === '/api/mobile/captures/image/file') return route.fulfill({ status: 200, contentType: 'image/jpeg', body: sampleImage });
     if (url.pathname === '/api/mobile/captures') return json({ captures, total: captures.length, nextCursor: null });
     if (url.pathname.startsWith('/api/mobile/captures/')) {
       const id = url.pathname.split('/')[4];

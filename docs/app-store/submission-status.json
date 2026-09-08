@@ -1,0 +1,53 @@
+{
+  "appId": "6809771188",
+  "appVersion": "1.0.0",
+  "build": "14",
+  "buildId": "c4ec4541-c4f3-4dff-954b-bcebfe1104fc",
+  "releaseType": "AFTER_APPROVAL",
+  "appStoreState": "PREPARE_FOR_SUBMISSION",
+  "screenshots": [
+    {
+      "id": "388f2bbd-56de-4f67-bcd5-6ae1e8de498d",
+      "fileName": "gallery-01-welcome.png",
+      "state": "COMPLETE"
+    },
+    {
+      "id": "9c08a6e2-c0ef-49de-be47-7fb28235247a",
+      "fileName": "gallery-02-collection.png",
+      "state": "COMPLETE"
+    },
+    {
+      "id": "fbf536f7-0517-4347-b47a-dad4c9e6998d",
+      "fileName": "gallery-03-source-detail.png",
+      "state": "COMPLETE"
+    },
+    {
+      "id": "44809c5c-e8f4-4121-80da-01919e3b97f1",
+      "fileName": "gallery-04-new-note.png",
+      "state": "COMPLETE"
+    },
+    {
+      "id": "d9c9e284-e025-4962-9495-cf620925bcfe",
+      "fileName": "gallery-05-settings.png",
+      "state": "COMPLETE"
+    }
+  ],
+  "expo": {
+    "username": "notpritam",
+    "email": "notpritamsharma@gmail.com",
+    "project": "@notpritam/foundkeep",
+    "projectId": "33362145-2b45-4d86-bb08-cd10c6bfae61",
+    "additionalMembers": 0,
+    "pendingInvitations": 0
+  },
+  "submissionId": "c1741dc1-0bcb-4f07-8e16-18ff0f351ba3",
+  "submitted": false,
+  "blockers": [
+    "App Review contact phone number",
+    "Publish App Privacy answers in App Store Connect"
+  ],
+  "ci": {
+    "runId": "34265762252",
+    "conclusion": "success"
+  }
+}
