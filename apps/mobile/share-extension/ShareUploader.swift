@@ -55,7 +55,7 @@ final class ShareUploader {
   private let queue: URL
   private let policy = FoundkeepSharePolicy.current
   private let connection: FoundkeepQueueSession?
-  private var uploadedClientIds = Set<String>()
+  private var batch = FoundkeepShareBatch()
   private let session = URLSession(configuration: .ephemeral, delegate: FoundkeepNoRedirectDelegate(), delegateQueue: nil)
 
   init() throws {
@@ -136,24 +136,23 @@ final class ShareUploader {
       guard let name = FoundkeepQueueScope.organizationName(value, limit: 40) else { throw FoundkeepUploadError.invalidOrganization }
       if seenTags.insert(name.lowercased()).inserted { normalizedTags.append(name) }
     }
-    let batchId = UUID().uuidString
     var records: [(FoundkeepShareItem, URL)] = []
     // Persist the whole batch before its first network request. An explicit
-    // folder correction can replace pending records using the same client IDs.
-    for item in items where !uploadedClientIds.contains(item.clientId) {
+    // folder correction keeps the batch and client IDs of the original save.
+    for item in batch.pendingItems(items, clientId: { $0.clientId }) {
       guard try self.token() == token else { throw FoundkeepUploadError.signedOut }
-      records.append((item, try enqueue(item, batchId: batchId, note: note, folderId: folderId, userTags: normalizedTags)))
+      records.append((item, try enqueue(item, batchId: batch.id, note: note, folderId: folderId, userTags: normalizedTags)))
     }
     for (item, recordURL) in records {
       do {
         try await submit(recordURL, token: token)
-        uploadedClientIds.insert(item.clientId)
+        batch.markUploaded(clientId: item.clientId)
       } catch FoundkeepUploadError.folderNotFound {
         for (_, pendingURL) in records { markOrganizationReview(pendingURL) }
         throw FoundkeepUploadError.folderNotFound
       } catch { }
     }
-    let uploaded = items.filter { uploadedClientIds.contains($0.clientId) }.count
+    let uploaded = items.count - batch.pendingItems(items, clientId: { $0.clientId }).count
     return FoundkeepSaveResult(uploaded: uploaded, queued: items.count - uploaded)
   }
 

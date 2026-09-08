@@ -56,6 +56,25 @@ struct QueueScopeTests {
     let legacyJSON = queuedJSON.replacingOccurrences(of: #""ownerAccountId":"account-a","#, with: "")
     var legacy = try! JSONDecoder().decode(FoundkeepPendingRecord.self, from: Data(legacyJSON.utf8))
     expect(legacy.ownerAccountId == nil && !legacy.resolveFolderToUnfiled(for: "account-a"), "Legacy ownerless captures decode safely and are never reassigned")
+    // A succeeds, B discovers a deleted folder, then the user chooses Unfiled.
+    // The second attempt must retain A's batch while retrying only B and C.
+    var batch = FoundkeepShareBatch()
+    let sharedItems = ["A", "B", "C"]
+    let originalBatchId = batch.id
+    expect(batch.pendingItems(sharedItems, clientId: { $0 }) == sharedItems, "The first attempt includes every shared item")
+    batch.markUploaded(clientId: "A")
+    let correctedItems = batch.pendingItems(sharedItems, clientId: { $0 })
+    expect(correctedItems == ["B", "C"], "Folder correction retries pending items without uploading A again")
+    let correctedRecords = correctedItems.map { clientId in
+      FoundkeepPendingRecord(id: "record-\(clientId)", clientId: clientId, batchId: batch.id, ownerAccountId: "account-a", metadata: ["batchId": .string(batch.id), "folderId": .null], payloadPath: nil, attempts: 0, nextAttemptAt: 0, createdAt: 1000, requiresOrganizationReview: false, organizationReviewReason: nil)
+    }
+    expect(correctedRecords.allSatisfy { $0.batchId == originalBatchId && $0.metadata["batchId"] == .string(originalBatchId) }, "Corrected B and C remain Saved together with the already uploaded A")
+    let durableCorrection = try! JSONDecoder().decode([FoundkeepPendingRecord].self, from: JSONEncoder().encode(correctedRecords))
+    expect(durableCorrection.allSatisfy { $0.batchId == originalBatchId && $0.metadata["batchId"] == .string(originalBatchId) }, "Durable retry metadata retains the original batch after folder correction")
+    batch.markUploaded(clientId: "B")
+    batch.markUploaded(clientId: "C")
+    expect(batch.pendingItems(sharedItems, clientId: { $0 }).isEmpty && batch.id == originalBatchId, "Finishing a corrected share keeps one batch identity")
+    expect(FoundkeepShareBatch().id != originalBatchId, "A separate share session starts a separate batch")
     print("Passed \(checks) native queue scope checks.")
   }
 }

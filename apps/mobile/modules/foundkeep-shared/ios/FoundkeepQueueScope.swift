@@ -5,6 +5,19 @@ struct FoundkeepQueueSession: Equatable {
   let accountId: String
 }
 
+struct FoundkeepShareBatch {
+  let id = UUID().uuidString
+  private(set) var uploadedClientIds = Set<String>()
+
+  func pendingItems<Item>(_ items: [Item], clientId: (Item) -> String) -> [Item] {
+    items.filter { !uploadedClientIds.contains(clientId($0)) }
+  }
+
+  mutating func markUploaded(clientId: String) {
+    uploadedClientIds.insert(clientId)
+  }
+}
+
 enum FoundkeepQueueScope {
   static func organizationName(_ value: String, limit: Int) -> String? {
     let name = value.trimmingCharacters(in: .whitespacesAndNewlines).precomposedStringWithCanonicalMapping
@@ -94,4 +107,3 @@ enum FoundkeepJSONValue: Codable, Equatable {
     }
   }
 }
-
