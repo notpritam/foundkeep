@@ -124,6 +124,9 @@
 .capture-open { display:block; padding:0; width:100%; color:var(--ink); background:transparent; text-align:left; }
 .capture-open:focus-visible { outline-offset:-3px; }
 .capture-open>img { width:100%; height:190px; object-fit:cover; object-position:top; border-bottom:1px solid #d8dccf; background:#e4e8dd; }
+.file-card-preview { min-height:144px; display:flex; flex-direction:column; justify-content:flex-end; gap:6px; padding:20px; border-bottom:1px solid var(--line); background:#e7e9df; text-align:left; }
+.file-card-preview strong { max-width:100%; overflow-wrap:anywhere; font-size:17px; line-height:1.25; }
+.file-card-kind,.file-card-size { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
 .capture-card-body { padding:18px; }
 .capture-meta { display:flex; gap:12px; justify-content:space-between; font-size:10px; color:var(--muted); }
 .capture-meta time { white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -161,6 +164,11 @@
 .detail-body>h2 { font-size:32px; line-height:1.15; }
 .detail-source { display:inline-block; font-size:12px; margin-top:17px; color:var(--muted); }
 .detail-image { margin-top:24px; width:100%; height:auto; background:#e6e9dd; border:1px solid var(--line); border-radius:6px; }
+.detail-media { display:block; width:100%; max-height:55vh; margin:20px 0; background:#171917; }
+.detail-audio { display:block; width:100%; margin:20px 0; }
+.detail-file { margin-top:20px; padding:17px; border:1px solid var(--line); border-radius:8px; background:#f7f8f3; }
+.detail-file h3 { overflow-wrap:anywhere; font-size:16px; }
+.detail-file p { margin:6px 0 15px; color:var(--muted); font-size:11px; }
 .detail-section { margin-top:28px; }
 .detail-section h3 { font-family:Geist,sans-serif; font-size:11px; letter-spacing:0; font-weight:600; color:var(--muted); margin-bottom:10px; }
 .detail-section p { font-size:14px; line-height:1.8; white-space:pre-wrap; }

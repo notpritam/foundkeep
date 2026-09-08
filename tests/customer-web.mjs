@@ -166,6 +166,31 @@ test('library search, filter and detail render capture text safely', async t => 
   await page.keyboard.press('/'); assert.equal(await page.evaluate(() => document.activeElement.id), 'search');
 });
 
+test('universal files render as collection items with safe previews and origin details', async t => {
+  const batchId = '09f0c5db-1b39-44f0-b020-ad11b7d87d9c';
+  const captures = [
+    { id: 'document-1', clientId: 'document-1', batchId, type: 'document', status: 'done', sourceTitle: 'Quarterly report', sourceUrl: 'https://example.com/report', fileName: 'Quarterly Report.pdf', fileMime: 'application/pdf', fileBytes: 12345, fileUrl: '/api/captures/document-1/file', capturedAt: now, tags: [], provenance: { sourceApplication: 'com.apple.DocumentsApp', originalFileName: 'Quarterly Report.pdf', declaredMime: 'application/pdf', byteSize: 12345 } },
+    { id: 'audio-1', clientId: 'audio-1', batchId, type: 'audio', status: 'done', fileName: 'Voice memo.m4a', fileMime: 'audio/mp4', fileBytes: 23456, fileUrl: '/api/captures/audio-1/file', capturedAt: now - 1, tags: [] },
+    { id: 'video-1', clientId: 'video-1', batchId, type: 'video', status: 'done', fileName: 'Clip.mp4', fileMime: 'video/mp4', fileBytes: 34567, fileUrl: '/api/captures/video-1/file', capturedAt: now - 2, tags: [] },
+    { id: 'file-1', clientId: 'file-1', batchId, type: 'file', status: 'done', fileName: 'Archive.zip', fileMime: 'application/octet-stream', fileBytes: 45678, fileUrl: '/api/captures/file-1/file', capturedAt: now - 3, tags: [] },
+  ];
+  const { page } = await pageFor(t, { captures });
+  await openLibrary(page);
+  for (const type of ['video', 'audio', 'document', 'file']) assert.equal(await page.locator(`[data-type="${type}"]`).count(), 1);
+  assert.match(await page.locator('#capture-grid').textContent(), /Quarterly Report\.pdf/);
+  assert.match(await page.locator('#capture-grid').textContent(), /Voice memo\.m4a/);
+  await page.locator('[data-type="document"]').click();
+  await page.locator('.capture-open').click();
+  await page.locator('#detail-actions').waitFor({ state: 'visible' });
+  const detail = await page.locator('#detail-body').textContent();
+  assert.match(detail, /12\.1 KB/);
+  assert.match(detail, /com\.apple\.DocumentsApp/);
+  assert.match(detail, /application\/pdf/);
+  const fileLink = page.locator('#detail-body a[href="/api/captures/document-1/file"]');
+  assert.equal(await fileLink.count(), 1);
+  assert.equal(await fileLink.getAttribute('target'), '_blank');
+});
+
 test('bookmark details preserve a readable trail back to the original page', async t => {
   const { page } = await pageFor(t, { captures: [fixtureCaptures.find(capture => capture.id === 'bookmark')] });
   await openLibrary(page); await page.locator('.capture-open').click();

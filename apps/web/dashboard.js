@@ -1,7 +1,7 @@
 import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig, setAccountContext } from './customer.js?v=1.5.0';
 
 const state = { account: null, connections: [], usage: null, captures: [], cursor: null, total: 0, type: '', query: '', listRequest: 0, controller: null, detailRequest: 0, detail: null, extension: null, extensionId: null, expired: false, noteClientId: null, recoveryCode: '', connecting: false, preferences: null, preferenceRevision: 0 };
-const kinds = { screenshot: 'Screenshot', selection: 'Highlight', bookmark: 'Bookmark', image: 'Image', note: 'Note', tweet: 'Tweet' };
+const kinds = { screenshot: 'Screenshot', selection: 'Highlight', bookmark: 'Bookmark', image: 'Image', video: 'Video', audio: 'Audio', document: 'Document', file: 'File', note: 'Note', tweet: 'Tweet' };
 let toastTimer, searchTimer, listRetry = () => loadCaptures();
 
 function toast(message) {
@@ -38,6 +38,16 @@ window.addEventListener('atlas-session-expired', expireSession);
 $('#session-dialog').addEventListener('cancel', event => event.preventDefault());
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
 function bytes(value) { return `${((value || 0) / 1048576).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`; }
+function fileBytes(value) {
+  const amount = Math.max(0, Number(value) || 0);
+  if (amount < 1024) return `${amount} B`;
+  if (amount < 1048576) return `${(amount / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} KB`;
+  return `${(amount / 1048576).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
+}
+function safeFileUrl(value, id) {
+  const expected = `/api/captures/${encodeURIComponent(String(id))}/file`;
+  return value === expected ? expected : null;
+}
 function updateAccount() {
   const { account, usage, connections } = state;
   if (!account) return;
@@ -159,7 +169,7 @@ function showLibraryState(title, description, { loading = false, retry, action, 
   }
 }
 function captureTitle(capture) {
-  return capture.sourceTitle || (capture.noteText || capture.selectionText || '').slice(0, 120) || `Untitled ${kinds[capture.type]?.toLowerCase() || 'capture'}`;
+  return capture.sourceTitle || capture.fileName || (capture.noteText || capture.selectionText || '').slice(0, 120) || `Untitled ${kinds[capture.type]?.toLowerCase() || 'capture'}`;
 }
 
 const captureMethods = {
@@ -167,6 +177,9 @@ const captureMethods = {
   'keyboard-highlight': 'Highlight keyboard shortcut', 'keyboard-region': 'Region keyboard shortcut', 'keyboard-full-page': 'Full page keyboard shortcut',
   'context-save-page': 'Saved from right-click menu', 'context-selection': 'Selection from right-click menu', 'context-link': 'Link from right-click menu', 'context-image': 'Image from right-click menu',
   'extension-note': 'Note from extension', 'library-note': 'Note from library', 'twitter-action': 'Saved from X',
+  'ios-share-url': 'Shared from iPhone', 'ios-share-text': 'Text shared from iPhone', 'ios-share-image': 'Image shared from iPhone',
+  'ios-share-video': 'Video shared from iPhone', 'ios-share-audio': 'Audio shared from iPhone', 'ios-share-document': 'Document shared from iPhone',
+  'ios-share-file': 'File shared from iPhone', 'ios-app-note': 'Note from iPhone app',
 };
 function originValue(list, label, value) {
   if (value === null || value === undefined || value === '') return;
@@ -202,6 +215,10 @@ function appendCaptureOrigin(body, capture) {
   if (provenance.contentHash) originValue(list, 'Content fingerprint', textElement('code', provenance.contentHash));
   originValue(list, 'Extraction', provenance.extractionStatus);
   if (provenance.extractionError) originValue(list, 'Extraction note', provenance.extractionError);
+  originValue(list, 'Source app', provenance.sourceApplication);
+  originValue(list, 'Original file', provenance.originalFileName);
+  originValue(list, 'Declared type', provenance.declaredMime);
+  originValue(list, 'Original size', Number.isSafeInteger(provenance.byteSize) ? fileBytes(provenance.byteSize) : null);
   section.append(list);
   if (Array.isArray(provenance.headings) && provenance.headings.length) {
     const outline = textElement('details', null, 'origin-outline'); outline.append(textElement('summary', `Page outline · ${provenance.headings.length} headings`));
@@ -218,6 +235,16 @@ function captureCard(capture) {
     const image = textElement('img'); image.src = blob; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
     image.addEventListener('error', () => { image.replaceWith(textElement('div', 'Image preview unavailable. Open to retry.', 'image-unavailable')); }, { once: true });
     button.append(image);
+  }
+  const fileUrl = safeFileUrl(capture.fileUrl, capture.id);
+  if (!blob && fileUrl) {
+    const preview = textElement('div', null, 'file-card-preview');
+    preview.append(
+      textElement('span', kinds[capture.type] || 'File', 'file-card-kind'),
+      textElement('strong', capture.fileName || 'Shared file'),
+      textElement('span', fileBytes(capture.fileBytes), 'file-card-size'),
+    );
+    button.append(preview);
   }
   const body = textElement('div', null, 'capture-card-body');
   const meta = textElement('div', null, 'capture-meta'); meta.append(textElement('span', kinds[capture.type] || 'Capture'), textElement('time', dateLabel(capture.capturedAt)));
@@ -321,6 +348,20 @@ async function openCapture(id) {
         const errorBox = textElement('div', 'The image could not load. ', 'form-message is-error');
         const retry = textElement('button', 'Retry image', 'subtle-button'); retry.type = 'button'; retry.addEventListener('click', () => openCapture(id)); errorBox.append(retry); image.replaceWith(errorBox);
       }, { once: true }); body.append(image);
+    }
+    const fileUrl = safeFileUrl(capture.fileUrl, capture.id);
+    if (fileUrl) {
+      if (capture.fileMime?.startsWith('image/')) {
+        const image = textElement('img', null, 'detail-image'); image.src = fileUrl; image.alt = capture.fileName || capture.sourceTitle || 'Saved image'; body.append(image);
+      } else if (capture.fileMime?.startsWith('video/')) {
+        const video = textElement('video', null, 'detail-media'); video.src = fileUrl; video.controls = true; video.preload = 'metadata'; body.append(video);
+      } else if (capture.fileMime?.startsWith('audio/')) {
+        const audio = textElement('audio', null, 'detail-audio'); audio.src = fileUrl; audio.controls = true; audio.preload = 'metadata'; body.append(audio);
+      }
+      const filePanel = textElement('section', null, 'detail-file');
+      filePanel.append(textElement('h3', capture.fileName || 'Shared file'), textElement('p', `${capture.fileMime || 'File'} · ${fileBytes(capture.fileBytes)}`));
+      const link = textElement('a', capture.fileMime === 'application/octet-stream' ? 'Download saved file' : 'Open saved file', 'button secondary compact');
+      link.href = fileUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; filePanel.append(link); body.append(filePanel);
     }
     appendCaptureOrigin(body, capture);
     for (const [title, content] of [['Highlight', capture.selectionText], ['Note', capture.noteText], ['Summary', capture.summary], ['Article text', capture.articleText], ['Text in image', capture.ocrText]]) {
