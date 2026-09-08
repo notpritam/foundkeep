@@ -4,7 +4,7 @@ Audit date: 2026-09-07
 
 ## Result
 
-The customer extension, dashboard, account API, local-first queue, store package and reviewer path were reviewed together. The release package remains Chrome Web Store version `1.0.0`. Its only external launch gate is the new extension ID that Google assigns on the first dashboard upload; that ID must be added to the website and backend allowlists before submitting the item for review.
+The customer extension, dashboard, account API, local-first queue, store package and reviewer path were reviewed together. The Chrome Web Store release is publicly available at version `1.0.0` with ID `cficnecbdbiddngllpfbacabgbcjinmk`. The website and backend allowlists include that ID alongside the migration build.
 
 ## Data flow verified
 

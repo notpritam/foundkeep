@@ -17,16 +17,6 @@ function setDemoSaved(saved) {
 saveButton?.addEventListener('click', () => setDemoSaved(true));
 resetButton?.addEventListener('click', () => setDemoSaved(false));
 
-document.querySelector('#copyExtensions')?.addEventListener('click', async () => {
-  const status = document.querySelector('#copyStatus');
-  try {
-    await navigator.clipboard.writeText('chrome://extensions');
-    status.textContent = 'Copied. Paste it into Chrome’s address bar.';
-  } catch {
-    status.textContent = 'Copy chrome://extensions from the step above and paste it into Chrome’s address bar.';
-  }
-});
-
 // A Web Store install button is shown only when a verified public listing is configured.
 import('./customer.js?v=1.5.0').then(({ customerConfig }) => customerConfig()).then(config => {
   if (!config.storeUrl) return;
@@ -37,9 +27,12 @@ import('./customer.js?v=1.5.0').then(({ customerConfig }) => customerConfig()).t
   install.target = '_blank';
   install.rel = 'noopener noreferrer';
   install.textContent = 'Add to Chrome';
-  document.querySelector('.download-note').textContent = 'Chrome on your computer · Chrome Web Store · Manual ZIP installation also available below';
-  const manual = document.createElement('a');
-  manual.href = 'foundkeep-extension.zip?build=1.6.1'; manual.download = 'foundkeep-extension.zip';
-  manual.className = 'text-link local-install-choice'; manual.textContent = 'Download ZIP for manual installation';
-  install.after(manual);
+  document.querySelector('.download-note').textContent = 'Available now in the Chrome Web Store · Version 1.0.0 · Automatic updates';
+  if (!document.querySelector('[data-manual-install]')) {
+    const manual = document.createElement('a');
+    manual.href = 'foundkeep-extension.zip?build=1.6.1'; manual.download = 'foundkeep-extension.zip';
+    manual.dataset.manualInstall = '';
+    manual.className = 'text-link local-install-choice'; manual.textContent = 'Manual ZIP for Edge, Brave, Opera or Vivaldi';
+    install.after(manual);
+  }
 }).catch(() => { /* Manual ZIP installation remains available without configuration. */ });

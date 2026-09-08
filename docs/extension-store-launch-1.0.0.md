@@ -2,7 +2,7 @@
 
 ## Release channels
 
-The Chrome Web Store launch starts at `1.0.0`, sourced from `deploy/store-version.txt`. The existing self-hosted signed channel is `1.6.1`; it has a separate version history and cannot accept a lower-version update. The Web Store assigns a new extension ID on the first upload.
+Foundkeep is publicly available from the Chrome Web Store at version `1.0.0`, sourced from `deploy/store-version.txt`. Its Store ID is `cficnecbdbiddngllpfbacabgbcjinmk`. The existing self-hosted signed channel is `1.6.1`; it has a separate version history and cannot accept a lower-version update.
 
 ## Customer flow
 
@@ -52,10 +52,6 @@ The Chrome Web Store assigns a new extension ID, so Chrome gives it a separate I
 - Customer signup, recovery, account controls, pairing, capture, source provenance and cloud-library tests.
 - Manual visual review at the popup’s 390×600 surface, the local library at 1440×1050, and all store asset dimensions.
 
-## First-upload sequence
+## Published listing
 
-1. Upload the 1.0.0 ZIP as a new Chrome Web Store item without submitting it for review yet.
-2. Copy the item’s assigned extension ID.
-3. Add that ID alongside the established self-hosted ID in `apps/web/customer-config.json` and the production `ATLAS_CUSTOMER_EXTENSION_IDS` setting.
-4. Deploy and verify pairing, preference refresh and sync with the store build.
-5. Complete the Store listing, Privacy, Distribution and Test instructions tabs, then submit for automatic publication after review.
+The public install URL is `https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk`. The assigned ID is present alongside the migration build in the website and backend allowlists. Chrome owns Store signing and automatically distributes approved updates.

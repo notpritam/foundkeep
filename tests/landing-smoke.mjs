@@ -75,23 +75,10 @@ test("capture demo saves and resets without requiring an account", async (t) => 
     "demoSave",
   );
 });
-test("installation remains usable when clipboard permission is denied", async (t) => {
+test("installation offers the public Store release and a working manual package", async (t) => {
   const page = await pageFor(t);
-  await page.evaluate(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      value: {
-        writeText: async () => {
-          throw new Error("Denied");
-        },
-      },
-      configurable: true,
-    });
-  });
-  await page.locator("#copyExtensions").click();
-  assert.match(
-    await page.locator("#copyStatus").textContent(),
-    /chrome:\/\/extensions/,
-  );
+  const storeHref = await page.locator("[data-extension-install]").getAttribute("href");
+  assert.equal(storeHref, "https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk");
   const href = await page.locator("a[download]").first().getAttribute("href");
   const response = await page.request.get(new URL(href, base + "/").href);
   assert.equal(response.status(), 200);

@@ -109,8 +109,8 @@ test("the assigned Store extension is pre-authorized without replacing the migra
   assert.deepEqual(customerConfig.extensionIds, [storeId, migrationId]);
   assert.equal(
     customerConfig.storeUrl,
-    null,
-    "Do not send customers to the Store until the listing is public",
+    `https://chromewebstore.google.com/detail/${storeId}`,
+    "Send customers to the public Store listing",
   );
   const backendConfig = await readFile("apps/backend/src/config.ts", "utf8");
   assert.match(backendConfig, new RegExp(storeId));
