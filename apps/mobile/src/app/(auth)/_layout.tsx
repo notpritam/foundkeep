@@ -1,2 +1,3 @@
 import { Stack } from 'expo-router';
-export default function AuthLayout() { return <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />; }
+import { useMotionAllowed } from '../../components/motion.tsx';
+export default function AuthLayout() { const motion = useMotionAllowed(); return <Stack screenOptions={{ headerShown: false, animation: motion ? 'slide_from_right' : 'fade' }} />; }

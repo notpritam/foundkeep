@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { Folder, Organization } from '../api/types.ts';
-import { addUserTag, STARTER_TAGS } from '../collection/organization.ts';
+import { addUserTag, STARTER_TAGS, tagSuggestions } from '../collection/organization.ts';
 import { useSession } from '../session/SessionProvider.tsx';
 import { colors, typography } from '../theme.ts';
 import { Button, Field, Message, Screen } from './ui.tsx';
@@ -59,7 +59,7 @@ export function OrganizationPicker({ value, onChange, filter = false, manageFold
       finally { setSaving(false); }
     } }]);
   };
-  const tags = [...new Set([...(organization?.tags.map(tag => tag.name) || []), ...(organization?.suggestedTags || STARTER_TAGS), ...value.userTags])].filter((name, i, names) => names.findIndex(tag => tag.toLowerCase() === name.toLowerCase()) === i);
+  const tags = useMemo(() => tagSuggestions(organization?.tags.map(tag => tag.name) || [], value.userTags, tag, organization?.suggestedTags || STARTER_TAGS), [organization, value.userTags, tag]);
   const summary = value.folderId ? value.folderName || 'Selected folder' : filter && value.folderId === undefined ? 'All saves' : 'Unfiled';
   const folderRow = (id: string | null | undefined, name: string, count?: number) => <Pressable accessibilityRole="button" accessibilityLabel={name} accessibilityState={{ selected: value.folderId === id }} onPress={() => onChange({ ...value, folderId: id, folderName: name })} style={({ pressed }) => [styles.folder, pressed && { opacity: .7 }]}><Ionicons name={id ? 'folder-outline' : id === null ? 'file-tray-outline' : 'grid-outline'} color={colors.moss} size={20} /><Text style={styles.folderName}>{name}</Text>{count !== undefined ? <Text style={typography.small}>{count}</Text> : null}{value.folderId === id ? <Ionicons name="checkmark" color={colors.ink} size={19} /> : null}</Pressable>;
   return <>
@@ -75,9 +75,9 @@ export function OrganizationPicker({ value, onChange, filter = false, manageFold
         <Field label={editingFolder ? 'Folder name' : 'Create a folder'} value={folderName} onChangeText={setFolderName} placeholder="e.g. Weekend ideas" maxLength={80} />
         {folderName.trim() ? <Button secondary label={editingFolder ? 'Rename folder' : 'Create folder'} onPress={() => void saveFolder()} loading={saving} /> : null}
         {editingFolder ? <View style={{ gap: 8 }}><Button secondary label="Delete folder" onPress={deleteFolder} disabled={saving} /><Button secondary label="Cancel folder changes" onPress={() => { setEditingFolder(null); setFolderName(''); }} disabled={saving} /></View> : null}
-        <Text style={[typography.heading, { paddingTop: 14 }]}>Tags</Text><Text style={typography.small}>{filter ? 'Choose a tag to narrow your collection.' : 'Pick suggestions or make your own. Up to 20 per save.'}</Text>
-        <View style={styles.chips}>{tags.map(name => { const selected = value.userTags.some(tag => tag.toLowerCase() === name.toLowerCase()); return <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => toggleTag(name)} style={[styles.chip, selected && styles.selected]}><Text style={[styles.chipText, selected && { color: colors.paper }]}>#{name}</Text></Pressable>; })}</View>
+        <Text style={[typography.heading, { paddingTop: 14 }]}>Tags</Text><Text style={typography.small}>{filter ? 'Choose a tag to narrow your collection.' : 'Pick a suggestion or type to find or create a tag.'}</Text>
         <Field label={filter ? 'Find a tag' : 'Create a tag'} value={tag} onChangeText={setTag} maxLength={40} autoCapitalize="none" returnKeyType="done" onSubmitEditing={() => { addTag(tag); Keyboard.dismiss(); }} placeholder="e.g. design ideas" />{tag.trim() ? <Button secondary label={filter ? 'Filter by tag' : 'Add tag'} onPress={() => addTag(tag)} /> : null}
+        <View style={styles.chips}>{tags.map(name => { const selected = value.userTags.some(tag => tag.toLowerCase() === name.toLowerCase()); return <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => toggleTag(name)} style={[styles.chip, selected && styles.selected]}><Text style={[styles.chipText, selected && { color: colors.paper }]}>#{name}</Text></Pressable>; })}</View>
         <Message error>{error}</Message>{error && !saving ? <Button secondary label="Reload folders and tags" onPress={() => void load(true)} /> : null}
         {filter ? <Button secondary label="Clear filters" onPress={() => { onChange({ folderId: undefined, userTags: [] }); setVisible(false); }} /> : null}
       </ScrollView>
