@@ -151,8 +151,10 @@ function finalizeCapture(db: Database, row: Row, stamp: number, updatedAt: numbe
     const kept = fitDerived(wanted,available);
     const omitted = kept.summary !== wanted.summary || kept.ocr_text !== wanted.ocr_text
       || kept.category !== wanted.category || kept.tags !== wanted.tags;
+    // Edits can advance the revision while OCR awaits. Every worker write must
+    // advance the stored value too, including within the same clock tick.
     const result = db.query(`UPDATE customer_captures SET status=?,summary=?,ocr_text=?,category=?,tags=?,
-      storage_bytes=?,enrich_error=?,processing_at=NULL,updated_at=?
+      storage_bytes=?,enrich_error=?,processing_at=NULL,updated_at=MAX(updated_at+1,?)
       WHERE id=? AND account_id=? AND status='processing' AND processing_at=?`)
       .run(status,kept.summary,kept.ocr_text,kept.category,kept.tags,baseBytes+derivedBytes(kept),
         status === "failed" ? RECOGNITION_ERROR : omitted ? STORAGE_ERROR : null,
@@ -167,7 +169,7 @@ export async function processCustomerQueue(db: Database, options: Options = {}):
   for (let index=0; index<(options.batchSize || 4); index++) {
     const stamp = now();
     const row = db.query(`UPDATE customer_captures SET status='processing',
-      processing_at=?, enrich_attempts=enrich_attempts+1, updated_at=?
+      processing_at=?, enrich_attempts=enrich_attempts+1, updated_at=MAX(updated_at+1,?)
       WHERE id=(SELECT id FROM customer_captures WHERE enrich_attempts<3 AND
         (status='pending' OR (status='failed' AND updated_at<?) OR
          (status='processing' AND COALESCE(processing_at,0)<?))
@@ -204,7 +206,7 @@ export async function processCustomerQueue(db: Database, options: Options = {}):
   }
   // A crash on the last attempt must not leave a permanent processing indicator.
   db.query(`UPDATE customer_captures SET status='failed',processing_at=NULL,
-    enrich_error='Saved safely. Text recognition could not finish.',updated_at=?
+    enrich_error='Saved safely. Text recognition could not finish.',updated_at=MAX(updated_at+1,?)
     WHERE status='processing' AND enrich_attempts>=3 AND COALESCE(processing_at,0)<?`)
     .run(now(),now()-LEASE_MS);
   return processed;

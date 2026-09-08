@@ -1,57 +1,184 @@
 import Foundation
 import Security
+import CryptoKit
 
 enum FoundkeepUploadError: LocalizedError {
   case signedOut
   case storage
   case server
+  case folderNotFound
+  case invalidOrganization
   var errorDescription: String? {
-    switch self { case .signedOut: return "Open Foundkeep once to connect this iPhone."; case .storage: return "Foundkeep could not keep a safe local copy."; case .server: return "Saved for upload when Foundkeep is online." }
+    switch self { case .signedOut: return "Open Foundkeep once to connect this iPhone."; case .storage: return "Foundkeep could not keep a safe local copy."; case .server: return "Saved for upload when Foundkeep is online."; case .folderNotFound: return "That folder no longer exists. Your items are kept safely. Choose another folder or No folder, then save again."; case .invalidOrganization: return "Use up to 20 tags of 40 characters each, and folder names of up to 80 characters, without control characters." }
   }
 }
 
 struct FoundkeepSaveResult { let uploaded: Int; let queued: Int }
+
+struct FoundkeepFolder: Codable {
+  let id: String
+  let name: String
+  let count: Int
+}
+
+struct FoundkeepTag: Codable {
+  let name: String
+  let count: Int
+}
+
+struct FoundkeepOrganization: Codable {
+  var folders: [FoundkeepFolder]
+  let tags: [FoundkeepTag]
+  let suggestedTags: [String]
+  let suggestedFolders: [String]
+
+  static let starters = FoundkeepOrganization(folders: [], tags: [], suggestedTags: ["Read later", "Inspiration", "Work", "Personal"], suggestedFolders: ["Reading", "Projects", "Inspiration"])
+}
+
+private struct FoundkeepOrganizationCache: Codable {
+  let credentialDigest: String
+  let organization: FoundkeepOrganization
+}
+
+private struct FoundkeepFolderResponse: Decodable { let folder: FoundkeepFolder }
+
+// Every authenticated endpoint has a canonical URL. Never forward its credentials through redirects.
+private final class FoundkeepNoRedirectDelegate: NSObject, URLSessionTaskDelegate {
+  func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+    completionHandler(nil)
+  }
+}
 
 final class ShareUploader {
   private let manager = FileManager.default
   private let container: URL
   private let queue: URL
   private let policy = FoundkeepSharePolicy.current
+  private let connection: FoundkeepQueueSession?
+  private var uploadedClientIds = Set<String>()
+  private let session = URLSession(configuration: .ephemeral, delegate: FoundkeepNoRedirectDelegate(), delegateQueue: nil)
 
   init() throws {
     guard let container = manager.containerURL(forSecurityApplicationGroupIdentifier: "group.app.foundkeep.ios") else { throw FoundkeepUploadError.storage }
     self.container = container
+    connection = try? Self.readConnection()
     queue = container.appendingPathComponent("queue", isDirectory: true)
     try manager.createDirectory(at: queue, withIntermediateDirectories: true)
   }
 
   var isConnected: Bool { (try? token()) != nil }
 
-  func save(_ items: [FoundkeepShareItem], note: String) async throws -> FoundkeepSaveResult {
-    guard let token = try token() else { throw FoundkeepUploadError.signedOut }
-    let batchId = UUID().uuidString
-    var uploaded = 0
-    for item in items {
-      let recordURL = try enqueue(item, batchId: batchId, note: note)
-      do { try await submit(recordURL, token: token); uploaded += 1 } catch { }
+  var cachedOrganization: FoundkeepOrganization? {
+    let url = container.appendingPathComponent("organization.json")
+    guard let token = try? token(),
+          let data = try? Data(contentsOf: url),
+          let cache = try? JSONDecoder().decode(FoundkeepOrganizationCache.self, from: data),
+          cache.credentialDigest == credentialDigest(token) else {
+      try? manager.removeItem(at: url)
+      return nil
     }
+    return cache.organization
+  }
+
+  func loadOrganization() async throws -> FoundkeepOrganization {
+    let (data, token) = try await organizationRequest(path: "/api/mobile/organization")
+    let organization = try JSONDecoder().decode(FoundkeepOrganization.self, from: data)
+    cacheOrganization(organization, token: token)
+    return organization
+  }
+
+  func createFolder(name: String) async throws -> FoundkeepFolder {
+    guard let name = FoundkeepQueueScope.organizationName(name, limit: 80) else { throw FoundkeepUploadError.invalidOrganization }
+    let body = try JSONSerialization.data(withJSONObject: ["name": name])
+    let (data, token) = try await organizationRequest(path: "/api/mobile/folders", body: body)
+    let folder = try JSONDecoder().decode(FoundkeepFolderResponse.self, from: data).folder
+    var organization = cachedOrganization ?? .starters
+    organization.folders.removeAll { $0.id == folder.id }
+    organization.folders.append(folder)
+    cacheOrganization(organization, token: token)
+    return folder
+  }
+
+  private func organizationRequest(path: String, body: Data? = nil) async throws -> (Data, String) {
+    guard let token = try token() else { throw FoundkeepUploadError.signedOut }
+    var request = URLRequest(url: URL(string: "https://foundkeep.app\(path)")!)
+    request.httpMethod = body == nil ? "GET" : "POST"
+    request.httpBody = body
+    request.timeoutInterval = 8
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+    let (data, response) = try await session.data(for: request)
+    guard try self.token() == token else { throw FoundkeepUploadError.signedOut }
+    guard let http = response as? HTTPURLResponse else { throw FoundkeepUploadError.server }
+    if http.statusCode == 401 { throw FoundkeepUploadError.signedOut }
+    guard (200...299).contains(http.statusCode) else { throw FoundkeepUploadError.server }
+    return (data, token)
+  }
+
+  private func cacheOrganization(_ organization: FoundkeepOrganization, token: String) {
+    guard (try? self.token()) == token else { return }
+    let cache = FoundkeepOrganizationCache(credentialDigest: credentialDigest(token), organization: organization)
+    guard let data = try? JSONEncoder().encode(cache) else { return }
+    try? data.write(to: container.appendingPathComponent("organization.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+  }
+
+  private func credentialDigest(_ token: String) -> String {
+    SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
+  }
+
+  func save(_ items: [FoundkeepShareItem], note: String, folderId: String? = nil, userTags: [String] = []) async throws -> FoundkeepSaveResult {
+    guard let token = try token() else { throw FoundkeepUploadError.signedOut }
+    guard userTags.count <= 20 else { throw FoundkeepUploadError.invalidOrganization }
+    var normalizedTags: [String] = []
+    var seenTags = Set<String>()
+    for value in userTags {
+      guard let name = FoundkeepQueueScope.organizationName(value, limit: 40) else { throw FoundkeepUploadError.invalidOrganization }
+      if seenTags.insert(name.lowercased()).inserted { normalizedTags.append(name) }
+    }
+    let batchId = UUID().uuidString
+    var records: [(FoundkeepShareItem, URL)] = []
+    // Persist the whole batch before its first network request. An explicit
+    // folder correction can replace pending records using the same client IDs.
+    for item in items where !uploadedClientIds.contains(item.clientId) {
+      guard try self.token() == token else { throw FoundkeepUploadError.signedOut }
+      records.append((item, try enqueue(item, batchId: batchId, note: note, folderId: folderId, userTags: normalizedTags)))
+    }
+    for (item, recordURL) in records {
+      do {
+        try await submit(recordURL, token: token)
+        uploadedClientIds.insert(item.clientId)
+      } catch FoundkeepUploadError.folderNotFound {
+        for (_, pendingURL) in records { markOrganizationReview(pendingURL) }
+        throw FoundkeepUploadError.folderNotFound
+      } catch { }
+    }
+    let uploaded = items.filter { uploadedClientIds.contains($0.clientId) }.count
     return FoundkeepSaveResult(uploaded: uploaded, queued: items.count - uploaded)
   }
 
-  private func enqueue(_ item: FoundkeepShareItem, batchId: String, note: String) throws -> URL {
-    let metadata = captureMetadata(item, batchId: batchId, note: note)
+  private func enqueue(_ item: FoundkeepShareItem, batchId: String, note: String, folderId: String?, userTags: [String]) throws -> URL {
+    guard let connection, try Self.readConnection() == connection else { throw FoundkeepUploadError.signedOut }
+    let metadata = captureMetadata(item, batchId: batchId, note: note, folderId: folderId, userTags: userTags)
     if item.payloadPath != nil {
       let header = try JSONSerialization.data(withJSONObject: metadata)
       guard header.count <= 16 * 1024 else { throw FoundkeepUploadError.storage }
     }
     var record: [String: Any] = [
       "id": UUID().uuidString, "clientId": item.clientId, "batchId": batchId,
+      "ownerAccountId": connection.accountId, "requiresOrganizationReview": false,
       "metadata": metadata,
       "attempts": 0, "nextAttemptAt": 0, "createdAt": Date().timeIntervalSince1970 * 1000,
     ]
     if let payloadPath = item.payloadPath { record["payloadPath"] = payloadPath }
     let data = try JSONSerialization.data(withJSONObject: record)
     let url = queue.appendingPathComponent("\(item.clientId).json")
+    if manager.fileExists(atPath: url.path) {
+      guard let existingData = try? Data(contentsOf: url),
+            let existing = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any],
+            FoundkeepQueueScope.owns(existing["ownerAccountId"] as? String, accountId: connection.accountId) else { throw FoundkeepUploadError.storage }
+    }
+    guard try Self.readConnection() == connection else { throw FoundkeepUploadError.signedOut }
     try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     return url
   }
@@ -59,6 +186,7 @@ final class ShareUploader {
   private func submit(_ recordURL: URL, token: String) async throws {
     let data = try Data(contentsOf: recordURL)
     guard let record = try JSONSerialization.jsonObject(with: data) as? [String: Any], let metadata = record["metadata"] as? [String: Any] else { throw FoundkeepUploadError.storage }
+    guard FoundkeepQueueScope.owns(record["ownerAccountId"] as? String, accountId: connection?.accountId), try self.token() == token else { throw FoundkeepUploadError.signedOut }
     let metadataData = try JSONSerialization.data(withJSONObject: metadata)
     var request: URLRequest
     if let path = record["payloadPath"] as? String {
@@ -71,8 +199,9 @@ final class ShareUploader {
       request.setValue(String(size), forHTTPHeaderField: "Content-Length")
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
       request.timeoutInterval = policy.uploadTimeout
-      let (_, response) = try await URLSession.shared.upload(for: request, fromFile: payloadURL)
-      guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw FoundkeepUploadError.server }
+      guard try self.token() == token else { throw FoundkeepUploadError.signedOut }
+      let (data, response) = try await session.upload(for: request, fromFile: payloadURL)
+      try validateCaptureResponse(data: data, response: response)
       try? manager.removeItem(at: payloadURL)
     } else {
       request = URLRequest(url: URL(string: "https://foundkeep.app/api/captures")!)
@@ -81,18 +210,35 @@ final class ShareUploader {
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
       request.httpBody = metadataData
       request.timeoutInterval = policy.uploadTimeout
-      let (_, response) = try await URLSession.shared.data(for: request)
-      guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw FoundkeepUploadError.server }
+      guard try self.token() == token else { throw FoundkeepUploadError.signedOut }
+      let (data, response) = try await session.data(for: request)
+      try validateCaptureResponse(data: data, response: response)
     }
     try manager.removeItem(at: recordURL)
   }
 
-  private func captureMetadata(_ item: FoundkeepShareItem, batchId: String, note: String) -> [String: Any] {
+  private func validateCaptureResponse(data: Data, response: URLResponse) throws {
+    guard let http = response as? HTTPURLResponse else { throw FoundkeepUploadError.server }
+    if FoundkeepQueueScope.isMissingFolder(statusCode: http.statusCode, data: data) { throw FoundkeepUploadError.folderNotFound }
+    guard (200...299).contains(http.statusCode) else { throw FoundkeepUploadError.server }
+  }
+
+  private func markOrganizationReview(_ recordURL: URL) {
+    guard let data = try? Data(contentsOf: recordURL),
+          var record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          FoundkeepQueueScope.owns(record["ownerAccountId"] as? String, accountId: connection?.accountId) else { return }
+    record["requiresOrganizationReview"] = true
+    record["organizationReviewReason"] = "folder_not_found"
+    if let updated = try? JSONSerialization.data(withJSONObject: record) { try? updated.write(to: recordURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]) }
+  }
+
+  private func captureMetadata(_ item: FoundkeepShareItem, batchId: String, note: String, folderId: String?, userTags: [String]) -> [String: Any] {
     let now = Int(Date().timeIntervalSince1970 * 1000)
     let hasPayload = item.payloadPath != nil
     var metadata: [String: Any] = [
       "clientId": item.clientId, "batchId": batchId, "type": item.type,
       "capturedAt": now, "processingOptions": ["ocr": true, "summaries": true, "tags": true],
+      "folderId": folderId as Any? ?? NSNull(), "userTags": userTags,
     ]
     if !hasPayload, let value = item.sourceURL { metadata["sourceUrl"] = value }
     if !hasPayload, let value = item.sourceTitle { metadata["sourceTitle"] = value }
@@ -140,18 +286,23 @@ final class ShareUploader {
   }
 
   private func token() throws -> String? {
+    guard let current = try Self.readConnection(), current == connection else { return nil }
+    return current.token
+  }
+
+  private static func readConnection() throws -> FoundkeepQueueSession? {
     let account = Data("foundkeep-device-token".utf8)
     var query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "app.foundkeep.shared",
       kSecAttrAccount as String: "foundkeep-device-token", kSecAttrGeneric as String: account,
-      kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne,
+      kSecReturnData as String: true, kSecReturnAttributes as String: true, kSecMatchLimit as String: kSecMatchLimitOne,
     ]
     if let group = Bundle.main.object(forInfoDictionaryKey: "FoundkeepKeychainAccessGroup") as? String, !group.contains("$(") { query[kSecAttrAccessGroup as String] = group }
     var result: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &result)
     if status == errSecItemNotFound { return nil }
-    guard status == errSecSuccess, let data = result as? Data else { throw FoundkeepUploadError.signedOut }
-    return String(data: data, encoding: .utf8)
+    guard status == errSecSuccess, let attributes = result as? [String: Any], let data = attributes[kSecValueData as String] as? Data else { throw FoundkeepUploadError.signedOut }
+    return FoundkeepQueueScope.session(token: String(data: data, encoding: .utf8), boundAccountId: attributes[kSecAttrLabel as String] as? String)
   }
 
   private func base64URL(_ data: Data) -> String { data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") }

@@ -242,6 +242,21 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX customer_push_devices_account ON customer_push_devices(account_id, enabled);
   `,
+  // 9 — account-owned folders and personal tags, separate from enrichment.
+  `
+  CREATE TABLE customer_folders (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    normalized_name TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(account_id, normalized_name)
+  );
+  ALTER TABLE customer_captures ADD COLUMN manual_tags TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE customer_captures ADD COLUMN folder_id TEXT REFERENCES customer_folders(id) ON DELETE SET NULL;
+  CREATE INDEX customer_captures_owner_folder ON customer_captures(account_id, folder_id);
+  `,
 ];
 
 function migrate(db: Database): void {

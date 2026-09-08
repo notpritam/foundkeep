@@ -18,7 +18,7 @@ export default function OpenFoundkeepLink() {
       router.replace('/(auth)/sign-in');
       return;
     }
-    router.replace((!target.requiresAuth && account ? '/(app)/collection' : target.href) as Href);
+    router.replace((!target.requiresAuth && account ? '/(app)/(tabs)/collection' : target.href) as Href);
   }, [account, params.path, ready, setPendingRoute]);
   return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}><ActivityIndicator color={colors.accent} /></View>;
 }

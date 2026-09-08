@@ -2,8 +2,8 @@ export type FoundkeepLink = { href: string; requiresAuth: boolean };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const protectedRoutes = new Map<string, string>([
-  ['collection', '/(app)/collection'],
-  ['settings', '/(app)/settings'],
+  ['collection', '/(app)/(tabs)/collection'],
+  ['settings', '/(app)/(tabs)/settings'],
   ['new-note', '/(app)/new-note'],
 ]);
 const publicRoutes = new Map<string, string>([
@@ -45,7 +45,8 @@ export function parseFoundkeepLink(raw: string): FoundkeepLink | null {
 /** Validate an internal destination before carrying it through authentication. */
 export function safeReturnPath(raw: unknown): string | null {
   if (typeof raw !== 'string' || raw.length > 160) return null;
-  if (protectedRoutes.has(raw.replace(/^\/\(app\)\//, ''))) return raw;
+  const destination = protectedRoutes.get(raw.replace(/^\/\(app\)\/(?:\(tabs\)\/)?/, ''));
+  if (destination && raw.startsWith('/(app)/')) return destination;
   const capture = /^\/\(app\)\/capture\/([^/]+)$/.exec(raw);
   return capture && UUID.test(capture[1]!) ? `/(app)/capture/${capture[1]!.toLowerCase()}` : null;
 }

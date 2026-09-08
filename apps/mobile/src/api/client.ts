@@ -1,4 +1,4 @@
-import type { Account, Capture, CaptureList, NativeSession, Usage } from './types.ts';
+import type { Account, Capture, CaptureList, Folder, Organization, NativeSession, Usage } from './types.ts';
 
 const API_ORIGIN = 'https://foundkeep.app';
 const REQUEST_TIMEOUT = 15_000;
@@ -14,7 +14,7 @@ export class FoundkeepApiError extends Error {
 }
 
 type ClientOptions = { getToken: () => Promise<string | null>; fetcher?: typeof fetch };
-type JsonOptions = { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown; authenticated?: boolean; cacheMs?: number; reload?: boolean };
+type JsonOptions = { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown; authenticated?: boolean; cacheMs?: number; reload?: boolean };
 type ReadOptions = { reload?: boolean };
 
 export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptions) {
@@ -116,18 +116,26 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     unregisterNotifications: () => json<{ ok: true }>('/api/mobile/notifications', { method: 'DELETE' }),
     logout: () => json<{ ok: true }>('/api/mobile/logout', { method: 'POST' }),
     deleteAccount: (password: string) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: { password } }),
-    listCaptures(filters: { q?: string; type?: string; cursor?: string }, options: ReadOptions = {}) {
+    listCaptures(filters: { q?: string; type?: string; cursor?: string; batchId?: string; folderId?: string; tag?: string }, options: ReadOptions = {}) {
       const query = new URLSearchParams({ view: 'cards' });
       if (filters.q) query.set('q', filters.q);
       if (filters.type) query.set('type', filters.type);
       if (filters.cursor) query.set('cursor', filters.cursor);
+      if (filters.batchId) query.set('batchId', filters.batchId);
+      if (filters.folderId) query.set('folderId', filters.folderId);
+      if (filters.tag) query.set('tag', filters.tag);
       return json<CaptureList>(`/api/mobile/captures?${query}`, { cacheMs: 10_000, ...options });
     },
-    createNote(value: { clientId: string; noteText: string; capturedAt: number }) {
+    createNote(value: { clientId: string; noteText: string; capturedAt: number; folderId?: string | null; userTags?: string[] }) {
       return json<{ capture: Capture; duplicate: boolean }>('/api/captures', { method: 'POST', body: { ...value, type: 'note' } });
     },
     getCapture: (id: string, options: ReadOptions = {}) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { cacheMs: 20_000, ...options }),
+    updateCapture: (id: string, value: { sourceTitle: string | null; noteText: string | null; expectedUpdatedAt: number; folderId?: string | null; userTags?: string[] }) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { method: 'PUT', body: value }),
     deleteCapture: (id: string) => json<{ ok: true }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    organization: (options: ReadOptions = {}) => json<Organization>('/api/mobile/organization', { cacheMs: 30_000, ...options }),
+    createFolder: (name: string) => json<{ folder: Folder }>('/api/mobile/folders', { method: 'POST', body: { name } }),
+    renameFolder: (id: string, name: string) => json<{ folder: Folder }>(`/api/mobile/folders/${encodeURIComponent(id)}`, { method: 'PUT', body: { name } }),
+    deleteFolder: (id: string) => json<{ ok: true }>(`/api/mobile/folders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     fileUrl: (id: string) => `${API_ORIGIN}/api/mobile/captures/${encodeURIComponent(id)}/file`,
   };
 }

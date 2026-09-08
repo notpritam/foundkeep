@@ -1,0 +1,16 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Brand, Button, Screen } from '../../components/ui.tsx';
+import { useSession } from '../../session/SessionProvider.tsx';
+import { colors, typography } from '../../theme.ts';
+const steps = [
+  { icon: 'share-outline', title: 'Find something to keep', body: 'In Safari, Photos, Files, or another app, tap Share.' },
+  { icon: 'bookmark-outline', title: 'Choose Foundkeep', body: 'Swipe along the app row and tap More if you don’t see it. Add Foundkeep to your favorites for next time.' },
+  { icon: 'checkmark-outline', title: 'Save it to your collection', body: 'Add a note if you like, then tap Save. Everything appears here with its source attached.' },
+] as const;
+export default function ShareGuide() {
+  const { policy, updateRequired } = useSession();
+  return <Screen top={false}><ScrollView contentContainerStyle={styles.page}><Brand compact /><View style={styles.heading}><Text style={typography.title}>Keep a good find.{`\n`}In a few taps.</Text><Text style={[typography.body, { color: colors.muted }]}>Save straight from the app you’re using.</Text></View>{steps.map((step, index) => <View key={step.title} style={styles.step}><View style={styles.icon}><Ionicons name={step.icon} size={23} color={colors.moss} /></View><View style={styles.copy}><Text style={styles.stepTitle}>{index + 1}. {step.title}</Text><Text style={typography.body}>{step.body}</Text></View></View>)}<View style={styles.actions}><Button label="Got it" onPress={() => router.dismissTo('/(app)/(tabs)/collection')} />{policy.capture.note && !updateRequired ? <Button label="Try writing a note" secondary onPress={() => router.replace('/(app)/new-note')} /> : null}</View></ScrollView></Screen>;
+}
+const styles = StyleSheet.create({ page: { padding: 24, paddingBottom: 48, gap: 28 }, heading: { gap: 12, paddingTop: 10 }, step: { flexDirection: 'row', alignItems: 'flex-start', gap: 15 }, icon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.paleMoss, alignItems: 'center', justifyContent: 'center' }, copy: { flex: 1, gap: 6 }, stepTitle: { color: colors.ink, fontSize: 17, fontWeight: '600' }, actions: { gap: 12, marginTop: 8 } });

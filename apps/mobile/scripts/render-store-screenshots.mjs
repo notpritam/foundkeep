@@ -44,6 +44,7 @@ const makeContext = async signedIn => {
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (url.pathname === '/mobile-policy.json') return json(policy);
     if (url.pathname === '/api/mobile/me') return json({ account, connectionId: 'review-device', usage: { captures: captures.length, bytes: 13_081_673, maxCaptures: 1000, maxBytes: 209_715_200 } });
+    if (url.pathname === '/api/mobile/organization') return json({ folders: [], tags: [], suggestedTags: ['Read later', 'Inspiration', 'Work', 'Personal'], suggestedFolders: ['Reading', 'Projects', 'Inspiration'] });
     if (url.pathname === '/api/mobile/captures') return json({ captures, total: captures.length, nextCursor: null });
     if (url.pathname.startsWith('/api/mobile/captures/')) {
       const id = url.pathname.split('/')[4];
@@ -64,13 +65,13 @@ try {
 
   const context = await makeContext(true);
   const page = await context.newPage();
-  await page.goto(base); await page.getByText('Your collection.').waitFor(); await ready(page);
+  await page.goto(base); await page.getByText('All your finds.').waitFor(); await ready(page);
   await shot(page, '02-collection.png');
   await page.getByRole('button', { name: /Open Link A field guide/ }).click(); await page.getByText('Original source', { exact: true }).waitFor(); await ready(page);
   await shot(page, '03-source-detail.png');
-  await page.getByText('New note', { exact: true }).click(); await page.getByText('A thought worth keeping').waitFor(); await ready(page);
+  await page.goto(base + '/collection'); await page.getByRole('button', { name: 'Write a new note' }).click(); await page.getByText('A thought worth keeping').waitFor(); await ready(page);
   await shot(page, '04-new-note.png');
-  await page.getByText('Settings', { exact: true }).click(); await page.getByText('Live configuration').waitFor(); await ready(page);
+  await page.goto(base + '/settings'); await page.getByText('Live configuration').waitFor(); await ready(page);
   await shot(page, '05-settings.png');
   await context.close();
 } finally {

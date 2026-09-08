@@ -16,6 +16,8 @@ export type CaptureProvenance = {
   publishedAt?: string | null;
   modifiedAt?: string | null;
   language?: string | null;
+  leadImageUrl?: string | null;
+  faviconUrl?: string | null;
   targetUrl?: string | null;
   capturedAt?: number;
   sourceApplication?: string | null;
@@ -41,6 +43,9 @@ export type Capture = {
   ocrText: string | null;
   category: string | null;
   tags: string[];
+  userTags?: string[];
+  folderId?: string | null;
+  folder?: Folder | null;
   blobUrl: string | null;
   fileName: string | null;
   fileMime: string | null;
@@ -63,3 +68,6 @@ export type NativeSession = {
 };
 
 export type CaptureList = { captures: Capture[]; nextCursor: string | null; total: number };
+
+export type Folder = { id: string; name: string; count?: number };
+export type Organization = { folders: Folder[]; tags: { name: string; count: number }[]; suggestedTags: string[]; suggestedFolders: string[] };

@@ -53,7 +53,13 @@ final class ShareItemLoader: @unchecked Sendable {
   }
 
   func discard(_ items: [FoundkeepShareItem]) {
-    for item in items { if let path = item.payloadPath { try? manager.removeItem(at: container.appendingPathComponent(path)) } }
+    for item in items {
+      // A save can remain queued after a recoverable folder error or a session
+      // switch. Closing the sheet must not delete its durable payload.
+      let record = container.appendingPathComponent("queue/\(item.clientId).json")
+      guard !manager.fileExists(atPath: record.path) else { continue }
+      if let path = item.payloadPath { try? manager.removeItem(at: container.appendingPathComponent(path)) }
+    }
   }
 
   private func load(_ provider: NSItemProvider, title: String?, sharedContext: [String: Any]?) async throws -> FoundkeepShareItem? {

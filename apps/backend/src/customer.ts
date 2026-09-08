@@ -27,6 +27,10 @@ import {
   writeCustomerFile,
 } from "./customer-files.ts";
 import { isExpoPushToken } from "./customer-notifications.ts";
+import {
+  CustomerOrganizationError, captureOrganization, capturesWithTag, createFolder, deleteFolder,
+  folderIdentifier, organizationBytes, organizationName, readOrganization, renameFolder, requireFolder,
+} from "./customer-organization.ts";
 
 const DAY = 86_400_000;
 const MAX_BODY = 12 * 1024 * 1024;
@@ -35,7 +39,7 @@ const MAX_IMAGE = 8 * 1024 * 1024;
 const MAX_CAPTURES = 1000;
 const MAX_BYTES = 200 * 1024 * 1024;
 const TYPES = new Set(["screenshot", "selection", "bookmark", "image", "note", "tweet", "video", "audio", "document", "file"]);
-const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json";
+const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json,manual_tags,folder_id,(SELECT name FROM customer_folders WHERE id=customer_captures.folder_id AND account_id=customer_captures.account_id) AS folder_name";
 // List views need excerpts, not every article and OCR result in the account.
 // Keep the full representation as the default for installed older clients.
 const CARD_TEXT_COLUMNS = new Set(["selection_text", "note_text", "article_text", "summary", "ocr_text"]);
@@ -57,6 +61,7 @@ export interface CustomerCaptureRow {
   summary: string | null; ocr_text: string | null; category: string | null; tags: string;
   enrich_error: string | null; enrich_attempts: number; processing_at: number | null;
   provenance_json: string | null; processing_options_json: string | null;
+  manual_tags: string; folder_id: string | null; folder_name: string | null;
 }
 interface Auth { account: AccountRow; kind: "session" | "connection"; credentialId: string }
 type CustomerEnv = { Bindings: { clientIp?: string }; Variables: { customerAuth: Auth } };
@@ -92,6 +97,8 @@ export function customerCaptureDto(row: CustomerCaptureRow) {
     sourceUrl: row.source_url, sourceTitle: row.source_title, selectionText: row.selection_text,
     noteText: row.note_text, articleText: row.article_text, summary: row.summary, ocrText: row.ocr_text,
     category: row.category, tags: JSON.parse(row.tags || "[]") as string[],
+    userTags: JSON.parse(row.manual_tags || "[]") as string[], folderId: row.folder_id ?? null,
+    folder: row.folder_id && row.folder_name ? { id: row.folder_id, name: row.folder_name } : null,
     blobUrl: row.blob_mime ? `/api/captures/${row.id}/blob` : null,
     fileName: row.file_name, fileMime: row.file_mime, fileBytes: row.file_bytes,
     fileUrl: row.file_path ? `/api/captures/${row.id}/file` : null,
@@ -368,6 +375,7 @@ export function customerRoutes(db: Database) {
   }
 
   app.onError((error, c) => {
+    if (error instanceof CustomerOrganizationError) return c.json({ error: error.code, message: error.message }, error.status);
     if (error instanceof CustomerError) {
       if (error.retryAfter !== undefined) c.header("Retry-After", String(error.retryAfter));
       else if (error.status === 429) c.header("Retry-After", "900");
@@ -634,7 +642,7 @@ export function customerRoutes(db: Database) {
             return;
           }
           while (index < ids.length) {
-            const row = db.query("SELECT * FROM customer_captures WHERE id = ? AND account_id = ?").get(ids[index++]!.id, current.account.id) as CustomerCaptureRow | null;
+            const row = db.query(`SELECT ${CAPTURE_COLUMNS},blob_data FROM customer_captures WHERE id = ? AND account_id = ?`).get(ids[index++]!.id, current.account.id) as CustomerCaptureRow | null;
             if (!row) continue;
             const dataUrl = row.blob_data && row.blob_mime ? `data:${row.blob_mime};base64,${Buffer.from(row.blob_data).toString("base64")}` : null;
             controller.enqueue(encoder.encode((first ? "" : ",") + JSON.stringify({ ...customerCaptureDto(row), dataUrl })));
@@ -794,19 +802,21 @@ export function customerRoutes(db: Database) {
     }
     const provenanceJson = provenance ? JSON.stringify(provenance) : null;
     const processingOptionsJson = JSON.stringify(processingOptions);
-    const storageBytes = image.bytes + [sourceUrl, sourceTitle, selectionText, noteText, articleText, clientId, batchId, provenanceJson, processingOptionsJson].reduce((sum, text) => sum + Buffer.byteLength(text || "", "utf8"), 0);
+    const baseStorageBytes = image.bytes + [sourceUrl, sourceTitle, selectionText, noteText, articleText, clientId, batchId, provenanceJson, processingOptionsJson].reduce((sum, text) => sum + Buffer.byteLength(text || "", "utf8"), 0);
     const result = db.transaction(() => {
       // Authentication must still hold after the streamed body was received.
       auth(c);
       const existing = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE account_id = ? AND client_id = ?`).get(current.account.id, clientId) as CustomerCaptureRow | null;
       if (existing) return { capture: customerCaptureDto(existing), duplicate: true };
+      const organization = captureOrganization(db, current.account.id, body);
+      const storageBytes = baseStorageBytes + organizationBytes(organization.folderId, organization.manualTags);
       const used = usage(current.account.id);
       if (used.captures >= MAX_CAPTURES || used.bytes + storageBytes > MAX_BYTES) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
       const global = db.query("SELECT COUNT(*) captures, COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures").get() as { captures: number; bytes: number };
       if (global.captures >= globalMaxCaptures || global.bytes + storageBytes > globalMaxBytes) fail(503, "storage_unavailable", "Foundkeep storage is temporarily full. Your extension will keep this capture locally.");
       const id = crypto.randomUUID();
       const now = Date.now();
-      db.query("INSERT INTO customer_captures(id,account_id,client_id,batch_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,provenance_json,processing_options_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, batchId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now, provenanceJson, processingOptionsJson);
+      db.query("INSERT INTO customer_captures(id,account_id,client_id,batch_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,provenance_json,processing_options_json,folder_id,manual_tags) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, batchId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now, provenanceJson, processingOptionsJson, organization.folderId, organization.manualTags);
       return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
     })();
     return c.json(result, result.duplicate ? 200 : 201);
@@ -833,6 +843,7 @@ export function customerRoutes(db: Database) {
       void c.req.raw.body?.cancel();
       return c.json({ capture: customerCaptureDto(existing), duplicate: true });
     }
+    captureOrganization(db, current.account.id, body);
     const sourceUrl = textField(body, "sourceUrl", 4096);
     if (sourceUrl) {
       try {
@@ -865,12 +876,14 @@ export function customerRoutes(db: Database) {
       }
       if (type === "image" && !stored.mime.startsWith("image/")) fail(415, "invalid_file_type", "The shared image data is invalid.");
       if (provenance?.contentHash && provenance.contentHash !== stored.sha256) fail(400, "content_hash_mismatch", "The shared file does not match its source record.");
-      const storageBytes = stored.bytes + [clientId, batchId, sourceUrl, sourceTitle, noteText, fileName, provenanceJson, processingOptionsJson]
+      const baseStorageBytes = stored.bytes + [clientId, batchId, sourceUrl, sourceTitle, noteText, fileName, provenanceJson, processingOptionsJson]
         .reduce((sum, value) => sum + Buffer.byteLength(value || "", "utf8"), 0);
       const result = db.transaction(() => {
         auth(c);
         const duplicate = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE account_id=? AND client_id=?`).get(current.account.id, clientId) as CustomerCaptureRow | null;
         if (duplicate) return { capture: customerCaptureDto(duplicate), duplicate: true };
+        const organization = captureOrganization(db, current.account.id, body);
+        const storageBytes = baseStorageBytes + organizationBytes(organization.folderId, organization.manualTags);
         const used = usage(current.account.id);
         if (used.captures >= MAX_CAPTURES || used.bytes + storageBytes > MAX_BYTES) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
         const global = db.query("SELECT COUNT(*) captures, COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures").get() as { captures: number; bytes: number };
@@ -880,11 +893,11 @@ export function customerRoutes(db: Database) {
         db.query(`INSERT INTO customer_captures(
           id,account_id,client_id,batch_id,type,source_url,source_title,note_text,
           storage_bytes,captured_at,created_at,updated_at,provenance_json,processing_options_json,
-          file_name,file_path,file_mime,file_bytes
-        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+          file_name,file_path,file_mime,file_bytes,folder_id,manual_tags
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
           id,current.account.id,clientId,batchId,type,sourceUrl,sourceTitle,noteText,
           storageBytes,capturedAt as number,now,now,provenanceJson,processingOptionsJson,
-          fileName,stored!.relativePath,stored!.mime,stored!.bytes,
+          fileName,stored!.relativePath,stored!.mime,stored!.bytes,organization.folderId,organization.manualTags,
         );
         return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
       })();
@@ -897,21 +910,67 @@ export function customerRoutes(db: Database) {
     }
   });
 
+  app.get("/mobile/organization", (c) => {
+    const current = auth(c);
+    return c.json(readOrganization(db, current.account.id));
+  });
+  app.post("/mobile/folders", async (c) => {
+    const current = auth(c);
+    const body = await jsonBody(c);
+    const name = organizationName(body.name, 80, "A folder name");
+    const result = db.transaction(() => {
+      auth(c, false, false);
+      return createFolder(db, current.account.id, name);
+    }).immediate();
+    return c.json({ folder: result.folder }, result.created ? 201 : 200);
+  });
+  app.put("/mobile/folders/:id", async (c) => {
+    const current = auth(c);
+    const body = await jsonBody(c);
+    const name = organizationName(body.name, 80, "A folder name");
+    const folder = db.transaction(() => {
+      auth(c, false, false);
+      return renameFolder(db, current.account.id, c.req.param("id"), name);
+    }).immediate();
+    return c.json({ folder });
+  });
+  app.delete("/mobile/folders/:id", (c) => {
+    const current = auth(c);
+    db.transaction(() => deleteFolder(db, current.account.id, c.req.param("id"))).immediate();
+    return c.json({ ok: true });
+  });
+
   app.get("/mobile/captures", (c) => {
     const current = auth(c);
     if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
     const view = c.req.query("view") || "full";
+    const batchId = c.req.query("batchId");
     const cursor = mobileCursor(c.req.query("cursor") || "");
     if (search.length > 200 || (type && !TYPES.has(type)) || !["full", "cards"].includes(view)) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
+    if (batchId !== undefined && !/^[A-Za-z0-9_-]{1,80}$/.test(batchId)) fail(400, "invalid_batch", "The shared collection identifier is invalid.");
     const where = ["account_id = ?"];
     const args: (string | number)[] = [current.account.id];
+    if (batchId !== undefined) { where.push("batch_id = ?"); args.push(batchId); }
+    const folderFilter = c.req.query("folderId");
+    if (folderFilter === "unfiled") where.push("folder_id IS NULL");
+    else if (folderFilter !== undefined) {
+      const id = folderIdentifier(folderFilter)!;
+      requireFolder(db, current.account.id, id);
+      where.push("folder_id = ?"); args.push(id);
+    }
+    const tagFilter = c.req.query("tag");
+    if (tagFilter !== undefined) {
+      const matching = capturesWithTag(db, current.account.id, organizationName(tagFilter, 40, "A tag"));
+      where.push(matching.length ? `id IN (${matching.map(() => "?").join(",")})` : "0");
+      args.push(...matching);
+    }
     if (type) { where.push("type = ?"); args.push(type); }
     if (search) {
       const like = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
-      where.push("(source_title LIKE ? ESCAPE '\\' OR note_text LIKE ? ESCAPE '\\' OR selection_text LIKE ? ESCAPE '\\' OR article_text LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR ocr_text LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\' OR file_name LIKE ? ESCAPE '\\' OR source_url LIKE ? ESCAPE '\\')");
-      args.push(...Array(9).fill(like));
+      where.push("(source_title LIKE ? ESCAPE '\\' OR note_text LIKE ? ESCAPE '\\' OR selection_text LIKE ? ESCAPE '\\' OR article_text LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR ocr_text LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\' OR file_name LIKE ? ESCAPE '\\' OR source_url LIKE ? ESCAPE '\\' OR manual_tags LIKE ? ESCAPE '\\')");
+      args.push(...Array(10).fill(like));
     }
     const total = (db.query(`SELECT COUNT(*) count FROM customer_captures WHERE ${where.join(" AND ")}`).get(...args) as { count: number }).count;
     if (cursor) {
@@ -925,7 +984,7 @@ export function customerRoutes(db: Database) {
 
   function serveCustomerFile(c: C, cookieOnly: boolean) {
     const current = auth(c, cookieOnly);
-    const row = db.query("SELECT file_path,file_name,file_mime FROM customer_captures WHERE id=? AND account_id=?").get(c.req.param("id"), current.account.id) as { file_path: string | null; file_name: string | null; file_mime: string | null } | null;
+    const row = db.query("SELECT file_path,file_name,file_mime FROM customer_captures WHERE id=? AND account_id=?").get(c.req.param("id")!, current.account.id) as { file_path: string | null; file_name: string | null; file_mime: string | null } | null;
     if (!row?.file_path || !row.file_mime) fail(404, "not_found", "File not found.");
     let path: string;
     try { path = resolveCustomerFile(config.dataDir, row.file_path); } catch { fail(404, "not_found", "File not found."); }
@@ -944,6 +1003,49 @@ export function customerRoutes(db: Database) {
     const current = auth(c);
     return c.json({ capture: customerCaptureDto(findCapture(c.req.param("id"), current.account.id)) });
   });
+  app.put("/mobile/captures/:id", async (c) => {
+    const current = auth(c);
+    rates.take(`edit:${current.account.id}`, 120, 60_000);
+    const release = acquireUpload(current.account.id);
+    try {
+      // Allow maximum-length text even when JSON escapes every character.
+      const body = await jsonBody(c, 320 * 1024);
+      const keys = ["sourceTitle", "noteText", "expectedUpdatedAt"];
+      if (Object.keys(body).some(key => ![...keys, "folderId", "userTags"].includes(key)) || keys.some(key => !(key in body))) {
+        fail(400, "invalid_input", "Send a title, note, and the capture revision.");
+      }
+      const sourceTitle = textField(body, "sourceTitle", 1000);
+      const noteText = textField(body, "noteText", 50_000);
+      const expectedUpdatedAt = body.expectedUpdatedAt;
+      if (!Number.isSafeInteger(expectedUpdatedAt) || (expectedUpdatedAt as number) < 0) {
+        fail(400, "invalid_input", "Use a valid capture revision.");
+      }
+      const result = db.transaction(() => {
+        const verified = auth(c, false, false);
+        if (verified.account.id !== current.account.id || verified.kind !== current.kind || verified.credentialId !== current.credentialId) {
+          fail(401, "unauthorized", "Your session expired. Sign in again.");
+        }
+        const row = findCapture(c.req.param("id"), current.account.id);
+        if (row.updated_at !== expectedUpdatedAt) fail(409, "capture_changed", "This capture changed. Refresh it before saving your edits.");
+        const organization = captureOrganization(db, current.account.id, body, row);
+        // Preserve all original, file, image, and enrichment storage accounting.
+        const delta = Buffer.byteLength(sourceTitle || "", "utf8") + Buffer.byteLength(noteText || "", "utf8")
+          - Buffer.byteLength(row.source_title || "", "utf8") - Buffer.byteLength(row.note_text || "", "utf8")
+          + organizationBytes(organization.folderId, organization.manualTags) - organizationBytes(row.folder_id, row.manual_tags);
+        if (delta > 0) {
+          if (usage(current.account.id).bytes + delta > MAX_BYTES) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
+          const global = db.query("SELECT COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures").get() as { bytes: number };
+          if (global.bytes + delta > globalMaxBytes) fail(503, "storage_unavailable", "Foundkeep storage is temporarily full. Please try saving your edits later.");
+        }
+        const updatedAt = Math.max(Date.now(), row.updated_at + 1);
+        const updated = db.query("UPDATE customer_captures SET source_title=?,note_text=?,folder_id=?,manual_tags=?,storage_bytes=?,updated_at=? WHERE id=? AND account_id=? AND updated_at=?")
+          .run(sourceTitle, noteText, organization.folderId, organization.manualTags, row.storage_bytes + delta, updatedAt, row.id, current.account.id, expectedUpdatedAt as number);
+        if (!updated.changes) fail(409, "capture_changed", "This capture changed. Refresh it before saving your edits.");
+        return { capture: customerCaptureDto(findCapture(row.id, current.account.id)) };
+      })();
+      return c.json(result);
+    } finally { release(); }
+  });
   app.delete("/mobile/captures/:id", (c) => {
     const current = auth(c);
     const row = db.query("SELECT file_path FROM customer_captures WHERE id=? AND account_id=?").get(c.req.param("id"), current.account.id) as { file_path: string | null } | null;
@@ -953,15 +1055,18 @@ export function customerRoutes(db: Database) {
     return c.json({ ok: true });
   });
 
-  app.get("/captures/:id/blob", (c) => {
-    const current = auth(c, true);
-    const row = db.query("SELECT blob_data,blob_mime FROM customer_captures WHERE id = ? AND account_id = ?").get(c.req.param("id"), current.account.id) as { blob_data: Uint8Array | null; blob_mime: string | null } | null;
+  function serveCustomerBlob(c: C, cookieOnly: boolean) {
+    const current = auth(c, cookieOnly);
+    const row = db.query("SELECT blob_data,blob_mime FROM customer_captures WHERE id = ? AND account_id = ?").get(c.req.param("id")!, current.account.id) as { blob_data: Uint8Array | null; blob_mime: string | null } | null;
     if (!row?.blob_data || !row.blob_mime || !["image/png", "image/jpeg", "image/webp"].includes(row.blob_mime)) fail(404, "not_found", "Image not found.");
     c.header("Content-Type", row.blob_mime);
     c.header("Content-Security-Policy", "default-src 'none'; sandbox");
     c.header("Cross-Origin-Resource-Policy", "same-origin");
     return c.body(new Uint8Array(row.blob_data).buffer);
-  });
+  }
+
+  app.get("/captures/:id/blob", (c) => serveCustomerBlob(c, true));
+  app.get("/mobile/captures/:id/blob", (c) => serveCustomerBlob(c, false));
 
   app.get("/captures/:id", (c) => {
     const current = auth(c, true);

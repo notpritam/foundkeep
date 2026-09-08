@@ -3,6 +3,7 @@ import type { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { openDb } from "../src/db.ts";
 import { createApp } from "../src/app.ts";
+import { processCustomerQueue } from "../src/customer-enrichment.ts";
 
 const ORIGIN = process.env.ATLAS_CUSTOMER_ORIGIN || "https://atlas.notpritam.in";
 const PRIMARY_ORIGIN = "https://foundkeep.app";
@@ -56,6 +57,256 @@ function heldUpload(cookie: string, target = app) {
 }
 
 describe("customer account security", () => {
+  test("mobile image blobs require a live owner credential and preserve the image MIME allowlist", async () => {
+    const owner = await register();
+    const other = await register();
+    const device = await connect(owner.cookie);
+    const otherDevice = await connect(other.cookie);
+    const saved = (await (await capture(device.bearer, { type: "image", dataUrl: PNG })).json()).capture;
+    const path = `/captures/${saved.id}/blob`;
+    const response = await mobile(path, "GET", undefined, device.bearer);
+    expect(response.status).toBe(200);
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(Buffer.from(PNG.split(",")[1]!, "base64"));
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
+    expect((await mobile(path, "GET", undefined, otherDevice.bearer)).status).toBe(404);
+    expect((await mobile(path)).status).toBe(401);
+    expect((await mobile(`${path}?token=${device.token}`)).status).toBe(401);
+    expect((await request(path, "GET", undefined, device.bearer)).status).toBe(403);
+    expect((await request(path, "GET", undefined, owner.cookie)).status).toBe(200);
+    for (const mime of ["image/svg+xml", "text/html", "application/octet-stream"]) {
+      db.query("UPDATE customer_captures SET blob_mime=? WHERE id=?").run(mime, saved.id);
+      expect((await mobile(path, "GET", undefined, device.bearer)).status).toBe(404);
+    }
+    db.query("UPDATE customer_captures SET blob_mime='image/png',blob_data=NULL WHERE id=?").run(saved.id);
+    expect((await mobile(path, "GET", undefined, device.bearer)).status).toBe(404);
+    expect((await mobile("/logout", "POST", undefined, device.bearer)).status).toBe(200);
+    expect((await mobile(path, "GET", undefined, device.bearer)).status).toBe(401);
+  });
+
+  test("mobile batch pages combine owner, search, type and card filters without dropping children", async () => {
+    const owner = await register();
+    const other = await register();
+    const device = await connect(owner.cookie);
+    const batchId = crypto.randomUUID();
+    for (let index = 0; index < 52; index += 1) {
+      expect((await capture(device.bearer, {
+        clientId: `batch-${index}`, batchId, type: "bookmark", capturedAt: 1000,
+        articleText: "a".repeat(600) + "needle", noteText: null,
+      })).status).toBe(201);
+    }
+    for (const extra of [
+      { batchId: crypto.randomUUID(), type: "bookmark", articleText: "needle" },
+      { batchId, type: "note", articleText: "needle" },
+      { batchId, type: "bookmark", articleText: "unrelated" },
+      { type: "bookmark", articleText: "needle" },
+    ]) expect((await capture(device.bearer, extra)).status).toBe(201);
+    expect((await capture(other.cookie, { batchId, type: "bookmark", articleText: "needle" })).status).toBe(201);
+    const query = `/captures?batchId=${batchId}&type=bookmark&q=needle&view=cards`;
+    const first = await (await mobile(query, "GET", undefined, device.bearer)).json();
+    expect(first.total).toBe(52);
+    expect(first.captures).toHaveLength(50);
+    expect(first.nextCursor).toBeTruthy();
+    const second = await (await mobile(`${query}&cursor=${first.nextCursor}`, "GET", undefined, device.bearer)).json();
+    expect(second.total).toBe(52);
+    expect(second.captures).toHaveLength(2);
+    expect(second.nextCursor).toBeNull();
+    const children = [...first.captures, ...second.captures];
+    expect(new Set(children.map(item => item.id)).size).toBe(52);
+    for (const item of children) {
+      expect(item.batchId).toBe(batchId);
+      expect(item.clientId).toStartWith("batch-");
+      expect(item.contentView).toBe("card");
+      expect(item.articleText).toHaveLength(480);
+    }
+    const allChildren = await (await mobile(`/captures?batchId=${batchId}`, "GET", undefined, device.bearer)).json();
+    expect(allChildren.total).toBe(54);
+  });
+
+  test("mobile batch filters reject empty, oversized and unsafe identifiers", async () => {
+    const owner = await register();
+    const device = await connect(owner.cookie);
+    for (const batchId of ["", "a".repeat(81), "has space", "../other", "batch' OR 1=1", "é"]) {
+      const response = await mobile(`/captures?batchId=${encodeURIComponent(batchId)}`, "GET", undefined, device.bearer);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("invalid_batch");
+    }
+    const valid = await mobile(`/captures?batchId=${"a".repeat(78)}_-`, "GET", undefined, device.bearer);
+    expect(valid.status).toBe(200);
+    expect(await valid.json()).toMatchObject({ captures: [], total: 0, nextCursor: null });
+  });
+
+  test("mobile edits preserve original provenance and full saved content while accounting for UTF-8 byte changes", async () => {
+    const owner = await register();
+    const device = await connect(owner.cookie);
+    const provenance = {
+      schemaVersion: 1, captureMethod: "ios-share-url", pageUrl: "https://example.com/original",
+      canonicalUrl: "https://example.com/original", pageTitle: "Original source title", siteName: "Example",
+      description: null, authors: ["Original Author"], publishedAt: null, modifiedAt: null,
+      language: "en", leadImageUrl: null, faviconUrl: null, targetUrl: null, headings: ["Original section"],
+      capturedAt: 1000, extractedAt: 1000, extractorVersion: 1, contentHash: "a".repeat(43),
+      extractionStatus: "complete", extractionError: null,
+    };
+    const saved = (await (await capture(device.bearer, {
+      type: "bookmark", sourceUrl: provenance.pageUrl, sourceTitle: "Old", noteText: "é",
+      articleText: "Original article. ".repeat(100), selectionText: "Original selection", dataUrl: PNG,
+      batchId: crypto.randomUUID(), capturedAt: 1000, provenance,
+    })).json()).capture;
+    db.query("UPDATE customer_captures SET summary='summary',ocr_text='OCR',category='Reading',tags='[\"saved\"]',storage_bytes=storage_bytes+27 WHERE id=?").run(saved.id);
+    const before = db.query("SELECT * FROM customer_captures WHERE id=?").get(saved.id) as any;
+    const response = await mobile(`/captures/${saved.id}`, "PUT", {
+      sourceTitle: "New 📚", noteText: "好", expectedUpdatedAt: saved.updatedAt,
+    }, device.bearer);
+    expect(response.status).toBe(200);
+    const edited = (await response.json()).capture;
+    expect(edited.updatedAt).toBeGreaterThan(saved.updatedAt);
+    expect(edited).toEqual({
+      ...saved, sourceTitle: "New 📚", noteText: "好", updatedAt: edited.updatedAt,
+      summary: "summary", ocrText: "OCR", category: "Reading", tags: ["saved"],
+    });
+    expect(edited.articleText.length).toBeGreaterThan(480);
+    const after = db.query("SELECT * FROM customer_captures WHERE id=?").get(saved.id) as any;
+    expect(after).toEqual({ ...before, source_title: "New 📚", note_text: "好", storage_bytes: before.storage_bytes + 6, updated_at: edited.updatedAt });
+    const cleared = await mobile(`/captures/${saved.id}`, "PUT", {
+      sourceTitle: null, noteText: null, expectedUpdatedAt: edited.updatedAt,
+    }, device.bearer);
+    expect(cleared.status).toBe(200);
+    expect((await cleared.json()).capture).toMatchObject({ sourceTitle: null, noteText: null, provenance });
+    expect((db.query("SELECT storage_bytes FROM customer_captures WHERE id=?").get(saved.id) as any).storage_bytes).toBe(before.storage_bytes - 5);
+  });
+
+  test("mobile edits use monotonic revisions and reject stale or concurrent overwrites", async () => {
+    const owner = await register();
+    const device = await connect(owner.cookie);
+    const saved = (await (await capture(device.bearer)).json()).capture;
+    const revision = Date.now() + 100_000;
+    db.query("UPDATE customer_captures SET updated_at=? WHERE id=?").run(revision, saved.id);
+    const update = { sourceTitle: "Updated", noteText: "Kept", expectedUpdatedAt: revision };
+    const first = await mobile(`/captures/${saved.id}`, "PUT", update, device.bearer);
+    expect(first.status).toBe(200);
+    expect((await first.json()).capture.updatedAt).toBe(revision + 1);
+    const stale = await mobile(`/captures/${saved.id}`, "PUT", { ...update, noteText: "Stale overwrite" }, device.bearer);
+    expect(stale.status).toBe(409);
+    expect((await stale.json()).error).toBe("capture_changed");
+    const attempts = await Promise.all(["First device", "Second device"].map(noteText =>
+      mobile(`/captures/${saved.id}`, "PUT", { ...update, noteText, expectedUpdatedAt: revision + 1 }, device.bearer)));
+    expect(attempts.map(response => response.status).sort()).toEqual([200, 409]);
+    const winner = (await attempts.find(response => response.status === 200)!.json()).capture;
+    const current = (await (await mobile(`/captures/${saved.id}`, "GET", undefined, device.bearer)).json()).capture;
+    expect(current).toEqual(winner);
+    expect(current.updatedAt).toBe(revision + 2);
+  });
+
+  test.each(["done", "failed"] as const)("enrichment %s completion advances past an in-flight mobile edit and rejects its stale revision", async status => {
+    const owner = await register();
+    const device = await connect(owner.cookie);
+    const saved = (await (await capture(device.bearer, { type: "image", dataUrl: PNG })).json()).capture;
+    const path = `/captures/${saved.id}`;
+    let editResponse: TestResponse | undefined;
+    let edited: any;
+    await processCustomerQueue(db, { batchSize: 1, now: () => saved.updatedAt, ocr: async () => {
+      const processing = (await (await mobile(path, "GET", undefined, device.bearer)).json()).capture;
+      editResponse = await mobile(path, "PUT", {
+        sourceTitle: "Personal title", noteText: "Edited during recognition", expectedUpdatedAt: processing.updatedAt,
+      }, device.bearer);
+      edited = (await editResponse.json()).capture;
+      if (status === "failed") throw new Error("OCR unavailable");
+      return "Recognized text";
+    } });
+    expect(editResponse?.status).toBe(200);
+    expect(edited.updatedAt).toBeGreaterThan(saved.updatedAt);
+    const completed = (await (await mobile(path, "GET", undefined, device.bearer)).json()).capture;
+    expect(completed.status).toBe(status);
+    expect(completed.updatedAt).toBe(edited.updatedAt + 1);
+    expect(completed.sourceTitle).toBe("Personal title");
+    expect(completed.noteText).toBe("Edited during recognition");
+    const stale = await mobile(path, "PUT", {
+      sourceTitle: "Stale title", noteText: null, expectedUpdatedAt: edited.updatedAt,
+    }, device.bearer);
+    expect(stale.status).toBe(409);
+    expect((await stale.json()).error).toBe("capture_changed");
+  });
+
+  test("mobile edits validate the complete personal-field payload and reject foreign ownership", async () => {
+    const owner = await register();
+    const other = await register();
+    const device = await connect(owner.cookie);
+    const otherDevice = await connect(other.cookie);
+    const saved = (await (await capture(device.bearer)).json()).capture;
+    const path = `/captures/${saved.id}`;
+    const update = { sourceTitle: null, noteText: "New note", expectedUpdatedAt: saved.updatedAt };
+    expect((await mobile(path, "PUT", update)).status).toBe(401);
+    expect((await mobile(path, "PUT", update, otherDevice.bearer)).status).toBe(404);
+    for (const invalid of [
+      {}, { noteText: "Missing title", expectedUpdatedAt: saved.updatedAt },
+      { sourceTitle: null, expectedUpdatedAt: saved.updatedAt },
+      { sourceTitle: null, noteText: null }, { ...update, expectedUpdatedAt: -1 },
+      { ...update, expectedUpdatedAt: 1.5 }, { ...update, expectedUpdatedAt: "1" },
+      { ...update, expectedUpdatedAt: Number.MAX_SAFE_INTEGER + 1 },
+      { ...update, sourceTitle: "a".repeat(1001) }, { ...update, noteText: "a".repeat(50_001) },
+      { ...update, sourceTitle: 123 }, { ...update, noteText: {} },
+      { ...update, sourceUrl: "https://replacement.example" }, { ...update, articleText: "Replacement article" },
+      { ...update, provenance: null }, { ...update, accountId: other.account.id },
+    ]) {
+      const response = await mobile(path, "PUT", invalid, device.bearer);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("invalid_input");
+    }
+    expect((await (await mobile(path, "GET", undefined, device.bearer)).json()).capture).toEqual(saved);
+    const boundary = await mobile(path, "PUT", {
+      sourceTitle: "a".repeat(1000), noteText: "é".repeat(50_000), expectedUpdatedAt: saved.updatedAt,
+    }, device.bearer);
+    expect(boundary.status).toBe(200);
+    expect((await boundary.json()).capture.noteText).toHaveLength(50_000);
+  });
+
+  test("mobile edits apply account and global byte budgets to the field delta and allow shrinking at capacity", async () => {
+    const owner = await register();
+    const other = await register();
+    const device = await connect(owner.cookie);
+    const saved = (await (await capture(device.bearer, { sourceTitle: "Old", noteText: "é" })).json()).capture;
+    const otherSaved = (await (await capture(other.cookie)).json()).capture;
+    const path = `/captures/${saved.id}`;
+    db.query("UPDATE customer_captures SET storage_bytes=209715200 WHERE id=?").run(saved.id);
+    const full = await mobile(path, "PUT", { sourceTitle: "Old", noteText: "好", expectedUpdatedAt: saved.updatedAt }, device.bearer);
+    expect(full.status).toBe(409);
+    expect((await full.json()).error).toBe("quota_exceeded");
+    expect((db.query("SELECT note_text,storage_bytes,updated_at FROM customer_captures WHERE id=?").get(saved.id) as any))
+      .toEqual({ note_text: "é", storage_bytes: 209715200, updated_at: saved.updatedAt });
+    const shrunk = await mobile(path, "PUT", { sourceTitle: null, noteText: null, expectedUpdatedAt: saved.updatedAt }, device.bearer);
+    expect(shrunk.status).toBe(200);
+    const revision = (await shrunk.json()).capture.updatedAt;
+    expect((db.query("SELECT storage_bytes FROM customer_captures WHERE id=?").get(saved.id) as any).storage_bytes).toBe(209715195);
+    db.query("UPDATE customer_captures SET storage_bytes=1937768453 WHERE id=?").run(otherSaved.id);
+    const globalFull = await mobile(path, "PUT", { sourceTitle: null, noteText: "a", expectedUpdatedAt: revision }, device.bearer);
+    expect(globalFull.status).toBe(503);
+    expect((await globalFull.json()).error).toBe("storage_unavailable");
+    expect((db.query("SELECT note_text,storage_bytes,updated_at FROM customer_captures WHERE id=?").get(saved.id) as any))
+      .toEqual({ note_text: null, storage_bytes: 209715195, updated_at: revision });
+    const sameSize = await mobile(path, "PUT", { sourceTitle: "", noteText: null, expectedUpdatedAt: revision }, device.bearer);
+    expect(sameSize.status).toBe(200);
+  });
+
+  test("an in-flight mobile edit cannot save after device logout", async () => {
+    const owner = await register();
+    const device = await connect(owner.cookie);
+    const saved = (await (await capture(device.bearer)).json()).capture;
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
+    const pending = app.request(`${ORIGIN}/api/mobile/captures/${saved.id}`, {
+      method: "PUT", headers: { authorization: device.bearer, "content-type": "application/json" }, body: stream,
+    });
+    expect((await mobile("/logout", "POST", undefined, device.bearer)).status).toBe(200);
+    controller.enqueue(new TextEncoder().encode(JSON.stringify({
+      sourceTitle: "Revoked edit", noteText: null, expectedUpdatedAt: saved.updatedAt,
+    })));
+    controller.close();
+    expect((await pending).status).toBe(401);
+    expect((await (await request(`/captures/${saved.id}`, "GET", undefined, owner.cookie)).json()).capture).toEqual(saved);
+  });
+
   test("mobile card pages bound text payloads while search and detail retain full saved content", async () => {
     const owner = await register();
     const device = await connect(owner.cookie);

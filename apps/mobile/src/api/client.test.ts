@@ -200,3 +200,25 @@ test('notification registration and removal use the current mobile connection', 
   ]);
   assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), { expoPushToken: 'ExpoPushToken[abc_DEF-0123456789]' });
 });
+
+test('organization filters and personal edits remain authenticated and invalidate organization counts', async () => {
+  const requests: Array<{ url: URL; method: string; body: any }> = [];
+  let reads = 0;
+  const client = createFoundkeepClient({ getToken: async () => 'private-device', fetcher: async (input, init) => {
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer private-device');
+    const url = new URL(String(input)); assert.equal(url.origin, 'https://foundkeep.app');
+    requests.push({ url, method: init?.method || 'GET', body: init?.body ? JSON.parse(String(init.body)) : null });
+    if (url.pathname === '/api/mobile/organization') { reads++; return Response.json({ folders: [], tags: [], suggestedTags: [], suggestedFolders: [] }); }
+    return Response.json({ capture: { id: 'item' }, captures: [], nextCursor: null, total: 0 });
+  } });
+  await client.organization(); await client.organization(); assert.equal(reads, 1);
+  await client.listCaptures({ folderId: 'unfiled', tag: 'Ideas & Work', batchId: 'batch-1' });
+  const query = requests.at(-1)!.url.searchParams;
+  assert.equal(query.get('tag'), 'Ideas & Work'); assert.equal(query.get('folderId'), 'unfiled'); assert.equal(query.get('batchId'), 'batch-1');
+  await client.updateCapture('item', { sourceTitle: 'Mine', noteText: null, expectedUpdatedAt: 12, folderId: null, userTags: ['Ideas & Work'] });
+  assert.deepEqual(requests.at(-1)!.body, { sourceTitle: 'Mine', noteText: null, expectedUpdatedAt: 12, folderId: null, userTags: ['Ideas & Work'] });
+  assert.equal(requests.at(-1)!.method, 'PUT');
+  await client.organization(); assert.equal(reads, 2);
+  await client.createNote({ clientId: 'new', capturedAt: 13, noteText: 'Keep this', folderId: 'reading', userTags: ['Personal'] });
+  assert.equal(requests.at(-1)!.body.folderId, 'reading'); assert.deepEqual(requests.at(-1)!.body.userTags, ['Personal']);
+});

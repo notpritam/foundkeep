@@ -4,7 +4,7 @@
 
 ## Platform
 
-Web dashboard and Chromium browser extension.
+Web dashboard, Chromium browser extension, and an Expo iPhone app with a native iOS Share Extension.
 
 ## Purpose and operating context
 
@@ -17,6 +17,16 @@ Customers create an email/password account, save a recovery code, install the ex
 Each customer controls capture methods, readable bookmark extraction, page metadata, note source attachment, popup order, recent items, context menus, sync, OCR, summaries, tags, and success feedback from the dashboard. Preference changes do not require an extension release. Manifest permissions and executable features still do.
 
 Every capture can retain the visited URL, canonical URL, title, description, site, authors, publication and modification dates, language, lead image, favicon, target URL, headings, capture method, capture and extraction times, extractor version, extraction status, and a content fingerprint. Raw page HTML is not stored.
+
+## iPhone Gallery
+
+The selected mobile direction is **02 / Gallery**: a virtualized image-led collection with a sticky header, search, folder/tag filter, and capture-type controls. Large accessibility text uses one column. The canonical folded-bookmark artwork is shared across the app and Share Extension. Loading cards use a restrained shimmer, real image-loading/error states, and Reduce Motion support.
+
+Customers can save from the iOS Share menu, create notes in the app, view every item in a multi-item share, and edit titles/notes without replacing original provenance. Each save can belong to one optional folder and carry up to 20 personal tags. Reading, Projects, Inspiration, and starter tags are suggestions, created only when chosen. Folder names are account-owned and editable; deleting a folder keeps its captures. Personal tags remain separate from enrichment suggestions.
+
+The same private backend stores app, browser, and dashboard captures. Native previews use owner-authenticated routes. The app uses email/password and recovery codes today; social sign-in is planned and is not advertised as functional. The short legal footer is “By continuing, you agree to our Terms and Privacy Policy.”
+
+Application version stays 1.0.0. Compatible JavaScript and assets can use Expo Updates; Swift Share Extension, entitlements, and other native changes require a new App Store/TestFlight binary. Queued uploads are bound to their account; unscoped legacy records are retained for recovery instead of being assigned to a new account.
 
 ## Security and compatibility
 

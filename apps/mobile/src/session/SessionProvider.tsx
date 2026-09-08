@@ -44,13 +44,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void FoundkeepShared.retryPending();
   }, []);
   const refresh = useCallback(async () => {
-    try { const me = await client.me(); setAccount(me.account); setUsage(me.usage); }
+    const credential = await getToken();
+    try {
+      const me = await client.me();
+      if (!credential || await FoundkeepShared.getToken() !== credential) return;
+      await FoundkeepShared.refreshSession(credential, JSON.stringify(me.account));
+      if (await FoundkeepShared.getToken() !== credential) return;
+      setAccount(me.account); setUsage(me.usage);
+    }
     catch (error) {
-      if (error instanceof FoundkeepApiError && error.status === 401) {
+      if (error instanceof FoundkeepApiError && error.status === 401 && await FoundkeepShared.getToken() === credential) {
         await FoundkeepShared.clearSession(); setToken(null); setAccount(null); setUsage(null);
       } else throw error;
     }
-  }, [client]);
+  }, [client, getToken]);
   useEffect(() => {
     let live = true;
     void (async () => {

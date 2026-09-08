@@ -22,7 +22,7 @@ export function NavigationController() {
       return;
     }
     if (!target.requiresAuth && account) {
-      router.replace('/(app)/collection');
+      router.replace('/(app)/(tabs)/collection');
       return;
     }
     router.replace(target.href as Href);

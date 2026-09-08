@@ -4,15 +4,21 @@ const { withXcodeProject } = require('expo/config-plugins');
 
 const TARGET_NAME = 'FoundkeepShare';
 const BUNDLE_IDENTIFIER = 'app.foundkeep.ios.ShareExtension';
-const SOURCE_FILES = ['ShareViewController.swift', 'ShareItemLoader.swift', 'ShareUploader.swift', 'SharePolicy.swift'];
-const RESOURCE_FILES = ['SafariPreprocessor.js', 'PrivacyInfo.xcprivacy'];
+const SOURCE_FILES = ['ShareViewController.swift', 'ShareItemLoader.swift', 'ShareUploader.swift', 'SharePolicy.swift', 'FoundkeepQueueScope.swift'];
+const MARK_FILE = 'FoundkeepMark.png';
+const RESOURCE_FILES = ['SafariPreprocessor.js', 'PrivacyInfo.xcprivacy', MARK_FILE];
 const ALL_FILES = ['Info.plist', 'FoundkeepShare.entitlements', ...SOURCE_FILES, ...RESOURCE_FILES];
 
 function copyNativeSources(projectRoot, platformProjectRoot) {
   const source = path.join(projectRoot, 'share-extension');
   const target = path.join(platformProjectRoot, TARGET_NAME);
   fs.mkdirSync(target, { recursive: true });
-  for (const file of ALL_FILES) fs.copyFileSync(path.join(source, file), path.join(target, file));
+  for (const file of ALL_FILES) {
+    const sourceFile = file === MARK_FILE ? path.join(projectRoot, 'assets', 'images', 'mark.png')
+      : file === 'FoundkeepQueueScope.swift' ? path.join(projectRoot, 'modules', 'foundkeep-shared', 'ios', file)
+      : path.join(source, file);
+    fs.copyFileSync(sourceFile, path.join(target, file));
+  }
 }
 
 function addTopLevelGroup(project, files) {
@@ -55,7 +61,26 @@ module.exports = function withFoundkeepShareExtension(config) {
   return withXcodeProject(config, mod => {
     const project = mod.modResults;
     copyNativeSources(mod.modRequest.projectRoot, mod.modRequest.platformProjectRoot);
-    if (project.findTargetKey(TARGET_NAME)) return mod;
+    const existingTarget = project.findTargetKey(TARGET_NAME) || project.findTargetKey(`"${TARGET_NAME}"`);
+    if (existingTarget) {
+      const group = project.findPBXGroupKey({ name: TARGET_NAME });
+      if (!group) throw new Error('Foundkeep could not locate the Share Extension group.');
+      const mark = project.addFile(MARK_FILE, group);
+      if (mark) {
+        mark.uuid = project.generateUuid();
+        mark.target = existingTarget;
+        project.addToPbxBuildFileSection(mark);
+        project.addToPbxResourcesBuildPhase(mark);
+      }
+      const scope = project.addFile('FoundkeepQueueScope.swift', group);
+      if (scope) {
+        scope.uuid = project.generateUuid();
+        scope.target = existingTarget;
+        project.addToPbxBuildFileSection(scope);
+        project.addToPbxSourcesBuildPhase(scope);
+      }
+      return mod;
+    }
 
     const target = project.addTarget(TARGET_NAME, 'app_extension', TARGET_NAME, BUNDLE_IDENTIFIER);
     addTopLevelGroup(project, ALL_FILES);

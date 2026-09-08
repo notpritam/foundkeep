@@ -21,3 +21,6 @@ web-extension.*
 
 # Synthetic browser review screenshots
 .impeccable/review/
+
+# Compiled native-app browser verification
+apps/mobile/dist-gallery-preview/

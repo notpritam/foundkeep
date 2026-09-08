@@ -1,8 +1,10 @@
+> **Selected direction: 02 / Gallery (2026-09-08).** Native implementation now uses the canonical mark, short legal footer, sticky search/filter header, accessible Gallery cards and shimmer. User also requested folders and tags at save time; custom folders, personal tags, starter suggestions, and iPhone share organization are included in this implementation. OAuth and persistent offline collection browsing remain separate work.
+
 # Foundkeep mobile: UX, authentication, and performance audit
 
 Date: 2026-09-08. Baseline: the working Foundkeep 1.0.0 TestFlight app. This packet contains **interactive design concepts, verified local loading fixes, and an implementation specification**. OAuth, the new native UI, and disk-based offline reading are not yet shipped.
 
-## Review the three directions
+## Archived comparison: Gallery selected
 
 Open [the interactive comparison](https://omni--8914.getbb.app), or serve this directory and open `index.html`. Use the Collection / Sign in / First save controls. Each phone supports opening a card, editing a title/note, inspecting grouped images, searching, and demonstrating offline/dark states. Sample content only; the buttons never authenticate or upload anything.
 
@@ -20,9 +22,9 @@ Recommendation: **01 as the default, with a remembered 02 grid/list toggle**. Ev
 2. **Structure:** compare the three collection structures above against a shared sign-in → share setup → first saved item → optional notifications flow. Preserve source traceability in every detail view.
 3. **Visual system:** established Foundkeep warm paper, near-black, vermilion action color and moss status color. System typography in native controls, restrained brand display moments. 44-point native targets; distinct light/dark tokens; content-led hierarchy.
 4. **Behavior:** native push/back navigation, sheets for focused tasks, source opening, explicit edit/save, visible queued/processing/ready/failed states, original source separate from user notes. Motion responds to an action; no decorative looping animation. Honor Reduce Motion, Dynamic Type and screen readers.
-5. **Boundary:** this is a browser prototype to select a structure. It does not validate native gestures, provider authentication, persistence, push delivery, or frame performance. No production UI direction has been selected yet.
+5. **Boundary:** this is a browser prototype to select a structure. It does not validate native gestures, provider authentication, persistence, push delivery, or frame performance. The user selected 02 / Gallery; native implementation and its verification follow below.
 
-The established PRODUCT.md still describes mainly web/extension surfaces; its native-product scope should be updated with the selected direction. DESIGN.md remains the brand authority. The seven structures considered were readable library, gallery, timeline, topic shelves, search-first, inbox, and pinned/recent home; surface seed `ae4fbaf8` dealt inbox, gallery, and pinned/recent. No replacement visual identity is proposed.
+PRODUCT.md now includes the native Gallery and organization model. DESIGN.md remains the brand authority. The seven structures considered were readable library, gallery, timeline, topic shelves, search-first, inbox, and pinned/recent home; surface seed `ae4fbaf8` dealt inbox, gallery, and pinned/recent. No replacement visual identity is proposed.
 
 ## What was actually broken
 
@@ -168,7 +170,7 @@ Performed locally:
 - Mobile test suite, backend customer API tests and TypeScript checks pass (latest counts recorded in the work log).
 - Compiled Expo web app smoke test: collection loads, a server match absent from the excerpt remains visible, typing yields one debounced request, and a >64 KB detail renders with no page errors.
 - Interactive concept test covers edit propagation across all three designs, grouped-image access, optional onboarding, offline/demo states, images and widths 320/390/768/1024/1440.
-- Independent concept review found two issues (provider placeholder marks and dark pending-label contrast); both fixes were scored resolved. This review does not approve a native implementation or the pending direction selection.
+- Independent concept review found two issues (provider placeholder marks and dark pending-label contrast); both fixes were scored resolved. This review does not approve a native implementation or replace native implementation validation.
 
 Still owed before release:
 
