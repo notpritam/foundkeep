@@ -12,7 +12,7 @@
     "verify:ios": "node scripts/verify-ios-project.mjs",
     "store:screenshots": "expo export --platform web --output-dir dist-store-preview && node scripts/render-store-screenshots.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test scripts/config.test.mjs src/api/client.test.ts src/collection/model.test.ts src/collection/preview.test.ts src/collection/organization.test.ts src/linking/deepLinks.test.ts src/policy/mobilePolicy.test.ts src/share/queue.test.ts src/share/safariPreprocessor.test.mjs"
+    "test": "node --test scripts/config.test.mjs scripts/runtime.test.mjs src/api/client.test.ts src/collection/model.test.ts src/collection/preview.test.ts src/collection/organization.test.ts src/linking/deepLinks.test.ts src/policy/mobilePolicy.test.ts src/share/queue.test.ts src/share/safariPreprocessor.test.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
