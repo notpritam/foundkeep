@@ -26,6 +26,7 @@ import {
   safeFileName,
   writeCustomerFile,
 } from "./customer-files.ts";
+import { isExpoPushToken } from "./customer-notifications.ts";
 
 const DAY = 86_400_000;
 const MAX_BODY = 12 * 1024 * 1024;
@@ -455,6 +456,41 @@ export function customerRoutes(db: Database) {
     const current = auth(c);
     if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
     return c.json({ account: accountDto(current.account), connectionId: current.credentialId, usage: usage(current.account.id) });
+  });
+
+  app.get("/mobile/notifications", (c) => {
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    const row = db.query("SELECT enabled FROM customer_push_devices WHERE connection_id=? AND account_id=?")
+      .get(current.credentialId, current.account.id) as { enabled: number } | null;
+    return c.json({ enabled: row?.enabled === 1 });
+  });
+
+  app.post("/mobile/notifications", async (c) => {
+    const body = await jsonBody(c);
+    const expoPushToken = body.expoPushToken;
+    if (!isExpoPushToken(expoPushToken)) fail(400, "invalid_push_token", "Foundkeep could not register notifications on this device.");
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    const now = Date.now();
+    db.transaction(() => {
+      // A token can move when its physical device signs into another account.
+      db.query("DELETE FROM customer_push_devices WHERE expo_push_token=? AND connection_id!=?")
+        .run(expoPushToken, current.credentialId);
+      db.query(`INSERT INTO customer_push_devices(connection_id,account_id,expo_push_token,enabled,created_at,updated_at)
+        VALUES(?,?,?,?,?,?) ON CONFLICT(connection_id) DO UPDATE SET
+        account_id=excluded.account_id,expo_push_token=excluded.expo_push_token,enabled=1,updated_at=excluded.updated_at`)
+        .run(current.credentialId, current.account.id, expoPushToken, 1, now, now);
+    })();
+    return c.json({ ok: true });
+  });
+
+  app.delete("/mobile/notifications", (c) => {
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    db.query("DELETE FROM customer_push_devices WHERE connection_id=? AND account_id=?")
+      .run(current.credentialId, current.account.id);
+    return c.json({ ok: true });
   });
 
   app.post("/mobile/logout", (c) => {

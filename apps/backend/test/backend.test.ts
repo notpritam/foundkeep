@@ -59,6 +59,22 @@ test("health works with a valid token", async () => {
   expect(body.service).toBe("atlas");
 });
 
+test("mobile web links stay allowlisted and universal-link metadata requires the Apple team", async () => {
+  const open = await call("GET", "/open?path=https://evil.example");
+  expect(open.status).toBe(302);
+  expect(open.headers.get("location")).toBe("/open.html?path=collection");
+  const before = process.env.ATLAS_APPLE_TEAM_ID;
+  delete process.env.ATLAS_APPLE_TEAM_ID;
+  expect((await call("GET", "/.well-known/apple-app-site-association")).status).toBe(404);
+  process.env.ATLAS_APPLE_TEAM_ID = "A1B2C3D4E5";
+  const association = await call("GET", "/.well-known/apple-app-site-association");
+  expect(association.status).toBe(200);
+  expect(association.headers.get("content-type")).toContain("application/json");
+  expect(await association.json()).toMatchObject({ applinks: { details: [{ appIDs: ["A1B2C3D4E5.app.foundkeep.ios"] }] } });
+  if (before === undefined) delete process.env.ATLAS_APPLE_TEAM_ID;
+  else process.env.ATLAS_APPLE_TEAM_ID = before;
+});
+
 test("scope is enforced — read-only token cannot ingest", async () => {
   const res = await call("POST", "/v1/captures", {
     token: readOnly,

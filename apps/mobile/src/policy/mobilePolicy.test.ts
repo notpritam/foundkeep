@@ -6,11 +6,13 @@ test('accepts a complete bounded data-only mobile policy', () => {
   const candidate = structuredClone(DEFAULT_MOBILE_POLICY);
   candidate.revision = 8;
   candidate.capture.video = false;
+  candidate.features.notifications = false;
   candidate.limits.uploadTimeoutSeconds = 20;
   candidate.notice = 'Uploads are briefly delayed.';
   const policy = normalizeMobilePolicy(candidate);
   assert.equal(policy?.revision, 8);
   assert.equal(policy?.limits.articleCharacters, 500_000);
+  assert.equal(policy?.features.notifications, false);
   assert.equal(isCaptureEnabled(policy!, 'video'), false);
   assert.equal(isCaptureEnabled(policy!, 'document'), true);
 });

@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { DEFAULT_PROCESSING_OPTIONS, parseStoredJson, type ProcessingOptions } from "./customer-provenance.ts";
+import { deliverCaptureNotification } from "./customer-notifications.ts";
 
 type Content = {
   type: string;
@@ -79,7 +80,13 @@ export async function recognizeImage(bytes: Uint8Array): Promise<string> {
   }
 }
 
-type Options = { ocr?: (bytes: Uint8Array) => Promise<string>; batchSize?: number; now?: () => number };
+type Notification = { accountId: string; captureId: string; status: "done" | "failed" };
+type Options = {
+  ocr?: (bytes: Uint8Array) => Promise<string>;
+  batchSize?: number;
+  now?: () => number;
+  notify?: (value: Notification) => Promise<unknown>;
+};
 const RETRY_MS = 120_000;
 const LEASE_MS = 120_000;
 const ACCOUNT_MAX_BYTES = 200 * 1024 * 1024;
@@ -124,14 +131,14 @@ function fitDerived(wanted: Derived, budget: number): Derived {
 }
 
 function finalizeCapture(db: Database, row: Row, stamp: number, updatedAt: number, status: "done" | "failed", wanted: Derived) {
-  db.transaction(() => {
+  return db.transaction(() => {
     // OCR yields to uploads, deletes, account recovery and other workers. Read
     // ownership, lease and current usage together only when ready to commit.
     const current = db.query(`SELECT summary,ocr_text,category,tags,storage_bytes
       FROM customer_captures WHERE id=? AND account_id=? AND status='processing'
         AND processing_at=? AND EXISTS(SELECT 1 FROM customer_accounts WHERE id=?)`)
       .get(row.id,row.account_id,stamp,row.account_id) as (Derived & { storage_bytes: number }) | null;
-    if (!current) return;
+    if (!current) return false;
     const used = db.query(`SELECT COALESCE(SUM(storage_bytes),0) total,
       COALESCE(SUM(CASE WHEN account_id=? THEN storage_bytes ELSE 0 END),0) owner
       FROM customer_captures`).get(row.account_id) as { total: number; owner: number };
@@ -144,12 +151,13 @@ function finalizeCapture(db: Database, row: Row, stamp: number, updatedAt: numbe
     const kept = fitDerived(wanted,available);
     const omitted = kept.summary !== wanted.summary || kept.ocr_text !== wanted.ocr_text
       || kept.category !== wanted.category || kept.tags !== wanted.tags;
-    db.query(`UPDATE customer_captures SET status=?,summary=?,ocr_text=?,category=?,tags=?,
+    const result = db.query(`UPDATE customer_captures SET status=?,summary=?,ocr_text=?,category=?,tags=?,
       storage_bytes=?,enrich_error=?,processing_at=NULL,updated_at=?
       WHERE id=? AND account_id=? AND status='processing' AND processing_at=?`)
       .run(status,kept.summary,kept.ocr_text,kept.category,kept.tags,baseBytes+derivedBytes(kept),
         status === "failed" ? RECOGNITION_ERROR : omitted ? STORAGE_ERROR : null,
         updatedAt,row.id,row.account_id,stamp);
+    return result.changes === 1;
   }).immediate();
 }
 
@@ -168,10 +176,12 @@ export async function processCustomerQueue(db: Database, options: Options = {}):
         article_text,ocr_text,blob_data,blob_mime,enrich_attempts,processing_options_json`).get(stamp,stamp,stamp-RETRY_MS,stamp-LEASE_MS) as Row | null;
     if (!row) break;
     const processing = parseStoredJson<ProcessingOptions>(row.processing_options_json, { ...DEFAULT_PROCESSING_OPTIONS });
+    let finalized = false;
+    let finalStatus: "done" | "failed" = "done";
     try {
       const ocrText = processing.ocr && row.blob_data ? (await (options.ocr || recognizeImage)(row.blob_data)).slice(0,100_000) || null : row.ocr_text || null;
       const result = organizeText({...row,ocr_text:ocrText});
-      finalizeCapture(db,row,stamp,now(),"done",{
+      finalized = finalizeCapture(db,row,stamp,now(),"done",{
         summary: processing.summaries ? result.summary : null,
         ocr_text: processing.ocr ? ocrText : null,
         category: result.category,
@@ -179,12 +189,16 @@ export async function processCustomerQueue(db: Database, options: Options = {}):
       });
     } catch {
       const result = organizeText(row);
-      finalizeCapture(db,row,stamp,now(),"failed",{
+      finalStatus = "failed";
+      finalized = finalizeCapture(db,row,stamp,now(),"failed",{
         summary: processing.summaries ? result.summary : null,
         ocr_text: processing.ocr ? row.ocr_text || null : null,
         category: result.category,
         tags: processing.tags ? JSON.stringify(result.tags) : "[]",
       });
+    }
+    if (finalized && options.notify && (finalStatus === "done" || row.enrich_attempts >= 3)) {
+      try { await options.notify({ accountId: row.account_id, captureId: row.id, status: finalStatus }); } catch {}
     }
     processed++;
   }
@@ -201,7 +215,7 @@ export function startCustomerWorker(db: Database): () => void {
   const tick = async () => {
     if (busy) return;
     busy = true;
-    try { await processCustomerQueue(db); }
+    try { await processCustomerQueue(db, { notify: value => deliverCaptureNotification(db, value) }); }
     catch { console.error("Customer organization queue unavailable; will retry."); }
     finally { busy = false; }
   };

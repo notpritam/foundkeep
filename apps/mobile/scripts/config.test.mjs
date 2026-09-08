@@ -11,6 +11,7 @@ test('Foundkeep mobile config pins the release identity and safe OTA runtime', a
   assert.equal(app.ios.bundleIdentifier, 'app.foundkeep.ios');
   assert.equal(app.ios.buildNumber, '1');
   assert.equal(app.ios.supportsTablet, false);
+  assert.ok(app.ios.associatedDomains.includes('applinks:foundkeep.app'));
   assert.deepEqual(app.runtimeVersion, { policy: 'fingerprint' });
   assert.equal(app.updates.checkAutomatically, 'ON_LOAD');
   assert.equal(app.updates.fallbackToCacheTimeout, 0);
@@ -24,8 +25,10 @@ test('Foundkeep mobile config pins the release identity and safe OTA runtime', a
     ['1C8F.1'],
   );
   assert.ok(app.ios.privacyManifests.NSPrivacyCollectedDataTypes.some(item => item.NSPrivacyCollectedDataType === 'NSPrivacyCollectedDataTypeBrowsingHistory'));
+  assert.equal(app.ios.privacyManifests.NSPrivacyCollectedDataTypes.find(item => item.NSPrivacyCollectedDataType === 'NSPrivacyCollectedDataTypeDeviceID')?.NSPrivacyCollectedDataTypeLinked, true);
   assert.ok(app.plugins.includes('expo-router'));
   assert.ok(app.plugins.includes('expo-updates'));
+  assert.ok(app.plugins.includes('expo-notifications'));
   assert.doesNotMatch(JSON.stringify(app), /token|password|secret/i);
 });
 

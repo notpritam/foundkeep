@@ -43,6 +43,17 @@ describe("safe customer organization", () => {
     db.close();
   });
 
+  test("notifies only after an owned capture is durably finalized", async () => {
+    const db = fixture();
+    db.query("INSERT INTO customer_captures(id,account_id,type,note_text) VALUES(?,?,?,?)")
+      .run("ready", "owner-a", "note", "A saved thought");
+    const notifications: unknown[] = [];
+    await processCustomerQueue(db, { notify: async value => { notifications.push(value); } });
+    expect(notifications).toEqual([{ accountId: "owner-a", captureId: "ready", status: "done" }]);
+    expect((db.query("SELECT status FROM customer_captures WHERE id='ready'").get() as any).status).toBe("done");
+    db.close();
+  });
+
   test("honors immutable per-capture organization choices", async () => {
     const db = fixture();
     db.query("INSERT INTO customer_captures(id,account_id,type,blob_data,blob_mime,note_text,processing_options_json) VALUES(?,?,?,?,?,?,?)")

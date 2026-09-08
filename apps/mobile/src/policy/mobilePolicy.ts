@@ -8,6 +8,7 @@ export type MobilePolicy = {
   revision: number;
   cacheSeconds: number;
   minimumVersion: string;
+  features: { notifications: boolean };
   capture: Record<MobileCaptureType, boolean>;
   limits: {
     fileBytes: number;
@@ -24,6 +25,7 @@ export const DEFAULT_MOBILE_POLICY: MobilePolicy = {
   revision: 1,
   cacheSeconds: 300,
   minimumVersion: '1.0.0',
+  features: { notifications: true },
   capture: { bookmark: true, selection: true, note: true, image: true, video: true, audio: true, document: true, file: true },
   limits: { fileBytes: 50 * 1024 * 1024, textCharacters: 50_000, articleCharacters: 500_000, batchItems: 20, uploadTimeoutSeconds: 15 },
   notice: null,
@@ -34,14 +36,16 @@ const exactKeys = (value: unknown, keys: readonly string[]) => object(value) && 
 const integer = (value: unknown, min: number, max: number) => Number.isSafeInteger(value) && Number(value) >= min && Number(value) <= max;
 
 export function normalizeMobilePolicy(value: unknown): MobilePolicy | null {
-  const rootKeys = ['schemaVersion', 'revision', 'cacheSeconds', 'minimumVersion', 'capture', 'limits', 'notice'];
+  const rootKeys = ['schemaVersion', 'revision', 'cacheSeconds', 'minimumVersion', 'features', 'capture', 'limits', 'notice'];
   const limitKeys = ['fileBytes', 'textCharacters', 'articleCharacters', 'batchItems', 'uploadTimeoutSeconds'];
   if (!object(value) || !exactKeys(value, rootKeys)) return null;
   const capture = value.capture;
+  const features = value.features;
   const limits = value.limits;
   if (value.schemaVersion !== 1 ||
       !integer(value.revision, 1, Number.MAX_SAFE_INTEGER) || !integer(value.cacheSeconds, 60, 3600) ||
       typeof value.minimumVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(value.minimumVersion) ||
+      !object(features) || !exactKeys(features, ['notifications']) || typeof features.notifications !== 'boolean' ||
       !object(capture) || !exactKeys(capture, MOBILE_CAPTURE_TYPES) || MOBILE_CAPTURE_TYPES.some(type => typeof capture[type] !== 'boolean') ||
       !object(limits) || !exactKeys(limits, limitKeys) || !integer(limits.fileBytes, 1024 * 1024, 50 * 1024 * 1024) ||
       !integer(limits.textCharacters, 1000, 100_000) || !integer(limits.articleCharacters, 10_000, 500_000) || !integer(limits.batchItems, 1, 20) ||

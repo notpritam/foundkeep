@@ -32,7 +32,7 @@ const captures = [
   { ...baseCapture, id: 'video', clientId: 'video', type: 'video', sourceTitle: null, sourceUrl: null, fileName: 'Prototype walkthrough.mov', fileMime: 'video/quicktime', fileBytes: 8_641_923, fileUrl: '/api/captures/video/file', capturedAt: now - 259_200_000, provenance: { sourceApplication: 'Photos' } },
 ];
 const account = { id: 'review', email: 'review@foundkeep.app', name: 'App Review', createdAt: now - 999_999 };
-const policy = { schemaVersion: 1, revision: 1, cacheSeconds: 300, minimumVersion: '1.0.0', capture: { bookmark: true, selection: true, note: true, image: true, video: true, audio: true, document: true, file: true }, limits: { fileBytes: 52_428_800, textCharacters: 50_000, articleCharacters: 500_000, batchItems: 20, uploadTimeoutSeconds: 15 }, notice: null };
+const policy = { schemaVersion: 1, revision: 2, cacheSeconds: 300, minimumVersion: '1.0.0', features: { notifications: true }, capture: { bookmark: true, selection: true, note: true, image: true, video: true, audio: true, document: true, file: true }, limits: { fileBytes: 52_428_800, textCharacters: 50_000, articleCharacters: 500_000, batchItems: 20, uploadTimeoutSeconds: 15 }, notice: null };
 
 const executablePath = process.env.CHROMIUM_PATH || '/home/pritam/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome';
 const browser = await chromium.launch({ headless: true, executablePath });

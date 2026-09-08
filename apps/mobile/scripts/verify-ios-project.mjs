@@ -39,4 +39,7 @@ assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
 const mainEntitlements = await readFile(join(ios, 'Foundkeep', 'Foundkeep.entitlements'), 'utf8');
 assert.match(mainEntitlements, /group\.app\.foundkeep\.ios/);
 assert.match(mainEntitlements, /app\.foundkeep\.shared/);
+assert.match(mainEntitlements, /aps-environment/);
+assert.match(mainEntitlements, /com\.apple\.developer\.associated-domains/);
+assert.match(mainEntitlements, /applinks:foundkeep\.app/);
 console.log('Foundkeep iOS project includes the native Share Extension and shared security groups.');

@@ -98,6 +98,23 @@ describe("customer account security", () => {
     expect((await mobile("/me")).status).toBe(401);
   });
 
+  test("mobile notification routing is opt-in, connection-scoped and revoked on logout", async () => {
+    const registered = await mobile("/register", "POST", {
+      email: `mobile-push-${++sequence}@example.com`, name: "Mobile", password: PASSWORD, deviceName: "iPhone",
+    });
+    const session = await registered.json();
+    const bearer = `Bearer ${session.token}`;
+    expect(await (await mobile("/notifications", "GET", undefined, bearer)).json()).toEqual({ enabled: false });
+    expect((await mobile("/notifications", "POST", { expoPushToken: "not-a-token" }, bearer)).status).toBe(400);
+    expect((await mobile("/notifications", "POST", { expoPushToken: "ExpoPushToken[abc_DEF-0123456789]" }, bearer)).status).toBe(200);
+    expect(await (await mobile("/notifications", "GET", undefined, bearer)).json()).toEqual({ enabled: true });
+    expect((db.query("SELECT account_id,connection_id FROM customer_push_devices").get() as any)).toEqual({
+      account_id: session.account.id, connection_id: session.connection.id,
+    });
+    expect((await mobile("/logout", "POST", undefined, bearer)).status).toBe(200);
+    expect((db.query("SELECT COUNT(*) n FROM customer_push_devices").get() as any).n).toBe(0);
+  });
+
   test("mobile account deletion requires the password and revokes the device", async () => {
     const email = `mobile-delete-${++sequence}@example.com`;
     const registered = await mobile("/register", "POST", { email, name: "Delete Mobile", password: PASSWORD, deviceName: "iPhone" });

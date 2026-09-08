@@ -58,3 +58,23 @@ test('account deletion uses the authenticated mobile endpoint', async () => {
   assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { password: 'correct password' });
   assert.equal(new Headers(calls[0]?.init?.headers).get('authorization'), 'Bearer delete-token');
 });
+
+test('notification registration and removal use the current mobile connection', async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const client = createFoundkeepClient({
+    getToken: async () => 'device-token',
+    fetcher: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return Response.json(String(url).endsWith('/notifications') && init?.method === 'GET' ? { enabled: false } : { ok: true });
+    },
+  });
+  assert.deepEqual(await client.notificationStatus(), { enabled: false });
+  await client.registerNotifications('ExpoPushToken[abc_DEF-0123456789]');
+  await client.unregisterNotifications();
+  assert.deepEqual(calls.map(call => [call.url, call.init?.method]), [
+    ['https://foundkeep.app/api/mobile/notifications', 'GET'],
+    ['https://foundkeep.app/api/mobile/notifications', 'POST'],
+    ['https://foundkeep.app/api/mobile/notifications', 'DELETE'],
+  ]);
+  assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), { expoPushToken: 'ExpoPushToken[abc_DEF-0123456789]' });
+});

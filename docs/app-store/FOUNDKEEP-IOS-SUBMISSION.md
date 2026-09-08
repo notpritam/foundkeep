@@ -80,6 +80,9 @@ Everything you save appears in a searchable, filterable collection. Items shared
 BUILT FOR THE SHARE MENU
 Open Foundkeep once to sign in. Then choose Foundkeep from the iOS Share menu, add an optional note, and save. If the network is unavailable, the Share Extension keeps a protected local copy and retries after you reopen Foundkeep.
 
+OPTIONAL CAPTURE ALERTS
+Turn on private capture-ready alerts from Settings. Alerts contain no saved title, text, source, file, email address, or account name. Tap an alert to open the exact item in Foundkeep.
+
 YOU STAY IN CONTROL
 Delete captures from the app, export your cloud library from the web dashboard, or permanently delete your account. Data-only safety policy and feature settings can refresh without changing native permissions. Native capabilities arrive through signed App Store updates.
 
@@ -136,6 +139,7 @@ For every item below select **App Functionality**, **Linked to the User: Yes**, 
 | User Content → Audio Data | Stores audio the customer explicitly shares |
 | User Content → Other User Content | Stores links, readable page text, highlights, notes, documents and files the customer explicitly shares |
 | Browsing History | Stores the URL and available source metadata for pages the customer explicitly shares; the app does not monitor browsing |
+| Identifiers → Device ID | Stores the opt-in Expo push token with the customer's revocable iPhone connection so capture-ready alerts reach that device |
 
 ### Data not linked to the customer
 
@@ -143,7 +147,6 @@ For every item below select **App Functionality**, **Linked to the User: No**, a
 
 | App Privacy type | Why it is collected |
 | --- | --- |
-| Identifiers → Device ID | Expo's randomized update token is used to deliver compatible app updates |
 | Diagnostics → Crash Data | Used by Expo update delivery to diagnose update failures |
 | Diagnostics → Other Diagnostic Data | Operating-system, error and delivery information keeps updates reliable |
 
@@ -180,6 +183,7 @@ To test the main app:
 3. Open any item to see its saved source record.
 4. Use New note to save a note, then delete it from its detail screen if desired.
 5. Account deletion is available in Settings → Delete account and requires the current password plus a final confirmation.
+6. In Settings, enable Capture-ready alerts. After saving a new note, the generic notification opens that exact item. Foundkeep does not put saved content or account details in the alert.
 
 To test the Share Extension:
 1. Open Safari and visit any public page.
@@ -197,7 +201,7 @@ Account export is available after signing in at https://foundkeep.app/dashboard.
 1. Confirm the Apple Developer account has the main App ID, Share Extension App ID, and App Group capability.
 2. Authenticate EAS CLI and link the local Expo project.
 3. Create the production iOS build from `apps/mobile`.
-4. Install the build through TestFlight and test sign-in, notes, deletion, all Share-menu types, a multi-item share, offline queue retry, and source return links on a physical iPhone.
+4. Install the build through TestFlight and test sign-in return links, capture notifications, notes, deletion, all Share-menu types, a multi-item share, offline queue retry, and source return links on a physical iPhone.
 5. Upload/select build 1, add the screenshots and listing text, complete privacy and age-rating forms, and paste the private review credentials.
 6. Submit for review with manual release selected.
 

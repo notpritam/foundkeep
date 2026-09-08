@@ -5,11 +5,16 @@ import FoundkeepShared from '../../modules/foundkeep-shared/src';
 import { createFoundkeepClient, FoundkeepApiError } from '../api/client.ts';
 import type { Account, NativeSession, Usage } from '../api/types.ts';
 import { DEFAULT_MOBILE_POLICY, fetchMobilePolicy, normalizeMobilePolicy, requiresBinaryUpdate, type MobilePolicy } from '../policy/mobilePolicy.ts';
+import { safeReturnPath } from '../linking/deepLinks.ts';
+import { syncNotificationRegistration } from '../notifications/notifications.ts';
 
 type Credentials = { email: string; password: string };
 type SessionValue = {
   ready: boolean; account: Account | null; usage: Usage | null; token: string | null; recoveryCode: string | null;
   policy: MobilePolicy; updateRequired: boolean;
+  pendingRoute: string | null;
+  setPendingRoute(value: string | null): void;
+  consumePendingRoute(): string | null;
   client: ReturnType<typeof createFoundkeepClient>;
   register(value: Credentials & { name: string }): Promise<void>;
   login(value: Credentials): Promise<void>;
@@ -29,6 +34,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [policy, setPolicy] = useState<MobilePolicy>(DEFAULT_MOBILE_POLICY);
+  const [pendingRoute, setPendingRouteState] = useState<string | null>(null);
   const getToken = useCallback(async () => token ?? FoundkeepShared.getToken(), [token]);
   const client = useMemo(() => createFoundkeepClient({ getToken }), [getToken]);
 
@@ -79,24 +85,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
     return () => subscription.remove();
   }, [refresh, token]);
+  useEffect(() => {
+    if (token) void syncNotificationRegistration(client, policy.features.notifications).catch(() => {});
+  }, [client, policy.features.notifications, token]);
 
   const deviceName = Device.deviceName || Device.modelName || 'iPhone';
   const value = useMemo<SessionValue>(() => ({
-    ready, account, usage, token, recoveryCode, policy, updateRequired: requiresBinaryUpdate('1.0.0', policy.minimumVersion), client,
+    ready, account, usage, token, recoveryCode, policy, pendingRoute, updateRequired: requiresBinaryUpdate('1.0.0', policy.minimumVersion), client,
+    setPendingRoute: value => setPendingRouteState(safeReturnPath(value)),
+    consumePendingRoute: () => {
+      const value = pendingRoute;
+      setPendingRouteState(null);
+      return safeReturnPath(value);
+    },
     register: async input => accept(await client.register({ ...input, deviceName })),
     login: async input => accept(await client.login({ ...input, deviceName })),
     recover: async input => accept(await client.recover({ ...input, deviceName })),
     acknowledgeRecovery: () => setRecoveryCode(null), refresh,
     logout: async () => {
       try { if (token) await client.logout(); } finally {
-        await FoundkeepShared.clearSession(); setToken(null); setAccount(null); setUsage(null); setRecoveryCode(null);
+        await FoundkeepShared.clearSession(); setToken(null); setAccount(null); setUsage(null); setRecoveryCode(null); setPendingRouteState(null);
       }
     },
     deleteAccount: async password => {
       await client.deleteAccount(password);
-      await FoundkeepShared.clearSession(); setToken(null); setAccount(null); setUsage(null); setRecoveryCode(null);
+      await FoundkeepShared.clearSession(); setToken(null); setAccount(null); setUsage(null); setRecoveryCode(null); setPendingRouteState(null);
     },
-  }), [ready, account, usage, token, recoveryCode, policy, client, deviceName, accept, refresh]);
+  }), [ready, account, usage, token, recoveryCode, policy, pendingRoute, client, deviceName, accept, refresh]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

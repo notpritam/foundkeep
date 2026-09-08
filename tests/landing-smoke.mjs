@@ -174,6 +174,15 @@ test("customer copy explains readable bookmarks, source records, controls and iP
   assert.match(copy, /iPhone/i);
 });
 
+test("mobile handoff page creates only allowlisted Foundkeep links", async (t) => {
+  const page = await pageFor(t);
+  await page.goto(base + "/open.html?path=settings");
+  assert.equal(await page.locator("#open-app").getAttribute("href"), "foundkeep://settings");
+  await page.goto(base + "/open.html?path=https%3A%2F%2Fevil.example");
+  assert.equal(await page.locator("#open-app").getAttribute("href"), "foundkeep://collection");
+  assert.match(await page.locator(".open-private").textContent(), /never includes your password/i);
+});
+
 test("privacy policy discloses capture data and Chrome Web Store Limited Use", async (t) => {
   const page = await pageFor(t);
   await page.goto(base + "/privacy.html");

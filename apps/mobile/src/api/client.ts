@@ -56,6 +56,9 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
       return json<NativeSession>('/api/mobile/recover', { method: 'POST', body: devicePayload(value), authenticated: false });
     },
     me: () => json<{ account: Account; connectionId: string; usage: Usage }>('/api/mobile/me'),
+    notificationStatus: () => json<{ enabled: boolean }>('/api/mobile/notifications'),
+    registerNotifications: (expoPushToken: string) => json<{ ok: true }>('/api/mobile/notifications', { method: 'POST', body: { expoPushToken } }),
+    unregisterNotifications: () => json<{ ok: true }>('/api/mobile/notifications', { method: 'DELETE' }),
     logout: () => json<{ ok: true }>('/api/mobile/logout', { method: 'POST' }),
     deleteAccount: (password: string) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: { password } }),
     listCaptures(filters: { q?: string; type?: string; cursor?: string }) {

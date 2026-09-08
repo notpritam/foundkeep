@@ -230,6 +230,18 @@ const MIGRATIONS: string[] = [
   ALTER TABLE customer_captures ADD COLUMN file_bytes INTEGER NOT NULL DEFAULT 0;
   CREATE INDEX customer_captures_owner_batch ON customer_captures(account_id, batch_id);
   `,
+  // 8 — opt-in mobile push routing, scoped to a revocable connection.
+  `
+  CREATE TABLE customer_push_devices (
+    connection_id TEXT PRIMARY KEY REFERENCES customer_connections(id) ON DELETE CASCADE,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    expo_push_token TEXT NOT NULL UNIQUE,
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX customer_push_devices_account ON customer_push_devices(account_id, enabled);
+  `,
 ];
 
 function migrate(db: Database): void {

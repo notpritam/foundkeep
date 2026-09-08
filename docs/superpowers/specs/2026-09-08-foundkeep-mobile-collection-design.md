@@ -111,6 +111,15 @@ The native bridge exposes typed methods to sign in/out of shared storage, list p
 
 iOS does not guarantee background execution after a share sheet closes. The extension makes a time-bounded direct attempt and the containing app drains the queue at launch, foreground, manual retry, and permitted background refresh opportunities.
 
+## Deep links and capture-ready alerts
+
+- Foundkeep handles `foundkeep://` links and `https://foundkeep.app/open?path=…` Universal Links for sign-in, registration, recovery, collection, Settings, new-note, and UUID-scoped capture detail destinations.
+- A protected destination received while signed out is kept in memory, the customer signs in or recovers, and the app continues to that destination. The parser rejects other origins, arbitrary paths, credentials, fragments, and malformed capture IDs.
+- The Associated Domains entitlement is bundled in 1.0.0. The server publishes Apple association metadata only when `ATLAS_APPLE_TEAM_ID` contains the verified ten-character Apple Team ID.
+- Capture-ready notifications are opt-in from Settings. A push token is attached to one revocable mobile connection and is removed on opt-out, sign-out, connection revocation, recovery, or account deletion.
+- Push payloads contain generic status copy and a Foundkeep capture route only. They never contain a title, saved text, source URL, file, email address, account name, auth token, or recovery code.
+- The data-only mobile policy can disable notification registration without an app update. Existing enabled devices unregister when the app refreshes that policy.
+
 ## Main app
 
 The main Expo app uses native stack navigation and four primary surfaces:
