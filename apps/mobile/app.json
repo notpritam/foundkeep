@@ -12,7 +12,8 @@
     },
     "updates": {
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/33362145-2b45-4d86-bb08-cd10c6bfae61"
     },
     "ios": {
       "bundleIdentifier": "app.foundkeep.ios",
@@ -74,6 +75,7 @@
     ],
     "extra": {
       "eas": {
+        "projectId": "33362145-2b45-4d86-bb08-cd10c6bfae61",
         "build": {
           "experimental": {
             "ios": {

@@ -15,6 +15,8 @@ test('Foundkeep mobile config pins the release identity and safe OTA runtime', a
   assert.deepEqual(app.runtimeVersion, { policy: 'fingerprint' });
   assert.equal(app.updates.checkAutomatically, 'ON_LOAD');
   assert.equal(app.updates.fallbackToCacheTimeout, 0);
+  assert.equal(app.updates.url, 'https://u.expo.dev/33362145-2b45-4d86-bb08-cd10c6bfae61');
+  assert.equal(app.extra.eas.projectId, '33362145-2b45-4d86-bb08-cd10c6bfae61');
   assert.equal(app.ios.infoPlist.ITSAppUsesNonExemptEncryption, false);
   assert.equal(app.ios.infoPlist.NSPhotoLibraryUsageDescription, undefined);
   assert.equal(app.ios.privacyManifests.NSPrivacyTracking, false);
