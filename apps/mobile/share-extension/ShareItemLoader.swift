@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import UIKit
 import UniformTypeIdentifiers
 
 struct FoundkeepShareItem {
@@ -28,17 +27,20 @@ enum FoundkeepItemError: LocalizedError {
 
 final class ShareItemLoader: @unchecked Sendable {
   private let manager = FileManager.default
-  private let policy = FoundkeepSharePolicy.current
+  private let policy: FoundkeepSharePolicy
   private let container: URL
 
-  init() throws {
-    guard let value = manager.containerURL(forSecurityApplicationGroupIdentifier: "group.app.foundkeep.ios") else { throw FoundkeepItemError.unavailable }
-    container = value
+  init(container: URL? = nil, policy: FoundkeepSharePolicy = .current) throws {
+    self.policy = policy
+    guard let value = container ?? manager.containerURL(forSecurityApplicationGroupIdentifier: "group.app.foundkeep.ios") else { throw FoundkeepItemError.unavailable }
+    self.container = value
   }
 
   func load(_ inputs: [NSExtensionItem]) async throws -> [FoundkeepShareItem] {
     var output: [FoundkeepShareItem] = []
     for input in inputs {
+      if output.count >= policy.batchItems { break }
+      let initialCount = output.count
       var sharedContext: [String: Any]? = nil
       for provider in input.attachments ?? [] {
         if let context = try await webpageContext(provider) { sharedContext = context; break }
@@ -46,6 +48,12 @@ final class ShareItemLoader: @unchecked Sendable {
       for provider in input.attachments ?? [] {
         if output.count >= policy.batchItems { break }
         if let item = try await load(provider, title: input.attributedTitle?.string, sharedContext: sharedContext) { output.append(item) }
+      }
+      // Safari can supply only the preprocessing property list, with no URL
+      // attachment. Its validated page URL is then the item being shared.
+      if output.count == initialCount, let context = sharedContext,
+         let pageURL = context["pageUrl"] as? String, let url = URL(string: pageURL) {
+        output.append(try bookmark(url, title: input.attributedTitle?.string, context: context))
       }
     }
     if output.isEmpty { throw FoundkeepItemError.unavailable }
@@ -71,10 +79,7 @@ final class ShareItemLoader: @unchecked Sendable {
     }
     if provider.hasItemConformingToTypeIdentifier(UTType.propertyList.identifier) && provider.registeredTypeIdentifiers.allSatisfy({ $0 == UTType.propertyList.identifier }) { return nil }
     if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier), let url = try await value(provider, type: .url) as? URL {
-      guard policy.allows("bookmark") else { throw FoundkeepItemError.disabled }
-      let sourceURL = url.absoluteString
-      guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.user == nil, url.password == nil, sourceURL.count <= 4096 else { throw FoundkeepItemError.unavailable }
-      return FoundkeepShareItem(clientId: UUID().uuidString, type: "bookmark", sourceURL: sourceURL, sourceTitle: boundedTitle(title ?? context?["pageTitle"] as? String), selectionText: context?["selectedText"] as? String, fileName: nil, mime: nil, bytes: 0, payloadPath: nil, contentHash: hash(Data(sourceURL.utf8)), pageContext: context)
+      return try bookmark(url, title: title, context: context)
     }
     if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier), let text = try await value(provider, type: .plainText) as? String {
       guard policy.allows("selection") else { throw FoundkeepItemError.disabled }
@@ -87,6 +92,15 @@ final class ShareItemLoader: @unchecked Sendable {
     }) else { return nil }
     let uniform = UTType(identifier) ?? .data
     return try await copiedFile(provider, identifier: identifier, type: uniform, title: title, context: context)
+  }
+
+  private func bookmark(_ url: URL, title: String?, context: [String: Any]?) throws -> FoundkeepShareItem {
+    guard policy.allows("bookmark") else { throw FoundkeepItemError.disabled }
+    let sourceURL = url.absoluteString
+    guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+          let host = url.host, !host.isEmpty, url.user == nil, url.password == nil,
+          sourceURL.utf16.count <= 4096 else { throw FoundkeepItemError.unavailable }
+    return FoundkeepShareItem(clientId: UUID().uuidString, type: "bookmark", sourceURL: sourceURL, sourceTitle: boundedTitle(title ?? context?["pageTitle"] as? String), selectionText: context?["selectedText"] as? String, fileName: nil, mime: nil, bytes: 0, payloadPath: nil, contentHash: hash(Data(sourceURL.utf8)), pageContext: context)
   }
 
   private func copiedFile(_ provider: NSItemProvider, identifier: String, type: UTType, title: String?, context: [String: Any]?) async throws -> FoundkeepShareItem {
