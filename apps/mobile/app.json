@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Foundkeep",
+    "slug": "foundkeep",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "foundkeep",
+    "userInterfaceStyle": "automatic",
+    "runtimeVersion": { "policy": "fingerprint" },
+    "updates": { "checkAutomatically": "ON_LOAD", "fallbackToCacheTimeout": 0 },
+    "ios": {
+      "bundleIdentifier": "app.foundkeep.ios",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "usesAppleSignIn": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Foundkeep reads only the photos you explicitly choose to save.",
+        "NSPhotoLibraryAddUsageDescription": "Foundkeep can save an exported copy when you choose that action."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-updates",
+      ["expo-splash-screen", {
+        "backgroundColor": "#f3f3f0",
+        "image": "./assets/images/splash-icon.png",
+        "imageWidth": 92,
+        "dark": { "backgroundColor": "#171917" }
+      }]
+    ],
+    "experiments": { "typedRoutes": true, "reactCompiler": true }
+  }
+}

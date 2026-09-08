@@ -19,7 +19,11 @@
     "test:web": "node --test tests/landing-smoke.mjs",
     "test:customer": "node --test tests/customer-flow.mjs tests/customer-web.mjs",
     "prepare:web-assets": "node scripts/prepare-web-assets.mjs",
-    "brand:assets": "node scripts/render-brand-assets.mjs"
+    "brand:assets": "node scripts/render-brand-assets.mjs",
+    "mobile:start": "npm --workspace @foundkeep/mobile run start",
+    "mobile:test": "npm --workspace @foundkeep/mobile run test",
+    "mobile:typecheck": "npm --workspace @foundkeep/mobile run typecheck",
+    "mobile:prebuild": "npm --workspace @foundkeep/mobile run prebuild"
   },
   "devDependencies": {
     "crx3": "^2.0.0",

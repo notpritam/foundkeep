@@ -1,0 +1,63 @@
+export type CaptureType = 'screenshot' | 'selection' | 'bookmark' | 'image' | 'note' | 'tweet' | 'video' | 'audio' | 'document' | 'file';
+
+export type Account = { id: string; email: string; name: string; createdAt: number };
+export type Usage = { captures: number; bytes: number; maxCaptures: number; maxBytes: number };
+export type Connection = { id: string; name: string; createdAt: number; lastSeenAt: number | null };
+
+export type CaptureProvenance = {
+  schemaVersion?: 1;
+  captureMethod?: string;
+  pageUrl?: string | null;
+  canonicalUrl?: string | null;
+  pageTitle?: string | null;
+  siteName?: string | null;
+  description?: string | null;
+  authors?: string[];
+  publishedAt?: string | null;
+  modifiedAt?: string | null;
+  language?: string | null;
+  targetUrl?: string | null;
+  capturedAt?: number;
+  sourceApplication?: string | null;
+  originalFileName?: string | null;
+  declaredMime?: string | null;
+  byteSize?: number | null;
+};
+
+export type Capture = {
+  id: string;
+  clientId: string;
+  batchId: string | null;
+  type: CaptureType;
+  status: 'pending' | 'processing' | 'done' | 'failed';
+  sourceUrl: string | null;
+  sourceTitle: string | null;
+  selectionText: string | null;
+  noteText: string | null;
+  articleText: string | null;
+  summary: string | null;
+  ocrText: string | null;
+  category: string | null;
+  tags: string[];
+  blobUrl: string | null;
+  fileName: string | null;
+  fileMime: string | null;
+  fileBytes: number;
+  fileUrl: string | null;
+  width: number | null;
+  height: number | null;
+  capturedAt: number;
+  createdAt: number;
+  updatedAt: number;
+  enrichError: string | null;
+  provenance: CaptureProvenance | null;
+};
+
+export type NativeSession = {
+  account: Account;
+  token: string;
+  connection: Connection;
+  recoveryCode?: string;
+};
+
+export type CaptureList = { captures: Capture[]; nextCursor: string | null; total: number };
