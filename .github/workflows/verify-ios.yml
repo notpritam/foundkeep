@@ -1,0 +1,59 @@
+name: Verify iOS app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "bun.lock"
+      - "bunfig.toml"
+      - ".github/workflows/verify-ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install JavaScript dependencies
+        working-directory: .
+        run: bun install --frozen-lockfile
+
+      - name: Test the mobile app
+        run: |
+          bun run test
+          bun run typecheck
+
+      - name: Generate and inspect the Xcode project
+        run: |
+          bunx expo prebuild --platform ios --clean --no-install
+          node scripts/verify-ios-project.mjs
+
+      - name: Install iOS dependencies
+        run: pod install --project-directory=ios
+
+      - name: Compile the app and Share Extension
+        run: >-
+          xcodebuild
+          -workspace ios/Foundkeep.xcworkspace
+          -scheme Foundkeep
+          -configuration Release
+          -sdk iphonesimulator
+          -destination "generic/platform=iOS Simulator"
+          CODE_SIGNING_ALLOWED=NO
+          build
