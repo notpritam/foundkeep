@@ -221,6 +221,15 @@ const MIGRATIONS: string[] = [
   ALTER TABLE customer_captures ADD COLUMN provenance_json TEXT;
   ALTER TABLE customer_captures ADD COLUMN processing_options_json TEXT;
   `,
+  // 7 — universal mobile capture metadata and file-backed payloads.
+  `
+  ALTER TABLE customer_captures ADD COLUMN batch_id TEXT;
+  ALTER TABLE customer_captures ADD COLUMN file_name TEXT;
+  ALTER TABLE customer_captures ADD COLUMN file_path TEXT;
+  ALTER TABLE customer_captures ADD COLUMN file_mime TEXT;
+  ALTER TABLE customer_captures ADD COLUMN file_bytes INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX customer_captures_owner_batch ON customer_captures(account_id, batch_id);
+  `,
 ];
 
 function migrate(db: Database): void {

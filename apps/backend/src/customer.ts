@@ -24,17 +24,19 @@ const BODY_READ_DEADLINE_MS = 30_000;
 const MAX_IMAGE = 8 * 1024 * 1024;
 const MAX_CAPTURES = 1000;
 const MAX_BYTES = 200 * 1024 * 1024;
-const TYPES = new Set(["screenshot", "selection", "bookmark", "image", "note", "tweet"]);
-const CAPTURE_COLUMNS = "id,account_id,client_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json";
+const TYPES = new Set(["screenshot", "selection", "bookmark", "image", "note", "tweet", "video", "audio", "document", "file"]);
+const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json";
 
 interface AccountRow { id: string; email: string; name: string; password_hash: string; recovery_hash: string; created_at: number }
 interface ConnectionRow { id: string; account_id: string; name: string; created_at: number; last_seen_at: number | null; expires_at: number }
 interface CredentialRow { id: string; account_id: string; expires_at: number }
 export interface CustomerCaptureRow {
   id: string; account_id: string; client_id: string; type: string; status: string;
+  batch_id: string | null;
   source_url: string | null; source_title: string | null; selection_text: string | null;
   note_text: string | null; article_text: string | null; blob_data?: Uint8Array | null;
   blob_mime: string | null; blob_bytes: number; storage_bytes: number;
+  file_name: string | null; file_path: string | null; file_mime: string | null; file_bytes: number;
   width: number | null; height: number | null; captured_at: number; created_at: number; updated_at: number;
   summary: string | null; ocr_text: string | null; category: string | null; tags: string;
   enrich_error: string | null; enrich_attempts: number; processing_at: number | null;
@@ -54,11 +56,13 @@ function accountDto(row: AccountRow) { return { id: row.id, email: row.email, na
 function connectionDto(row: ConnectionRow) { return { id: row.id, name: row.name, createdAt: row.created_at, lastSeenAt: row.last_seen_at }; }
 export function customerCaptureDto(row: CustomerCaptureRow) {
   return {
-    id: row.id, clientId: row.client_id, type: row.type, status: row.status,
+    id: row.id, clientId: row.client_id, batchId: row.batch_id, type: row.type, status: row.status,
     sourceUrl: row.source_url, sourceTitle: row.source_title, selectionText: row.selection_text,
     noteText: row.note_text, articleText: row.article_text, summary: row.summary, ocrText: row.ocr_text,
     category: row.category, tags: JSON.parse(row.tags || "[]") as string[],
     blobUrl: row.blob_mime ? `/api/captures/${row.id}/blob` : null,
+    fileName: row.file_name, fileMime: row.file_mime, fileBytes: row.file_bytes,
+    fileUrl: row.file_path ? `/api/captures/${row.id}/file` : null,
     width: row.width, height: row.height, capturedAt: row.captured_at, createdAt: row.created_at,
     updatedAt: row.updated_at, enrichError: row.enrich_error,
     provenance: parseStoredJson<CaptureProvenance | null>(row.provenance_json, null),
@@ -677,6 +681,8 @@ export function customerRoutes(db: Database) {
     const clientId = textField(body, "clientId", 128, true)!;
     const type = textField(body, "type", 20, true)!;
     if (!TYPES.has(type)) fail(400, "invalid_type", "Choose a supported capture type.");
+    const batchId = textField(body, "batchId", 64);
+    if (batchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(batchId)) fail(400, "invalid_batch", "The shared collection identifier is invalid.");
     const sourceUrl = textField(body, "sourceUrl", 4096);
     if (sourceUrl) {
       let url: URL;
@@ -708,7 +714,7 @@ export function customerRoutes(db: Database) {
     }
     const provenanceJson = provenance ? JSON.stringify(provenance) : null;
     const processingOptionsJson = JSON.stringify(processingOptions);
-    const storageBytes = image.bytes + [sourceUrl, sourceTitle, selectionText, noteText, articleText, clientId, provenanceJson, processingOptionsJson].reduce((sum, text) => sum + Buffer.byteLength(text || "", "utf8"), 0);
+    const storageBytes = image.bytes + [sourceUrl, sourceTitle, selectionText, noteText, articleText, clientId, batchId, provenanceJson, processingOptionsJson].reduce((sum, text) => sum + Buffer.byteLength(text || "", "utf8"), 0);
     const result = db.transaction(() => {
       // Authentication must still hold after the streamed body was received.
       auth(c);
@@ -720,7 +726,7 @@ export function customerRoutes(db: Database) {
       if (global.captures >= globalMaxCaptures || global.bytes + storageBytes > globalMaxBytes) fail(503, "storage_unavailable", "Foundkeep storage is temporarily full. Your extension will keep this capture locally.");
       const id = crypto.randomUUID();
       const now = Date.now();
-      db.query("INSERT INTO customer_captures(id,account_id,client_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,provenance_json,processing_options_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now, provenanceJson, processingOptionsJson);
+      db.query("INSERT INTO customer_captures(id,account_id,client_id,batch_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,provenance_json,processing_options_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, batchId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now, provenanceJson, processingOptionsJson);
       return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
     })();
     return c.json(result, result.duplicate ? 200 : 201);

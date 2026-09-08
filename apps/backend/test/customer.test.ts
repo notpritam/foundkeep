@@ -411,6 +411,59 @@ describe("customer extension preferences", () => {
 });
 
 describe("private customer captures", () => {
+  test("models universal mobile items and preserves multi-share provenance", async () => {
+    const registered = await mobile("/register", "POST", {
+      email: `universal-${++sequence}@example.com`, name: "Universal", password: PASSWORD, deviceName: "iPhone",
+    });
+    const session = await registered.json();
+    const bearer = `Bearer ${session.token}`;
+    const batchId = crypto.randomUUID();
+    const capturedAt = Date.now() - 1_000;
+    const provenance = {
+      schemaVersion: 1,
+      captureMethod: "ios-share-document",
+      pageUrl: "https://example.com/report",
+      canonicalUrl: "https://example.com/report",
+      pageTitle: "Quarterly report",
+      siteName: "Example",
+      description: "A report shared from Files.",
+      authors: ["Example Team"],
+      publishedAt: null,
+      modifiedAt: null,
+      language: "en",
+      leadImageUrl: null,
+      faviconUrl: "https://example.com/favicon.ico",
+      targetUrl: null,
+      headings: [],
+      capturedAt,
+      extractedAt: capturedAt,
+      extractorVersion: 1,
+      contentHash: "b".repeat(43),
+      extractionStatus: "complete",
+      extractionError: null,
+      sourceApplication: "com.apple.DocumentsApp",
+      originalFileName: "Quarterly Report.pdf",
+      declaredMime: "application/pdf",
+      byteSize: 12345,
+    };
+    for (const [index, type] of ["video", "audio", "document", "file"].entries()) {
+      const response = await capture(bearer, {
+        clientId: `mobile-item-${index}`, type, batchId, capturedAt, provenance,
+      });
+      expect(response.status).toBe(201);
+      const item = (await response.json()).capture;
+      expect(item).toMatchObject({
+        clientId: `mobile-item-${index}`, type, batchId,
+        fileName: null, fileMime: null, fileBytes: 0, fileUrl: null,
+      });
+      expect(item.provenance).toEqual(provenance);
+    }
+    const columns = (db.query("PRAGMA table_info(customer_captures)").all() as any[]).map((row) => row.name);
+    expect(columns).toEqual(expect.arrayContaining(["batch_id", "file_name", "file_path", "file_mime", "file_bytes"]));
+    expect((await capture(bearer, { type: "document", batchId: "not-a-uuid" })).status).toBe(400);
+    expect((await capture(bearer, { type: "document", provenance: { ...provenance, sourceApplication: "x".repeat(301) } })).status).toBe(400);
+  });
+
   test("preserves bounded provenance and processing choices without trusting unsafe origins", async () => {
     const owner = await register();
     const other = await register();
