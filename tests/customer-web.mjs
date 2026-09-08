@@ -93,7 +93,7 @@ async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAc
 async function openLibrary(page) { await page.goto(`${base}/dashboard.html`); await page.locator('#new-note:not([disabled])').waitFor(); await page.locator('#capture-grid[aria-busy="false"]').waitFor({ state: 'attached' }); }
 
 test('customer pages present the Foundkeep identity', async () => {
-  for (const file of ['auth.html', 'dashboard.html', 'privacy.html', 'redeem.html']) {
+  for (const file of ['auth.html', 'dashboard.html', 'privacy.html', 'redeem.html', 'support.html', 'terms.html']) {
     const source = await readFile(path.resolve('apps/web', file), 'utf8');
     assert.match(source, /Foundkeep/);
     assert.doesNotMatch(source, />\s*Atlas(?:\s|<)/);

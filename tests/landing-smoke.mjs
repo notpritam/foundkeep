@@ -164,13 +164,14 @@ test("search and sharing metadata resolve to the production site and a real imag
   await page.locator('a[href="privacy.html"]').first().click();
   assert.match(await page.title(), /Privacy/);
 });
-test("customer copy explains readable bookmarks, source records, controls and Chromium support", async (t) => {
+test("customer copy explains readable bookmarks, source records, controls and iPhone support", async (t) => {
   const page = await pageFor(t);
   const copy = await page.locator('body').textContent();
   assert.match(copy, /readable copy/i);
   assert.match(copy, /original source/i);
   assert.match(copy, /capture settings/i);
   assert.match(copy, /Chrome, Edge, Brave, Opera/i);
+  assert.match(copy, /iPhone/i);
 });
 
 test("privacy policy discloses capture data and Chrome Web Store Limited Use", async (t) => {
@@ -197,7 +198,26 @@ test("customer support is hosted on Foundkeep and covers the full capture path",
   assert.match(copy, /local library/i);
   assert.match(copy, /Pending uploads retry automatically/i);
   assert.match(copy, /recovery code/i);
-  assert.match(copy, /Chrome Web Store release 1\.0\.0/i);
+  assert.match(copy, /version 1\.0\.0/i);
+  assert.match(copy, /notpritamsharma@gmail\.com/i);
+  assert.equal(await page.locator('a[href="terms.html"]').count() > 0, true);
+  assert.equal(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    true,
+  );
+});
+
+test("terms state customer content rights and expose a real support contact", async (t) => {
+  const page = await pageFor(t, 390);
+  await page.goto(base + "/terms.html");
+  assert.equal(
+    await page.locator('link[rel="canonical"]').getAttribute("href"),
+    "https://foundkeep.app/terms.html",
+  );
+  const copy = await page.locator("body").textContent();
+  assert.match(copy, /You keep ownership/i);
+  assert.match(copy, /have permission/i);
+  assert.match(copy, /notpritamsharma@gmail\.com/i);
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     true,

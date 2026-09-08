@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "cacheSeconds": 300,
+  "minimumVersion": "1.0.0",
+  "capture": {
+    "bookmark": true,
+    "selection": true,
+    "note": true,
+    "image": true,
+    "video": true,
+    "audio": true,
+    "document": true,
+    "file": true
+  },
+  "limits": {
+    "fileBytes": 52428800,
+    "textCharacters": 50000,
+    "articleCharacters": 500000,
+    "batchItems": 20,
+    "uploadTimeoutSeconds": 15
+  },
+  "notice": null
+}
