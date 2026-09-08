@@ -25,7 +25,7 @@ export function Button({ label, onPress, loading = false, disabled = false, seco
 }
 
 export function Field({ label, help, ...props }: TextInputProps & { label: string; help?: string }) {
-  return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><TextInput {...props} style={[styles.input, props.multiline && styles.multiline, props.style]} placeholderTextColor={colors.muted} selectionColor={colors.accent} accessibilityLabel={label} />{help ? <Text style={typography.small}>{help}</Text> : null}</View>;
+  return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><TextInput {...props} testID={props.testID || `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} style={[styles.input, props.multiline && styles.multiline, props.style]} placeholderTextColor={colors.muted} selectionColor={colors.accent} accessibilityLabel={label} />{help ? <Text style={typography.small}>{help}</Text> : null}</View>;
 }
 
 export function Message({ children, error = false }: { children?: ReactNode; error?: boolean }) {
