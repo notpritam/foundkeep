@@ -41,7 +41,7 @@ test('Safari preprocessor keeps readable text and source metadata bounded', () =
 test('malformed optional image metadata cannot prevent an otherwise valid capture', () => {
   const result = runPreprocessor({ lead: 'http://[' });
   assert.equal(result.pageUrl, 'https://example.test/article?from=share');
-  assert.equal(result.leadImageUrl, null);
+  assert.equal(result.leadImageUrl, undefined);
 });
 
 test('page fields are bounded to the server provenance contract', () => {
@@ -49,5 +49,16 @@ test('page fields are bounded to the server provenance contract', () => {
   assert.equal(result.pageTitle.length, 1000);
   assert.equal(result.siteName.length, 300);
   assert.equal(result.authors[0].length, 200);
-  assert.equal(result.language, null);
+  assert.equal(result.language, undefined);
+});
+
+test('Safari results contain only property-list compatible values', () => {
+  const verify = value => {
+    assert.notEqual(value, null, 'Apple property lists cannot represent null');
+    if (Array.isArray(value)) value.forEach(verify);
+    else if (typeof value === 'object') Object.values(value).forEach(verify);
+    else assert.ok(['string', 'number', 'boolean'].includes(typeof value));
+  };
+  verify(runPreprocessor());
+  verify(runPreprocessor({ selected: 'A passage to keep', lead: 'http://[', language: 'invalid_language' }));
 });

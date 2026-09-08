@@ -28,7 +28,7 @@ FoundkeepPreprocessor.prototype = {
     };
     var language = text(document.documentElement.lang, 35);
     if (language && !/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(language)) language = null;
-    arguments.completionFunction({
+    var result = {
       pageUrl: absoluteURL(location.href),
       canonicalUrl: absoluteURL(canonical ? canonical.href : null),
       pageTitle: text(document.title, 1000),
@@ -43,7 +43,13 @@ FoundkeepPreprocessor.prototype = {
       headings: headings,
       selectedText: selected || null,
       readableText: selected ? null : String(document.body ? document.body.innerText : '').replace(/\s+/g, ' ').trim().slice(0, 500000)
+    };
+    // Safari delivers this object as an Apple property list, which cannot
+    // represent null. Missing optional metadata must be omitted entirely.
+    Object.keys(result).forEach(function (key) {
+      if (result[key] === null) delete result[key];
     });
+    arguments.completionFunction(result);
   },
   finalize: function () {}
 };
