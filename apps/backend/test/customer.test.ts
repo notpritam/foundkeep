@@ -56,6 +56,26 @@ function heldUpload(cookie: string, target = app) {
 }
 
 describe("customer account security", () => {
+  test("mobile card pages bound text payloads while search and detail retain full saved content", async () => {
+    const owner = await register();
+    const device = await connect(owner.cookie);
+    const fullText = 'A paragraph worth keeping. '.repeat(6000) + 'rare-tail-match';
+    const saved = await (await capture(device.bearer, { type: 'bookmark', sourceUrl: 'https://example.com/story', articleText: fullText })).json();
+    const fullResponse = await mobile('/captures', 'GET', undefined, device.bearer);
+    const fullBody = await fullResponse.text();
+    const compactResponse = await mobile('/captures?view=cards&q=rare-tail-match', 'GET', undefined, device.bearer);
+    const compactBody = await compactResponse.text();
+    const compact = JSON.parse(compactBody);
+    expect(compact.captures).toHaveLength(1);
+    expect(compact.captures[0].contentView).toBe('card');
+    expect(compact.captures[0].articleText.length).toBeLessThanOrEqual(480);
+    expect(compactBody.length).toBeLessThan(fullBody.length / 20);
+    const detail = await (await mobile(`/captures/${saved.capture.id}`, 'GET', undefined, device.bearer)).json();
+    expect(detail.capture.articleText).toBe(fullText);
+    expect(JSON.parse(fullBody).captures[0].articleText).toBe(fullText);
+    expect((await mobile('/captures?view=unknown', 'GET', undefined, device.bearer)).status).toBe(400);
+  });
+
   test("mobile registration, login, recovery and logout use revocable device credentials", async () => {
     const email = `mobile-${++sequence}@example.com`;
     const registered = await mobile("/register", "POST", { email, name: "Mobile Person", password: PASSWORD, deviceName: "Pritam's iPhone" });

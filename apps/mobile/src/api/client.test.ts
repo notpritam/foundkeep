@@ -2,6 +2,34 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createFoundkeepClient, FoundkeepApiError } from './client.ts';
 
+test('long saved articles are decoded completely in collection and detail responses', async () => {
+  const articleText = 'A saved paragraph with accents — café. '.repeat(5000);
+  const capture = { id: 'long-article', type: 'bookmark', articleText, updatedAt: 123 };
+  const client = createFoundkeepClient({
+    getToken: async () => 'token',
+    fetcher: async input => Response.json(String(input).endsWith('/long-article')
+      ? { capture }
+      : { captures: [capture], total: 1, nextCursor: null }),
+  });
+  assert.equal((await client.listCaptures({})).captures[0]?.articleText, articleText);
+  assert.equal((await client.getCapture(capture.id)).capture.updatedAt, 123);
+});
+
+test('unreadable successful responses raise a recoverable API error instead of returning null', async () => {
+  for (const body of ['{"captures":', 'null', '<html>upstream problem</html>']) {
+    const client = createFoundkeepClient({
+      getToken: async () => 'token',
+      fetcher: async () => new Response(body, { status: 200 }),
+    });
+    await assert.rejects(client.listCaptures({}), (error: unknown) => {
+      assert.ok(error instanceof FoundkeepApiError);
+      assert.equal(error.code, 'invalid_response');
+      assert.equal(error.message.includes(body), false);
+      return true;
+    });
+  }
+});
+
 test('authenticated requests stay on the Foundkeep origin and encode collection filters', async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const fetcher: typeof fetch = async (input, init) => {
@@ -10,8 +38,102 @@ test('authenticated requests stay on the Foundkeep origin and encode collection 
   };
   const client = createFoundkeepClient({ getToken: async () => 'test-token', fetcher });
   await client.listCaptures({ q: 'small details', type: 'document', cursor: 'next_page' });
-  assert.equal(calls[0]?.url, 'https://foundkeep.app/api/mobile/captures?q=small+details&type=document&cursor=next_page');
+  assert.equal(calls[0]?.url, 'https://foundkeep.app/api/mobile/captures?view=cards&q=small+details&type=document&cursor=next_page');
   assert.equal(new Headers(calls[0]?.init?.headers).get('authorization'), 'Bearer test-token');
+});
+
+test('capture reads share requests and cache until explicitly refreshed or invalidated by a write', async () => {
+  let reads = 0;
+  const client = createFoundkeepClient({
+    getToken: async () => 'token',
+    fetcher: async (_url, init) => init?.method === 'POST'
+      ? Response.json({ capture: { id: 'new' } })
+      : Response.json({ captures: [{ id: String(++reads) }], total: 1, nextCursor: null }),
+  });
+  await Promise.all([client.listCaptures({}), client.listCaptures({})]);
+  assert.equal(reads, 1);
+  await client.listCaptures({});
+  assert.equal(reads, 1);
+  await client.listCaptures({}, { reload: true });
+  assert.equal(reads, 2);
+  await client.createNote({ clientId: 'new', noteText: 'A note', capturedAt: 1 });
+  await client.listCaptures({});
+  assert.equal(reads, 3);
+});
+
+test('capture caches never cross a changed or removed device credential', async () => {
+  let token: string | null = 'account-one';
+  let reads = 0;
+  const client = createFoundkeepClient({
+    getToken: async () => token,
+    fetcher: async () => Response.json({ captures: [{ id: String(++reads) }], total: 1, nextCursor: null }),
+  });
+  assert.equal((await client.listCaptures({})).captures[0]?.id, '1');
+  token = 'account-two';
+  assert.equal((await client.listCaptures({})).captures[0]?.id, '2');
+  token = null;
+  await assert.rejects(client.listCaptures({}), (error: unknown) => error instanceof FoundkeepApiError && error.status === 401);
+});
+
+test('a read started before a mutation cannot repopulate the cache with stale data', async () => {
+  let release!: (value: Response) => void;
+  let reads = 0;
+  const client = createFoundkeepClient({
+    getToken: async () => 'token',
+    fetcher: async (_url, init) => {
+      if (init?.method === 'POST') return Response.json({ capture: { id: 'new' } });
+      if (++reads === 1) return new Promise<Response>(resolve => { release = resolve; });
+      return Response.json({ captures: [{ id: 'new' }], total: 1, nextCursor: null });
+    },
+  });
+  const oldRead = client.listCaptures({});
+  await new Promise(resolve => setImmediate(resolve));
+  await client.createNote({ clientId: 'new', noteText: 'New note', capturedAt: 1 });
+  release(Response.json({ captures: [], total: 0, nextCursor: null }));
+  await oldRead;
+  assert.equal((await client.listCaptures({})).captures[0]?.id, 'new');
+});
+
+test('failed reads are retried, and the capture cache evicts older entries', async () => {
+  let reads = 0;
+  const client = createFoundkeepClient({
+    getToken: async () => 'token',
+    fetcher: async () => ++reads === 1 ? new Response('offline', { status: 503 }) : Response.json({ capture: { id: String(reads) } }),
+  });
+  await assert.rejects(client.getCapture('first'));
+  await client.getCapture('first');
+  assert.equal(reads, 2);
+  await client.getCapture('first');
+  assert.equal(reads, 2);
+  for (let i = 0; i < 21; i++) await client.getCapture(String(i));
+  const before = reads;
+  await client.getCapture('first');
+  assert.equal(reads, before + 1);
+});
+
+test('expired captures are fetched again without requiring a screen restart', async t => {
+  let now = 100_000, reads = 0;
+  t.mock.method(Date, 'now', () => now);
+  const client = createFoundkeepClient({ getToken: async () => 'token', fetcher: async () => Response.json({ capture: { id: String(++reads) } }) });
+  await client.getCapture('a');
+  now += 19_000;
+  await client.getCapture('a');
+  assert.equal(reads, 1);
+  now += 2_000;
+  await client.getCapture('a');
+  assert.equal(reads, 2);
+});
+
+test('very large responses remain readable without being retained in the memory cache', async () => {
+  let reads = 0;
+  const text = 'x'.repeat(3 * 1024 * 1024);
+  const client = createFoundkeepClient({
+    getToken: async () => 'token',
+    fetcher: async () => { reads++; return Response.json({ capture: { articleText: text } }); },
+  });
+  assert.equal((await client.getCapture('large')).capture.articleText?.length, text.length);
+  await client.getCapture('large');
+  assert.equal(reads, 2);
 });
 
 test('public registration omits authorization and returns the native device session', async () => {

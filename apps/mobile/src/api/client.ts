@@ -14,17 +14,37 @@ export class FoundkeepApiError extends Error {
 }
 
 type ClientOptions = { getToken: () => Promise<string | null>; fetcher?: typeof fetch };
-type JsonOptions = { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown; authenticated?: boolean };
+type JsonOptions = { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown; authenticated?: boolean; cacheMs?: number; reload?: boolean };
+type ReadOptions = { reload?: boolean };
 
 export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptions) {
-  async function json<T>(path: string, options: JsonOptions = {}): Promise<T> {
+  // Private, short-lived memory cache. Never persist account content in public
+  // storage, and never reuse a cache after its device credential changes.
+  const cache = new Map<string, { value: unknown; expiresAt: number; bytes: number }>();
+  const pending = new Map<string, Promise<unknown>>();
+  let cacheBytes = 0;
+  let generation = 0;
+  let scope: string | null = null;
+  const listeners = new Set<() => void>();
+  const clearCache = () => { generation++; cache.clear(); pending.clear(); cacheBytes = 0; };
+  const invalidate = () => { clearCache(); for (const listener of listeners) listener(); };
+  function remember(path: string, value: unknown, bytes: number, ttl: number) {
+    const previous = cache.get(path);
+    if (previous) { cacheBytes -= previous.bytes; cache.delete(path); }
+    if (bytes > 4 * 1024 * 1024) return;
+    cache.set(path, { value, expiresAt: Date.now() + ttl, bytes }); cacheBytes += bytes;
+    while (cache.size > 20 || cacheBytes > 4 * 1024 * 1024) {
+      const key = cache.keys().next().value!;
+      cacheBytes -= cache.get(key)!.bytes; cache.delete(key);
+    }
+  }
+  async function request<T>(path: string, options: JsonOptions, token: string | null): Promise<{ value: T; bytes: number }> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
     try {
       const headers = new Headers({ accept: 'application/json' });
       if (options.body !== undefined) headers.set('content-type', 'application/json');
       if (options.authenticated !== false) {
-        const token = await getToken();
         if (!token) throw new FoundkeepApiError(401, 'signed_out', 'Sign in to open your Foundkeep collection.');
         headers.set('authorization', `Bearer ${token}`);
       }
@@ -32,11 +52,16 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
         method: options.method || 'GET', headers, signal: controller.signal,
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       });
-      const raw = (await response.text()).slice(0, 64 * 1024);
+      // Capture responses can contain full articles. Truncating before JSON.parse
+      // corrupts valid responses and makes populated collections appear broken.
+      const raw = await response.text();
       let value: any = null;
       try { value = raw ? JSON.parse(raw) : null; } catch {}
       if (!response.ok) throw new FoundkeepApiError(response.status, String(value?.error || 'request_failed').slice(0, 80), String(value?.message || 'Foundkeep could not complete the request.'));
-      return value as T;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new FoundkeepApiError(response.status, 'invalid_response', 'Foundkeep could not read the response. Please try again.');
+      }
+      return { value: value as T, bytes: raw.length * 2 };
     } catch (error) {
       if (error instanceof FoundkeepApiError) throw error;
       if ((error as Error)?.name === 'AbortError') throw new FoundkeepApiError(0, 'timeout', 'Foundkeep took too long to respond. Try again.');
@@ -44,8 +69,38 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     } finally { clearTimeout(timer); }
   }
 
+  async function json<T>(path: string, options: JsonOptions = {}): Promise<T> {
+    const token = options.authenticated === false ? null : await getToken();
+    if (scope !== token) { clearCache(); scope = token; }
+    if (options.authenticated !== false && !token) throw new FoundkeepApiError(401, 'signed_out', 'Sign in to open your Foundkeep collection.');
+    if (options.method && options.method !== 'GET') {
+      clearCache();
+      try { return (await request<T>(path, options, token)).value; }
+      finally { invalidate(); }
+    }
+    const cached = cache.get(path);
+    if (!options.reload && cached && cached.expiresAt > Date.now()) {
+      cache.delete(path); cache.set(path, cached);
+      return cached.value as T;
+    }
+    const existing = pending.get(path);
+    if (existing) return existing as Promise<T>;
+    const started = generation;
+    const operation = request<T>(path, options, token).then(({ value, bytes }) => {
+      if (started === generation && options.cacheMs) remember(path, value, bytes, options.cacheMs);
+      return value;
+    }).catch(error => {
+      if (started === generation && error instanceof FoundkeepApiError && error.status === 401) clearCache();
+      throw error;
+    }).finally(() => { if (pending.get(path) === operation) pending.delete(path); });
+    pending.set(path, operation);
+    return operation;
+  }
+
   const devicePayload = <T extends { deviceName?: string }>(value: T) => ({ ...value, deviceName: value.deviceName?.trim() || 'iPhone' });
   return {
+    invalidate,
+    subscribeInvalidation(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     register(value: { email: string; name: string; password: string; deviceName?: string }) {
       return json<NativeSession>('/api/mobile/register', { method: 'POST', body: devicePayload(value), authenticated: false });
     },
@@ -61,17 +116,17 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     unregisterNotifications: () => json<{ ok: true }>('/api/mobile/notifications', { method: 'DELETE' }),
     logout: () => json<{ ok: true }>('/api/mobile/logout', { method: 'POST' }),
     deleteAccount: (password: string) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: { password } }),
-    listCaptures(filters: { q?: string; type?: string; cursor?: string }) {
-      const query = new URLSearchParams();
+    listCaptures(filters: { q?: string; type?: string; cursor?: string }, options: ReadOptions = {}) {
+      const query = new URLSearchParams({ view: 'cards' });
       if (filters.q) query.set('q', filters.q);
       if (filters.type) query.set('type', filters.type);
       if (filters.cursor) query.set('cursor', filters.cursor);
-      return json<CaptureList>(`/api/mobile/captures${query.size ? `?${query}` : ''}`);
+      return json<CaptureList>(`/api/mobile/captures?${query}`, { cacheMs: 10_000, ...options });
     },
     createNote(value: { clientId: string; noteText: string; capturedAt: number }) {
       return json<{ capture: Capture; duplicate: boolean }>('/api/captures', { method: 'POST', body: { ...value, type: 'note' } });
     },
-    getCapture: (id: string) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}`),
+    getCapture: (id: string, options: ReadOptions = {}) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { cacheMs: 20_000, ...options }),
     deleteCapture: (id: string) => json<{ ok: true }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     fileUrl: (id: string) => `${API_ORIGIN}/api/mobile/captures/${encodeURIComponent(id)}/file`,
   };

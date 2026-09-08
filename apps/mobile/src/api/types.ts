@@ -25,6 +25,8 @@ export type CaptureProvenance = {
 };
 
 export type Capture = {
+  /** Card responses contain text excerpts. Detail responses always contain full text. */
+  contentView?: 'card' | 'full';
   id: string;
   clientId: string;
   batchId: string | null;

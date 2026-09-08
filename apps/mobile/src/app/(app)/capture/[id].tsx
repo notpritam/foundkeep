@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { Capture } from '../../../api/types.ts';
 import { Button, Message, Screen } from '../../../components/ui.tsx';
 import { captureTitle } from '../../../collection/model.ts';
@@ -17,7 +17,29 @@ import FoundkeepShared from '../../../../modules/foundkeep-shared/src';
 
 export default function CaptureDetail() {
   const { id } = useLocalSearchParams<{ id: string }>(); const { client, token } = useSession(); const [capture, setCapture] = useState<Capture | null>(null); const [error, setError] = useState(''); const [opening, setOpening] = useState(false);
-  useEffect(() => { let live = true; void client.getCapture(id).then(value => { if (live) setCapture(value.capture); }).catch(value => { if (live) setError((value as Error).message); }); return () => { live = false; }; }, [client, id]);
+  const pending = useRef(false);
+  pending.current = capture?.status === 'pending' || capture?.status === 'processing';
+  useFocusEffect(useCallback(() => {
+    let live = true, request = 0;
+    let inFlight = false;
+    setCapture(null); setError('');
+    const load = async (reload = false, replace = false) => {
+      if (inFlight && !replace) return;
+      inFlight = true;
+      const current = ++request;
+      try {
+        const value = await client.getCapture(id, { reload });
+        if (live && current === request) { setCapture(value.capture); setError(''); }
+      } catch (value) {
+        if (live && current === request) setError((value as Error).message);
+      } finally { if (current === request) inFlight = false; }
+    };
+    void load();
+    const unsubscribe = client.subscribeInvalidation(() => void load(true, true));
+    const appState = AppState.addEventListener('change', state => { if (state === 'active') void load(true); });
+    const poll = setInterval(() => { if (AppState.currentState === 'active' && pending.current) void load(true); }, 5_000);
+    return () => { live = false; request++; clearInterval(poll); unsubscribe(); appState.remove(); };
+  }, [client, id]));
   const remove = () => Alert.alert('Delete this capture?', 'This permanently removes it from your Foundkeep account.', [{ text: 'Keep it', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await client.deleteCapture(id); router.replace('/(app)/collection'); } catch (value) { setError((value as Error).message); } } }]);
   const openFile = async () => {
     if (!capture?.fileName) return;

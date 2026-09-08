@@ -36,6 +36,12 @@ const MAX_CAPTURES = 1000;
 const MAX_BYTES = 200 * 1024 * 1024;
 const TYPES = new Set(["screenshot", "selection", "bookmark", "image", "note", "tweet", "video", "audio", "document", "file"]);
 const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json";
+// List views need excerpts, not every article and OCR result in the account.
+// Keep the full representation as the default for installed older clients.
+const CARD_TEXT_COLUMNS = new Set(["selection_text", "note_text", "article_text", "summary", "ocr_text"]);
+const CARD_COLUMNS = CAPTURE_COLUMNS.split(",").map(column =>
+  CARD_TEXT_COLUMNS.has(column) ? `substr(${column},1,480) AS ${column}` : column,
+).join(",");
 
 interface AccountRow { id: string; email: string; name: string; password_hash: string; recovery_hash: string; created_at: number }
 interface ConnectionRow { id: string; account_id: string; name: string; created_at: number; last_seen_at: number | null; expires_at: number }
@@ -896,24 +902,25 @@ export function customerRoutes(db: Database) {
     if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
+    const view = c.req.query("view") || "full";
     const cursor = mobileCursor(c.req.query("cursor") || "");
-    if (search.length > 200 || (type && !TYPES.has(type))) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
+    if (search.length > 200 || (type && !TYPES.has(type)) || !["full", "cards"].includes(view)) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
     const where = ["account_id = ?"];
     const args: (string | number)[] = [current.account.id];
     if (type) { where.push("type = ?"); args.push(type); }
     if (search) {
       const like = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
-      where.push("(source_title LIKE ? ESCAPE '\\' OR note_text LIKE ? ESCAPE '\\' OR selection_text LIKE ? ESCAPE '\\' OR article_text LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR ocr_text LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')");
-      args.push(...Array(7).fill(like));
+      where.push("(source_title LIKE ? ESCAPE '\\' OR note_text LIKE ? ESCAPE '\\' OR selection_text LIKE ? ESCAPE '\\' OR article_text LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR ocr_text LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\' OR file_name LIKE ? ESCAPE '\\' OR source_url LIKE ? ESCAPE '\\')");
+      args.push(...Array(9).fill(like));
     }
     const total = (db.query(`SELECT COUNT(*) count FROM customer_captures WHERE ${where.join(" AND ")}`).get(...args) as { count: number }).count;
     if (cursor) {
       where.push("(captured_at < ? OR (captured_at = ? AND id < ?))");
       args.push(cursor.capturedAt, cursor.capturedAt, cursor.id);
     }
-    const rows = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC,id DESC LIMIT 51`).all(...args) as CustomerCaptureRow[];
+    const rows = db.query(`SELECT ${view === "cards" ? CARD_COLUMNS : CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC,id DESC LIMIT 51`).all(...args) as CustomerCaptureRow[];
     const page = rows.slice(0, 50);
-    return c.json({ captures: page.map(customerCaptureDto), nextCursor: rows.length > 50 ? encodeMobileCursor(page.at(-1)!) : null, total });
+    return c.json({ captures: page.map(row => ({ ...customerCaptureDto(row), contentView: view === "cards" ? "card" : "full" })), nextCursor: rows.length > 50 ? encodeMobileCursor(page.at(-1)!) : null, total });
   });
 
   function serveCustomerFile(c: C, cookieOnly: boolean) {

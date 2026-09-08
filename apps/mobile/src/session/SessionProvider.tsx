@@ -80,11 +80,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
     if (state === 'active' && token) {
-      void FoundkeepShared.retryPending().then(() => refresh()).catch(() => {});
+      void FoundkeepShared.retryPending().then(() => { client.invalidate(); return refresh(); }).catch(() => {});
     }
     });
     return () => subscription.remove();
-  }, [refresh, token]);
+  }, [client, refresh, token]);
   useEffect(() => {
     if (token) void syncNotificationRegistration(client, policy.features.notifications).catch(() => {});
   }, [client, policy.features.notifications, token]);
