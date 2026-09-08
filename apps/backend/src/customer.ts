@@ -17,6 +17,15 @@ import {
   type CaptureProvenance,
   type ProcessingOptions,
 } from "./customer-provenance.ts";
+import {
+  CustomerFileError,
+  decodeCaptureHeader,
+  fileDisposition,
+  removeCustomerFile,
+  resolveCustomerFile,
+  safeFileName,
+  writeCustomerFile,
+} from "./customer-files.ts";
 
 const DAY = 86_400_000;
 const MAX_BODY = 12 * 1024 * 1024;
@@ -733,6 +742,138 @@ export function customerRoutes(db: Database) {
     } finally { release(); }
   });
 
+  app.post("/mobile/captures/file", async (c) => {
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    rates.take(`upload:${current.account.id}`, 120, 60_000);
+    let body: JsonObject;
+    try { body = decodeCaptureHeader(c.req.header("x-foundkeep-capture") || null); }
+    catch (error) {
+      if (error instanceof CustomerFileError) fail(error.status, error.code, error.message);
+      throw error;
+    }
+    const clientId = textField(body, "clientId", 128, true)!;
+    const type = textField(body, "type", 20, true)!;
+    if (!["image", "video", "audio", "document", "file"].includes(type)) fail(400, "invalid_type", "Choose a supported file type.");
+    const batchId = textField(body, "batchId", 64);
+    if (batchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(batchId)) fail(400, "invalid_batch", "The shared collection identifier is invalid.");
+    const existing = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE account_id=? AND client_id=?`).get(current.account.id, clientId) as CustomerCaptureRow | null;
+    if (existing) {
+      void c.req.raw.body?.cancel();
+      return c.json({ capture: customerCaptureDto(existing), duplicate: true });
+    }
+    const sourceUrl = textField(body, "sourceUrl", 4096);
+    if (sourceUrl) {
+      try {
+        const url = new URL(sourceUrl);
+        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error();
+      } catch { fail(400, "invalid_url", "Use an http or https source URL without credentials."); }
+    }
+    const sourceTitle = textField(body, "sourceTitle", 1000);
+    const noteText = textField(body, "noteText", 50_000);
+    const fileName = safeFileName(textField(body, "fileName", 500) || "Shared file");
+    const capturedAt = body.capturedAt ?? Date.now();
+    if (!Number.isSafeInteger(capturedAt) || (capturedAt as number) < 0 || (capturedAt as number) > Date.now() + DAY) fail(400, "invalid_date", "Use a valid capture timestamp in milliseconds.");
+    let provenance, processingOptions;
+    try {
+      provenance = normalizeProvenance(body.provenance, capturedAt as number);
+      processingOptions = normalizeProcessingOptions(body.processingOptions);
+    } catch (error) {
+      if (error instanceof ProvenanceValidationError) fail(400, "invalid_capture_context", error.message);
+      throw error;
+    }
+    const provenanceJson = provenance ? JSON.stringify(provenance) : null;
+    const processingOptionsJson = JSON.stringify(processingOptions);
+    const release = acquireUpload(current.account.id);
+    let stored: Awaited<ReturnType<typeof writeCustomerFile>> | null = null;
+    try {
+      try { stored = await writeCustomerFile(c.req.raw, { root: config.dataDir }); }
+      catch (error) {
+        if (error instanceof CustomerFileError) fail(error.status, error.code, error.message);
+        throw error;
+      }
+      if (type === "image" && !stored.mime.startsWith("image/")) fail(415, "invalid_file_type", "The shared image data is invalid.");
+      if (provenance?.contentHash && provenance.contentHash !== stored.sha256) fail(400, "content_hash_mismatch", "The shared file does not match its source record.");
+      const storageBytes = stored.bytes + [clientId, batchId, sourceUrl, sourceTitle, noteText, fileName, provenanceJson, processingOptionsJson]
+        .reduce((sum, value) => sum + Buffer.byteLength(value || "", "utf8"), 0);
+      const result = db.transaction(() => {
+        auth(c);
+        const duplicate = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE account_id=? AND client_id=?`).get(current.account.id, clientId) as CustomerCaptureRow | null;
+        if (duplicate) return { capture: customerCaptureDto(duplicate), duplicate: true };
+        const used = usage(current.account.id);
+        if (used.captures >= MAX_CAPTURES || used.bytes + storageBytes > MAX_BYTES) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
+        const global = db.query("SELECT COUNT(*) captures, COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures").get() as { captures: number; bytes: number };
+        if (global.captures >= globalMaxCaptures || global.bytes + storageBytes > globalMaxBytes) fail(503, "storage_unavailable", "Foundkeep storage is temporarily full. Your device will keep this capture queued.");
+        const id = crypto.randomUUID();
+        const now = Date.now();
+        db.query(`INSERT INTO customer_captures(
+          id,account_id,client_id,batch_id,type,source_url,source_title,note_text,
+          storage_bytes,captured_at,created_at,updated_at,provenance_json,processing_options_json,
+          file_name,file_path,file_mime,file_bytes
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+          id,current.account.id,clientId,batchId,type,sourceUrl,sourceTitle,noteText,
+          storageBytes,capturedAt as number,now,now,provenanceJson,processingOptionsJson,
+          fileName,stored!.relativePath,stored!.mime,stored!.bytes,
+        );
+        return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
+      })();
+      if (result.duplicate) removeCustomerFile(config.dataDir, stored.relativePath);
+      else stored = null;
+      return c.json(result, result.duplicate ? 200 : 201);
+    } finally {
+      if (stored) removeCustomerFile(config.dataDir, stored.relativePath);
+      release();
+    }
+  });
+
+  app.get("/mobile/captures", (c) => {
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    const search = c.req.query("q") || "";
+    const type = c.req.query("type") || "";
+    if (search.length > 200 || (type && !TYPES.has(type))) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
+    const where = ["account_id = ?"];
+    const args: (string | number)[] = [current.account.id];
+    if (type) { where.push("type = ?"); args.push(type); }
+    if (search) {
+      const like = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
+      where.push("(source_title LIKE ? ESCAPE '\\' OR note_text LIKE ? ESCAPE '\\' OR selection_text LIKE ? ESCAPE '\\' OR article_text LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR ocr_text LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')");
+      args.push(...Array(7).fill(like));
+    }
+    const rows = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC,id DESC LIMIT 101`).all(...args) as CustomerCaptureRow[];
+    return c.json({ captures: rows.slice(0, 100).map(customerCaptureDto), nextCursor: null, total: rows.length });
+  });
+
+  function serveCustomerFile(c: C, cookieOnly: boolean) {
+    const current = auth(c, cookieOnly);
+    const row = db.query("SELECT file_path,file_name,file_mime FROM customer_captures WHERE id=? AND account_id=?").get(c.req.param("id"), current.account.id) as { file_path: string | null; file_name: string | null; file_mime: string | null } | null;
+    if (!row?.file_path || !row.file_mime) fail(404, "not_found", "File not found.");
+    let path: string;
+    try { path = resolveCustomerFile(config.dataDir, row.file_path); } catch { fail(404, "not_found", "File not found."); }
+    const file = Bun.file(path);
+    if (!file.size) fail(404, "not_found", "File not found.");
+    c.header("Content-Type", row.file_mime);
+    c.header("Content-Disposition", fileDisposition(row.file_mime, row.file_name || "Shared file"));
+    c.header("Content-Security-Policy", "default-src 'none'; sandbox");
+    c.header("Cross-Origin-Resource-Policy", "same-origin");
+    return c.body(file.stream());
+  }
+
+  app.get("/captures/:id/file", (c) => serveCustomerFile(c, true));
+  app.get("/mobile/captures/:id/file", (c) => serveCustomerFile(c, false));
+  app.get("/mobile/captures/:id", (c) => {
+    const current = auth(c);
+    return c.json({ capture: customerCaptureDto(findCapture(c.req.param("id"), current.account.id)) });
+  });
+  app.delete("/mobile/captures/:id", (c) => {
+    const current = auth(c);
+    const row = db.query("SELECT file_path FROM customer_captures WHERE id=? AND account_id=?").get(c.req.param("id"), current.account.id) as { file_path: string | null } | null;
+    if (!row) fail(404, "not_found", "Capture not found.");
+    db.query("DELETE FROM customer_captures WHERE id=? AND account_id=?").run(c.req.param("id"), current.account.id);
+    removeCustomerFile(config.dataDir, row.file_path);
+    return c.json({ ok: true });
+  });
+
   app.get("/captures/:id/blob", (c) => {
     const current = auth(c, true);
     const row = db.query("SELECT blob_data,blob_mime FROM customer_captures WHERE id = ? AND account_id = ?").get(c.req.param("id"), current.account.id) as { blob_data: Uint8Array | null; blob_mime: string | null } | null;
@@ -749,8 +890,11 @@ export function customerRoutes(db: Database) {
   });
   app.delete("/captures/:id", (c) => {
     const current = auth(c, true);
+    const row = db.query("SELECT file_path FROM customer_captures WHERE id = ? AND account_id = ?").get(c.req.param("id"), current.account.id) as { file_path: string | null } | null;
+    if (!row) fail(404, "not_found", "Capture not found.");
     const deleted = db.query("DELETE FROM customer_captures WHERE id = ? AND account_id = ?").run(c.req.param("id"), current.account.id);
     if (!deleted.changes) fail(404, "not_found", "Capture not found.");
+    removeCustomerFile(config.dataDir, row.file_path);
     return c.json({ ok: true });
   });
   app.all("*", (c) => c.json({ error: "not_found", message: "API route not found." }, 404));

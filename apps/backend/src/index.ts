@@ -12,7 +12,7 @@ const stopCustomerWorker = startCustomerWorker(db);
 const server = Bun.serve<ConnData>({
   port: config.port,
   hostname: config.hostname,
-  maxRequestBodySize: 12 * 1024 * 1024,
+  maxRequestBodySize: 50 * 1024 * 1024,
   idleTimeout: 60,
   fetch(req, srv) {
     if (new URL(req.url).pathname === "/agent") {

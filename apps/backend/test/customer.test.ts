@@ -411,6 +411,53 @@ describe("customer extension preferences", () => {
 });
 
 describe("private customer captures", () => {
+  test("mobile clients upload, list, read and delete an owned file idempotently", async () => {
+    const registered = await mobile("/register", "POST", {
+      email: `file-${++sequence}@example.com`, name: "File Owner", password: PASSWORD, deviceName: "iPhone",
+    });
+    const session = await registered.json();
+    const bearer = `Bearer ${session.token}`;
+    const pdf = Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n");
+    const metadata = {
+      clientId: crypto.randomUUID(), batchId: crypto.randomUUID(), type: "document",
+      sourceUrl: "https://example.com/report", sourceTitle: "Report", noteText: "Keep this",
+      fileName: "Quarterly Report.pdf", capturedAt: Date.now(),
+    };
+    const upload = () => app.request(`${ORIGIN}/api/mobile/captures/file`, {
+      method: "POST",
+      headers: {
+        authorization: bearer,
+        "content-type": "application/pdf",
+        "content-length": String(pdf.length),
+        "x-foundkeep-capture": Buffer.from(JSON.stringify(metadata)).toString("base64url"),
+      },
+      body: pdf,
+    });
+    const response = await upload();
+    expect(response.status).toBe(201);
+    const first = await response.json() as any;
+    expect(first.duplicate).toBe(false);
+    expect(first.capture).toMatchObject({
+      type: "document", batchId: metadata.batchId, fileName: metadata.fileName,
+      fileMime: "application/pdf", fileBytes: pdf.length,
+    });
+    expect(first.capture.fileUrl).toBe(`/api/captures/${first.capture.id}/file`);
+    const duplicate = await upload();
+    expect(duplicate.status).toBe(200);
+    expect((await duplicate.json() as any).capture.id).toBe(first.capture.id);
+
+    const list = await mobile("/captures", "GET", undefined, bearer);
+    expect(list.status).toBe(200);
+    expect((await list.json() as any).captures[0].id).toBe(first.capture.id);
+    const file = await mobile(`/captures/${first.capture.id}/file`, "GET", undefined, bearer);
+    expect(file.status).toBe(200);
+    expect(file.headers.get("content-type")).toBe("application/pdf");
+    expect(file.headers.get("content-disposition")).toContain("Quarterly%20Report.pdf");
+    expect(Buffer.from(await file.arrayBuffer())).toEqual(pdf);
+    expect((await mobile(`/captures/${first.capture.id}`, "DELETE", undefined, bearer)).status).toBe(200);
+    expect((await mobile(`/captures/${first.capture.id}/file`, "GET", undefined, bearer)).status).toBe(404);
+  });
+
   test("models universal mobile items and preserves multi-share provenance", async () => {
     const registered = await mobile("/register", "POST", {
       email: `universal-${++sequence}@example.com`, name: "Universal", password: PASSWORD, deviceName: "iPhone",
