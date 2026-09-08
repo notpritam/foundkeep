@@ -36,9 +36,12 @@ test('Foundkeep mobile config pins the release identity and safe OTA runtime', a
 
 test('EAS profiles separate development, preview and production update channels', async () => {
   const eas = JSON.parse(await readFile(new URL('../eas.json', import.meta.url), 'utf8'));
+  assert.equal(eas.build.development.bun, '1.4.2');
   assert.equal(eas.build.development.developmentClient, true);
   assert.equal(eas.build.development.channel, 'development');
+  assert.equal(eas.build.preview.bun, '1.4.2');
   assert.equal(eas.build.preview.channel, 'preview');
+  assert.equal(eas.build.production.bun, '1.4.2');
   assert.equal(eas.build.production.channel, 'production');
   assert.equal(eas.build.production.autoIncrement, true);
 });
