@@ -24,7 +24,7 @@ The bundled Share Extension identifier is `app.foundkeep.ios.ShareExtension`. It
 | Secondary category | Utilities |
 | Content rights | Yes — the app can display material a customer explicitly saves from another source. Confirm that Foundkeep's terms require customers to have the right to save that material. |
 | License agreement | Apple's standard license agreement |
-| Copyright | **Account-owner action:** `2026 <the exact legal person or company that owns Foundkeep>` |
+| Copyright | `2026 NotPritam` |
 
 ### Age rating questionnaire
 
