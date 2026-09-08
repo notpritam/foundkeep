@@ -39,6 +39,9 @@ async function connect(cookie: string) {
 async function capture(credential: string, extra: Record<string, unknown> = {}) {
   return request("/captures", "POST", { clientId: crypto.randomUUID(), type: "note", noteText: "Private note", ...extra }, credential);
 }
+async function mobile(path: string, method = "GET", data?: unknown, bearer?: string) {
+  return request(`/mobile${path}`, method, data, bearer, null);
+}
 function heldUpload(cookie: string, target = app) {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   let cancelled = false;
@@ -52,6 +55,48 @@ function heldUpload(cookie: string, target = app) {
 }
 
 describe("customer account security", () => {
+  test("mobile registration, login, recovery and logout use revocable device credentials", async () => {
+    const email = `mobile-${++sequence}@example.com`;
+    const registered = await mobile("/register", "POST", { email, name: "Mobile Person", password: PASSWORD, deviceName: "Pritam's iPhone" });
+    expect(registered.status).toBe(201);
+    const first = await registered.json();
+    expect(first.account).toMatchObject({ email, name: "Mobile Person" });
+    expect(first.connection.name).toBe("Foundkeep for Pritam's iPhone");
+    expect(first.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(first.recoveryCode).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const firstBearer = `Bearer ${first.token}`;
+    expect((await (await mobile("/me", "GET", undefined, firstBearer)).json()).account).toEqual(first.account);
+
+    const login = await mobile("/login", "POST", { email, password: PASSWORD, deviceName: "iPhone 17" });
+    expect(login.status).toBe(200);
+    const second = await login.json();
+    expect(second.connection.name).toBe("Foundkeep for iPhone 17");
+    const secondBearer = `Bearer ${second.token}`;
+    expect((await mobile("/logout", "POST", undefined, secondBearer)).status).toBe(200);
+    expect((await mobile("/me", "GET", undefined, secondBearer)).status).toBe(401);
+    expect((await mobile("/me", "GET", undefined, firstBearer)).status).toBe(200);
+
+    const recovered = await mobile("/recover", "POST", { email, recoveryCode: first.recoveryCode, password: "new secure mobile password", deviceName: "Replacement iPhone" });
+    expect(recovered.status).toBe(200);
+    const third = await recovered.json();
+    expect(third.recoveryCode).not.toBe(first.recoveryCode);
+    expect((await mobile("/me", "GET", undefined, firstBearer)).status).toBe(401);
+    expect((await mobile("/me", "GET", undefined, `Bearer ${third.token}`)).status).toBe(200);
+    expect((db.query("SELECT COUNT(*) n FROM customer_connections WHERE account_id=?").get(first.account.id) as any).n).toBe(1);
+  });
+
+  test("mobile auth validates input and never issues browser cookies", async () => {
+    const email = `mobile-validation-${++sequence}@example.com`;
+    const shortPassword = await mobile("/register", "POST", { email, name: "Mobile", password: "short", deviceName: "iPhone" });
+    expect(shortPassword.status).toBe(400);
+    const registered = await mobile("/register", "POST", { email, name: "Mobile", password: PASSWORD, deviceName: "iPhone" });
+    expect(registered.status).toBe(201);
+    expect(registered.headers.get("set-cookie")).toBeNull();
+    expect((await mobile("/register", "POST", { email, name: "Mobile", password: PASSWORD, deviceName: "iPhone" })).status).toBe(409);
+    expect((await mobile("/login", "POST", { email, password: "incorrect password", deviceName: "iPhone" })).status).toBe(401);
+    expect((await mobile("/me")).status).toBe(401);
+  });
+
   test("accepts both exact Foundkeep website origins and rejects lookalikes", async () => {
     for (const [index, origin] of [PRIMARY_ORIGIN, LEGACY_ORIGIN].entries()) {
       const response = await app.request(`${origin}/api/auth/register`, {

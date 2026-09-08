@@ -275,6 +275,24 @@ export function customerRoutes(db: Database) {
     db.query("INSERT INTO customer_sessions(id,account_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?)").run(crypto.randomUUID(), accountId, hash(token), now, now + 30 * DAY);
     setCookie(c, cookieName, token, { ...cookieOptions, maxAge: 30 * 86_400 });
   }
+  function mobileDeviceName(body: JsonObject) {
+    const device = (textField(body, "deviceName", 72) || "iPhone").trim() || "iPhone";
+    return `Foundkeep for ${device}`;
+  }
+  function issueConnection(accountId: string, name: string) {
+    const now = Date.now();
+    db.query("DELETE FROM customer_connections WHERE expires_at <= ?").run(now);
+    const count = (db.query("SELECT COUNT(*) n FROM customer_connections WHERE account_id = ?").get(accountId) as { n: number }).n;
+    if (count >= 20) fail(409, "connection_limit", "Remove an old connected device before connecting another.");
+    const token = secret();
+    const connection: ConnectionRow = {
+      id: crypto.randomUUID(), account_id: accountId, name,
+      created_at: now, last_seen_at: null, expires_at: now + 90 * DAY,
+    };
+    db.query("INSERT INTO customer_connections(id,account_id,name,token_hash,created_at,last_seen_at,expires_at) VALUES(?,?,?,?,?,?,?)")
+      .run(connection.id, accountId, name, hash(token), connection.created_at, null, connection.expires_at);
+    return { token, connection: connectionDto(connection) };
+  }
   function revoke(accountId: string, keepSession?: string) {
     if (keepSession) db.query("DELETE FROM customer_sessions WHERE account_id = ? AND id != ?").run(accountId, keepSession);
     else db.query("DELETE FROM customer_sessions WHERE account_id = ?").run(accountId);
@@ -326,6 +344,78 @@ export function customerRoutes(db: Database) {
     }
     if (!["GET", "HEAD"].includes(c.req.method) && requestOrigin && !allowed) fail(403, "invalid_origin", "This website cannot change your Foundkeep account.");
     await next();
+  });
+
+  app.post("/mobile/register", async (c) => {
+    publicRate(c, "mobile-register");
+    const body = await jsonBody(c);
+    const email = emailField(body);
+    const password = passwordField(body);
+    const name = textField(body, "name", 100, true)!.trim();
+    const deviceName = mobileDeviceName(body);
+    if (emailAccount(email)) fail(409, "email_in_use", "An account with this email already exists. Sign in or use your recovery code.");
+    const passwordHash = await hashPassword(password);
+    const recoveryCode = secret();
+    const id = crypto.randomUUID();
+    const connection = db.transaction(() => {
+      if (emailAccount(email)) fail(409, "email_in_use", "An account with this email already exists.");
+      db.query("INSERT INTO customer_accounts(id,email,name,password_hash,recovery_hash,created_at) VALUES(?,?,?,?,?,?)")
+        .run(id, email, name, passwordHash, hash(recoveryCode), Date.now());
+      return issueConnection(id, deviceName);
+    })();
+    return c.json({ account: accountDto(account(id)!), recoveryCode, ...connection }, 201);
+  });
+
+  app.post("/mobile/login", async (c) => {
+    publicRate(c, "mobile-login");
+    const body = await jsonBody(c);
+    const email = emailField(body);
+    rates.take(`email:mobile-login:${hash(email)}`, 10, 15 * 60_000);
+    const password = passwordField(body, "password", false);
+    const deviceName = mobileDeviceName(body);
+    const owner = emailAccount(email);
+    if (!owner || !(await verifyPassword(password, owner.password_hash))) fail(401, "invalid_credentials", "Email or password is incorrect.");
+    const result = db.transaction(() => {
+      const current = account(owner.id);
+      if (!current || current.password_hash !== owner.password_hash) fail(401, "invalid_credentials", "Sign in again with your current password.");
+      return { account: accountDto(current), ...issueConnection(current.id, deviceName) };
+    })();
+    return c.json(result);
+  });
+
+  app.post("/mobile/recover", async (c) => {
+    publicRate(c, "mobile-recover");
+    const body = await jsonBody(c);
+    const email = emailField(body);
+    rates.take(`email:mobile-recover:${hash(email)}`, 10, 15 * 60_000);
+    const recovery = textField(body, "recoveryCode", 128, true)!.trim();
+    const password = passwordField(body);
+    const deviceName = mobileDeviceName(body);
+    const owner = emailAccount(email);
+    if (!owner || hash(recovery) !== owner.recovery_hash) fail(401, "invalid_credentials", "Email or recovery code is incorrect.");
+    const passwordHash = await hashPassword(password);
+    const recoveryCode = secret();
+    const result = db.transaction(() => {
+      const updated = db.query("UPDATE customer_accounts SET password_hash = ?, recovery_hash = ? WHERE id = ? AND recovery_hash = ?")
+        .run(passwordHash, hash(recoveryCode), owner.id, owner.recovery_hash);
+      if (!updated.changes) fail(401, "invalid_credentials", "This recovery code has already been used.");
+      revoke(owner.id);
+      return { account: accountDto(account(owner.id)!), recoveryCode, ...issueConnection(owner.id, deviceName) };
+    })();
+    return c.json(result);
+  });
+
+  app.get("/mobile/me", (c) => {
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    return c.json({ account: accountDto(current.account), connectionId: current.credentialId, usage: usage(current.account.id) });
+  });
+
+  app.post("/mobile/logout", (c) => {
+    const current = auth(c);
+    if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    db.query("DELETE FROM customer_connections WHERE id = ? AND account_id = ?").run(current.credentialId, current.account.id);
+    return c.json({ ok: true });
   });
 
   app.post("/auth/register", async (c) => {
@@ -495,21 +585,15 @@ export function customerRoutes(db: Database) {
     const body = await jsonBody(c);
     const code = textField(body, "code", 128, true)!;
     const name = (textField(body, "name", 100) || "Chrome browser").trim() || "Chrome browser";
-    const token = secret();
     const result = db.transaction(() => {
       const pair = db.query("SELECT * FROM customer_pairings WHERE code_hash = ? AND expires_at > ?").get(hash(code), Date.now()) as CredentialRow | null;
       if (!pair) fail(401, "invalid_pairing", "This connection code expired or was already used. Try connecting again.");
       const owner = account(pair.account_id);
       if (!owner) fail(401, "invalid_pairing", "This connection code is no longer valid.");
-      db.query("DELETE FROM customer_connections WHERE expires_at <= ?").run(Date.now());
-      const count = (db.query("SELECT COUNT(*) n FROM customer_connections WHERE account_id = ?").get(owner.id) as { n: number }).n;
-      if (count >= 20) fail(409, "connection_limit", "Remove an old browser connection before connecting another.");
       db.query("DELETE FROM customer_pairings WHERE id = ?").run(pair.id);
-      const connection: ConnectionRow = { id: crypto.randomUUID(), account_id: owner.id, name, created_at: Date.now(), last_seen_at: null, expires_at: Date.now() + 90 * DAY };
-      db.query("INSERT INTO customer_connections(id,account_id,name,token_hash,created_at,last_seen_at,expires_at) VALUES(?,?,?,?,?,?,?)").run(connection.id, owner.id, name, hash(token), connection.created_at, null, connection.expires_at);
-      return { account: accountDto(owner), connection: connectionDto(connection) };
+      return { account: accountDto(owner), ...issueConnection(owner.id, name) };
     })();
-    return c.json({ ...result, token }, 201);
+    return c.json(result, 201);
   });
 
   app.post("/connections/disconnect", (c) => {
