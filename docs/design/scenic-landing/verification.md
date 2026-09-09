@@ -1,6 +1,7 @@
 # Verification — September 9, 2026
 
 - `npm run test:web`: 12/12 tests passed, including live demo save/reset, public Chrome Store target, packaged ZIP, metadata and social image, 320/390/768/1440 layout and image loading, mobile menu keyboard/dismissal/navigation, support/privacy/terms and old-domain compatibility expectations.
+- After deployment, `ATLAS_SITE_URL=https://foundkeep.app npm run test:web`: 12/12 passed against the live origin.
 - Full-page screenshots at 1440×1000 and 390×844: no horizontal overflow, broken images or JavaScript errors.
 - Solid-background visible text contrast: zero failing pairs after correction; decorative aria-hidden illustrations and photographic regions excluded from that calculation.
 - Pixel sampling of the composited hero backdrop with text hidden: desktop minimum contrast 4.57 for the headline and 4.98 for supporting copy; phone 4.40 and 4.65. Thresholds are 3:1 for large text and 4.5:1 for supporting copy.
