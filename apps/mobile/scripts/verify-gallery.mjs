@@ -84,19 +84,44 @@ try {
   await page.getByRole('progressbar', { name: 'Loading your collection' }).waitFor();
   await shot(page, '01-shimmer.png');
   await page.getByRole('button', { name: /Open Link A field guide/ }).waitFor(); await ready(page);
+  const dock = page.getByTestId('floating-dock');
+  const galleryTab = page.getByRole('tab', { name: 'Gallery', exact: true });
+  assert.equal(await galleryTab.getAttribute('aria-selected'), 'true');
+  const expandedTab = await galleryTab.boundingBox();
+  assert.ok(expandedTab.height >= 44);
+  const addBox = await page.getByTestId('dock-new-note').boundingBox();
+  assert.ok(addBox.width >= 44 && addBox.height >= 44);
+  await page.getByRole('tab', { name: 'You', exact: true }).click();
+  await page.getByText('Settings.', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('tab', { name: 'You', exact: true }).getAttribute('aria-selected'), 'true');
+  await galleryTab.click(); await page.getByTestId('collection-header').waitFor();
   await shot(page, '02-gallery.png');
   const header = page.getByTestId('collection-header'); const before = await header.boundingBox(); const list = page.getByTestId('gallery-list');
   await list.evaluate(el => { el.scrollTop = 650; }); await page.waitForTimeout(200);
   assert.ok(await list.evaluate(el => el.scrollTop) > 0); const after = await header.boundingBox(); assert.equal(before.y, after.y); assert.equal(before.height, after.height);
   const controls = page.getByTestId('collection-expanded-controls');
   assert.equal(await controls.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+  // React Native Web always reports a screen reader; preserve expanded tab labels.
+  assert.equal((await galleryTab.boundingBox()).width, expandedTab.width);
   await shot(page, '03-compact-header.png');
   await list.evaluate(el => { el.scrollTop = 450; }); await page.waitForTimeout(150);
   assert.notEqual(await controls.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
   await page.getByRole('button', { name: 'Show search and filters' }).click();
   assert.equal(await page.getByRole('textbox', { name: 'Search saved items' }).evaluate(el => el === document.activeElement), true);
   await page.getByRole('textbox', { name: 'Search saved items' }).blur();
+  await list.evaluate(el => { el.scrollTop = el.scrollHeight; }); await page.waitForTimeout(200);
+  const footer = await page.getByText('24 finds · yours to keep', { exact: true }).boundingBox();
+  assert.ok(footer.y + footer.height < (await dock.boundingBox()).y, 'last list content must clear the floating dock');
   await list.evaluate(el => { el.scrollTop = 0; });
+  await page.setViewportSize({ width: 320, height: 680 }); await page.waitForTimeout(500);
+  const narrowDock = await dock.boundingBox();
+  assert.ok(narrowDock.x >= 0 && narrowDock.x + narrowDock.width <= 320);
+  for (const tab of [galleryTab, page.getByRole('tab', { name: 'You', exact: true })]) {
+    const box = await tab.boundingBox(); assert.ok(box.width >= 44 && box.height >= 44);
+    assert.ok(box.x >= 0 && box.x + box.width <= 320);
+  }
+  await shot(page, '09-narrow-floating-dock.png');
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Filter by folder or tag' }).click();
   await page.getByRole('button', { name: 'Reading', exact: true }).click();
   await page.getByRole('button', { name: 'Done', exact: true }).click(); await page.waitForTimeout(1000);
@@ -118,7 +143,9 @@ try {
   await page.getByRole('textbox', { name: 'Title', exact: true }).waitFor(); await page.waitForFunction(() => document.querySelector('[aria-label="Title"]')?.value === 'A field guide to small details'); await page.getByRole('textbox', { name: 'Title', exact: true }).fill('A better title');
   await page.getByRole('button', { name: 'Save changes' }).click();
   await page.getByText('A better title', { exact: true }).waitFor({ timeout: 8000 });
-  await page.goto(base + '/collection'); await page.getByRole('button', { name: 'Write a new note' }).click();
+  await page.goto(base + '/collection'); await page.getByRole('button', { name: 'Create a note' }).click();
+  await page.getByRole('textbox', { name: 'Your note', exact: true }).waitFor();
+  assert.equal(await page.getByTestId('floating-dock').isVisible(), false, 'dock should stay within its tab screens');
   await page.getByRole('textbox', { name: 'Your note', exact: true }).fill('Remember this gallery idea');
   await page.getByRole('button', { name: 'Choose folder and tags' }).click();
   await page.getByRole('textbox', { name: 'Create a folder', exact: true }).fill('Weekend ideas');
@@ -136,5 +163,5 @@ try {
   await shot(login, '06-sign-in.png');
   assert.ok((await login.getByText('By continuing,', { exact: false }).textContent()).includes('Terms and Privacy Policy'));
   await login.goto(base); await login.getByText('Found it?', { exact: false }).waitFor(); await ready(login); await shot(login, '07-welcome.png'); await signedOut.close();
-  console.log('Gallery checks passed: shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy. Synthetic fixtures; native checks separate.');
+  console.log('Gallery checks passed: floating dock navigation, narrow layout, footer clearance, quick-add, shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy. Synthetic fixtures; native checks separate.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

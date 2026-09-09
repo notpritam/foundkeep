@@ -10,7 +10,7 @@ import { GallerySkeleton } from './Shimmer.tsx';
 import { Button, Message } from './ui.tsx';
 import { colors, typography } from '../theme.ts';
 
-export function GalleryList({ collection, filtered = false, headerSpace = 0, onScroll }: { collection: ReturnType<typeof useCollection>; filtered?: boolean; headerSpace?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
+export function GalleryList({ collection, filtered = false, headerSpace = 0, bottomSpace = 24, onScroll }: { collection: ReturnType<typeof useCollection>; filtered?: boolean; headerSpace?: number; bottomSpace?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
   const { width, height, fontScale } = useWindowDimensions();
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [viewportHeight, setViewportHeight] = useState(height / 2);
@@ -23,7 +23,7 @@ export function GalleryList({ collection, filtered = false, headerSpace = 0, onS
   const renderItem = useCallback(({ item }: ListRenderItemInfo<Capture>) => <View style={{ width: columns === 1 ? '100%' : '48.5%' }}><MotionBoundary enabled={visibleIds.has(item.id)}><GalleryCard capture={item} onOpen={open} /></MotionBoundary></View>, [columns, open, visibleIds]);
   return <FlatList
     key={columns} testID="gallery-list" data={captures} numColumns={columns} keyExtractor={item => item.id} renderItem={renderItem}
-    style={styles.list} contentContainerStyle={[styles.content, !captures.length && { flexGrow: 1 }]}
+    style={styles.list} contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }, !captures.length && { flexGrow: 1 }]}
     columnWrapperStyle={columns === 2 ? styles.row : undefined} ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
     onLayout={event => setViewportHeight(event.nativeEvent.layout.height)}
     onViewableItemsChanged={viewability} viewabilityConfig={viewabilityConfig}

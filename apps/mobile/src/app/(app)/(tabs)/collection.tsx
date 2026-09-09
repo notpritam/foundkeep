@@ -6,6 +6,7 @@ import type { CaptureType } from '../../../api/types.ts';
 import { Brand, Message, Screen } from '../../../components/ui.tsx';
 import { OrganizationPicker, type OrganizationChoice } from '../../../components/OrganizationPicker.tsx';
 import { GalleryList } from '../../../components/GalleryList.tsx';
+import { useDock } from '../../../components/FloatingDock.tsx';
 import { useCollection } from '../../../collection/useCollection.ts';
 import { useSession } from '../../../session/SessionProvider.tsx';
 import { createScrollChrome } from '../../../collection/scrollChrome.ts';
@@ -25,6 +26,7 @@ export default function CollectionScreen() {
   const [organization, setOrganization] = useState<OrganizationChoice>({ folderId: undefined, userTags: [] });
   const { height, fontScale } = useWindowDimensions();
   const motion = useMotionAllowed();
+  const { setCollapsed, bottomSpace } = useDock();
   const searchRef = useRef<TextInput>(null);
   const searchingRef = useRef(false);
   const [headerHeight, setHeaderHeight] = useState(240);
@@ -34,8 +36,9 @@ export default function CollectionScreen() {
   const [compact, setCompact] = useState(false);
   const compactRef = useRef(false);
   const syncCompact = useCallback((next: boolean) => {
-    if (compactRef.current !== next) { compactRef.current = next; setCompact(next); }
-  }, []);
+    if (compactRef.current !== next) { compactRef.current = next; setCompact(next); setCollapsed(next); }
+  }, [setCollapsed]);
+  useEffect(() => () => setCollapsed(false), [setCollapsed]);
   const revealSearch = () => {
     chrome.reveal(); syncCompact(false); searchingRef.current = true;
     travel.stopAnimation();
@@ -61,7 +64,7 @@ export default function CollectionScreen() {
       </View>
     </View>
     <View style={styles.galleryRegion}>
-      <GalleryList collection={collection} headerSpace={headerHeight} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
+      <GalleryList collection={collection} headerSpace={headerHeight} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
       <Animated.View testID="collection-expanded-controls" pointerEvents={compact ? 'none' : 'auto'} accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[styles.header, { transform: [{ translateY: Animated.multiply(travel, -1) }] }]} onLayout={event => {
         const next = Math.ceil(event.nativeEvent.layout.height);
         if (next === measuredHeight.current) return;

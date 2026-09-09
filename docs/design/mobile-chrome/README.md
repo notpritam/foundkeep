@@ -1,6 +1,6 @@
 # Foundkeep mobile chrome and related saves
 
-The interactive comparison runs with `node docs/design/mobile-chrome/serve.mjs` on port 8926. It uses synthetic saves and the same scroll geometry as the app. The three bottom navigation choices are Floating dock, Edge bar, and Search dock; each supports purple/red, dark appearance, reduced motion, and opaque surfaces. Select a variant in the preview to record a preference locally. These are browser design previews, not native glass verification.
+The interactive comparison runs with `node docs/design/mobile-chrome/serve.mjs` on port 8926. It uses synthetic saves and the same scroll geometry as the app. Selected on September 9, 2026: **Floating dock + deep purple**. The archived bottom navigation choices are Floating dock, Edge bar, and Search dock; each supports purple/red, dark appearance, reduced motion, and opaque surfaces. Select a variant in the preview to record a preference locally. These are browser design previews, not native glass verification.
 
 ## Implemented in the app
 
@@ -20,8 +20,18 @@ The interactive comparison runs with `node docs/design/mobile-chrome/serve.mjs` 
 
 ## Release scope
 
-App version remains 1.0.0. The related endpoint is deployed. The UI is not published to TestFlight or OTA in this pass: the requested bottom-bar selection is pending. True native Liquid Glass for a custom floating bar may require adding a native module and a new binary; do not claim the browser blur prototype is native glass. No Supabase credential or auth-provider setting changes are part of this pass. No agent feature or explicit manually attached link graph is introduced; existing and future attached tags automatically participate in related matching.
+App version remains 1.0.0. The related endpoint is deployed. Floating dock + deep purple is implemented with `expo-glass-effect` 57.0.2. It requires a new TestFlight binary; its native dependency is included in Expo’s fingerprint. Ordinary later JavaScript changes can use OTA only for matching runtimes. The release status is recorded below. No Supabase credential or auth-provider setting changes are part of this pass. No agent feature or explicit manually attached link graph is introduced; existing and future attached tags automatically participate in related matching.
 
 ## Native verification notes
 
-The first Simulator login attempt hit the text labels instead of the input fields; the flow now uses existing `field-email` and `field-password` identifiers. The next attempt was held by Apple’s Save Password prompt; dismissing that system prompt completed sign-in. Synthetic cover URLs initially pointed to the authenticated BB preview and correctly failed without BB credentials; fixtures were corrected to a publicly accessible Foundkeep image. No credential was forwarded to the image host. Physical-device gesture feel and the selected new bottom bar still need a beta pass.
+The first Simulator login attempt hit the text labels instead of the input fields; the flow now uses existing `field-email` and `field-password` identifiers. The next attempt was held by Apple’s Save Password prompt; dismissing that system prompt completed sign-in. Synthetic cover URLs initially pointed to the authenticated BB preview and correctly failed without BB credentials; fixtures were corrected to a publicly accessible Foundkeep image. No credential was forwarded to the image host. Physical-device gesture feel still needs a beta pass.
+
+
+## Floating dock verification — September 9, 2026
+
+- The floating Gallery/You capsule and separate Create a note action use native Liquid Glass on supported iOS devices. Unsupported systems and Reduce Transparency use an opaque surface. No glass ancestor is faded to zero opacity.
+- Gallery scroll state contracts the dock to icons; upward scroll restores labels. VoiceOver and larger text retain labels; larger text stacks them beneath icons. Keyboard presentation hides the dock. Gallery and Settings reserve enough space to reach their final content.
+- All 50 mobile tests, TypeScript, Expo web export and compiled interaction checks pass. Browser checks cover tab navigation/selected semantics, 44-point targets, 320-point width, footer clearance, and creation through the dock. React Native Web always reports a screen reader; its expanded labels are expected. Native collapse is verified separately.
+- Signed Xcode Debug build and native iPhone 17 / iOS 26.5 checks pass: sign-in, native glass surface, collapse/reveal, both tabs, keyboard hiding, and quick-add. Light, dark and accessibility-extra-large screenshots were inspected. Evidence: `.impeccable/review/dock/native-{light,compact,dark,large}.png`; these use a disposable account and synthetic saves.
+- The initial unsigned Simulator build could not access the shared Keychain. Rebuilding with the existing local signing/team settings resolved the test setup; no auth bypass was added.
+- Personal Expo ownership verified: `notpritam`, `notpritamsharma@gmail.com`. Public App Review contact details remain missing. No App Store submission is claimed.
