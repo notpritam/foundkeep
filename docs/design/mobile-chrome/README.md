@@ -35,3 +35,21 @@ The first Simulator login attempt hit the text labels instead of the input field
 - Signed Xcode Debug build and native iPhone 17 / iOS 26.5 checks pass: sign-in, native glass surface, collapse/reveal, both tabs, keyboard hiding, and quick-add. Light, dark and accessibility-extra-large screenshots were inspected. Evidence: `.impeccable/review/dock/native-{light,compact,dark,large}.png`; these use a disposable account and synthetic saves.
 - The initial unsigned Simulator build could not access the shared Keychain. Rebuilding with the existing local signing/team settings resolved the test setup; no auth bypass was added.
 - Personal Expo ownership verified: `notpritam`, `notpritamsharma@gmail.com`. Public App Review contact details remain missing. No App Store submission is claimed.
+
+
+## Release candidate
+
+EAS production build [1.0.0 (15)](https://expo.dev/accounts/notpritam/projects/foundkeep/builds/d2c745e6-d704-423c-ae82-cec44a933b25) completed from `7b0550c`. The 17,283,958-byte IPA was inspected: main and Share Extension bundle IDs/versions, bundled Safari preprocessing, production channel, and runtime `03660500bff0bed464c73b169d8c9f0d01e85f19` match. Apple accepted upload delivery `f08ea11d-7456-4e7d-8fa0-2d1273c9d4da` with no errors. Processing and internal beta availability are verified separately below.
+
+The actual iOS Reduce Transparency switch was exercised, and normal glass was restored afterward. The initial test tapped the label rather than its switch; the final action used the inspected switch bounds. Simulator appearance and text size were restored. The disposable account, its captures, and temporary credential artifacts have been removed.
+
+[Physical iPhone test checklist](iphone-test-guide.md).
+
+
+## TestFlight release — available
+
+Verified September 9, 2026: **Foundkeep 1.0.0 (15)** is `VALID` and `IN_BETA_TESTING`, assigned to **Foundkeep Internal**, with en-US test notes saved. Apple build ID: `f08ea11d-7456-4e7d-8fa0-2d1273c9d4da`. Open TestFlight → Foundkeep → Update. No new invitation is needed for the existing internal tester.
+
+The beta association was verified using the group’s build list; Apple does not support reading a build’s `betaGroups` related resource. The Mac’s Python trust store could not download the archive, so the system HTTPS client downloaded it with certificate verification enabled. Neither workaround changes app behavior or disables validation.
+
+The release source is on `main` at `7b0550c`. Public App Store review is **not submitted**: the review-contact record is still absent, and the requested contact name/phone has not been provided. This beta release does not certify completion of App Privacy or social/push provider setup.

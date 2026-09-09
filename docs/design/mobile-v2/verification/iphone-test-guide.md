@@ -1,5 +1,7 @@
 # Foundkeep Gallery: iPhone test guide
 
+Build **1.0.0 (15)** supersedes this build-14 guide. Use the [floating dock + deep purple checklist](../../mobile-chrome/iphone-test-guide.md) for the current TestFlight release.
+
 This guide covers the Gallery iteration of Foundkeep 1.0.0. Install **1.0.0 (14)** from Foundkeep Internal in TestFlight. The release record is in [gallery-status.md](gallery-status.md).
 
 ## Install
