@@ -40,7 +40,7 @@ export function createApp(db: Database): Hono<Env> {
   app.use("*", async (c, next) => {
     await next();
     c.header("X-Content-Type-Options", "nosniff");
-    c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    c.header("Referrer-Policy", c.req.path.startsWith("/api/auth/oauth/") || c.req.path === "/auth.html" ? "no-referrer" : "strict-origin-when-cross-origin");
     c.header("X-Frame-Options", "SAMEORIGIN");
     c.header("Strict-Transport-Security", "max-age=31536000");
     if (["/auth.html", "/dashboard.html", "/open.html"].includes(c.req.path)) {

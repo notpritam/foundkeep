@@ -1,3 +1,4 @@
+import { mountOAuthButtons } from './oauth.js';
 import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig, setAccountContext } from './customer.js?v=1.5.0';
 
 const state = { account: null, connections: [], usage: null, captures: [], cursor: null, total: 0, type: '', query: '', listRequest: 0, controller: null, detailRequest: 0, detail: null, extension: null, extensionId: null, expired: false, noteClientId: null, recoveryCode: '', connecting: false, preferences: null, preferenceRevision: 0 };
@@ -54,6 +55,7 @@ function updateAccount() {
   $('#account-name').textContent = account.name || account.email;
   $('#account-avatar').textContent = (account.name || account.email).slice(0, 1).toUpperCase();
   $('#settings-email').textContent = account.email;
+  $('#password-settings').hidden = account.hasPassword === false;
   if (usage) {
     $('#nav-count').textContent = usage.captures.toLocaleString();
     $('#usage-summary').textContent = `${usage.captures.toLocaleString()} captures · ${bytes(usage.bytes)}`;
@@ -525,7 +527,15 @@ $('#finish-password-recovery').addEventListener('click', () => {
   if (!$('#password-recovery-saved').checked) return;
   state.recoveryCode = ''; $('#password-recovery-code').textContent = ''; closeDialog('#password-recovery-dialog'); toast('Password changed. Reconnect your browsers when you’re ready.');
 });
-$('#open-delete-account').addEventListener('click', () => { $('#delete-account-form').reset(); setMessage($('#delete-account-error'), ''); openDialog('#delete-account-dialog'); });
+$('#open-delete-account').addEventListener('click', () => {
+  $('#delete-account-form').reset(); setMessage($('#delete-account-error'), '');
+  const social = state.account?.hasPassword === false;
+  $('#delete-password-field').hidden = social; $('#delete-password').required = !social; $('#delete-password').disabled = social;
+  $('#delete-account-submit').hidden = social;
+  $('#oauth-delete-buttons').hidden = !social;
+  if (social) void mountOAuthButtons($('#oauth-delete-buttons'), $('#delete-account-error'), 'delete');
+  openDialog('#delete-account-dialog');
+});
 $('#delete-account-form').addEventListener('submit', async event => {
   event.preventDefault(); if ($('#delete-account-submit').disabled || !event.currentTarget.reportValidity()) return;
   $('#delete-account-submit').disabled = true; setMessage($('#delete-account-error'), '');

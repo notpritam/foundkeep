@@ -365,3 +365,43 @@ test('customer screens fit phone and desktop; save visual review evidence', asyn
   await openLibrary(page); await page.waitForFunction(() => document.querySelector('#extension-status').textContent.includes('Connected as'));
   await page.screenshot({ path: 'deploy/dist/store-assets/customer-browser-setup.png', fullPage: false });
 });
+
+test('social sign-in keeps proof locally and strips the callback before exchanging it', async t => {
+  const flow = 'a'.repeat(32), code = 'b'.repeat(43);
+  let received;
+  const { page, context } = await pageFor(t, { handler: ({ url, body }) => {
+    if (url.pathname === '/api/auth/providers') return { body: { providers: ['google'] } };
+    if (url.pathname === '/api/auth/oauth/start') { received = body; return { body: { flow, authorizeUrl: `${base}/api/auth/oauth/authorize/${flow}` } }; }
+    if (url.pathname === '/api/auth/oauth/exchange') return { body: { account } };
+  } });
+  await context.route(`**/api/auth/oauth/authorize/${flow}`, route => route.fulfill({ contentType: 'text/html', body: '<p>Provider fixture</p>' }));
+  await page.goto(`${base}/auth.html?mode=login`); await page.getByRole('button', { name: 'Continue with Google' }).click();
+  await page.waitForURL(`**/api/auth/oauth/authorize/${flow}`);
+  const pending = await page.evaluate(flow => JSON.parse(sessionStorage.getItem('foundkeep-oauth-' + flow)), flow);
+  assert.match(pending.verifier, /^[A-Za-z0-9_-]{43}$/); assert.match(received.codeChallenge, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(Object.hasOwn(received, 'verifier'), false);
+  const exchanged = page.waitForRequest('**/api/auth/oauth/exchange');
+  await page.goto(`${base}/auth.html?flow=${flow}&code=${code}`);
+  assert.equal((await exchanged).postDataJSON().verifier, pending.verifier);
+  await page.waitForURL('**/dashboard.html');
+  assert.equal(await page.evaluate(flow => sessionStorage.getItem('foundkeep-oauth-' + flow), flow), null);
+});
+
+test('social callback without local proof cannot silently sign into another collection', async t => {
+  const { page, requests } = await pageFor(t);
+  await page.goto(`${base}/auth.html?flow=${'a'.repeat(32)}&code=${'b'.repeat(43)}`);
+  await page.locator('#oauth-message').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#oauth-message').textContent(), /canceled or expired/);
+  assert.equal(new URL(page.url()).searchParams.has('code'), false);
+  assert.equal(requests.some(r => r.path === '/api/auth/oauth/exchange'), false);
+});
+
+test('a social-only dashboard offers reauthentication instead of an unusable password', async t => {
+  const { page, model } = await pageFor(t, { handler: ({ url }) => url.pathname === '/api/auth/providers' ? { body: { providers: ['apple'] } } : undefined });
+  model.account = { ...account, hasPassword: false };
+  await openLibrary(page); await page.locator('#open-account').click();
+  assert.equal(await page.locator('#password-settings').isVisible(), false);
+  await page.locator('#open-delete-account').click();
+  assert.equal(await page.locator('#delete-password').isVisible(), false);
+  await page.getByRole('button', { name: 'Verify with Apple' }).waitFor({ state: 'visible' });
+});

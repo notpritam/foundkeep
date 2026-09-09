@@ -3,11 +3,24 @@ import { config } from "./config.ts";
 import { openDb } from "./db.ts";
 import { RelayHub, type ConnData, type Sock } from "./relay.ts";
 import { startCustomerWorker } from "./customer-enrichment.ts";
+import { processAuthCleanup } from "./customer-oauth.ts";
+import { createSupabaseGateway } from "./supabase-auth.ts";
 
 const db = openDb();
 const app = createApp(db);
 const hub = new RelayHub(db);
 const stopCustomerWorker = startCustomerWorker(db);
+const authGateway = createSupabaseGateway();
+let cleaningAuth = false;
+const cleanAuth = async () => {
+  if (cleaningAuth) return;
+  cleaningAuth = true;
+  try { await processAuthCleanup(db, authGateway); } catch { /* Durable outbox retries without logging identities or tokens. */ }
+  finally { cleaningAuth = false; }
+};
+void cleanAuth();
+const authCleanupTimer = setInterval(cleanAuth, 30_000);
+authCleanupTimer.unref();
 
 const server = Bun.serve<ConnData>({
   port: config.port,
@@ -44,6 +57,7 @@ console.log(`  relay:    wss://<host>/agent`);
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     stopCustomerWorker();
+    clearInterval(authCleanupTimer);
     server.stop(true);
     process.exit(0);
   });

@@ -5,6 +5,7 @@ import { Linking, Platform } from 'react-native';
 import { useSession } from '../session/SessionProvider.tsx';
 import { notificationLink } from '../notifications/notifications.ts';
 import { parseFoundkeepLink } from './deepLinks.ts';
+import { parseOAuthReturn, pendingOAuth } from '../auth-oauth.ts';
 
 export function NavigationController() {
   const { ready, account, setPendingRoute } = useSession();
@@ -42,5 +43,16 @@ export function NavigationController() {
     }
     return () => { linkSubscription.remove(); responseSubscription?.remove(); };
   }, [open, ready]);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    // Browser previews use popstate; iOS uses +native-intent before navigation.
+    const returning = () => {
+      if (window.location.pathname !== '/oauth/complete') return;
+      const parsed = parseOAuthReturn('foundkeep://oauth/complete' + window.location.search + window.location.hash);
+      if (parsed) pendingOAuth.markReturn(parsed.flow);
+    };
+    window.addEventListener('popstate', returning);
+    return () => window.removeEventListener('popstate', returning);
+  }, []);
   return null;
 }

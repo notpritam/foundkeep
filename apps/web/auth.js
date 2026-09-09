@@ -1,3 +1,4 @@
+import { mountOAuthButtons, completeOAuth } from './oauth.js';
 import { $, api, setMessage, recoveryDownload } from './customer.js?v=1.5.0';
 
 let mode = 'signup';
@@ -21,8 +22,9 @@ function setMode(value) {
   $('#password').minLength = mode === 'login' ? 1 : 12;
   $('#password-label').textContent = mode === 'recover' ? 'New password' : 'Password';
   $('#password-help').hidden = mode === 'login';
-  $('#auth-terms').hidden = mode !== 'signup';
+  $('#auth-terms').hidden = mode === 'recover';
   $('.auth-recover').hidden = mode === 'recover';
+  $('#oauth-buttons').hidden = mode === 'recover' || !$('#oauth-buttons').children.length;
   document.querySelectorAll('[data-mode]').forEach(link => {
     if (link.dataset.mode === mode) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
   });
@@ -74,3 +76,5 @@ $('#continue-dashboard').addEventListener('click', () => {
   location.assign('/dashboard.html');
 });
 window.addEventListener('beforeunload', event => { if (recoveryCode && !$('#recovery-saved').checked) event.preventDefault(); });
+
+if (!completeOAuth()) void mountOAuthButtons($('#oauth-buttons'), $('#auth-error')).then(() => { $('#oauth-buttons').hidden = mode === 'recover' || !$('#oauth-buttons').children.length; });

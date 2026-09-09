@@ -1,6 +1,6 @@
 export type CaptureType = 'screenshot' | 'selection' | 'bookmark' | 'image' | 'note' | 'tweet' | 'video' | 'audio' | 'document' | 'file';
 
-export type Account = { id: string; email: string; name: string; createdAt: number };
+export type Account = { id: string; email: string; name: string; createdAt: number; hasPassword?: boolean };
 export type Usage = { captures: number; bytes: number; maxCaptures: number; maxBytes: number };
 export type Connection = { id: string; name: string; createdAt: number; lastSeenAt: number | null };
 

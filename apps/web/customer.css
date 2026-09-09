@@ -261,3 +261,6 @@
 }
 @media (max-width:420px) { .capture-grid { grid-template-columns:1fr; } .capture-open>img { height:205px; } .capture-card-body { padding:19px; } .capture-card h2 { font-size:23px; } .capture-meta { font-size:11px; } .capture-excerpt { font-size:12px; } .auth-panel { padding:21px; } .library-main { padding-inline:17px; } .library-header h1 { font-size:34px; } .library-header .button { gap:5px; padding-inline:9px; } .library-header .button svg { display:none; } }
 @media (prefers-reduced-motion:reduce) { .customer-body *, .customer-body *::before, .customer-body *::after { scroll-behavior:auto !important; animation:none !important; transition:none !important; } }
+
+.oauth-buttons { display: grid; gap: 10px; margin: 20px 0; }
+.oauth-buttons[hidden] { display: none; }

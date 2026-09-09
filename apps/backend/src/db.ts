@@ -257,6 +257,37 @@ const MIGRATIONS: string[] = [
   ALTER TABLE customer_captures ADD COLUMN folder_id TEXT REFERENCES customer_folders(id) ON DELETE SET NULL;
   CREATE INDEX customer_captures_owner_folder ON customer_captures(account_id, folder_id);
   `,
+  // Backend-owned social identities and short-lived OAuth transactions.
+  `
+  CREATE TABLE customer_auth_identities (
+    issuer TEXT NOT NULL, subject TEXT NOT NULL,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL, created_at INTEGER NOT NULL,
+    PRIMARY KEY(issuer,subject), UNIQUE(account_id,issuer)
+  );
+  CREATE TABLE customer_oauth_flows (
+    id TEXT PRIMARY KEY, issuer TEXT NOT NULL, provider TEXT NOT NULL,
+    client TEXT NOT NULL, intent TEXT NOT NULL, device_name TEXT NOT NULL,
+    account_id TEXT, credential_id TEXT, credential_kind TEXT,
+    client_challenge TEXT NOT NULL, server_verifier TEXT NOT NULL,
+    browser_hash TEXT, stage TEXT NOT NULL, code_hash TEXT, identity_json TEXT,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX customer_oauth_expiry ON customer_oauth_flows(expires_at);
+  CREATE TABLE customer_auth_proofs (
+    token_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    credential_id TEXT NOT NULL, credential_kind TEXT NOT NULL, expires_at INTEGER NOT NULL
+  );
+  CREATE TABLE customer_auth_cleanup (
+    issuer TEXT NOT NULL, subject TEXT NOT NULL, created_at INTEGER NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0, retry_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(issuer,subject)
+  );
+  CREATE TABLE customer_auth_tombstones (
+    issuer TEXT NOT NULL, subject TEXT NOT NULL, expires_at INTEGER NOT NULL,
+    PRIMARY KEY(issuer,subject)
+  );
+  `,
 ];
 
 function migrate(db: Database): void {

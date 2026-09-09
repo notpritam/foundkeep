@@ -222,3 +222,18 @@ test('organization filters and personal edits remain authenticated and invalidat
   await client.createNote({ clientId: 'new', capturedAt: 13, noteText: 'Keep this', folderId: 'reading', userTags: ['Personal'] });
   assert.equal(requests.at(-1)!.body.folderId, 'reading'); assert.deepEqual(requests.at(-1)!.body.userTags, ['Personal']);
 });
+
+test('social auth uses only Foundkeep endpoints and separates login from authenticated deletion', async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createFoundkeepClient({ getToken: async () => 'device-token', fetcher: async (url, init) => { calls.push({ url: String(url), init }); return Response.json({ providers: ['apple'] }); } });
+  await client.oauthProviders();
+  await client.startOAuth({ provider: 'google', intent: 'sign-in', codeChallenge: 'challenge' });
+  await client.exchangeOAuth({ flow: 'flow', code: 'handoff', verifier: 'verifier' }, 'sign-in');
+  await client.startOAuth({ provider: 'apple', intent: 'delete', codeChallenge: 'challenge' });
+  await client.exchangeOAuth({ flow: 'flow', code: 'handoff', verifier: 'verifier' }, 'delete');
+  await client.deleteAccount({ reauthToken: 'one-use-proof' });
+  for (const call of calls) assert.equal(new URL(call.url).origin, 'https://foundkeep.app');
+  for (const call of calls.slice(0,3)) assert.equal(new Headers(call.init?.headers).has('authorization'), false);
+  for (const call of calls.slice(3)) assert.equal(new Headers(call.init?.headers).get('authorization'), 'Bearer device-token');
+  assert.deepEqual(JSON.parse(String(calls.at(-1)?.init?.body)), { reauthToken: 'one-use-proof' });
+});

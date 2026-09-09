@@ -1,4 +1,5 @@
 import type { Account, Capture, CaptureList, Folder, Organization, NativeSession, Usage } from './types.ts';
+import type { OAuthIntent, OAuthProvider } from '../auth-oauth.ts';
 
 const API_ORIGIN = 'https://foundkeep.app';
 const REQUEST_TIMEOUT = 15_000;
@@ -101,6 +102,13 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
   return {
     invalidate,
     subscribeInvalidation(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    oauthProviders: () => json<{ providers: OAuthProvider[] }>('/api/auth/providers?client=ios', { authenticated: false }),
+    startOAuth(value: { provider: OAuthProvider; intent: OAuthIntent; codeChallenge: string }) {
+      return json<{ flow: string; authorizeUrl: string }>('/api/auth/oauth/start', { method: 'POST', body: { ...value, client: 'ios', deviceName: 'iPhone' }, authenticated: value.intent === 'delete' });
+    },
+    exchangeOAuth(value: { flow: string; code: string; verifier: string; password?: string }, intent: OAuthIntent) {
+      return json<NativeSession | { reauthToken: string }>('/api/auth/oauth/exchange', { method: 'POST', body: value, authenticated: intent === 'delete' });
+    },
     register(value: { email: string; name: string; password: string; deviceName?: string }) {
       return json<NativeSession>('/api/mobile/register', { method: 'POST', body: devicePayload(value), authenticated: false });
     },
@@ -115,7 +123,7 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     registerNotifications: (expoPushToken: string) => json<{ ok: true }>('/api/mobile/notifications', { method: 'POST', body: { expoPushToken } }),
     unregisterNotifications: () => json<{ ok: true }>('/api/mobile/notifications', { method: 'DELETE' }),
     logout: () => json<{ ok: true }>('/api/mobile/logout', { method: 'POST' }),
-    deleteAccount: (password: string) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: { password } }),
+    deleteAccount: (proof: string | { reauthToken: string }) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: typeof proof === 'string' ? { password: proof } : proof }),
     listCaptures(filters: { q?: string; type?: string; cursor?: string; batchId?: string; folderId?: string; tag?: string }, options: ReadOptions = {}) {
       const query = new URLSearchParams({ view: 'cards' });
       if (filters.q) query.set('q', filters.q);

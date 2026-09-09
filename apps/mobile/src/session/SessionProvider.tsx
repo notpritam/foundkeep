@@ -7,6 +7,7 @@ import type { Account, NativeSession, Usage } from '../api/types.ts';
 import { DEFAULT_MOBILE_POLICY, fetchMobilePolicy, normalizeMobilePolicy, requiresBinaryUpdate, type MobilePolicy } from '../policy/mobilePolicy.ts';
 import { safeReturnPath } from '../linking/deepLinks.ts';
 import { syncNotificationRegistration } from '../notifications/notifications.ts';
+import { pendingOAuth } from '../auth-oauth.ts';
 
 type Credentials = { email: string; password: string };
 type SessionValue = {
@@ -19,10 +20,11 @@ type SessionValue = {
   register(value: Credentials & { name: string }): Promise<void>;
   login(value: Credentials): Promise<void>;
   recover(value: Credentials & { recoveryCode: string }): Promise<void>;
+  acceptOAuthSession(value: NativeSession): Promise<void>;
   acknowledgeRecovery(): void;
   refresh(): Promise<void>;
   logout(): Promise<void>;
-  deleteAccount(password: string): Promise<void>;
+  deleteAccount(proof: string | { reauthToken: string }): Promise<void>;
 };
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -39,6 +41,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const client = useMemo(() => createFoundkeepClient({ getToken }), [getToken]);
 
   const accept = useCallback(async (session: NativeSession) => {
+    pendingOAuth.clear();
     await FoundkeepShared.setSession(session.token, JSON.stringify(session.account));
     setToken(session.token); setAccount(session.account); setRecoveryCode(session.recoveryCode || null);
     void FoundkeepShared.retryPending();
@@ -108,14 +111,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     register: async input => accept(await client.register({ ...input, deviceName })),
     login: async input => accept(await client.login({ ...input, deviceName })),
     recover: async input => accept(await client.recover({ ...input, deviceName })),
+    acceptOAuthSession: accept,
     acknowledgeRecovery: () => setRecoveryCode(null), refresh,
     logout: async () => {
+      pendingOAuth.clear();
       try { if (token) await client.logout(); } finally {
         await FoundkeepShared.clearSession(); setToken(null); setAccount(null); setUsage(null); setRecoveryCode(null); setPendingRouteState(null);
       }
     },
     deleteAccount: async password => {
       await client.deleteAccount(password);
+      pendingOAuth.clear();
       await FoundkeepShared.clearSession(); setToken(null); setAccount(null); setUsage(null); setRecoveryCode(null); setPendingRouteState(null);
     },
   }), [ready, account, usage, token, recoveryCode, policy, pendingRoute, client, deviceName, accept, refresh]);

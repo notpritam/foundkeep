@@ -16,6 +16,7 @@
       <div id="auth-fields">
         <div class="auth-tabs" aria-label="Account options"><a href="?mode=signup" data-mode="signup">Create account</a><a href="?mode=login" data-mode="login">Log in</a></div>
         <h2 id="auth-title">Your collection starts here.</h2><p id="auth-description" class="muted">Create an account to save new captures to your private cloud library.</p>
+        <div id="oauth-buttons" class="oauth-buttons" hidden></div>
         <form id="auth-form">
           <div class="field" id="name-field"><label for="name">Your name</label><input id="name" name="name" autocomplete="name" maxlength="100" required /></div>
           <div class="field"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" required /></div>
@@ -25,8 +26,15 @@
           <button class="button primary wide" id="auth-submit" type="submit">Create account <span aria-hidden="true">↗</span></button>
         </form>
         <p class="auth-recover"><a href="?mode=recover" data-mode="recover">Recover your account</a></p>
-        <p class="auth-terms" id="auth-terms">Accounts are optional in the browser. New captures sync after you connect the extension. Existing local captures stay local unless you choose to import them. By creating an account, you agree to the <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.</p>
+        <p class="auth-terms" id="auth-terms">By continuing, you agree to our <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.</p>
       </div>
+      <section id="oauth-completion" hidden aria-labelledby="oauth-title">
+        <h2 id="oauth-title">Your Foundkeep account.</h2>
+        <p id="oauth-message" class="form-message" role="status" hidden></p>
+        <div id="oauth-link-fields" hidden><div class="field"><label for="oauth-password">Existing Foundkeep password</label><input id="oauth-password" type="password" autocomplete="current-password" maxlength="128" /></div><button id="oauth-connect" class="button primary wide" type="button">Connect to my existing collection</button></div>
+        <button id="oauth-delete" class="button primary wide" type="button" hidden>Delete account permanently</button>
+        <p><a href="/auth.html?mode=login">Back to sign in</a> · <a href="/dashboard.html">Keep my account</a></p>
+      </section>
       <div id="recovery-save" hidden>
         <div class="success-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></svg></div>
         <h2 id="recovery-title" tabindex="-1">Keep your way back in.</h2><p class="muted">Save this recovery code somewhere private. This is the only time we’ll show it. You’ll need it if you forget your password; Foundkeep does not send reset emails.</p>

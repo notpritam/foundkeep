@@ -27,6 +27,8 @@ import {
   writeCustomerFile,
 } from "./customer-files.ts";
 import { isExpoPushToken } from "./customer-notifications.ts";
+import { registerCustomerOAuth, consumeDeletionProof, queueIdentityDeletion } from "./customer-oauth.ts";
+import { createSupabaseGateway, OAuthError, type OAuthGateway } from "./supabase-auth.ts";
 import {
   CustomerOrganizationError, captureOrganization, capturesWithTag, createFolder, deleteFolder,
   folderIdentifier, organizationBytes, organizationName, readOrganization, renameFolder, requireFolder,
@@ -47,7 +49,7 @@ const CARD_COLUMNS = CAPTURE_COLUMNS.split(",").map(column =>
   CARD_TEXT_COLUMNS.has(column) ? `substr(${column},1,480) AS ${column}` : column,
 ).join(",");
 
-interface AccountRow { id: string; email: string; name: string; password_hash: string; recovery_hash: string; created_at: number }
+export interface AccountRow { id: string; email: string; name: string; password_hash: string; recovery_hash: string; created_at: number }
 interface ConnectionRow { id: string; account_id: string; name: string; created_at: number; last_seen_at: number | null; expires_at: number }
 interface CredentialRow { id: string; account_id: string; expires_at: number }
 export interface CustomerCaptureRow {
@@ -63,8 +65,8 @@ export interface CustomerCaptureRow {
   provenance_json: string | null; processing_options_json: string | null;
   manual_tags: string; folder_id: string | null; folder_name: string | null;
 }
-interface Auth { account: AccountRow; kind: "session" | "connection"; credentialId: string }
-type CustomerEnv = { Bindings: { clientIp?: string }; Variables: { customerAuth: Auth } };
+export interface Auth { account: AccountRow; kind: "session" | "connection"; credentialId: string }
+export type CustomerEnv = { Bindings: { clientIp?: string }; Variables: { customerAuth: Auth } };
 type C = Context<CustomerEnv>;
 type JsonObject = Record<string, unknown>;
 class CustomerError extends Error {
@@ -89,7 +91,7 @@ function mobileCursor(raw: string): { capturedAt: number; id: string } | null {
 function encodeMobileCursor(row: CustomerCaptureRow) {
   return Buffer.from(JSON.stringify({ capturedAt: row.captured_at, id: row.id })).toString("base64url");
 }
-function accountDto(row: AccountRow) { return { id: row.id, email: row.email, name: row.name, createdAt: row.created_at }; }
+function accountDto(row: AccountRow) { return { id: row.id, email: row.email, name: row.name, createdAt: row.created_at, hasPassword: !!row.password_hash }; }
 function connectionDto(row: ConnectionRow) { return { id: row.id, name: row.name, createdAt: row.created_at, lastSeenAt: row.last_seen_at }; }
 export function customerCaptureDto(row: CustomerCaptureRow) {
   return {
@@ -193,7 +195,7 @@ async function passwordWork<T>(work: () => Promise<T>) {
   try { return await work(); } finally { passwordJobs--; }
 }
 const hashPassword = (password: string) => passwordWork(() => Bun.password.hash(password, { algorithm: "argon2id", memoryCost: 19456, timeCost: 2 }));
-const verifyPassword = (password: string, stored: string) => passwordWork(() => Bun.password.verify(password, stored));
+const verifyPassword = (password: string, stored: string) => stored ? passwordWork(() => Bun.password.verify(password, stored)) : Promise.resolve(false);
 
 // Process-wide slots bound retained body buffers before decoding or quota
 // checks. Account entries disappear on completion, so this map is bounded too.
@@ -268,7 +270,7 @@ function decodeImage(raw: unknown): { data: Buffer | null; mime: string | null; 
   return { data, mime, bytes: data.byteLength, width, height };
 }
 
-export function customerRoutes(db: Database) {
+export function customerRoutes(db: Database, oauthGateway: OAuthGateway = createSupabaseGateway()) {
   const app = new Hono<CustomerEnv>();
   const origin = config.customerOrigin;
   const websiteOrigins = new Set(config.customerOrigins);
@@ -339,13 +341,16 @@ export function customerRoutes(db: Database) {
   async function destroyAccount(c: C, current: Auth) {
     rates.take(`sensitive:${current.account.id}`, 10, 15 * 60_000);
     const body = await jsonBody(c);
-    if (!(await verifyPassword(passwordField(body, "password", false), current.account.password_hash))) fail(401, "invalid_credentials", "The password is incorrect.");
+    const deletionProof = typeof body.reauthToken === "string" ? body.reauthToken : null;
+    if (!deletionProof && !(await verifyPassword(passwordField(body, "password", false), current.account.password_hash))) fail(401, "invalid_credentials", "The password is incorrect.");
     const ownedFiles = db.query("SELECT file_path FROM customer_captures WHERE account_id = ? AND file_path IS NOT NULL").all(current.account.id) as { file_path: string }[];
     db.transaction(() => {
       const latest = auth(c, current.kind === "session");
       if (latest.kind !== current.kind || latest.credentialId !== current.credentialId || latest.account.password_hash !== current.account.password_hash) {
         fail(401, "invalid_credentials", "Your account access changed. Sign in again.");
       }
+      if (deletionProof) consumeDeletionProof(db, current, deletionProof);
+      queueIdentityDeletion(db, current.account.id);
       revoke(current.account.id);
       db.query("DELETE FROM customer_preferences WHERE account_id = ?").run(current.account.id);
       db.query("DELETE FROM customer_captures WHERE account_id = ?").run(current.account.id);
@@ -375,6 +380,7 @@ export function customerRoutes(db: Database) {
   }
 
   app.onError((error, c) => {
+    if (error instanceof OAuthError) return c.json({ error: error.code, message: error.message }, error.status);
     if (error instanceof CustomerOrganizationError) return c.json({ error: error.code, message: error.message }, error.status);
     if (error instanceof CustomerError) {
       if (error.retryAfter !== undefined) c.header("Retry-After", String(error.retryAfter));
@@ -406,6 +412,8 @@ export function customerRoutes(db: Database) {
     if (!["GET", "HEAD"].includes(c.req.method) && requestOrigin && !allowed) fail(403, "invalid_origin", "This website cannot change your Foundkeep account.");
     await next();
   });
+
+  registerCustomerOAuth(app, db, oauthGateway, { origin, website, auth, account, emailAccount, accountDto, session, issueConnection, jsonBody, verifyPassword, publicRate });
 
   app.post("/mobile/register", async (c) => {
     publicRate(c, "mobile-register");
