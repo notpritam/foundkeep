@@ -1,13 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import type { CaptureType } from '../../../api/types.ts';
 import { Brand, Message, Screen } from '../../../components/ui.tsx';
 import { OrganizationPicker, type OrganizationChoice } from '../../../components/OrganizationPicker.tsx';
 import { GalleryList } from '../../../components/GalleryList.tsx';
 import { useCollection } from '../../../collection/useCollection.ts';
 import { useSession } from '../../../session/SessionProvider.tsx';
+import { createScrollChrome } from '../../../collection/scrollChrome.ts';
+import { useMotionAllowed } from '../../../components/motion.tsx';
 import { colors } from '../../../theme.ts';
 
 const filters: Array<{ type?: CaptureType; label: string }> = [
@@ -21,30 +23,67 @@ export default function CollectionScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [type, setType] = useState<CaptureType>();
   const [organization, setOrganization] = useState<OrganizationChoice>({ folderId: undefined, userTags: [] });
-  const [searching, setSearching] = useState(false);
   const { height, fontScale } = useWindowDimensions();
+  const motion = useMotionAllowed();
+  const searchRef = useRef<TextInput>(null);
+  const searchingRef = useRef(false);
+  const [headerHeight, setHeaderHeight] = useState(240);
+  const measuredHeight = useRef(240);
+  const chrome = useRef(createScrollChrome(240)).current;
+  const travel = useRef(new Animated.Value(0)).current;
+  const [compact, setCompact] = useState(false);
+  const compactRef = useRef(false);
+  const syncCompact = useCallback((next: boolean) => {
+    if (compactRef.current !== next) { compactRef.current = next; setCompact(next); }
+  }, []);
+  const revealSearch = () => {
+    chrome.reveal(); syncCompact(false); searchingRef.current = true;
+    travel.stopAnimation();
+    if (motion) Animated.spring(travel, { toValue: 0, stiffness: 310, damping: 32, mass: 1, useNativeDriver: true }).start();
+    else travel.setValue(0);
+    searchRef.current?.focus();
+  };
+  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const hidden = chrome.scroll(contentOffset.y, contentSize.height - layoutMeasurement.height, searchingRef.current);
+    travel.stopAnimation(); travel.setValue(hidden);
+    syncCompact(hidden >= measuredHeight.current - 1);
+  }, [chrome, travel, syncCompact]);
   useEffect(() => { const timer = setTimeout(() => setSearchQuery(query.trim()), 250); return () => clearTimeout(timer); }, [query]);
   const collection = useCollection({ q: searchQuery || undefined, type, folderId: organization.folderId === null ? 'unfiled' : organization.folderId, tag: organization.userTags[0] });
   const canWrite = policy.capture.note && !updateRequired;
   return <Screen>
-    {/* Outside the list: header, search and filters stay anchored during scrolling. */}
-    <View testID="collection-header" style={styles.header}>
-      <View style={styles.top}><Brand compact /><Pressable accessibilityRole="button" accessibilityLabel="Write a new note" accessibilityState={{ disabled: !canWrite }} disabled={!canWrite} onPress={() => router.push('/(app)/new-note')} style={({ pressed }) => [styles.add, pressed && { opacity: .7 }, !canWrite && { opacity: .4 }]}><Ionicons name="add" size={25} color={colors.ink} /></Pressable></View>
-      {!searching && height > 550 && fontScale < 1.8 ? <View style={styles.heading}><Text style={styles.title}>All your finds.</Text><Text style={styles.subtitle}>A little of everything you love.</Text></View> : null}
-      {updateRequired ? <Message error>Update Foundkeep in the App Store to keep saving.</Message> : <Message>{policy.notice}</Message>}
-      <View style={styles.search}><Ionicons name="search-outline" size={19} color={colors.muted} /><TextInput testID="collection-search" value={query} onChangeText={setQuery} onFocus={() => setSearching(true)} onBlur={() => setSearching(false)} maxLength={200} accessibilityLabel="Search saved items" placeholder="Search your collection" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" /></View>
-      <OrganizationPicker value={organization} onChange={setOrganization} filter />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }}>
-        {filters.map(filter => <Pressable key={filter.label} accessibilityRole="button" accessibilityState={{ selected: type === filter.type }} onPress={() => setType(filter.type)} style={({ pressed }) => [styles.filter, type === filter.type && styles.filterActive, pressed && { opacity: .7 }]}><Text style={[styles.filterText, type === filter.type && styles.filterTextActive]}>{filter.label}</Text></Pressable>)}
-      </ScrollView>
+    <View testID="collection-header" style={[styles.top, compact && styles.topCompact]}>
+      <Brand compact />
+      <View style={styles.actions}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Show search and filters" onPress={revealSearch} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Ionicons name="search-outline" size={22} color={colors.ink} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Write a new note" accessibilityState={{ disabled: !canWrite }} disabled={!canWrite} onPress={() => router.push('/(app)/new-note')} style={({ pressed }) => [styles.add, pressed && styles.pressed, !canWrite && { opacity: .4 }]}><Ionicons name="add" size={25} color={colors.ink} /></Pressable>
+      </View>
     </View>
-    <GalleryList collection={collection} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
+    <View style={styles.galleryRegion}>
+      <GalleryList collection={collection} headerSpace={headerHeight} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
+      <Animated.View testID="collection-expanded-controls" pointerEvents={compact ? 'none' : 'auto'} accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[styles.header, { transform: [{ translateY: Animated.multiply(travel, -1) }] }]} onLayout={event => {
+        const next = Math.ceil(event.nativeEvent.layout.height);
+        if (next === measuredHeight.current) return;
+        measuredHeight.current = next; setHeaderHeight(next); travel.setValue(chrome.resize(next));
+      }}>
+        {height > 550 && fontScale < 1.8 ? <View style={styles.heading}><Text style={styles.title}>All your finds.</Text><Text style={styles.subtitle}>A little of everything you love.</Text></View> : null}
+        {updateRequired ? <Message error>Update Foundkeep in the App Store to keep saving.</Message> : <Message>{policy.notice}</Message>}
+        <View style={styles.search}><Ionicons name="search-outline" size={19} color={colors.muted} /><TextInput ref={searchRef} testID="collection-search" value={query} onChangeText={setQuery} onFocus={() => { searchingRef.current = true; chrome.reveal(); travel.setValue(0); syncCompact(false); }} onBlur={() => { searchingRef.current = false; }} maxLength={200} accessibilityLabel="Search saved items" placeholder="Search your collection" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" /></View>
+        <OrganizationPicker value={organization} onChange={setOrganization} filter />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }}>
+          {filters.map(filter => <Pressable key={filter.label} accessibilityRole="button" accessibilityState={{ selected: type === filter.type }} onPress={() => setType(filter.type)} style={({ pressed }) => [styles.filter, type === filter.type && styles.filterActive, pressed && styles.pressed]}><Text style={[styles.filterText, type === filter.type && styles.filterTextActive]}>{filter.label}</Text></Pressable>)}
+        </ScrollView>
+      </Animated.View>
+    </View>
   </Screen>;
 }
+
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 10, gap: 10, backgroundColor: colors.paper, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, add: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paleMoss },
+  galleryRegion: { flex: 1, overflow: 'hidden' },
+  header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, paddingHorizontal: 18, paddingTop: 4, paddingBottom: 12, gap: 10, backgroundColor: colors.paper },
+  top: { minHeight: 56, paddingHorizontal: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.paper, zIndex: 3 }, topCompact: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }, actions: { flexDirection: 'row', gap: 4 }, add: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, pressed: { opacity: .65 },
   heading: { gap: 5, paddingTop: 2, paddingBottom: 2 }, title: { color: colors.ink, fontSize: 32, lineHeight: 37, fontWeight: '700', letterSpacing: -.9 }, subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   search: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface }, searchInput: { flex: 1, minHeight: 44, color: colors.ink, fontSize: 16, paddingVertical: 8 },
-  filters: { gap: 8 }, filter: { paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }, filterActive: { backgroundColor: colors.ink, borderColor: colors.ink }, filterText: { color: colors.muted, fontSize: 13, fontWeight: '600' }, filterTextActive: { color: colors.paper },
+  filters: { gap: 8 }, filter: { paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }, filterActive: { backgroundColor: colors.accent, borderColor: colors.accent }, filterText: { color: colors.muted, fontSize: 13, fontWeight: '600' }, filterTextActive: { color: colors.onAccent },
 });

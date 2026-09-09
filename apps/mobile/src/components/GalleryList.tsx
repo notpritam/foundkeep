@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { FlatList, RefreshControl, StyleSheet, Text, useWindowDimensions, View, type ListRenderItemInfo } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, useWindowDimensions, View, type ListRenderItemInfo, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import type { Capture } from '../api/types.ts';
 import { galleryColumns } from '../collection/preview.ts';
 import { useCollection } from '../collection/useCollection.ts';
@@ -10,7 +10,7 @@ import { GallerySkeleton } from './Shimmer.tsx';
 import { Button, Message } from './ui.tsx';
 import { colors, typography } from '../theme.ts';
 
-export function GalleryList({ collection, filtered = false }: { collection: ReturnType<typeof useCollection>; filtered?: boolean }) {
+export function GalleryList({ collection, filtered = false, headerSpace = 0, onScroll }: { collection: ReturnType<typeof useCollection>; filtered?: boolean; headerSpace?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
   const { width, height, fontScale } = useWindowDimensions();
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [viewportHeight, setViewportHeight] = useState(height / 2);
@@ -27,12 +27,12 @@ export function GalleryList({ collection, filtered = false }: { collection: Retu
     columnWrapperStyle={columns === 2 ? styles.row : undefined} ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
     onLayout={event => setViewportHeight(event.nativeEvent.layout.height)}
     onViewableItemsChanged={viewability} viewabilityConfig={viewabilityConfig}
-    onScroll={event => { const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent; setFooterVisible(contentOffset.y + layoutMeasurement.height > contentSize.height - 320); }} scrollEventThrottle={100}
+    onScroll={event => { const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent; setFooterVisible(contentOffset.y + layoutMeasurement.height > contentSize.height - 320); onScroll?.(event); }} scrollEventThrottle={onScroll ? 16 : 100}
     keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
     initialNumToRender={8} maxToRenderPerBatch={6} windowSize={7}
-    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.moss} />}
+    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.accent} progressViewOffset={headerSpace} />}
     onEndReached={() => { if (!error && !loading) void loadMore(); }} onEndReachedThreshold={.35}
-    ListHeaderComponent={captures.length && error ? <View style={styles.error}><Message error>{error}</Message><Button secondary label="Try again" onPress={() => void refresh()} /></View> : null}
+    ListHeaderComponent={<><View style={{ height: headerSpace }} />{captures.length && error ? <View style={styles.error}><Message error>{error}</Message><Button secondary label="Try again" onPress={() => void refresh()} /></View> : null}</>}
     ListFooterComponent={loadingMore ? <View style={{ paddingTop: 12 }}><MotionBoundary enabled={footerVisible}><GallerySkeleton columns={columns} viewportHeight={200} /></MotionBoundary></View> : captures.length ? <Text style={styles.count}>{captures.length < total ? `${captures.length} of ${total} finds` : `${total} ${total === 1 ? 'find' : 'finds'} · yours to keep`}</Text> : null}
     ListEmptyComponent={loading ? <GallerySkeleton columns={columns} viewportHeight={viewportHeight} /> : error ? <View style={styles.empty}><Text style={typography.heading}>Couldn’t open your collection.</Text><Message error>{error}</Message><Button label="Try again" onPress={() => void refresh()} /></View> : <View style={styles.empty}>
       <Text style={[typography.title, { textAlign: 'center' }]}>{filtered ? 'No finds this time.' : 'A home for your good finds.'}</Text>

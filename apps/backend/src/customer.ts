@@ -29,6 +29,7 @@ import {
 import { isExpoPushToken } from "./customer-notifications.ts";
 import { registerCustomerOAuth, consumeDeletionProof, queueIdentityDeletion } from "./customer-oauth.ts";
 import { createSupabaseGateway, OAuthError, type OAuthGateway } from "./supabase-auth.ts";
+import { relatedCaptures, type RelatedMetadata } from "./customer-related.ts";
 import {
   CustomerOrganizationError, captureOrganization, capturesWithTag, createFolder, deleteFolder,
   folderIdentifier, organizationBytes, organizationName, readOrganization, renameFolder, requireFolder,
@@ -1007,6 +1008,23 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
 
   app.get("/captures/:id/file", (c) => serveCustomerFile(c, true));
   app.get("/mobile/captures/:id/file", (c) => serveCustomerFile(c, false));
+  app.get("/mobile/captures/:id/related", (c) => {
+    const current = auth(c);
+    const columns = `id,account_id,captured_at,batch_id,folder_id,source_url,manual_tags,tags,
+      json_extract(provenance_json,'$.canonicalUrl') AS canonical_url,
+      json_extract(provenance_json,'$.pageUrl') AS page_url`;
+    const capture = db.query(`SELECT ${columns} FROM customer_captures WHERE id=? AND account_id=?`)
+      .get(c.req.param("id"), current.account.id) as RelatedMetadata | null;
+    if (!capture) fail(404, "not_found", "Capture not found.");
+    // Accounts are capped at MAX_CAPTURES. Read only matching metadata, then
+    // retrieve at most six card excerpts; never load the library's full articles.
+    const metadata = db.query(`SELECT ${columns}
+      FROM customer_captures WHERE account_id=? ORDER BY captured_at DESC,id DESC LIMIT ?`)
+      .all(current.account.id, MAX_CAPTURES) as RelatedMetadata[];
+    const matches = relatedCaptures(capture, metadata);
+    const read = db.query(`SELECT ${CARD_COLUMNS} FROM customer_captures WHERE id=? AND account_id=?`);
+    return c.json({ items: matches.map(match => ({ capture: { ...customerCaptureDto(read.get(match.id, current.account.id) as CustomerCaptureRow), contentView: "card" }, reasons: match.reasons })) });
+  });
   app.get("/mobile/captures/:id", (c) => {
     const current = auth(c);
     return c.json({ capture: customerCaptureDto(findCapture(c.req.param("id"), current.account.id)) });

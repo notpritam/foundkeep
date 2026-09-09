@@ -68,6 +68,7 @@ export type NativeSession = {
 };
 
 export type CaptureList = { captures: Capture[]; nextCursor: string | null; total: number };
+export type RelatedSave = { capture: Capture; reasons: { kind: 'batch' | 'source' | 'tag' | 'folder'; label: string }[] };
 
 export type Folder = { id: string; name: string; count?: number };
 export type Organization = { folders: Folder[]; tags: { name: string; count: number }[]; suggestedTags: string[]; suggestedFolders: string[] };

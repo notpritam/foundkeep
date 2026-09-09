@@ -11,7 +11,7 @@ import { colors } from '../theme.ts';
 export const captureIcons = { bookmark: 'link-outline', image: 'image-outline', screenshot: 'scan-outline', document: 'document-text-outline', file: 'document-outline', note: 'create-outline', selection: 'text-outline', audio: 'musical-notes-outline', video: 'videocam-outline', tweet: 'chatbubble-outline' } as const;
 export const captureLabels = { bookmark: 'Link', image: 'Image', screenshot: 'Screenshot', document: 'Document', file: 'File', note: 'Note', selection: 'Highlight', audio: 'Audio', video: 'Video', tweet: 'Post' } as const;
 
-export function CapturePreview({ capture, style, contain = false }: { capture: Capture; style?: StyleProp<ViewStyle>; contain?: boolean }) {
+export function CapturePreview({ capture, style, contain = false, compact = false }: { capture: Capture; style?: StyleProp<ViewStyle>; contain?: boolean; compact?: boolean }) {
   const { token, account } = useSession();
   const source = useMemo(() => capturePreviewSource(capture, token, account?.id), [capture, token, account?.id]);
   const key = source?.uri || '';
@@ -30,7 +30,7 @@ export function CapturePreview({ capture, style, contain = false }: { capture: C
     {source && !failed ? <>
       <Animated.Image key={key} source={source} style={[StyleSheet.absoluteFill, { opacity }]} resizeMode={contain ? 'contain' : 'cover'} resizeMethod="resize" onLoad={() => setLoadedKey(key)} onError={() => setFailedKey(key)} accessible={false} />
       {!loaded ? <Shimmer style={StyleSheet.absoluteFill} /> : null}
-    </> : <View style={styles.fallback}><Ionicons name={captureIcons[capture.type]} size={32} color={colors.moss} />{failed ? <Text style={styles.label}>Preview unavailable</Text> : <Text style={styles.label}>{capture.fileMime?.split('/')[1]?.toUpperCase() || captureLabels[capture.type]}</Text>}</View>}
+    </> : <View style={styles.fallback}><Ionicons name={captureIcons[capture.type]} size={compact ? 22 : 32} color={colors.accent} />{compact ? null : <Text style={styles.label}>{failed ? 'Preview unavailable' : capture.fileMime?.split('/')[1]?.toUpperCase() || captureLabels[capture.type]}</Text>}</View>}
   </View>;
 }
-const styles = StyleSheet.create({ preview: { backgroundColor: colors.paleMoss, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', aspectRatio: 1.25 }, fallback: { padding: 12, gap: 10, alignItems: 'center' }, label: { color: colors.muted, fontSize: 12, textAlign: 'center' } });
+const styles = StyleSheet.create({ preview: { backgroundColor: colors.accentSoft, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', aspectRatio: 1.25 }, fallback: { padding: 12, gap: 10, alignItems: 'center' }, label: { color: colors.muted, fontSize: 12, textAlign: 'center' } });

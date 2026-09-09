@@ -62,6 +62,7 @@ const makeContext = async signedIn => {
       return json({ captures: list, total: list.length, nextCursor: null });
     }
     if (/\/(blob|file)$/.test(url.pathname)) return route.fulfill({ contentType: 'image/webp', body: art });
+    if (url.pathname.endsWith('/related')) return json({ items: url.pathname.includes('/document/') ? [] : [{ capture: captures.find(item => item.id === 'document'), reasons: [{ kind: 'tag', label: 'Shared tag: Inspiration' }] }] });
     if (url.pathname.startsWith('/api/mobile/captures/')) {
       const id = url.pathname.split('/')[4];
       const capture = captures.find(capture => capture.id === id);
@@ -87,7 +88,15 @@ try {
   const header = page.getByTestId('collection-header'); const before = await header.boundingBox(); const list = page.getByTestId('gallery-list');
   await list.evaluate(el => { el.scrollTop = 650; }); await page.waitForTimeout(200);
   assert.ok(await list.evaluate(el => el.scrollTop) > 0); const after = await header.boundingBox(); assert.equal(before.y, after.y); assert.equal(before.height, after.height);
-  await shot(page, '03-sticky-header.png'); await list.evaluate(el => { el.scrollTop = 0; });
+  const controls = page.getByTestId('collection-expanded-controls');
+  assert.equal(await controls.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+  await shot(page, '03-compact-header.png');
+  await list.evaluate(el => { el.scrollTop = 450; }); await page.waitForTimeout(150);
+  assert.notEqual(await controls.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+  await page.getByRole('button', { name: 'Show search and filters' }).click();
+  assert.equal(await page.getByRole('textbox', { name: 'Search saved items' }).evaluate(el => el === document.activeElement), true);
+  await page.getByRole('textbox', { name: 'Search saved items' }).blur();
+  await list.evaluate(el => { el.scrollTop = 0; });
   await page.getByRole('button', { name: 'Filter by folder or tag' }).click();
   await page.getByRole('button', { name: 'Reading', exact: true }).click();
   await page.getByRole('button', { name: 'Done', exact: true }).click(); await page.waitForTimeout(1000);
@@ -95,6 +104,16 @@ try {
   await page.getByRole('button', { name: /Open Link A field guide/ }).click();
   await page.getByText('Original source', { exact: true }).waitFor();
   assert.ok((await page.getByText('A saved article.', { exact: false }).textContent()).length > 64000);
+  const related = page.getByRole('button', { name: /^Open related save Autumn research brief/ });
+  await related.waitFor();
+  await page.getByRole('button', { name: 'Show source details' }).click();
+  await page.getByText('https://example.com/field-guide', { exact: true }).waitFor();
+  const editAction = page.getByRole('button', { name: 'Edit and organize' });
+  const editBox = await editAction.boundingBox(); assert.ok(editBox.width <= 48 && editBox.height >= 44);
+  const sourceBox = await page.getByRole('button', { name: 'Open original source' }).boundingBox(); assert.ok(sourceBox.width <= 48 && sourceBox.height >= 44);
+  await related.click(); await page.waitForURL('**/capture/document'); await page.getByRole('button', { name: 'Open or share file' }).waitFor();
+  await shot(page, '08-compact-detail.png');
+  await page.goto(base + '/capture/bookmark');
   await page.getByRole('button', { name: 'Edit and organize' }).click();
   await page.getByRole('textbox', { name: 'Title', exact: true }).waitFor(); await page.waitForFunction(() => document.querySelector('[aria-label="Title"]')?.value === 'A field guide to small details'); await page.getByRole('textbox', { name: 'Title', exact: true }).fill('A better title');
   await page.getByRole('button', { name: 'Save changes' }).click();
@@ -117,5 +136,5 @@ try {
   await shot(login, '06-sign-in.png');
   assert.ok((await login.getByText('By continuing,', { exact: false }).textContent()).includes('Terms and Privacy Policy'));
   await login.goto(base); await login.getByText('Found it?', { exact: false }).waitFor(); await ready(login); await shot(login, '07-welcome.png'); await signedOut.close();
-  console.log('Gallery checks passed: shimmer, sticky header, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy. Synthetic fixtures; native checks separate.');
+  console.log('Gallery checks passed: shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy. Synthetic fixtures; native checks separate.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

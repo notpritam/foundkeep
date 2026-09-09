@@ -1,4 +1,4 @@
-import type { Account, Capture, CaptureList, Folder, Organization, NativeSession, Usage } from './types.ts';
+import type { Account, Capture, CaptureList, Folder, Organization, NativeSession, Usage, RelatedSave } from './types.ts';
 import type { OAuthIntent, OAuthProvider } from '../auth-oauth.ts';
 
 const API_ORIGIN = 'https://foundkeep.app';
@@ -138,6 +138,7 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
       return json<{ capture: Capture; duplicate: boolean }>('/api/captures', { method: 'POST', body: { ...value, type: 'note' } });
     },
     getCapture: (id: string, options: ReadOptions = {}) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { cacheMs: 20_000, ...options }),
+    relatedCaptures: (id: string, options: ReadOptions = {}) => json<{ items: RelatedSave[] }>(`/api/mobile/captures/${encodeURIComponent(id)}/related`, { cacheMs: 10_000, ...options }),
     updateCapture: (id: string, value: { sourceTitle: string | null; noteText: string | null; expectedUpdatedAt: number; folderId?: string | null; userTags?: string[] }) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { method: 'PUT', body: value }),
     deleteCapture: (id: string) => json<{ ok: true }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     organization: (options: ReadOptions = {}) => json<Organization>('/api/mobile/organization', { cacheMs: 30_000, ...options }),

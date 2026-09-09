@@ -9,7 +9,7 @@ export function Screen({ children, keyboard = false, top = true }: { children: R
 }
 
 export function Mark({ size = 38 }: { size?: number }) {
-  return <Image source={require('../../assets/images/mark.png')} accessible={false} style={{ width: size, height: size }} />;
+  return <Image source={require('../../assets/images/mark.png')} accessible={false} style={{ width: size, height: size, borderRadius: size * .22 }} />;
 }
 
 export function Brand({ compact = false }: { compact?: boolean }) {
@@ -50,6 +50,6 @@ const styles = StyleSheet.create({
   field: { gap: 7 },
   input: { minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: 10, backgroundColor: colors.surface, paddingHorizontal: 14, color: colors.ink, fontSize: 17 },
   multiline: { minHeight: 130, paddingTop: 14, textAlignVertical: 'top' },
-  message: { padding: 12, borderRadius: 8, backgroundColor: colors.paleMoss },
+  message: { padding: 12, borderRadius: 8, backgroundColor: colors.accentSoft },
   messageError: { backgroundColor: colors.errorSurface },
 });

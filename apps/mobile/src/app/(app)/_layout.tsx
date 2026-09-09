@@ -8,9 +8,9 @@ export const unstable_settings = { initialRouteName: '(tabs)' };
 export default function AppLayout() {
   const { ready, account } = useSession();
   const motion = useMotionAllowed();
-  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.moss} /></View>;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.accent} /></View>;
   if (!account) return <Redirect href="/(auth)/sign-in" />;
-  return <Stack screenOptions={{ headerStyle: { backgroundColor: colors.paper }, headerTintColor: colors.ink, headerShadowVisible: false, contentStyle: { backgroundColor: colors.paper }, animation: motion ? 'default' : 'fade', headerBackButtonDisplayMode: 'minimal' }}>
+  return <Stack screenOptions={{ headerStyle: { backgroundColor: colors.paper }, headerTintColor: colors.accent, headerTitleStyle: { color: colors.ink, fontSize: 17, fontWeight: '600' }, headerShadowVisible: false, contentStyle: { backgroundColor: colors.paper }, animation: motion ? 'default' : 'fade', headerBackButtonDisplayMode: 'minimal' }}>
     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     <Stack.Screen name="capture/[id]" options={{ title: 'Saved item' }} />
     <Stack.Screen name="batch/[id]" options={{ title: 'Saved together' }} />

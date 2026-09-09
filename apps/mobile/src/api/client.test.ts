@@ -2,6 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createFoundkeepClient, FoundkeepApiError } from './client.ts';
 
+test('related-save requests stay private, coalesce, and refresh after edits or account changes', async () => {
+  let token = 'first', reads = 0;
+  const client = createFoundkeepClient({ getToken: async () => token, fetcher: async (input, init) => {
+    assert.equal(new URL(String(input)).origin, 'https://foundkeep.app');
+    assert.equal(new Headers(init?.headers).get('authorization'), `Bearer ${token}`);
+    if (init?.method === 'PUT') return Response.json({ capture: { id: 'one' } });
+    assert.equal(new URL(String(input)).pathname, '/api/mobile/captures/one/related');
+    reads++; return Response.json({ items: [] });
+  } });
+  await Promise.all([client.relatedCaptures('one'), client.relatedCaptures('one')]);
+  await client.relatedCaptures('one'); assert.equal(reads, 1);
+  await client.updateCapture('one', { sourceTitle: null, noteText: null, expectedUpdatedAt: 1, userTags: ['New'] });
+  await client.relatedCaptures('one'); assert.equal(reads, 2);
+  token = 'second'; await client.relatedCaptures('one'); assert.equal(reads, 3);
+});
+
 test('long saved articles are decoded completely in collection and detail responses', async () => {
   const articleText = 'A saved paragraph with accents — café. '.repeat(5000);
   const capture = { id: 'long-article', type: 'bookmark', articleText, updatedAt: 123 };

@@ -42,7 +42,7 @@ export function GallerySkeleton({ columns, viewportHeight }: { columns: number; 
   </View>;
 }
 const styles = StyleSheet.create({
-  base: { overflow: 'hidden', backgroundColor: colors.paleMoss }, sweep: { position: 'absolute', top: 0, bottom: 0, left: 0, flexDirection: 'row' },
+  base: { overflow: 'hidden', backgroundColor: colors.accentSoft }, sweep: { position: 'absolute', top: 0, bottom: 0, left: 0, flexDirection: 'row' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
   card: { borderRadius: 12, backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1 },
   copy: { padding: 14, gap: 12 }, line: { height: 14, width: '90%', borderRadius: 3, backgroundColor: colors.line },

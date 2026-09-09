@@ -19,7 +19,7 @@ export const GalleryCard = memo(function GalleryCard({ capture, onOpen }: { capt
       <View style={styles.source}><Ionicons name={captureIcons[capture.type]} size={13} color={colors.muted} /><Text style={styles.sourceText} numberOfLines={1}>{source}</Text></View>
       <Text style={styles.title} numberOfLines={4}>{captureTitle(capture)}</Text>
       {written && excerpt && excerpt !== captureTitle(capture) ? <Text style={styles.excerpt} numberOfLines={6}>{excerpt}</Text> : null}
-      {capture.folder ? <View style={styles.state}><Ionicons name="folder-outline" size={12} color={colors.moss} /><Text style={styles.sourceText} numberOfLines={1}>{capture.folder.name}</Text></View> : null}
+      {capture.folder ? <View style={styles.state}><Ionicons name="folder-outline" size={12} color={colors.accent} /><Text style={styles.sourceText} numberOfLines={1}>{capture.folder.name}</Text></View> : null}
       {capture.userTags?.length ? <Text style={styles.sourceText} numberOfLines={2}>{capture.userTags.slice(0, 2).map(tag => `#${tag}`).join('  ')}{capture.userTags.length > 2 ? ` +${capture.userTags.length - 2}` : ''}</Text> : null}
       {capture.batchId ? <View style={styles.state}><Ionicons name="layers-outline" size={12} color={colors.muted} /><Text style={styles.sourceText}>Saved together</Text></View> : null}
       {pending ? <View style={styles.state}><Ionicons name="time-outline" size={12} color={colors.pending} /><Text style={[styles.stateText, { color: colors.pending }]}>Preparing details</Text></View> : capture.status === 'failed' ? <Text style={styles.stateText}>Saved · details unavailable</Text> : null}
