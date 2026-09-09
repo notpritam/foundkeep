@@ -77,8 +77,13 @@ test("capture demo saves and resets without requiring an account", async (t) => 
 });
 test("installation offers the public Store release and a working manual package", async (t) => {
   const page = await pageFor(t);
-  const storeHref = await page.locator("[data-extension-install]").getAttribute("href");
-  assert.equal(storeHref, "https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk");
+  const storeHref = await page
+    .locator("[data-extension-install]")
+    .getAttribute("href");
+  assert.equal(
+    storeHref,
+    "https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk",
+  );
   const href = await page.locator("a[download]").first().getAttribute("href");
   const response = await page.request.get(new URL(href, base + "/").href);
   assert.equal(response.status(), 200);
@@ -142,18 +147,15 @@ test("search and sharing metadata resolve to the production site and a real imag
   assert.match(response.headers()["content-type"], /image\/(png|jpeg)/);
   const robots = await page.request.get(base + "/robots.txt");
   assert.equal(robots.status(), 200);
-  assert.match(
-    await robots.text(),
-    /https:\/\/foundkeep.app\/sitemap.xml/,
-  );
+  assert.match(await robots.text(), /https:\/\/foundkeep.app\/sitemap.xml/);
   const sitemap = await page.request.get(base + "/sitemap.xml");
   assert.equal(sitemap.status(), 200);
-  await page.locator('a[href="privacy.html"]').first().click();
+  await page.locator('.site-footer a[href="privacy.html"]').click();
   assert.match(await page.title(), /Privacy/);
 });
 test("customer copy explains readable bookmarks, source records, controls and iPhone support", async (t) => {
   const page = await pageFor(t);
-  const copy = await page.locator('body').textContent();
+  const copy = await page.locator("body").textContent();
   assert.match(copy, /readable copy/i);
   assert.match(copy, /original source/i);
   assert.match(copy, /capture settings/i);
@@ -161,13 +163,43 @@ test("customer copy explains readable bookmarks, source records, controls and iP
   assert.match(copy, /iPhone/i);
 });
 
+test("mobile navigation opens, closes on Escape and follows section links", async (t) => {
+  const page = await pageFor(t, 390);
+  const toggle = page.getByRole("button", { name: "Open navigation" });
+  await toggle.click();
+  assert.equal(await page.locator("#mobile-nav").isVisible(), true);
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#mobile-nav").isVisible(), false);
+  assert.equal(
+    await page
+      .locator(".menu-toggle")
+      .evaluate((button) => button === document.activeElement),
+    true,
+  );
+  await toggle.click();
+  await page.locator('#mobile-nav a[href="#library"]').click();
+  assert.equal(new URL(page.url()).hash, "#library");
+  assert.equal(await page.locator("#mobile-nav").isVisible(), false);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  assert.equal(await page.locator(".menu-toggle").isVisible(), false);
+});
+
 test("mobile handoff page creates only allowlisted Foundkeep links", async (t) => {
   const page = await pageFor(t);
   await page.goto(base + "/open.html?path=settings");
-  assert.equal(await page.locator("#open-app").getAttribute("href"), "foundkeep://settings");
+  assert.equal(
+    await page.locator("#open-app").getAttribute("href"),
+    "foundkeep://settings",
+  );
   await page.goto(base + "/open.html?path=https%3A%2F%2Fevil.example");
-  assert.equal(await page.locator("#open-app").getAttribute("href"), "foundkeep://collection");
-  assert.match(await page.locator(".open-private").textContent(), /never includes your password/i);
+  assert.equal(
+    await page.locator("#open-app").getAttribute("href"),
+    "foundkeep://collection",
+  );
+  assert.match(
+    await page.locator(".open-private").textContent(),
+    /never includes your password/i,
+  );
 });
 
 test("privacy policy discloses capture data and Chrome Web Store Limited Use", async (t) => {
@@ -196,9 +228,11 @@ test("customer support is hosted on Foundkeep and covers the full capture path",
   assert.match(copy, /recovery code/i);
   assert.match(copy, /version 1\.0\.0/i);
   assert.match(copy, /notpritamsharma@gmail\.com/i);
-  assert.equal(await page.locator('a[href="terms.html"]').count() > 0, true);
+  assert.equal((await page.locator('a[href="terms.html"]').count()) > 0, true);
   assert.equal(
-    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
     true,
   );
 });
@@ -215,7 +249,9 @@ test("terms state customer content rights and expose a real support contact", as
   assert.match(copy, /have permission/i);
   assert.match(copy, /notpritamsharma@gmail\.com/i);
   assert.equal(
-    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
     true,
   );
 });
@@ -227,12 +263,14 @@ test("landing page presents Foundkeep and its branded extension download", async
   assert.match(copy, /Foundkeep/);
   assert.doesNotMatch(copy, /\bAtlas\b/);
   assert.equal(
-    await page.locator('a[download="foundkeep-extension.zip"]').getAttribute("href"),
+    await page
+      .locator('a[download="foundkeep-extension.zip"]')
+      .getAttribute("href"),
     "foundkeep-extension.zip?build=1.6.1",
   );
   assert.equal(
     await page.locator('meta[property="og:image"]').getAttribute("content"),
-    "https://foundkeep.app/assets/foundkeep-social.png",
+    "https://foundkeep.app/assets/foundkeep-scenic-social.png",
   );
 });
 
@@ -241,6 +279,9 @@ test("legacy website redirects while extension compatibility routes stay live", 
   assert.match(caddy, /foundkeep\.app\s*\{[^}]*reverse_proxy localhost:8790/s);
   assert.match(caddy, /atlas\.notpritam\.in\s*\{/);
   assert.match(caddy, /@extension_compat path .*\/api\/\*/);
-  assert.match(caddy, /handle @extension_compat\s*\{\s*reverse_proxy localhost:8790/s);
+  assert.match(
+    caddy,
+    /handle @extension_compat\s*\{\s*reverse_proxy localhost:8790/s,
+  );
   assert.match(caddy, /redir https:\/\/foundkeep\.app\{uri\} permanent/);
 });

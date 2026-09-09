@@ -1,0 +1,20 @@
+[
+  {
+    "label": "desktop",
+    "width": 1440,
+    "height": 1000,
+    "pageHeight": 5974,
+    "overflow": false,
+    "brokenImages": [],
+    "errors": []
+  },
+  {
+    "label": "mobile",
+    "width": 390,
+    "height": 844,
+    "pageHeight": 7801,
+    "overflow": false,
+    "brokenImages": [],
+    "errors": []
+  }
+]

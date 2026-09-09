@@ -1,0 +1,22 @@
+[
+  {
+    "viewport": "desktop",
+    "selector": ".hero-copy h1",
+    "minimumContrast": 4.57
+  },
+  {
+    "viewport": "desktop",
+    "selector": ".hero-copy>p",
+    "minimumContrast": 4.98
+  },
+  {
+    "viewport": "mobile",
+    "selector": ".hero-copy h1",
+    "minimumContrast": 4.4
+  },
+  {
+    "viewport": "mobile",
+    "selector": ".hero-copy>p",
+    "minimumContrast": 4.65
+  }
+]
