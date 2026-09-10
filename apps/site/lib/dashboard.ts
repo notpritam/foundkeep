@@ -18,7 +18,7 @@ export function dashboardHref(state: DashboardState) {
   return `/dashboard${params.size ? `?${params}` : ''}`;
 }
 export function capturesPath(state: Pick<DashboardState, 'q' | 'type'>, cursor?: string) {
-  const params = new URLSearchParams({ limit: '60' });
+  const params = new URLSearchParams({ limit: '60', sort: 'recent', view: 'cards' });
   if (state.q) params.set('q', state.q);
   if (state.type) params.set('type', state.type);
   if (cursor) params.set('cursor', cursor);
@@ -34,6 +34,7 @@ export interface Provenance {
 export interface Capture {
   id: string; type: string; sourceTitle?: string; sourceUrl?: string; blobUrl?: string; fileUrl?: string;
   previewUrl?: string; width?: number; height?: number; fileName?: string; fileMime?: string; fileBytes?: number; selectionText?: string; noteText?: string; summary?: string; articleText?: string; ocrText?: string;
+  createdAt?: number | string; savedVia?: 'iphone' | 'browser' | 'dashboard' | null;
   capturedAt: number | string; status: string; category?: string; tags?: string[]; provenance?: Provenance; enrichError?: string;
 }
 export interface CapturePage { captures: Capture[]; nextCursor: string | null; total: number }

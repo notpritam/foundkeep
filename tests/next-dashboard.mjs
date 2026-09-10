@@ -84,7 +84,7 @@ try {
   record('Dashboard fits desktop, phone and narrow phone widths');
   await page.setViewportSize({ width: 1440, height: 1600 });
   let previewActive = 0, previewMaximum = 0, previewCompleted = 0;
-  const remoteCards = Array.from({ length: 8 }, (_, index) => ({ id: `queued-preview-${index}`, type: 'bookmark', sourceTitle: `Queued preview ${index + 1}`, previewUrl: `/api/captures/queued-preview-${index}/preview`, capturedAt: Date.now(), status: 'done' }));
+  const remoteCards = Array.from({ length: 8 }, (_, index) => ({ id: `queued-preview-${index}`, type: 'bookmark', sourceTitle: `Queued preview ${index + 1}`, summary: 'A saved reference. '.repeat(index % 3 * 6), width: 640, height: [320, 640, 900][index % 3], previewUrl: `/api/captures/queued-preview-${index}/preview`, capturedAt: Date.now(), status: 'done' }));
   await page.route('**/api/captures?**', async route => { if (new URL(route.request().url()).searchParams.get('q') === 'preview-queue') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ captures: remoteCards, nextCursor: null, total: remoteCards.length }) }); await route.continue(); });
   await page.route('**/api/captures/queued-preview-*/preview', async route => {
     previewActive++; previewMaximum = Math.max(previewMaximum, previewActive);
@@ -97,9 +97,32 @@ try {
   await page.locator('.capture-card').last().scrollIntoViewIfNeeded();
   await page.waitForFunction(() => document.querySelectorAll('.capture-preview-shell img').length === 8 && [...document.querySelectorAll('.capture-preview-shell img')].every(image => image.complete && image.naturalWidth));
   assert.equal(previewCompleted, 8); assert.ok(previewMaximum <= 2, `Remote preview concurrency reached ${previewMaximum}`);
+  const packed = await page.locator('#capture-grid > [data-capture-id]').evaluateAll(nodes => nodes.map(node => { const box = node.getBoundingClientRect(); return { x: box.x, y: box.y, height: box.height }; }));
+  assert.ok(new Set(packed.map(item => item.height)).size > 2);
+  for (const [index, item] of packed.entries()) {
+    const next = packed.slice(index + 1).find(later => Math.abs(item.x - later.x) < 1);
+    if (next) assert.ok(Math.abs(next.y - item.y - item.height - 18) < 1, 'cards pack immediately below their column neighbor');
+  }
+  await page.screenshot({ path: path.join(evidence, 'flowing-gallery.png'), fullPage: true });
+
   await page.unroute('**/api/captures?**'); await page.unroute('**/api/captures/queued-preview-*/preview');
   await page.locator('#search').fill(''); await page.locator('.capture-note').waitFor();
   record(`Eight delayed previews load through the bounded queue (maximum ${previewMaximum} concurrent)`);
+  const mobileLogin = await context.request.post(base + '/api/mobile/login', { data: { email: account.email, password: cleanupPassword, deviceName: 'iPhone QA' } });
+  assert.equal(mobileLogin.status(), 200, await mobileLogin.text());
+  const mobileToken = (await mobileLogin.json()).token;
+  const latest = await context.request.post(base + '/api/captures', { headers: { Authorization: `Bearer ${mobileToken}` }, data: { clientId: crypto.randomUUID(), type: 'bookmark', sourceTitle: 'Latest arrival from iPhone', sourceUrl: 'https://youtube.com/watch?v=qa', capturedAt: 1, processingOptions: { ocr: false, summaries: false, tags: false } } });
+  assert.equal(latest.status(), 201, await latest.text());
+  await page.getByRole('button', { name: 'Open Bookmark: Latest arrival from iPhone' }).waitFor({ timeout: 22000 });
+  assert.match(await page.locator('.capture-card').first().innerText(), /Latest arrival from iPhone/);
+  assert.match(await page.locator('.capture-card').first().innerText(), /YouTube/);
+  assert.match(await page.locator('.capture-card').first().innerText(), /iPhone/);
+  await page.waitForTimeout(300);
+  const geometry = await page.locator('#capture-grid > [data-capture-id]').evaluateAll(nodes => nodes.map(node => { const box = node.getBoundingClientRect(); return { x: box.x, y: box.y, height: box.height }; }));
+  for (const [index, item] of geometry.entries()) for (const later of geometry.slice(index + 1)) if (Math.abs(item.x - later.x) < 1) assert.ok(later.y >= item.y + item.height + 17, 'web masonry preserves the 18px gutter');
+  await page.screenshot({ path: path.join(evidence, 'recent-masonry.png'), fullPage: true });
+  record('Newest cross-device save appears automatically with platform and saving-device labels');
+
   await page.setViewportSize({ width: 390, height: 1000 }); await page.locator('.capture-note .capture-open').click(); await page.waitForURL('**/dashboard/saved/**');
   assert.equal(await page.locator('.capture-reading-view').count(), 1); await page.screenshot({ path: path.join(evidence, 'reading-mobile.png'), fullPage: true }); record('Phone card opens the dedicated reading page');
   const dependent = requests.filter(request => !request.url().endsWith('/api/auth/providers') && !/\/(blob|file|preview)$/.test(new URL(request.url()).pathname));
