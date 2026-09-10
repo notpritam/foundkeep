@@ -92,7 +92,10 @@ try {
   await page.getByTestId('masonry-gallery').waitFor();
   const geometry = await page.locator('[data-testid^="gallery-cell-"]').evaluateAll(nodes => nodes.map(node => { const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; }));
   assert.ok(new Set(geometry.map(item => Math.round(item.height))).size > 1, 'cards use their own content height');
-  for (const [index, item] of geometry.entries()) for (const later of geometry.slice(index + 1)) if (Math.abs(item.x - later.x) < 1) assert.ok(later.y >= item.y + item.height + 11, 'masonry cards keep a 12px gap without overlaps');
+  for (const x of new Set(geometry.map(item => item.x))) {
+    const column = geometry.filter(item => Math.abs(item.x - x) < 1).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < column.length; i++) assert.ok(Math.abs(column[i].y - column[i - 1].y - column[i - 1].height - 12) <= 1, 'each consecutive card sits 12px below the previous card, without row-height holes');
+  }
 
   const dock = page.getByTestId('floating-dock');
   const galleryTab = page.getByRole('tab', { name: 'Gallery', exact: true });
@@ -247,5 +250,23 @@ try {
   await login.getByText(/Browser extension · Just now/).waitFor();
   await shot(login, '19-recent-masonry.png');
   await signedOut.close();
+  // Regression: the reported short/tall X bookmark pair must pack independently.
+  captures.splice(0, captures.length, ...['Just testing', 'Agentic AI Improvements Workflow', 'Make a video on it, launching', 'Launch video'].map((sourceTitle, index) => ({
+    ...baseCapture, id: `gap-${index}`, type: 'bookmark', sourceTitle, sourceUrl: 'https://x.com/example/status/1', capturedAt: now - index, createdAt: now - index,
+    savedVia: 'iphone', batchId: 'gap-report', ...(index === 1 ? { folder: { id: 'inspiration', name: 'Inspiration' }, userTags: ['craft'] } : {}),
+  })));
+  const gapContext = await makeContext(true); const gapPage = await gapContext.newPage();
+  await gapPage.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await gapPage.goto(base + '/collection');
+  await gapPage.getByRole('button', { name: 'Open Link Just testing', exact: true }).waitFor(); await ready(gapPage);
+  const cells = await gapPage.locator('[data-testid^="gallery-cell-"]').evaluateAll(nodes => nodes.map(node => { const box = node.getBoundingClientRect(); return { id: node.dataset.testid, x: box.x, y: box.y, bottom: box.bottom, height: box.height }; }));
+  const short = cells.find(cell => cell.id === 'gallery-cell-gap-0'); const tall = cells.find(cell => cell.id === 'gallery-cell-gap-1'); const next = cells.find(cell => cell.id === 'gallery-cell-gap-2');
+  assert.ok(tall.height > short.height + 40, 'fixture reproduces the unequal card heights');
+  assert.equal(next.x, short.x);
+  assert.ok(Math.abs(next.y - short.bottom - 12) <= 1, 'next left card follows the short card immediately');
+  assert.ok(next.y < tall.bottom, 'next left card starts before the taller right card finishes');
+  await shot(gapPage, '20-reported-card-gap-fixed.png');
+  console.log('Reported card-gap check passed:', JSON.stringify({ shortHeight: short.height, tallHeight: tall.height, leftGap: next.y - short.bottom }));
+  await gapContext.close();
   console.log('Gallery checks passed: floating dock navigation, narrow layout, footer clearance, quick-add, shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy, onboarding, live reduced-transparency and increased-contrast fallbacks, dark palette. Synthetic fixtures; native checks separate.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

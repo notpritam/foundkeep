@@ -36,3 +36,11 @@ Evidence: `.impeccable/review/masonry-web/`, `.impeccable/review/masonry-native/
 - Production serves the exact update for build 15's runtime. Its 2,207,044-byte launch bundle was downloaded and matched the manifest SHA-256 hash.
 - Open Foundkeep to download the update, then fully close and reopen it to apply. Version remains **1.0.0**.
 - The temporary native QA account and all 61 saves were deleted; its session returned 401 afterward. Temporary credential files and matching Maestro logs were removed.
+
+## Reported unequal-height bookmark gap
+
+The subsequent phone screenshot still showed the previous `Good things, kept close.` subtitle, raw `x.com` label, no saving-channel/date label, and aligned second-row cards. The published masonry update was reverified through the production manifest and launch-bundle checksum.
+
+The exact short/tall bookmark arrangement was recreated in dark mode with synthetic data. On the current compiled Expo UI, the short card measured 219.56 px and the tall card 305.56 px; the next left card started 12.44 px below the short card, before the tall card ended. The regression now checks both minimum and maximum spacing between consecutive cards in a column, so row-height holes cannot pass by merely avoiding overlap. Preview: `.impeccable/review/gallery/20-reported-card-gap-fixed.png`.
+
+An already-running older app needs a cold launch to download its update, then another cold launch to apply it. The new gallery subtitle is `Recently saved · newest first`.
