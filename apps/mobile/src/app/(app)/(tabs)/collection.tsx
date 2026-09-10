@@ -22,6 +22,7 @@ const filters: Array<{ type?: CaptureType; label: string }> = [
 export default function CollectionScreen() {
   const { policy, updateRequired } = useSession();
   const [query, setQuery] = useState('');
+  const [listReset, setListReset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [type, setType] = useState<CaptureType>();
   const [organization, setOrganization] = useState<OrganizationChoice>({ folderId: undefined, userTags: [] });
@@ -65,19 +66,19 @@ export default function CollectionScreen() {
       </View>
     </View>
     <View style={styles.galleryRegion}>
-      <GalleryList collection={collection} headerSpace={headerHeight} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
+      <GalleryList resetKey={listReset} collection={collection} headerSpace={headerHeight} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
       <Animated.View testID="collection-expanded-controls" pointerEvents={compact ? 'none' : 'auto'} accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[styles.header, { transform: [{ translateY: Animated.multiply(travel, -1) }] }]} onLayout={event => {
         const next = Math.ceil(event.nativeEvent.layout.height);
         if (next === measuredHeight.current) return;
         measuredHeight.current = next; setHeaderHeight(next); travel.setValue(chrome.resize(next));
       }}>
         <View style={styles.controls}>
-        {height > 550 && fontScale < 1.8 ? <View style={styles.heading}><Text style={styles.title}>The collection.</Text><Text style={styles.subtitle}>Good things, kept close.</Text></View> : null}
+        {height > 550 && fontScale < 1.8 ? <View style={styles.heading}><Text style={styles.title}>The collection.</Text><Text style={styles.subtitle}>Recently saved · newest first</Text></View> : null}
         {updateRequired ? <Message error>Update Foundkeep in the App Store to keep saving.</Message> : <Message>{policy.notice}</Message>}
         <View style={styles.search}><Ionicons name="search-outline" size={19} color={colors.muted} /><TextInput ref={searchRef} testID="collection-search" value={query} onChangeText={setQuery} onFocus={() => { searchingRef.current = true; chrome.reveal(); travel.setValue(0); syncCompact(false); }} onBlur={() => { searchingRef.current = false; }} maxLength={200} accessibilityLabel="Search saved items" placeholder="Search your collection" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" /></View>
         <View style={styles.filterRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
-          {filters.map(filter => <Pressable key={filter.label} accessibilityRole="button" accessibilityState={{ selected: type === filter.type }} onPress={() => setType(filter.type)} style={({ pressed }) => [styles.filter, type === filter.type && styles.filterActive, pressed && styles.pressed]}><Text style={[styles.filterText, type === filter.type && styles.filterTextActive]}>{filter.label}</Text></Pressable>)}
+          {filters.map(filter => <Pressable key={filter.label} accessibilityRole="button" accessibilityState={{ selected: type === filter.type }} onPress={() => { setType(filter.type); setListReset(value => value + 1); if (!filter.type) { setQuery(''); setSearchQuery(''); setOrganization({ folderId: undefined, userTags: [] }); void collection.refresh(); } chrome.reveal(); syncCompact(false); travel.setValue(0); }} style={({ pressed }) => [styles.filter, type === filter.type && styles.filterActive, pressed && styles.pressed]}><Text style={[styles.filterText, type === filter.type && styles.filterTextActive]}>{filter.label}</Text></Pressable>)}
         </ScrollView>
         <OrganizationPicker value={organization} onChange={setOrganization} filter compact />
         </View>

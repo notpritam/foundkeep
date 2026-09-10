@@ -89,6 +89,11 @@ try {
   await page.getByRole('progressbar', { name: 'Loading your collection' }).waitFor();
   await shot(page, '01-shimmer.png');
   await page.getByRole('button', { name: /Open Link A field guide/ }).waitFor(); await ready(page);
+  await page.getByTestId('masonry-gallery').waitFor();
+  const geometry = await page.locator('[data-testid^="gallery-cell-"]').evaluateAll(nodes => nodes.map(node => { const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; }));
+  assert.ok(new Set(geometry.map(item => Math.round(item.height))).size > 1, 'cards use their own content height');
+  for (const [index, item] of geometry.entries()) for (const later of geometry.slice(index + 1)) if (Math.abs(item.x - later.x) < 1) assert.ok(later.y >= item.y + item.height + 11, 'masonry cards keep a 12px gap without overlaps');
+
   const dock = page.getByTestId('floating-dock');
   const galleryTab = page.getByRole('tab', { name: 'Gallery', exact: true });
   assert.equal(await galleryTab.getAttribute('aria-selected'), 'true');
@@ -235,6 +240,12 @@ try {
   await login.getByRole('textbox', { name: 'Password', exact: true }).fill('fixture long password');
   await login.getByRole('button', { name: 'Sign in', exact: true }).click();
   await login.waitForURL('**/collection'); await login.getByTestId('collection-header').waitFor();
+  captures.unshift({ ...baseCapture, id: 'latest-arrival', type: 'bookmark', sourceTitle: 'Newest save from another device', sourceUrl: 'https://youtube.com/watch?v=latest', savedVia: 'browser', capturedAt: 1, createdAt: Date.now() });
+  await login.getByRole('button', { name: /Open Link Newest save from another device/ }).waitFor({ timeout: 22000 });
+  assert.equal(await login.locator('[data-testid^="gallery-cell-"]').first().getAttribute('data-testid'), 'gallery-cell-latest-arrival');
+  await login.getByText('YouTube', { exact: true }).waitFor();
+  await login.getByText(/Browser extension · Just now/).waitFor();
+  await shot(login, '19-recent-masonry.png');
   await signedOut.close();
   console.log('Gallery checks passed: floating dock navigation, narrow layout, footer clearance, quick-add, shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy, onboarding, live reduced-transparency and increased-contrast fallbacks, dark palette. Synthetic fixtures; native checks separate.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

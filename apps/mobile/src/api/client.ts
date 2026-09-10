@@ -125,7 +125,7 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     logout: () => json<{ ok: true }>('/api/mobile/logout', { method: 'POST' }),
     deleteAccount: (proof: string | { reauthToken: string }) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: typeof proof === 'string' ? { password: proof } : proof }),
     listCaptures(filters: { q?: string; type?: string; cursor?: string; batchId?: string; folderId?: string; tag?: string }, options: ReadOptions = {}) {
-      const query = new URLSearchParams({ view: 'cards' });
+      const query = new URLSearchParams({ view: 'cards', sort: 'recent' });
       if (filters.q) query.set('q', filters.q);
       if (filters.type) query.set('type', filters.type);
       if (filters.cursor) query.set('cursor', filters.cursor);

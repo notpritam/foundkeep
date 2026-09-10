@@ -55,6 +55,7 @@ export type Capture = {
   height: number | null;
   capturedAt: number;
   createdAt: number;
+  savedVia?: 'iphone' | 'browser' | 'dashboard' | null;
   updatedAt: number;
   enrichError: string | null;
   provenance: CaptureProvenance | null;

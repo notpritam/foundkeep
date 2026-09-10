@@ -1,3 +1,4 @@
+import { savedVia, savedViaLabels, sourcePlatform } from '../../../../../../packages/shared/src/collection-presentation.ts';
 import { AdaptiveText as Text } from '../../../components/AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -119,7 +120,7 @@ export default function CaptureDetail() {
         {originExpanded ? <View style={{ gap: 16, paddingTop: 20 }}>
           <Row label="Page" value={source} /><Row label="Canonical page" value={capture.provenance?.canonicalUrl} />
           <Row label="Original title" value={capture.provenance?.pageTitle} /><Row label="Publisher" value={capture.provenance?.siteName} />
-          <Row label="Source app" value={capture.provenance?.sourceApplication} /><Row label="Original file" value={capture.provenance?.originalFileName} />
+          <Row label="Platform" value={sourcePlatform(capture)} /><Row label="Saved via" value={savedVia(capture) ? savedViaLabels[savedVia(capture)!] : null} /><Row label="Source app" value={capture.provenance?.sourceApplication} /><Row label="Original file" value={capture.provenance?.originalFileName} />
           <Row label="Declared type" value={capture.provenance?.declaredMime} /><Row label="Original size" value={capture.provenance?.byteSize ? readableBytes(capture.provenance.byteSize) : null} />
           <Row label="Suggested tags" value={capture.tags?.map(tag => `#${tag}`).join('  ')} />
         </View> : null}
