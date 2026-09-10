@@ -16,6 +16,6 @@ export function OAuthButtons({ intent = 'sign-in' }: { intent?: OAuthIntent }) {
     }).catch(() => {}).finally(() => { if (live) setLoaded(true); });
     return () => { live = false; };
   }, [client]);
-  if (!providers.length) return intent === 'delete' && loaded ? <Message error>Identity verification is temporarily unavailable. Try again shortly, or visit foundkeep.app/support.html.</Message> : null;
+  if (!providers.length) return intent === 'delete' && loaded ? <Message error>Identity verification is temporarily unavailable. Try again shortly, or visit foundkeep.app/support.</Message> : null;
   return <View style={{ gap: 10 }}>{providers.map(provider => <Button key={provider} secondary label={`${intent === 'delete' ? 'Verify' : 'Continue'} with ${OAUTH_NAMES[provider]}`} onPress={() => router.push({ pathname: '/oauth/complete', params: { provider, intent } })} />)}</View>;
 }

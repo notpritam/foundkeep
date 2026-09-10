@@ -1,21 +1,35 @@
 import { router } from 'expo-router';
-import { Image, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Brand, Button, LegalFooter, Screen } from '../../components/ui.tsx';
-import { colors, typography } from '../../theme.ts';
+import { GlassSurface } from '../../components/ScenicSurface.tsx';
+import { colors } from '../../theme.ts';
 
 export default function Welcome() {
-  const { width, fontScale } = useWindowDimensions();
-  return <Screen><ScrollView contentContainerStyle={styles.page}><Brand compact />
-    <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.collage, { height: Math.min(width * .62, 260) }]}>
-      <Image source={require('../../../assets/images/welcome-room.webp')} style={styles.photo} resizeMode="cover" />
-      <View style={styles.note}><Text style={styles.noteLabel}>A passing thought</Text><Text style={styles.noteText}>Make room for{`\n`}the good things.</Text><View style={styles.noteLine} /></View>
+  const { fontScale, height } = useWindowDimensions();
+  return <Screen immersive><StatusBar style="light" /><ScrollView contentContainerStyle={styles.page}>
+    <Brand compact inverse />
+    <View style={[styles.hero, { paddingTop: height < 700 ? 24 : 50 }]}>
+      <Text style={[styles.title, { fontSize: fontScale > 1.4 ? 40 : 52 }]}>Found it?{`\n`}Keep it.</Text>
+      <Text style={styles.copy}>Let your mind wander.{`\n`}Keep the things worth finding again.</Text>
     </View>
-    <View style={styles.hero}><Text style={[typography.display, { fontSize: fontScale > 1.4 ? 36 : 46 }]}>Found it?{`\n`}Keep it.</Text><Text style={[typography.body, styles.copy]}>Links, photos, words, and everything in between. One private collection.</Text></View>
-    <View style={styles.actions}><Button label="Create your account" onPress={() => router.push('/(auth)/register')} /><Button label="I already have an account" secondary onPress={() => router.push('/(auth)/sign-in')} /><LegalFooter /></View>
+    <View style={styles.space} />
+    <GlassSurface style={styles.actions}>
+      <View style={styles.intro}><Text style={styles.label}>YOUR OWN LITTLE COLLECTION</Text><Text style={styles.description}>Links, photos, words, and everything in between.</Text></View>
+      <Button label="Create your account" onPress={() => router.push('/(auth)/register')} />
+      <Button label="I already have an account" secondary onPress={() => router.push('/(auth)/sign-in')} />
+      <LegalFooter />
+    </GlassSurface>
   </ScrollView></Screen>;
 }
 const styles = StyleSheet.create({
-  page: { flexGrow: 1, paddingHorizontal: 26, paddingTop: 18, paddingBottom: 28, gap: 28 }, hero: { gap: 16 }, copy: { maxWidth: 350, color: colors.muted }, actions: { gap: 10, marginTop: 'auto' },
-  collage: { marginTop: 8, marginBottom: 0, justifyContent: 'center' }, photo: { width: '63%', height: '91%', borderRadius: 12, transform: [{ rotate: '-6deg' }] },
-  note: { position: 'absolute', right: 0, bottom: 12, width: '49%', padding: 17, gap: 12, backgroundColor: colors.note, borderWidth: 1, borderColor: colors.line, borderRadius: 9, transform: [{ rotate: '7deg' }] }, noteLabel: { fontSize: 11, color: colors.muted }, noteText: { fontSize: 17, lineHeight: 24, color: colors.ink, fontWeight: '500' }, noteLine: { height: 2, width: 35, backgroundColor: colors.accent, marginTop: 8 },
+  page: { flexGrow: 1, paddingHorizontal: 22, paddingTop: 18, paddingBottom: 30, gap: 24 },
+  hero: { gap: 18, paddingHorizontal: 4 },
+  title: { color: '#FFFFFF', lineHeight: 55, fontWeight: '700', letterSpacing: -2.1, textShadowColor: 'rgba(4,40,65,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 16 },
+  copy: { color: '#FFFFFF', fontSize: 17, lineHeight: 25, maxWidth: 310 },
+  space: { flex: 1, minHeight: 36 },
+  actions: { padding: 18, gap: 10, borderRadius: 28 },
+  intro: { gap: 8, paddingBottom: 6 },
+  label: { color: colors.accent, fontSize: 10, lineHeight: 15, letterSpacing: 1.25, fontWeight: '700' },
+  description: { color: colors.ink, fontSize: 17, lineHeight: 24, fontWeight: '500' },
 });

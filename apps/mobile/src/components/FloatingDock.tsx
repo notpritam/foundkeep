@@ -1,12 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { router, Tabs } from 'expo-router';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, Keyboard, Platform, Pressable, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Animated, Keyboard, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '../session/SessionProvider.tsx';
 import { colors } from '../theme.ts';
 import { useMotionAllowed } from './motion.tsx';
+import { GlassSurface } from './ScenicSurface.tsx';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 const DockContext = createContext({ collapsed: false, setCollapsed: (_value: boolean) => {}, bottomSpace: 100, height: 60 });
@@ -23,19 +23,15 @@ export function DockProvider({ children }: { children: ReactNode }) {
 }
 export const useDock = () => useContext(DockContext);
 
-function useDockAccessibility() {
-  const [opaque, setOpaque] = useState(true);
+function useDockScreenReader() {
   const [screenReader, setScreenReader] = useState(false);
   useEffect(() => {
     let live = true;
     void AccessibilityInfo.isScreenReaderEnabled().then(value => { if (live) setScreenReader(value); }).catch(() => {});
     const reader = AccessibilityInfo.addEventListener('screenReaderChanged', setScreenReader);
-    if (Platform.OS !== 'ios') return () => { live = false; reader.remove(); };
-    void AccessibilityInfo.isReduceTransparencyEnabled().then(value => { if (live) setOpaque(value); }).catch(() => {});
-    const transparency = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setOpaque);
-    return () => { live = false; reader.remove(); transparency.remove(); };
+    return () => { live = false; reader.remove(); };
   }, []);
-  return { opaque, screenReader };
+  return screenReader;
 }
 
 /** A floating tab bar: its absolute frame leaves the collection behind the glass. */
@@ -43,14 +39,12 @@ export function FloatingDock({ state, descriptors, navigation, insets }: TabBarP
   const { collapsed, height } = useDock();
   const { width, fontScale } = useWindowDimensions();
   const { policy, updateRequired } = useSession();
-  const { opaque, screenReader } = useDockAccessibility();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const screenReader = useDockScreenReader();
   const motion = useMotionAllowed();
   const [keyboard, setKeyboard] = useState(Keyboard.isVisible());
   const progress = useRef(new Animated.Value(0)).current;
   const stacked = fontScale >= 1.3;
   const compact = collapsed && state.routes[state.index]?.name === 'collection' && !stacked && !screenReader;
-  const glass = Platform.OS === 'ios' && !opaque && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   const expandedWidth = Math.min(120, (width - insets.left - insets.right - 32 - 60 - 10 - 12) / 2);
   const tabWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [expandedWidth, 56] });
   const labelWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [expandedWidth - 44, 0] });
@@ -71,10 +65,8 @@ export function FloatingDock({ state, descriptors, navigation, insets }: TabBarP
   }, [compact, motion, progress]);
 
   if (keyboard) return null;
-  const Surface = glass ? GlassView : View;
-  const materialProps = glass ? { glassEffectStyle: 'regular' as const, colorScheme: scheme } as const : {};
   return <View testID="floating-dock" pointerEvents="box-none" style={[styles.frame, { bottom: Math.max(insets.bottom, 12), left: insets.left + 16, right: insets.right + 16 }]}>
-    <Surface {...materialProps} testID={glass ? 'dock-native-glass' : 'dock-solid-surface'} style={[styles.surface, styles.tabs, { height }, !glass && styles.opaque]}>
+    <GlassSurface testID="dock-material" style={[styles.surface, styles.tabs, { height }]}>
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         const options = descriptors[route.key].options;
@@ -95,24 +87,23 @@ export function FloatingDock({ state, descriptors, navigation, insets }: TabBarP
           </Pressable>
         </Animated.View>;
       })}
-    </Surface>
-    <Surface {...materialProps} style={[styles.surface, styles.addSurface, !glass && styles.opaque]}>
+    </GlassSurface>
+    <GlassSurface interactive style={[styles.surface, styles.addSurface]}>
       <Pressable testID="dock-new-note" accessibilityRole="button" accessibilityLabel="Create a note" accessibilityState={{ disabled: !canWrite }} disabled={!canWrite} onPress={() => router.push('/(app)/new-note')} style={({ pressed }) => [styles.add, pressed && styles.pressed]}>
         <Ionicons accessible={false} name="add" size={28} color={canWrite ? colors.accent : colors.muted} />
       </Pressable>
-    </Surface>
+    </GlassSurface>
   </View>;
 }
 
 const styles = StyleSheet.create({
   frame: { position: 'absolute', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  surface: { borderRadius: 42, borderCurve: 'continuous', shadowColor: '#211A2D', shadowOffset: { width: 0, height: 6 }, shadowOpacity: .13, shadowRadius: 16, elevation: 6 },
-  opaque: { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
+  surface: { borderRadius: 42, borderCurve: 'continuous', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 6 }, shadowOpacity: .13, shadowRadius: 16, elevation: 6 },
   tabs: { flexDirection: 'row', alignItems: 'center', padding: 6 },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 36 },
   stacked: { flexDirection: 'column', gap: 3 },
   selected: { backgroundColor: colors.accentSoft },
-  pressed: { backgroundColor: colors.line },
+  pressed: { backgroundColor: colors.accentSoft },
   label: { fontSize: 13, fontWeight: '600', color: colors.muted, textAlign: 'center' },
   selectedLabel: { color: colors.accent },
   addSurface: { width: 60, height: 60 },

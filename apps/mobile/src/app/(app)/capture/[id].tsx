@@ -7,6 +7,7 @@ import type { Capture } from '../../../api/types.ts';
 import { CapturePreview, captureLabels } from '../../../components/CapturePreview.tsx';
 import { EditCaptureSheet } from '../../../components/EditCaptureSheet.tsx';
 import { RelatedSaves } from '../../../components/RelatedSaves.tsx';
+import { FrostedPanel } from '../../../components/ScenicSurface.tsx';
 import { Shimmer } from '../../../components/Shimmer.tsx';
 import { Button, Message, Screen } from '../../../components/ui.tsx';
 import { capturePreviewSource } from '../../../collection/preview.ts';
@@ -93,18 +94,20 @@ export default function CaptureDetail() {
           {tags.length > 4 ? <Pressable accessibilityRole="button" accessibilityLabel={`Show all ${tags.length} tags`} onPress={() => setEditing(capture)} style={styles.tag}><Text style={styles.tagText}>+{tags.length - 4}</Text></Pressable> : null}
         </View> : null}
       </View>
-      {capturePreviewSource(capture, token, account?.id) ? <CapturePreview capture={capture} contain={capture.type === 'image' || capture.type === 'screenshot'} style={{ borderRadius: 14 }} /> : null}
+      {capturePreviewSource(capture, token, account?.id) ? <CapturePreview capture={capture} contain={capture.type === 'image' || capture.type === 'screenshot'} style={{ borderRadius: 22 }} /> : null}
       {pending.current ? <Message>Saved. Your details are being prepared.</Message> : capture.status === 'failed' ? <Message>Saved safely. Some details could not be prepared.</Message> : null}
       {capture.fileName ? <Pressable accessibilityRole="button" accessibilityLabel={opening ? 'Preparing file' : 'Open or share file'} disabled={opening} onPress={() => void openFile()} style={({ pressed }) => [styles.file, pressed && styles.pressed]}>
         <Ionicons name={capture.type === 'audio' ? 'musical-notes-outline' : capture.type === 'video' ? 'videocam-outline' : 'document-outline'} size={24} color={colors.accent} />
         <View style={{ flex: 1, gap: 4 }}><Text style={styles.fileName}>{capture.fileName}</Text><Text style={typography.small}>{capture.fileMime || 'File'} · {readableBytes(capture.fileBytes)}</Text></View>
         {opening ? <ActivityIndicator color={colors.accent} /> : <Ionicons name="share-outline" size={20} color={colors.accent} />}
       </Pressable> : null}
+      {capture.selectionText || capture.noteText || capture.summary || capture.articleText ? <FrostedPanel style={styles.reading}>
       <Row label="Highlight" value={capture.selectionText} />
       <Row label="Note" value={capture.noteText} />
       <Row label="Summary" value={capture.summary} />
       <Row label="Saved text" value={capture.articleText} />
-      <View style={styles.origin}>
+      </FrostedPanel> : null}
+      <FrostedPanel style={styles.origin}>
         <Pressable accessibilityRole="button" accessibilityLabel="Show source details" accessibilityState={{ expanded: originExpanded }} onPress={() => setOriginExpanded(value => !value)} style={styles.originToggle}>
           <View style={{ flex: 1, gap: 4 }}><Text style={typography.heading}>Original source</Text><Text numberOfLines={1} style={typography.small}>{source || publisher || capture.provenance?.originalFileName || 'Saved in Foundkeep'}</Text></View>
           <Ionicons name={originExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.muted} />
@@ -116,7 +119,7 @@ export default function CaptureDetail() {
           <Row label="Declared type" value={capture.provenance?.declaredMime} /><Row label="Original size" value={capture.provenance?.byteSize ? readableBytes(capture.provenance.byteSize) : null} />
           <Row label="Suggested tags" value={capture.tags?.map(tag => `#${tag}`).join('  ')} />
         </View> : null}
-      </View>
+      </FrostedPanel>
       <Message error>{error}</Message>
       <RelatedSaves key={capture.id} capture={capture} />
     </ScrollView>
@@ -127,10 +130,11 @@ function QuickAction({ label, icon, onPress }: { label: string; icon: React.Comp
   return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}><Ionicons name={icon} size={22} color={colors.accent} /></Pressable>;
 }
 const styles = StyleSheet.create({
-  page: { padding: 22, paddingBottom: 48, gap: 24 }, loading: { flex: 1, justifyContent: 'center', padding: 24, gap: 16 },
+  page: { padding: 20, paddingBottom: 48, gap: 22 }, loading: { flex: 1, justifyContent: 'center', padding: 24, gap: 16 },
   actions: { flexDirection: 'row' }, quickAction: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 }, pressed: { opacity: .6 },
-  hero: { gap: 12 }, tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, tag: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.accentSoft, maxWidth: '100%' }, tagText: { color: colors.accent, fontSize: 13, lineHeight: 18, flexShrink: 1 },
-  file: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface }, fileName: { color: colors.ink, fontSize: 15, fontWeight: '600' },
+  hero: { gap: 12 }, tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, tag: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 22, backgroundColor: colors.accentSoft, maxWidth: '100%' }, tagText: { color: colors.accent, fontSize: 13, lineHeight: 18, flexShrink: 1 },
+  file: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, borderRadius: 20, backgroundColor: colors.surface }, fileName: { color: colors.ink, fontSize: 15, fontWeight: '600' },
   row: { gap: 8 }, rowValue: { color: colors.ink, fontSize: 16, lineHeight: 25 },
-  origin: { paddingVertical: 16, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.line }, originToggle: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  reading: { gap: 24 },
+  origin: { padding: 18 }, originToggle: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 14 },
 });

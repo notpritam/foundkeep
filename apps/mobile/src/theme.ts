@@ -1,20 +1,26 @@
 import { DynamicColorIOS, Platform, StyleSheet, type ColorValue } from 'react-native';
 
 const light = {
-  paper: '#F7F6FA', surface: '#FFFFFF', ink: '#211A2D', muted: '#655D71',
-  line: '#E2DDEA', accent: '#7041C7', accentPressed: '#5B2CA9',
-  accentSoft: '#EEE6FB', error: '#A52B22', white: '#FFFFFF', black: '#000000',
-  note: '#EEE6FB', pending: '#806024', errorSurface: '#F5E0DD', onAccent: '#FFFFFF', onError: '#FFFFFF',
+  paper: '#F0F6F8', surface: '#FFFFFF', ink: '#182F3A', muted: '#405D6B',
+  line: '#CADCE4', accent: '#086CA8', accentPressed: '#075584',
+  accentSoft: '#DFEFFA', error: '#A52B22', white: '#FFFFFF', black: '#000000',
+  note: '#E8F5E5', pending: '#76551B', errorSurface: '#F8E8E5', onAccent: '#FFFFFF', onError: '#FFFFFF',
+  glass: 'rgba(255,255,255,0.82)', glassCard: 'rgba(255,255,255,0.92)', glassEdge: 'rgba(255,255,255,0.88)',
+  sceneWash: 'rgba(240,246,248,0.76)', sceneShade: 'rgba(4,47,75,0.30)', shadow: '#194A62',
 };
 const dark: typeof light = {
-  paper: '#19161F', surface: '#231F2B', ink: '#F3EEFB', muted: '#B8ADC8',
-  line: '#40364E', accent: '#BC98FA', accentPressed: '#A47CE6',
-  accentSoft: '#37294C', error: '#F1998B', white: '#FFFFFF', black: '#000000',
-  note: '#37294C', pending: '#DBB777', errorSurface: '#452A28', onAccent: '#211A2D', onError: '#211A2D',
+  paper: '#10232F', surface: '#193440', ink: '#EFF7FB', muted: '#B2C8D2',
+  line: '#38525E', accent: '#85CEF4', accentPressed: '#B2E0F8',
+  accentSoft: '#214A60', error: '#F2A79D', white: '#FFFFFF', black: '#000000',
+  note: '#253E37', pending: '#E2C887', errorSurface: '#4B302F', onAccent: '#092A3E', onError: '#261B19',
+  glass: 'rgba(21,46,59,0.88)', glassCard: 'rgba(25,52,64,0.95)', glassEdge: 'rgba(168,211,231,0.23)',
+  sceneWash: 'rgba(9,29,42,0.88)', sceneShade: 'rgba(3,24,40,0.35)', shadow: '#000E18',
 };
 export const palettes = { light, dark };
 export const colors = Object.fromEntries(Object.entries(light).map(([key, value]) => [key,
-  Platform.OS === 'ios' ? DynamicColorIOS({ light: value, dark: dark[key as keyof typeof light] }) : value,
+  Platform.OS === 'ios' ? DynamicColorIOS({ light: value, dark: dark[key as keyof typeof light] })
+    // RN Web cannot compose shadowOpacity with a CSS variable color.
+    : Platform.OS === 'web' && key !== 'shadow' ? `var(--foundkeep-${key}, ${value})` : value,
 ])) as Record<keyof typeof light, ColorValue>;
 
 export const typography = StyleSheet.create({

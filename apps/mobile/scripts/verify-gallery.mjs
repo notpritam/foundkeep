@@ -7,7 +7,7 @@ import { chromium } from 'playwright-core';
 const root = path.resolve('dist-gallery-preview');
 const output = path.resolve('../../.impeccable/review/gallery');
 await mkdir(output, { recursive: true });
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.ttf': 'font/ttf', '.json': 'application/json' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.webp': 'image/webp', '.ttf': 'font/ttf', '.json': 'application/json' };
 const server = createServer(async (request, response) => {
   try {
     const requested = decodeURIComponent(new URL(request.url || '/', 'http://local').pathname);
@@ -51,6 +51,7 @@ const makeContext = async signedIn => {
   await context.route('https://foundkeep.app/**', async route => {
     const url = new URL(route.request().url());
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (url.pathname === '/api/auth/providers') return json({ providers: ['apple', 'google'] });
     if (url.pathname === '/mobile-policy.json') return json(policy);
     if (url.pathname === '/api/mobile/me') return json({ account, connectionId: 'review-device', usage: { captures: captures.length, bytes: 13_081_673, maxCaptures: 1000, maxBytes: 209_715_200 } });
     if (url.pathname === '/api/mobile/organization') return json({ folders, tags: [{ name: 'Inspiration', count: 1 }], suggestedTags: ['Work', 'Personal'], suggestedFolders: ['Reading', 'Projects'] });
@@ -94,8 +95,31 @@ try {
   await page.getByRole('tab', { name: 'You', exact: true }).click();
   await page.getByText('Settings.', { exact: true }).waitFor();
   assert.equal(await page.getByRole('tab', { name: 'You', exact: true }).getAttribute('aria-selected'), 'true');
+  await page.getByText('Settings.', { exact: true }).evaluate(el => { let parent = el.parentElement; while (parent && getComputedStyle(parent).overflowY !== 'auto') parent = parent.parentElement; if (parent) parent.scrollTop = 0; });
+  await ready(page); await shot(page, '13-settings.png');
+  await page.getByRole('button', { name: 'How to save from other apps' }).click();
+  await page.getByText('Keep a good find.', { exact: false }).waitFor();
+  await shot(page, '14-share-guide.png');
+  await page.getByRole('button', { name: 'Got it', exact: true }).click();
   await galleryTab.click(); await page.getByTestId('collection-header').waitFor();
   await shot(page, '02-gallery.png');
+  // Accessibility changes must update every shared material without a reload.
+  const material = page.getByTestId('dock-material');
+  assert.match(await material.evaluate(el => getComputedStyle(el).backdropFilter), /blur/);
+  const media = await context.newCDPSession(page);
+  for (const preference of ['prefers-reduced-transparency', 'prefers-contrast']) {
+    await media.send('Emulation.setEmulatedMedia', { features: [{ name: preference, value: preference === 'prefers-contrast' ? 'more' : 'reduce' }] });
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backdropFilter === 'none');
+    assert.equal(await material.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    assert.equal(await page.getByTestId('scenic-backdrop').locator('img').count(), 0);
+  }
+  await shot(page, '11-solid-accessibility.png');
+  await media.send('Emulation.setEmulatedMedia', { features: [] });
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backdropFilter.includes('blur'));
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backgroundColor === 'rgba(21, 46, 59, 0.88)');
+  await shot(page, '10-dark-gallery.png');
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
   const header = page.getByTestId('collection-header'); const before = await header.boundingBox(); const list = page.getByTestId('gallery-list');
   await list.evaluate(el => { el.scrollTop = 650; }); await page.waitForTimeout(200);
   assert.ok(await list.evaluate(el => el.scrollTop) > 0); const after = await header.boundingBox(); assert.equal(before.y, after.y); assert.equal(before.height, after.height);
@@ -147,6 +171,7 @@ try {
   await page.getByRole('textbox', { name: 'Your note', exact: true }).waitFor();
   assert.equal(await page.getByTestId('floating-dock').isVisible(), false, 'dock should stay within its tab screens');
   await page.getByRole('textbox', { name: 'Your note', exact: true }).fill('Remember this gallery idea');
+  await shot(page, '15-new-note.png');
   await page.getByRole('button', { name: 'Choose folder and tags' }).click();
   await page.getByRole('textbox', { name: 'Create a folder', exact: true }).fill('Weekend ideas');
   await page.getByRole('button', { name: 'Create folder', exact: true }).click();
@@ -159,9 +184,9 @@ try {
   assert.equal(captures[0].folder.name, 'Weekend ideas'); assert.deepEqual(captures[0].userTags, ['my idea']); assert.equal(writes, 2);
   await shot(page, '05-organized-save.png'); assert.deepEqual(errors, []); await context.close();
   const signedOut = await makeContext(false); const login = await signedOut.newPage();
-  await login.goto(base + '/sign-in'); await login.getByText('Welcome back.', { exact: true }).waitFor(); await ready(login);
+  await login.goto(base + '/sign-in'); await login.getByText('Welcome back.', { exact: true }).waitFor(); await login.getByRole('button', { name: 'Continue with Apple' }).waitFor(); await ready(login);
   await shot(login, '06-sign-in.png');
-  assert.ok((await login.getByText('By continuing,', { exact: false }).textContent()).includes('Terms and Privacy Policy'));
+  assert.ok((await login.getByText('By continuing,', { exact: false }).textContent()).includes('Terms and Privacy'));
   await login.goto(base); await login.getByText('Found it?', { exact: false }).waitFor(); await ready(login); await shot(login, '07-welcome.png'); await signedOut.close();
-  console.log('Gallery checks passed: floating dock navigation, narrow layout, footer clearance, quick-add, shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy. Synthetic fixtures; native checks separate.');
+  console.log('Gallery checks passed: floating dock navigation, narrow layout, footer clearance, quick-add, shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy, onboarding, live reduced-transparency and increased-contrast fallbacks, dark palette. Synthetic fixtures; native checks separate.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

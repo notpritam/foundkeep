@@ -2,6 +2,8 @@
 
 The interactive comparison runs with `node docs/design/mobile-chrome/serve.mjs` on port 8926. It uses synthetic saves and the same scroll geometry as the app. Selected on September 9, 2026: **Floating dock + deep purple**. The archived bottom navigation choices are Floating dock, Edge bar, and Search dock; each supports purple/red, dark appearance, reduced motion, and opaque surfaces. Select a variant in the preview to record a preference locally. These are browser design previews, not native glass verification.
 
+September 10 update: the floating dock remains; the palette is superseded by the landing page's [scenic azure glass treatment](../mobile-glass/README.md). Its code and browser verification are complete; native delivery awaits the Mac.
+
 ## Implemented in the app
 
 - Purple accents, neutral backgrounds, and semantic light/dark colors replace moss; error colors remain distinct. The canonical Foundkeep mark stays intact.
