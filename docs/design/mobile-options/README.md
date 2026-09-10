@@ -4,7 +4,7 @@ September 10, 2026. Chosen direction: **Quiet Collection for the app, Glass Hori
 
 Implemented in the Expo app on `feat/mobile-scenic-glass`. Email expands on request, existing sessions bypass authentication, and old welcome links redirect to the current entry flow. Folder/tag filters share a row with content filters. Settings and the share guide use quieter sections; cards and reader headers use rounded image previews with overlapping frosted captions.
 
-Verification: TypeScript, 50 mobile unit tests, web and iOS exports, compiled browser gallery/auth/OAuth checks. Browser coverage includes narrow layouts, direct/legacy entry links, session redirects, registration/recovery, organized note saving, long articles, private images, dark mode, reduced transparency, increased contrast, scrolling chrome and related saves. On the Mac, a frozen-lockfile install reproduces build 15’s runtime `03660500bff0bed464c73b169d8c9f0d01e85f19`. Native visual verification and release evidence are recorded in the release handoff.
+Verification: TypeScript, 50 mobile unit tests, web and iOS exports, compiled browser gallery/auth/OAuth checks. Browser coverage includes narrow layouts, direct/legacy entry links, session redirects, registration/recovery, organized note saving, long articles, private images, dark mode, reduced transparency, increased contrast, scrolling chrome and related saves. On the Mac, a frozen-lockfile install reproduces build 15’s runtime `03660500bff0bed464c73b169d8c9f0d01e85f19`. Native visual verification passed and the hybrid is live over the air for TestFlight 1.0.0 (15). See [release evidence](../mobile-quiet-glass-release.md).
 
 Live review: [Mobile directions](https://omni--8934.getbb.app/?screen=welcome&view=all).
 
