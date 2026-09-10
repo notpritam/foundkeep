@@ -37,3 +37,7 @@ A protected SQLite backup was taken before migration. Rehearsal on that copy pre
 - Design detector ran once in degraded regex mode; remaining Geist warnings refer to the approved incumbent typeface. Computed contrast was checked separately by the reviewer.
 
 Screenshots: [desktop landing](landing-desktop.png), [iPhone landing](landing-mobile.png), [desktop setup](setup-desktop.png), [iPhone setup](setup-mobile.png), [dashboard suggestion](dashboard-desktop.png).
+
+## Live verification
+
+Published code commit `4622c2e` to main and the production checkout. The restarted backend is healthy on schema 13, with existing record counts preserved and SQLite integrity `ok`. The production landing, dashboard, auth, support, app handoff, configuration and health routes returned 200. Browser verification confirmed iPhone-first actions, beta access email destination, safe app link, Apple/Google discovery, and the signed-out dashboard guard with no script errors. See `live-check.json`.

@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-09-10T05:44:59.686Z",
+  "origin": "https://foundkeep.app",
+  "pages": {
+    "/": 200,
+    "/dashboard.html": 200,
+    "/auth.html": 200,
+    "/support.html": 200,
+    "/open?path=collection": 200,
+    "/customer-config.json": 200,
+    "/iphone.js?v=20260910-platforms": 200,
+    "/healthz": 200
+  },
+  "browserErrors": [],
+  "distribution": "private-beta",
+  "providers": [
+    "apple",
+    "google"
+  ],
+  "iphoneFirst": true,
+  "accountGuard": "signed-out dashboard requires login"
+}
