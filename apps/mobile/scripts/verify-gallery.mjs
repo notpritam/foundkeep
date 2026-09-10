@@ -51,6 +51,10 @@ const makeContext = async signedIn => {
   await context.route('https://foundkeep.app/**', async route => {
     const url = new URL(route.request().url());
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (url.pathname === '/api/mobile/login' || url.pathname === '/api/mobile/register') {
+      assert.equal(route.request().postDataJSON().email, 'review@example.com');
+      return json({ token: 'fixture-account-token', account, recoveryCode: url.pathname.endsWith('register') ? 'FK-fixture-recovery-code' : undefined });
+    }
     if (url.pathname === '/api/auth/providers') return json({ providers: ['apple', 'google'] });
     if (url.pathname === '/mobile-policy.json') return json(policy);
     if (url.pathname === '/api/mobile/me') return json({ account, connectionId: 'review-device', usage: { captures: captures.length, bytes: 13_081_673, maxCaptures: 1000, maxBytes: 209_715_200 } });
@@ -103,6 +107,10 @@ try {
   await page.getByRole('button', { name: 'Got it', exact: true }).click();
   await galleryTab.click(); await page.getByTestId('collection-header').waitFor();
   await shot(page, '02-gallery.png');
+  await page.goto(base + '/sign-in');
+  await page.waitForURL('**/collection');
+  assert.equal(await page.getByRole('button', { name: 'Continue with email' }).count(), 0);
+  await page.getByRole('button', { name: /Open Link A field guide/ }).waitFor();
   // Accessibility changes must update every shared material without a reload.
   const material = page.getByTestId('dock-material');
   assert.match(await material.evaluate(el => getComputedStyle(el).backdropFilter), /blur/);
@@ -111,13 +119,13 @@ try {
     await media.send('Emulation.setEmulatedMedia', { features: [{ name: preference, value: preference === 'prefers-contrast' ? 'more' : 'reduce' }] });
     await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backdropFilter === 'none');
     assert.equal(await material.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
-    assert.equal(await page.getByTestId('scenic-backdrop').locator('img').count(), 0);
+    assert.equal(await page.getByTestId('scenic-backdrop').count(), 0);
   }
   await shot(page, '11-solid-accessibility.png');
   await media.send('Emulation.setEmulatedMedia', { features: [] });
   await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backdropFilter.includes('blur'));
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backgroundColor === 'rgba(21, 46, 59, 0.88)');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backgroundColor === 'rgba(34, 48, 53, 0.88)');
   await shot(page, '10-dark-gallery.png');
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
   const header = page.getByTestId('collection-header'); const before = await header.boundingBox(); const list = page.getByTestId('gallery-list');
@@ -146,12 +154,15 @@ try {
   }
   await shot(page, '09-narrow-floating-dock.png');
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Show search and filters' }).click();
+  await page.getByRole('textbox', { name: 'Search saved items' }).blur();
   await page.getByRole('button', { name: 'Filter by folder or tag' }).click();
   await page.getByRole('button', { name: 'Reading', exact: true }).click();
   await page.getByRole('button', { name: 'Done', exact: true }).click(); await page.waitForTimeout(1000);
   assert.equal(await page.getByRole('button', { name: /^Open Link/ }).count(), 1);
   await page.getByRole('button', { name: /Open Link A field guide/ }).click();
   await page.getByText('Original source', { exact: true }).waitFor();
+  await ready(page); await shot(page, '16-glass-reader.png');
   assert.ok((await page.getByText('A saved article.', { exact: false }).textContent()).length > 64000);
   const related = page.getByRole('button', { name: /^Open related save Autumn research brief/ });
   await related.waitFor();
@@ -184,9 +195,46 @@ try {
   assert.equal(captures[0].folder.name, 'Weekend ideas'); assert.deepEqual(captures[0].userTags, ['my idea']); assert.equal(writes, 2);
   await shot(page, '05-organized-save.png'); assert.deepEqual(errors, []); await context.close();
   const signedOut = await makeContext(false); const login = await signedOut.newPage();
-  await login.goto(base + '/sign-in'); await login.getByText('Welcome back.', { exact: true }).waitFor(); await login.getByRole('button', { name: 'Continue with Apple' }).waitFor(); await ready(login);
+  await login.goto(base + '/sign-in'); await login.getByText('Your collection awaits.', { exact: true }).waitFor(); await login.getByRole('button', { name: 'Continue with Apple' }).waitFor(); await ready(login);
   await shot(login, '06-sign-in.png');
   assert.ok((await login.getByText('By continuing,', { exact: false }).textContent()).includes('Terms and Privacy'));
-  await login.goto(base); await login.getByText('Found it?', { exact: false }).waitFor(); await ready(login); await shot(login, '07-welcome.png'); await signedOut.close();
+  assert.equal(await login.getByRole('textbox', { name: 'Email', exact: true }).count(), 0);
+  await login.getByRole('button', { name: 'Continue with email' }).click();
+  await login.getByRole('textbox', { name: 'Email', exact: true }).fill('review@example.com');
+  await login.getByRole('textbox', { name: 'Password', exact: true }).fill('example password');
+  assert.equal(await login.getByRole('button', { name: 'Continue with email' }).getAttribute('aria-expanded'), 'true');
+  await login.setViewportSize({ width: 320, height: 568 });
+  await ready(login); await shot(login, '17-email-narrow.png');
+  assert.ok(await login.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await login.getByRole('button', { name: 'New here? Create an account' }).click();
+  await login.getByText('Make it yours.', { exact: true }).waitFor();
+  await login.getByRole('button', { name: 'Continue with email' }).click();
+  await login.getByRole('textbox', { name: 'Name', exact: true }).waitFor();
+  await login.getByRole('textbox', { name: 'Email', exact: true }).waitFor();
+  await shot(login, '18-register-narrow.png');
+  await login.getByRole('textbox', { name: 'Name', exact: true }).fill('Review');
+  await login.getByRole('textbox', { name: 'Email', exact: true }).fill('review@example.com');
+  await login.getByRole('textbox', { name: 'Password', exact: true }).fill('fixture long password');
+  await login.getByRole('button', { name: 'Create account', exact: true }).click();
+  await login.getByText('Keep this somewhere safe.', { exact: true }).waitFor();
+  await login.getByRole('button', { name: 'I saved the code', exact: true }).click();
+  await login.getByRole('button', { name: 'Continue to Foundkeep', exact: true }).click();
+  await login.getByRole('button', { name: 'Got it', exact: true }).click();
+  await login.getByTestId('collection-header').waitFor();
+  await login.goto(base + '/register'); await login.waitForURL('**/collection');
+  await login.evaluate(() => localStorage.removeItem('foundkeep-device-token'));
+  for (const route of ['', '/welcome']) {
+    await login.goto(base + route); await login.waitForURL('**/sign-in');
+    await login.getByText('Your collection awaits.', { exact: true }).waitFor();
+    assert.equal(await login.getByRole('button', { name: 'Get started', exact: true }).count(), 0);
+  }
+  await login.setViewportSize({ width: 390, height: 844 });
+  await ready(login); await shot(login, '07-direct-sign-in.png');
+  await login.getByRole('button', { name: 'Continue with email' }).click();
+  await login.getByRole('textbox', { name: 'Email', exact: true }).fill('review@example.com');
+  await login.getByRole('textbox', { name: 'Password', exact: true }).fill('fixture long password');
+  await login.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await login.waitForURL('**/collection'); await login.getByTestId('collection-header').waitFor();
+  await signedOut.close();
   console.log('Gallery checks passed: floating dock navigation, narrow layout, footer clearance, quick-add, shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy, onboarding, live reduced-transparency and increased-contrast fallbacks, dark palette. Synthetic fixtures; native checks separate.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

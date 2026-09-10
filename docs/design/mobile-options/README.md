@@ -1,6 +1,10 @@
 # Foundkeep mobile direction comparison
 
-September 10, 2026. The user rejected the scenic welcome screen and requested multiple variants of every screen before choosing. Native release work is on hold for that design choice; the Mac connection was confirmed, but no native build or OTA update was submitted in this pass.
+September 10, 2026. Chosen direction: **Quiet Collection for the app, Glass Horizon for gallery cards and saved-item details**. Open directly to provider-first sign-in; remove the welcome/Get started step. The two-column gallery and subtle floating glass dock remain.
+
+Implemented in the Expo app on `feat/mobile-scenic-glass`. Email expands on request, existing sessions bypass authentication, and old welcome links redirect to the current entry flow. Folder/tag filters share a row with content filters. Settings and the share guide use quieter sections; cards and reader headers use rounded image previews with overlapping frosted captions.
+
+Verification: TypeScript, 50 mobile unit tests, web and iOS exports, compiled browser gallery/auth/OAuth checks. Browser coverage includes narrow layouts, direct/legacy entry links, session redirects, registration/recovery, organized note saving, long articles, private images, dark mode, reduced transparency, increased contrast, scrolling chrome and related saves. On the Mac, a frozen-lockfile install reproduces build 15’s runtime `03660500bff0bed464c73b169d8c9f0d01e85f19`. Native visual verification and release evidence are recorded in the release handoff.
 
 Live review: [Mobile directions](https://omni--8934.getbb.app/?screen=welcome&view=all).
 
@@ -14,7 +18,7 @@ This is a browser design prototype using sample content, not the installed app. 
 | B · Glass Horizon | Scenic depth; more translucent sheets; a featured image followed by smaller cards | Save cards floating over scenery; content settles onto a pale background |
 | C · Quiet Collection | Editorial typography, fewer containers, flat image gallery, subtle frosted dock | A short introduction above a small collage; a quiet paper surface |
 
-Recommendation: **A** keeps the relationship to the landing page while protecting clarity. B makes more of the glass effect; C gives saved content the most visual emphasis. Each direction is a consistent system, but the user can mix screens.
+The approved combination uses **C** for the overall interface and **B** for saved content. The comparison below remains available as a record of the explored directions.
 
 ## Coverage: 42 variants
 
@@ -36,4 +40,4 @@ Screenshot evidence is under `.impeccable/review/mobile-options/`: welcome, gall
 
 Start with `node docs/design/mobile-options/serve.mjs` (port 8934 by default; override with `PORT`). Expose the active port through `bb connect expose 8934` for remote review.
 
-After the user chooses, apply the selected design to the Expo app and resume native iPhone verification, runtime compatibility checks and TestFlight/OTA delivery. Keep version 1.0.0.
+Release the selected hybrid after native verification. Keep version 1.0.0; use EAS Update only when the runtime matches the installed TestFlight binary.

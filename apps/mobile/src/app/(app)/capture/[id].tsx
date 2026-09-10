@@ -77,6 +77,7 @@ export default function CaptureDetail() {
     { text: 'Cancel', style: 'cancel' as const },
   ]);
   const tags = [...new Set([...(capture.userTags || []), ...(capture.tags || [])])];
+  const hasPreview = Boolean(capturePreviewSource(capture, token, account?.id));
   const publisher = capture.provenance?.siteName || capture.provenance?.sourceApplication;
   return <Screen top={false}>
     <Stack.Screen options={{ title: 'Saved item', headerRight: () => <View style={styles.actions}>
@@ -85,7 +86,8 @@ export default function CaptureDetail() {
       <QuickAction label="More saved item actions" icon="ellipsis-horizontal" onPress={more} />
     </View> }} />
     <ScrollView contentContainerStyle={styles.page}>
-      <View style={styles.hero}>
+      {hasPreview ? <CapturePreview capture={capture} contain={capture.type === 'image' || capture.type === 'screenshot'} style={styles.cover} /> : null}
+      <FrostedPanel style={[styles.hero, hasPreview && styles.overlap]}>
         <Text selectable style={typography.title}>{captureTitle(capture)}</Text>
         <Text style={typography.small}>{publisher || captureLabels[capture.type]} · Saved {date(capture.capturedAt)}</Text>
         {capture.folder || tags.length ? <View style={styles.tags}>
@@ -93,8 +95,7 @@ export default function CaptureDetail() {
           {tags.slice(0, 4).map(tag => <Pressable key={tag} accessibilityRole="button" accessibilityLabel={`Edit tag ${tag}`} onPress={() => setEditing(capture)} style={styles.tag}><Text style={styles.tagText}>#{tag}</Text></Pressable>)}
           {tags.length > 4 ? <Pressable accessibilityRole="button" accessibilityLabel={`Show all ${tags.length} tags`} onPress={() => setEditing(capture)} style={styles.tag}><Text style={styles.tagText}>+{tags.length - 4}</Text></Pressable> : null}
         </View> : null}
-      </View>
-      {capturePreviewSource(capture, token, account?.id) ? <CapturePreview capture={capture} contain={capture.type === 'image' || capture.type === 'screenshot'} style={{ borderRadius: 22 }} /> : null}
+      </FrostedPanel>
       {pending.current ? <Message>Saved. Your details are being prepared.</Message> : capture.status === 'failed' ? <Message>Saved safely. Some details could not be prepared.</Message> : null}
       {capture.fileName ? <Pressable accessibilityRole="button" accessibilityLabel={opening ? 'Preparing file' : 'Open or share file'} disabled={opening} onPress={() => void openFile()} style={({ pressed }) => [styles.file, pressed && styles.pressed]}>
         <Ionicons name={capture.type === 'audio' ? 'musical-notes-outline' : capture.type === 'video' ? 'videocam-outline' : 'document-outline'} size={24} color={colors.accent} />
@@ -130,9 +131,11 @@ function QuickAction({ label, icon, onPress }: { label: string; icon: React.Comp
   return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}><Ionicons name={icon} size={22} color={colors.accent} /></Pressable>;
 }
 const styles = StyleSheet.create({
-  page: { padding: 20, paddingBottom: 48, gap: 22 }, loading: { flex: 1, justifyContent: 'center', padding: 24, gap: 16 },
+  page: { padding: 20, paddingTop: 8, paddingBottom: 48, gap: 20 }, loading: { flex: 1, justifyContent: 'center', padding: 24, gap: 16 },
   actions: { flexDirection: 'row' }, quickAction: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 }, pressed: { opacity: .6 },
-  hero: { gap: 12 }, tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, tag: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 22, backgroundColor: colors.accentSoft, maxWidth: '100%' }, tagText: { color: colors.accent, fontSize: 13, lineHeight: 18, flexShrink: 1 },
+  cover: { borderRadius: 24, aspectRatio: 1.05 },
+  hero: { gap: 12, padding: 20, borderRadius: 24 },
+  overlap: { marginTop: -56, marginHorizontal: 10, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 5 }, shadowOpacity: .05, shadowRadius: 16 }, tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, tag: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9, backgroundColor: colors.accentSoft, maxWidth: '100%' }, tagText: { color: colors.accent, fontSize: 13, lineHeight: 18, flexShrink: 1 },
   file: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, borderRadius: 20, backgroundColor: colors.surface }, fileName: { color: colors.ink, fontSize: 15, fontWeight: '600' },
   row: { gap: 8 }, rowValue: { color: colors.ink, fontSize: 16, lineHeight: 25 },
   reading: { gap: 24 },

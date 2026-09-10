@@ -1,6 +1,6 @@
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Image, Platform, StyleSheet, useColorScheme, View, type ViewProps, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Platform, StyleSheet, useColorScheme, View, type ViewProps, type ViewStyle } from 'react-native';
 import { colors, palettes } from '../theme.ts';
 
 const MaterialContext = createContext({ opaque: true, scheme: 'light' as 'light' | 'dark' });
@@ -35,22 +35,13 @@ export function MaterialProvider({ children }: { children: ReactNode }) {
 export const useMaterial = () => useContext(MaterialContext);
 const webPalette = (scheme: 'light' | 'dark') => Object.entries(palettes[scheme]).map(([name, color]) => `--foundkeep-${name}:${color}`).join(';');
 
-/** Fixed scenic artwork has no scroll loop, large blur, or moving background. */
-export function ScenicBackdrop({ immersive = false }: { immersive?: boolean }) {
-  const { opaque } = useMaterial();
-  return <View testID="scenic-backdrop" pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
-    {(!opaque || immersive) && <Image accessible={false} source={require('../../assets/images/scenic-alpine.webp')} resizeMode="cover" style={StyleSheet.absoluteFill} />}
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: immersive ? colors.sceneShade : opaque ? colors.paper : colors.sceneWash }]} />
-  </View>;
-}
-
 /** Liquid Glass on compatible iOS; frosted web preview and solid fallbacks. */
 export function GlassSurface({ children, style, interactive = false, ...props }: ViewProps & { interactive?: boolean }) {
   const { opaque, scheme } = useMaterial();
   const native = Platform.OS === 'ios' && !opaque && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   const Surface = native ? GlassView : View;
   const webFrost = Platform.OS === 'web' && !opaque ? { backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)' } as ViewStyle : undefined;
-  return <Surface {...props} {...(native ? { glassEffectStyle: 'regular' as const, colorScheme: scheme, tintColor: scheme === 'dark' ? '#163C50' : '#DBF1FB', isInteractive: interactive } : {})}
+  return <Surface {...props} {...(native ? { glassEffectStyle: 'regular' as const, colorScheme: scheme, tintColor: scheme === 'dark' ? '#223035' : '#F8F8F4', isInteractive: interactive } : {})}
     style={[styles.material, !native && { backgroundColor: opaque ? colors.surface : colors.glass }, webFrost, style, opaque && { backgroundColor: colors.surface, borderColor: colors.line }]}>{children}</Surface>;
 }
 

@@ -12,7 +12,6 @@ import { useSession } from '../../../session/SessionProvider.tsx';
 import { createScrollChrome } from '../../../collection/scrollChrome.ts';
 import { useMotionAllowed } from '../../../components/motion.tsx';
 import { colors } from '../../../theme.ts';
-import { GlassSurface } from '../../../components/ScenicSurface.tsx';
 
 const filters: Array<{ type?: CaptureType; label: string }> = [
   { label: 'All' }, { type: 'bookmark', label: 'Links' }, { type: 'image', label: 'Images' }, { type: 'note', label: 'Notes' },
@@ -57,13 +56,13 @@ export default function CollectionScreen() {
   const collection = useCollection({ q: searchQuery || undefined, type, folderId: organization.folderId === null ? 'unfiled' : organization.folderId, tag: organization.userTags[0] });
   const canWrite = policy.capture.note && !updateRequired;
   return <Screen>
-    <GlassSurface testID="collection-header" style={[styles.top, compact && styles.topCompact]}>
+    <View testID="collection-header" style={[styles.top, compact && styles.topCompact]}>
       <Brand compact />
       <View style={styles.actions}>
         <Pressable accessibilityRole="button" accessibilityLabel="Show search and filters" onPress={revealSearch} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Ionicons name="search-outline" size={22} color={colors.ink} /></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Write a new note" accessibilityState={{ disabled: !canWrite }} disabled={!canWrite} onPress={() => router.push('/(app)/new-note')} style={({ pressed }) => [styles.add, pressed && styles.pressed, !canWrite && { opacity: .4 }]}><Ionicons name="add" size={25} color={colors.ink} /></Pressable>
       </View>
-    </GlassSurface>
+    </View>
     <View style={styles.galleryRegion}>
       <GalleryList collection={collection} headerSpace={headerHeight} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
       <Animated.View testID="collection-expanded-controls" pointerEvents={compact ? 'none' : 'auto'} accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[styles.header, { transform: [{ translateY: Animated.multiply(travel, -1) }] }]} onLayout={event => {
@@ -71,15 +70,17 @@ export default function CollectionScreen() {
         if (next === measuredHeight.current) return;
         measuredHeight.current = next; setHeaderHeight(next); travel.setValue(chrome.resize(next));
       }}>
-        <GlassSurface style={styles.controls}>
-        {height > 550 && fontScale < 1.8 ? <View style={styles.heading}><Text style={styles.title}>All your finds.</Text><Text style={styles.subtitle}>A little of everything you love.</Text></View> : null}
+        <View style={styles.controls}>
+        {height > 550 && fontScale < 1.8 ? <View style={styles.heading}><Text style={styles.title}>The collection.</Text><Text style={styles.subtitle}>Good things, kept close.</Text></View> : null}
         {updateRequired ? <Message error>Update Foundkeep in the App Store to keep saving.</Message> : <Message>{policy.notice}</Message>}
         <View style={styles.search}><Ionicons name="search-outline" size={19} color={colors.muted} /><TextInput ref={searchRef} testID="collection-search" value={query} onChangeText={setQuery} onFocus={() => { searchingRef.current = true; chrome.reveal(); travel.setValue(0); syncCompact(false); }} onBlur={() => { searchingRef.current = false; }} maxLength={200} accessibilityLabel="Search saved items" placeholder="Search your collection" placeholderTextColor={colors.muted} style={styles.searchInput} returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" /></View>
-        <OrganizationPicker value={organization} onChange={setOrganization} filter />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }}>
+        <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
           {filters.map(filter => <Pressable key={filter.label} accessibilityRole="button" accessibilityState={{ selected: type === filter.type }} onPress={() => setType(filter.type)} style={({ pressed }) => [styles.filter, type === filter.type && styles.filterActive, pressed && styles.pressed]}><Text style={[styles.filterText, type === filter.type && styles.filterTextActive]}>{filter.label}</Text></Pressable>)}
         </ScrollView>
-        </GlassSurface>
+        <OrganizationPicker value={organization} onChange={setOrganization} filter compact />
+        </View>
+        </View>
       </Animated.View>
     </View>
   </Screen>;
@@ -87,10 +88,10 @@ export default function CollectionScreen() {
 
 const styles = StyleSheet.create({
   galleryRegion: { flex: 1, overflow: 'hidden' },
-  header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 12 },
-  controls: { padding: 16, gap: 12, borderRadius: 26 },
-  top: { minHeight: 56, marginHorizontal: 12, marginTop: 6, marginBottom: 2, paddingHorizontal: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 28, zIndex: 3 }, topCompact: { borderColor: colors.glassEdge }, actions: { flexDirection: 'row', gap: 4 }, add: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, pressed: { opacity: .65 },
-  heading: { gap: 5, paddingTop: 2, paddingBottom: 2 }, title: { color: colors.ink, fontSize: 32, lineHeight: 37, fontWeight: '700', letterSpacing: -1.1 }, subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20 },
-  search: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: colors.line, borderRadius: 23, backgroundColor: colors.surface }, searchInput: { flex: 1, minHeight: 44, color: colors.ink, fontSize: 16, paddingVertical: 8 },
-  filters: { gap: 8 }, filter: { paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }, filterActive: { backgroundColor: colors.accent, borderColor: colors.accent }, filterText: { color: colors.muted, fontSize: 13, fontWeight: '600' }, filterTextActive: { color: colors.onAccent },
+  header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 16, backgroundColor: colors.paper },
+  controls: { gap: 14 },
+  top: { minHeight: 56, marginHorizontal: 20, marginTop: 6, marginBottom: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 3, backgroundColor: colors.paper }, topCompact: { borderColor: colors.line }, actions: { flexDirection: 'row', gap: 4 }, add: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, pressed: { opacity: .65 },
+  heading: { gap: 5, paddingTop: 2, paddingBottom: 2 }, title: { color: colors.ink, fontSize: 32, lineHeight: 37, fontWeight: '600', letterSpacing: -1.1 }, subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20 },
+  search: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface }, searchInput: { flex: 1, minHeight: 44, color: colors.ink, fontSize: 16, paddingVertical: 8 },
+  filterRow: { flexDirection: 'row', gap: 10, alignItems: 'center' }, filters: { gap: 5 }, filter: { paddingHorizontal: 13, minHeight: 44, justifyContent: 'center', borderRadius: 7, backgroundColor: colors.paper }, filterActive: { backgroundColor: colors.accentSoft }, filterText: { color: colors.muted, fontSize: 13, fontWeight: '600' }, filterTextActive: { color: colors.accent },
 });

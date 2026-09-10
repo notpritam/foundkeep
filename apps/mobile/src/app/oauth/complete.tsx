@@ -110,7 +110,7 @@ export default function OAuthComplete() {
   const remove = async () => {
     if (!proof || busy) return;
     setBusy(true); setError('');
-    try { await session.deleteAccount({ reauthToken: proof }); setProof(null); router.replace('/(auth)/welcome'); }
+    try { await session.deleteAccount({ reauthToken: proof }); setProof(null); router.replace('/(auth)/sign-in'); }
     catch (value) { setError((value as Error).message); }
     finally { setBusy(false); }
   };

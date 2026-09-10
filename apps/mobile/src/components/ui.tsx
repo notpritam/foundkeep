@@ -2,11 +2,10 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography } from '../theme.ts';
-import { ScenicBackdrop } from './ScenicSurface.tsx';
 
-export function Screen({ children, keyboard = false, top = true, immersive = false }: { children: ReactNode; keyboard?: boolean; top?: boolean; immersive?: boolean }) {
-  const content = <SafeAreaView edges={top ? ['top', 'left', 'right'] : ['left', 'right']} style={styles.fill}>{children}</SafeAreaView>;
-  return <View style={styles.screen}><ScenicBackdrop immersive={immersive} />{keyboard ? <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>{content}</KeyboardAvoidingView> : content}</View>;
+export function Screen({ children, keyboard = false, top = true, bottom = false }: { children: ReactNode; keyboard?: boolean; top?: boolean; bottom?: boolean }) {
+  const content = <SafeAreaView edges={[...(top ? ['top' as const] : []), 'left', 'right', ...(bottom ? ['bottom' as const] : [])]} style={styles.fill}>{children}</SafeAreaView>;
+  return <View style={styles.screen}>{keyboard ? <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>{content}</KeyboardAvoidingView> : content}</View>;
 }
 
 export function Mark({ size = 38 }: { size?: number }) {
@@ -21,8 +20,8 @@ export function LegalFooter() {
   return <Text style={styles.legal}>By continuing, you accept our <Text accessibilityRole="link" style={styles.legalLink} onPress={() => void Linking.openURL('https://foundkeep.app/terms')}>Terms</Text> and <Text accessibilityRole="link" style={styles.legalLink} onPress={() => void Linking.openURL('https://foundkeep.app/privacy')}>Privacy</Text>.</Text>;
 }
 
-export function Button({ label, onPress, loading = false, disabled = false, secondary = false, danger = false }: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean; secondary?: boolean; danger?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, danger && styles.buttonDanger, pressed && styles.buttonPressed, (disabled || loading) && styles.buttonDisabled]}>{loading ? <ActivityIndicator color={secondary && !danger ? colors.ink : danger ? colors.onError : colors.onAccent} /> : <Text style={[styles.buttonText, secondary && !danger && styles.buttonTextSecondary, danger && { color: colors.onError }]}>{label}</Text>}</Pressable>;
+export function Button({ label, onPress, loading = false, disabled = false, secondary = false, danger = false, icon }: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean; secondary?: boolean; danger?: boolean; icon?: ReactNode }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, danger && styles.buttonDanger, pressed && styles.buttonPressed, (disabled || loading) && styles.buttonDisabled]}>{loading ? <ActivityIndicator color={secondary && !danger ? colors.ink : danger ? colors.onError : colors.paper} /> : <><View style={styles.buttonIcon}>{icon}</View><Text style={[styles.buttonText, secondary && !danger && styles.buttonTextSecondary, danger && { color: colors.onError }]}>{label}</Text></>}</Pressable>;
 }
 
 export function Field({ label, help, ...props }: TextInputProps & { label: string; help?: string }) {
@@ -42,15 +41,16 @@ const styles = StyleSheet.create({
   legal: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', paddingHorizontal: 10, paddingVertical: 12 },
   legalLink: { color: colors.ink, textDecorationLine: 'underline' },
   fieldLabel: { color: colors.ink, fontSize: 14, fontWeight: '500' },
-  button: { minHeight: 52, borderRadius: 26, paddingHorizontal: 20, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent },
+  button: { minHeight: 52, borderRadius: 13, paddingHorizontal: 20, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ink },
   buttonSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   buttonDanger: { backgroundColor: colors.error },
   buttonPressed: { opacity: .78 },
   buttonDisabled: { opacity: .46 },
-  buttonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
+  buttonIcon: { position: 'absolute', left: 18 },
+  buttonText: { color: colors.paper, fontSize: 15, fontWeight: '600' },
   buttonTextSecondary: { color: colors.ink },
   field: { gap: 7 },
-  input: { minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: 16, backgroundColor: colors.surface, paddingHorizontal: 14, color: colors.ink, fontSize: 17 },
+  input: { minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface, paddingHorizontal: 14, color: colors.ink, fontSize: 17 },
   multiline: { minHeight: 130, paddingTop: 14, textAlignVertical: 'top' },
   message: { padding: 12, borderRadius: 14, backgroundColor: colors.accentSoft },
   messageError: { backgroundColor: colors.errorSurface },

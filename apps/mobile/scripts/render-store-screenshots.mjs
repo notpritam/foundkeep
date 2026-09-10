@@ -69,12 +69,12 @@ const shot = async (page, name) => page.screenshot({ path: path.join(output, nam
 try {
   const welcomeContext = await makeContext(false);
   const welcome = await welcomeContext.newPage();
-  await welcome.goto(base); await ready(welcome); await welcome.getByText('Found it?').waitFor();
-  await shot(welcome, '01-welcome.png'); await welcomeContext.close();
+  await welcome.goto(base); await ready(welcome); await welcome.getByText('Your collection awaits.').waitFor();
+  await shot(welcome, '01-sign-in.png'); await welcomeContext.close();
 
   const context = await makeContext(true);
   const page = await context.newPage();
-  await page.goto(base); await page.getByText('All your finds.').waitFor(); await ready(page);
+  await page.goto(base); await page.getByText('The collection.').waitFor(); await ready(page);
   await shot(page, '02-collection.png');
   await page.getByRole('button', { name: /Open Link A field guide/ }).click(); await page.getByText('Original source', { exact: true }).waitFor(); await ready(page);
   await shot(page, '03-source-detail.png');
