@@ -72,6 +72,10 @@ test("recent order uses collection arrival time and persists the saving platform
   expect(next.captures[0].id).toBe(first.id);
   expect(next.captures[0].savedVia).toBe("dashboard");
   expect(next.nextCursor).toBeNull();
+  db.query("UPDATE customer_captures SET article_text=? WHERE id=?").run("a".repeat(2000), latest.id);
+  const cards = await (await request("/captures?sort=recent&view=cards", "GET", undefined, owner.cookie)).json();
+  expect(cards.captures[0].articleText.length).toBe(480);
+  expect((await (await request(`/captures/${latest.id}`, "GET", undefined, owner.cookie)).json()).capture.articleText.length).toBe(2000);
   const native = await (await mobile("/captures?sort=recent", "GET", undefined, device.bearer)).json();
   expect(native.captures.map((item: any) => item.id)).toEqual([latest.id, first.id]);
   expect((await request("/captures?sort=invalid", "GET", undefined, owner.cookie)).status).toBe(400);

@@ -761,6 +761,8 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     const current = auth(c, true);
     const recent = recentOrder(c);
     const dateColumn = recent ? "created_at" : "captured_at";
+    const view = c.req.query("view") || "full";
+    if (!["full", "cards"].includes(view)) fail(400, "invalid_view", "Choose a valid collection view.");
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
     if (search.length > 200 || (type && !TYPES.has(type))) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
@@ -784,7 +786,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
       where.push(`(${dateColumn} < ? OR (${dateColumn} = ? AND id < ?))`);
       args.push(value[0], value[0], value[1]);
     }
-    const rows = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY ${dateColumn} DESC, id DESC LIMIT ?`).all(...args, limit + 1) as CustomerCaptureRow[];
+    const rows = db.query(`SELECT ${view === "cards" ? CARD_COLUMNS : CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY ${dateColumn} DESC, id DESC LIMIT ?`).all(...args, limit + 1) as CustomerCaptureRow[];
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
