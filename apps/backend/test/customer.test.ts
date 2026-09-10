@@ -4,6 +4,8 @@ import { existsSync } from "node:fs";
 import { openDb } from "../src/db.ts";
 import { createApp } from "../src/app.ts";
 import { processCustomerQueue } from "../src/customer-enrichment.ts";
+import { customerRoutes } from "../src/customer.ts";
+import { createPreviewFetcher } from "../src/customer-preview.ts";
 
 const ORIGIN = process.env.ATLAS_CUSTOMER_ORIGIN || "https://atlas.notpritam.in";
 const PRIMARY_ORIGIN = "https://foundkeep.app";
@@ -57,6 +59,104 @@ function heldUpload(cookie: string, target = app) {
 }
 
 describe("customer account security", () => {
+  test("article preview DTOs use an owned same-origin endpoint and ignore caller-selected URLs", async () => {
+    const owner = await register();
+    const other = await register();
+    const saved = (await (await capture(owner.cookie, { type: "bookmark", sourceUrl: "https://example.com/article" })).json()).capture;
+    const lead = "https://images.example.com/article.png";
+    db.query("UPDATE customer_captures SET provenance_json=? WHERE id=?").run(JSON.stringify({ leadImageUrl: lead }), saved.id);
+    const dto = (await (await request(`/captures/${saved.id}`, "GET", undefined, owner.cookie)).json()).capture;
+    expect(dto.previewUrl).toBe(`/api/captures/${saved.id}/preview`);
+    const requested: string[] = [];
+    const fetcher = createPreviewFetcher({
+      resolve: async () => [{ address: "93.184.215.14", family: 4 }],
+      transport: async target => {
+        requested.push(target.url.href);
+        return { status: 200, headers: new Headers({ "content-type": "image/png", "set-cookie": "untrusted=value" }),
+          body: (async function* () { yield Buffer.from(PNG.split(",")[1]!, "base64"); })(), cancel() {} };
+      },
+    });
+    const router = customerRoutes(db, undefined, fetcher);
+    const read = (cookie: string) => router.request(`${ORIGIN}/captures/${saved.id}/preview?url=http://127.0.0.1/`, { headers: { cookie } });
+    expect((await read(other.cookie)).status).toBe(404);
+    expect(requested).toEqual([]);
+    const response = await read(owner.cookie);
+    expect(response.status).toBe(200);
+    expect(requested).toEqual([lead]);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    for (const url of ["http://127.0.0.1/x", "data:image/png;base64,abc", null]) {
+      db.query("UPDATE customer_captures SET provenance_json=? WHERE id=?").run(JSON.stringify({ leadImageUrl: url }), saved.id);
+      const invalid = (await (await request(`/captures/${saved.id}`, "GET", undefined, owner.cookie)).json()).capture;
+      expect(invalid.previewUrl).toBeNull();
+      expect((await read(owner.cookie)).status).toBe(404);
+    }
+    expect(requested).toEqual([lead]);
+  });
+
+  test("in-flight article previews recheck owner sessions and capture existence before returning bytes", async () => {
+    for (const revoke of ["session", "capture"]) {
+      const owner = await register();
+      const saved = (await (await capture(owner.cookie)).json()).capture;
+      db.query("UPDATE customer_captures SET provenance_json=? WHERE id=?").run(JSON.stringify({ leadImageUrl: "https://images.example.com/a.png" }), saved.id);
+      let entered!: () => void; let release!: () => void;
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      const held = new Promise<void>(resolve => { release = resolve; });
+      const fetcher = createPreviewFetcher({ resolve: async () => [{ address: "93.184.215.14", family: 4 }], transport: async () => {
+        entered(); await held;
+        return { status: 200, headers: new Headers({ "content-type": "image/png" }), body: (async function* () { yield Buffer.from(PNG.split(",")[1]!, "base64"); })(), cancel() {} };
+      } });
+      const router = customerRoutes(db, undefined, fetcher);
+      const pending = router.request(`${ORIGIN}/captures/${saved.id}/preview`, { headers: { cookie: owner.cookie } });
+      await started;
+      if (revoke === "session") expect((await request("/auth/logout", "POST", {}, owner.cookie)).status).toBe(200);
+      else expect((await request(`/captures/${saved.id}`, "DELETE", undefined, owner.cookie)).status).toBe(200);
+      release();
+      expect((await pending).status).toBe(revoke === "session" ? 401 : 404);
+    }
+  });
+
+  test("web previews can use an existing uploaded raster file and refuse other file types", async () => {
+    const owner = await register();
+    const device = await connect(owner.cookie);
+    const png = Buffer.from(PNG.split(",")[1]!, "base64");
+    const uploaded = await app.request(`${ORIGIN}/api/mobile/captures/file`, {
+      method: "POST", headers: { authorization: device.bearer, "content-type": "image/png", "content-length": String(png.length),
+        "x-foundkeep-capture": Buffer.from(JSON.stringify({ clientId: crypto.randomUUID(), type: "image", fileName: "preview.png" })).toString("base64url") }, body: png,
+    });
+    expect(uploaded.status).toBe(201);
+    const saved = (await uploaded.json() as any).capture;
+    try {
+      const response = await request(`/captures/${saved.id}/preview`, "GET", undefined, owner.cookie);
+      expect(response.status).toBe(200);
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(png);
+      db.query("UPDATE customer_captures SET file_mime='image/svg+xml' WHERE id=?").run(saved.id);
+      expect((await request(`/captures/${saved.id}/preview`, "GET", undefined, owner.cookie)).status).toBe(404);
+    } finally { await request(`/captures/${saved.id}`, "DELETE", undefined, owner.cookie); }
+  });
+
+  test("web previews require an owner session and return stored raster images without accepting URL input", async () => {
+    const owner = await register();
+    const other = await register();
+    const device = await connect(owner.cookie);
+    const saved = (await (await capture(owner.cookie, { type: "image", dataUrl: PNG })).json()).capture;
+    const path = `/captures/${saved.id}/preview`;
+    const response = await request(`${path}?url=http://127.0.0.1/`, "GET", undefined, owner.cookie);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
+    expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(Buffer.from(PNG.split(",")[1]!, "base64"));
+    expect((await request(path, "GET", undefined, other.cookie)).status).toBe(404);
+    expect((await request(path)).status).toBe(401);
+    expect((await request(path, "GET", undefined, device.bearer)).status).toBe(403);
+    const empty = (await (await capture(owner.cookie)).json()).capture;
+    expect(empty.previewUrl).toBeNull();
+    expect((await request(`/captures/${empty.id}/preview?url=https://example.com/image.png`, "GET", undefined, owner.cookie)).status).toBe(404);
+  });
+
   test("mobile image blobs require a live owner credential and preserve the image MIME allowlist", async () => {
     const owner = await register();
     const other = await register();

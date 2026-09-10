@@ -1,0 +1,17 @@
+'use client';
+import { memo } from 'react';
+import { DashboardImage } from './dashboard-image';
+import { motion, useReducedMotion } from 'motion/react';
+import { captureKinds, captureTitle, capturePreview, dateLabel, fileBytes, kindLabel, safeFileUrl, safeSource, type Capture } from '../../lib/dashboard';
+export const CaptureCard = memo(function CaptureCard({ capture, open, selected }: { capture: Capture; selected?: boolean; open: (id: string) => void }) {
+  const reduceMotion = useReducedMotion();
+  const blob = capturePreview(capture);
+  const file = safeFileUrl(capture.fileUrl, capture.id);
+  const title = captureTitle(capture);
+  const excerpt = capture.selectionText || capture.noteText || capture.summary || capture.articleText;
+  const source = safeSource(capture.sourceUrl);
+  return <motion.article whileHover={reduceMotion ? undefined : { y: -2 }} transition={{ duration: 0.16 }} className={`capture-card capture-${Object.hasOwn(captureKinds, capture.type) ? capture.type : 'note'}${selected ? ' capture-selected' : ''}`} aria-current={selected ? 'true' : undefined}><button className="capture-open" type="button" aria-label={`Open ${kindLabel(capture.type)}: ${title}`} onClick={() => open(capture.id)}>
+    {blob ? <DashboardImage src={blob} alt="" mode="card" width={capture.width} height={capture.height} kind={kindLabel(capture.type)} /> : file ? <div className="file-card-preview"><span className="file-card-kind">{kindLabel(capture.type)}</span><strong>{capture.fileName || 'Shared file'}</strong><span className="file-card-size">{fileBytes(capture.fileBytes)}</span></div> : ['screenshot', 'image'].includes(capture.type) ? <div className="capture-preview-placeholder"><span>{kindLabel(capture.type)}</span><p>No saved preview</p></div> : null}
+    <div className="capture-card-body"><div className="capture-meta"><span>{kindLabel(capture.type)}</span><time>{dateLabel(capture.capturedAt)}</time></div><h2>{title}</h2>{excerpt && excerpt !== title ? <p className="capture-excerpt">{excerpt.slice(0, 700)}</p> : null}<div className="capture-card-footer"><span>{source ? source.hostname.replace(/^www\./, '') : 'Saved in Foundkeep'}</span>{['pending', 'processing'].includes(capture.status) ? <span className="processing-status">Adding context</span> : capture.status === 'failed' ? <span className="failed-status">Context unavailable</span> : null}</div></div>
+  </button></motion.article>;
+});

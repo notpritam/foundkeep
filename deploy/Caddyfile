@@ -1,9 +1,17 @@
 # Foundkeep block for omni's SHARED /etc/caddy/Caddyfile.
 #
-# Foundkeep serves the website and API from the same backend.
+# Keep API, uploads, relay, and native/extension compatibility on Bun. Next
+# serves static public pages and request-scoped private React pages.
 foundkeep.app {
 	tls internal
-	reverse_proxy localhost:8790
+	encode zstd gzip
+	@backend path /api /api/* /v1 /v1/* /admin /admin/* /agent /agent/* /invite /invite/* /ext /ext/* /healthz /customer-config.json /mobile-policy.json /updates.xml /atlas-extension.zip /foundkeep-extension.zip /.well-known/* /redeem /redeem.html
+	handle @backend {
+		reverse_proxy 127.0.0.1:8790
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8791
+	}
 }
 
 www.foundkeep.app {

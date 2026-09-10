@@ -1,0 +1,85 @@
+'use client';
+import {Children,createContext,isValidElement,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
+import Link from 'next/link';
+import {useAnimate} from 'motion/react-mini';
+import {customerConfig,DEFAULT_CONFIG,extensionMessage,isIphoneBrowser,type CustomerConfig} from '@/lib/platforms';
+import type {Account} from '@/lib/types';
+type Extension={account?:Account;version?:string};
+const Context=createContext<{config:CustomerConfig;extension:Extension|null;account:Account|null;checked:boolean;iphone:boolean}>({config:DEFAULT_CONFIG,extension:null,account:null,checked:false,iphone:false});
+export function LandingProvider({children}:{children:ReactNode}){
+ const [value,setValue]=useState({config:DEFAULT_CONFIG,extension:null as Extension|null,account:null as Account|null,checked:false,iphone:false});
+ useEffect(()=>{let current=0,disposed=false;const check=async()=>{
+  const seq=++current;
+  const config=await customerConfig();
+  if(disposed||seq!==current)return;
+  const ids=[...new Set(config.extensionIds)];
+  const available=new Map<string,Extension>();
+  let remaining=ids.length,account:Account|null=null,accountChecked=false;
+  const publish=()=>{
+   if(disposed||seq!==current)return;
+   setValue(previous=>{
+    const signedIn=accountChecked?account:previous.account;
+    const extensions=ids.flatMap(id=>available.has(id)?[available.get(id)!]:[]);
+    const detected=extensions.find(item=>signedIn&&item.account?.id===signedIn.id)||extensions[0];
+    return {config,extension:detected||(remaining===0?null:previous.extension),account:signedIn,checked:!!detected||remaining===0,iphone:isIphoneBrowser()};
+   });
+  };
+  // Publish each positive response immediately. A silent legacy installation
+  // must not delay the current extension or the independent website session.
+  void fetch('/api/me',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(8000)})
+   .then(r=>r.ok?r.json():null).catch(()=>null).then(me=>{account=me?.account||null;accountChecked=true;publish();});
+  for(const id of ids)void extensionMessage<Extension>({kind:'atlas-ping'},id)
+   .then(extension=>{available.set(id,extension);},()=>{}).finally(()=>{remaining--;publish();});
+  publish();
+ };
+ const recheck=()=>{if(document.visibilityState==='hidden')return;let pending=false;try{const t=Number(sessionStorage.getItem('foundkeep-install-return'));pending=t>Date.now()-1800000;sessionStorage.removeItem('foundkeep-install-return');}catch{}if(pending&&!(globalThis as any).chrome?.runtime?.sendMessage){location.reload();return;}void check();};
+ void check();window.addEventListener('focus',recheck);window.addEventListener('pageshow',recheck);document.addEventListener('visibilitychange',recheck);return()=>{disposed=true;current++;window.removeEventListener('focus',recheck);window.removeEventListener('pageshow',recheck);document.removeEventListener('visibilitychange',recheck);};},[]);
+ return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+const Arrow=()=> <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>;
+export function ExtensionLink({className='text-link',quiet=false}:{className?:string;quiet?:boolean}){const {config,extension,account}=useContext(Context);const connected=!!account&&extension?.account?.id===account.id;const href=extension?`/dashboard${connected?'':'?panel=devices'}`:config.storeUrl;return <a className={className} data-extension-install href={href} target={extension?undefined:'_blank'} rel={extension?undefined:'noopener noreferrer'} onClick={()=>{if(!extension)try{sessionStorage.setItem('foundkeep-install-return',String(Date.now()));}catch{}}}><span data-extension-label>{extension?connected?'Open library':extension.account?'Review connection':'Connect browser':quiet?'Add to Chrome':'Add to Chrome'}</span>{!quiet&&<Arrow/>}</a>;}
+export function ExtensionNote(){const {extension,account,checked}=useContext(Context);return <span className="download-note" role="status">{extension?account&&extension.account?.id===account.id?'Extension installed · Connected to your account.':'Extension installed · Connect your account to sync.':checked?'Chrome Web Store · Version 1.0.0 · Automatic updates':'Checking this browser…'}</span>;}
+export function IphoneLink({className='text-link'}:{className?:string}){const {config}=useContext(Context);return <a className={className} data-iphone-install href={config.iphone.url}><span data-iphone-label>{config.iphone.distribution==='private-beta'?'Request iPhone beta':config.iphone.label}</span></a>;}
+export function IphoneBadge(){const {config}=useContext(Context);return <span className="beta-badge" data-iphone-badge>{config.iphone.badge}</span>;}
+export function IphoneAvailability(){const {config}=useContext(Context);return <span data-iphone-availability>{config.iphone.description}</span>;}
+export function HeroActions(){const {extension,account,checked}=useContext(Context);const connected=!!account&&extension?.account?.id===account.id;return <div className="hero-action-group"><a className="button button-white" href={account?'/dashboard':'/signup'}>{account?'Open my library':'Start collecting'}<Arrow/></a><div className="hero-availability"><span className="hero-browser-status"><span className={extension?'install-proof':'install-neutral'} role="status">{extension?connected?'Browser connected':'Extension installed':checked?'For your browser':'Checking browser…'}</span>{!connected&&<ExtensionLink quiet/>}</span><IphoneLink/></div></div>;}
+export function PlatformGrid({children}:{children:ReactNode}){const {iphone}=useContext(Context);const items=Children.toArray(children);if(iphone){const i=items.findIndex(item=>isValidElement<{className?:string}>(item)&&item.props.className?.includes('phone-platform'));if(i>0)items.unshift(...items.splice(i,1));}return <div className="platform-grid">{items}</div>;}
+export function LandingHeader(){
+ const [open,setOpen]=useState(false);
+ const toggle=useRef<HTMLButtonElement>(null),nav=useRef<HTMLElement>(null);
+ const {account}=useContext(Context);
+ useEffect(()=>{
+  if(!open)return;
+  const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){setOpen(false);toggle.current?.focus();}};
+  const outside=(event:Event)=>{if(event.target instanceof Node&&!nav.current?.contains(event.target)&&!toggle.current?.contains(event.target))setOpen(false);};
+  const desktop=matchMedia('(min-width: 541px)');
+  const resize=()=>{if(desktop.matches)setOpen(false);};
+  document.addEventListener('keydown',key);
+  document.addEventListener('pointerdown',outside);
+  document.addEventListener('focusin',outside);
+  desktop.addEventListener('change',resize);
+  return()=>{document.removeEventListener('keydown',key);document.removeEventListener('pointerdown',outside);document.removeEventListener('focusin',outside);desktop.removeEventListener('change',resize);};
+ },[open]);
+ return <header className="site-header"><Link className="brand" href="/" aria-label="Foundkeep home"><img src="/assets/studio-mark.svg" width="32" height="32" alt=""/><span>Foundkeep</span></Link><nav className="desktop-nav" aria-label="Primary"><a href="#capture">How it works</a><a href="#library">Your collection</a><a href="#everywhere">Get Foundkeep</a></nav><div className="header-actions"><a className="login-link" href={account?'/dashboard':'/login'}>{account?'My library':'Log in'}</a><a className="button button-white button-small" href={account?'/dashboard':'/signup'}>{account?'Open library':'Start collecting'}<Arrow/></a><button className="menu-toggle" ref={toggle} type="button" aria-label={open?'Close navigation':'Open navigation'} aria-expanded={open} aria-controls="mobile-nav" onClick={()=>setOpen(v=>!v)}><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#i-menu"/></svg></button></div><nav ref={nav} id="mobile-nav" className="mobile-nav" aria-label="Mobile navigation" hidden={!open} onClick={()=>setOpen(false)}><a href="#capture">How it works</a><a href="#library">Your collection</a><a href="#everywhere">Get Foundkeep</a><a href={account?'/dashboard':'/login'}>{account?'My library':'Log in'}</a></nav></header>;
+}
+export function Reveal({children,className}:{children:ReactNode;className?:string}){
+ const [scope,animate]=useAnimate();
+ useEffect(()=>{
+  const element=scope.current as HTMLElement;
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let playback:ReturnType<typeof animate>|undefined;
+  const observer=new IntersectionObserver(entries=>{
+   if(!reduced.matches&&entries.some(entry=>entry.isIntersecting)){
+    playback=animate(element,{opacity:[0.65,1],transform:['translateY(12px)','translateY(0px)']},{duration:0.5,ease:[0.16,1,0.3,1]});
+    observer.disconnect();
+   }
+  },{threshold:0.12});
+  const preferenceChanged=()=>{
+   if(reduced.matches){observer.disconnect();playback?.stop();element.style.opacity='1';element.style.transform='none';}
+  };
+  if(!reduced.matches)observer.observe(element);
+  reduced.addEventListener('change',preferenceChanged);
+  return()=>{observer.disconnect();playback?.stop();reduced.removeEventListener('change',preferenceChanged);};
+ },[animate,scope]);
+ return <div ref={scope} className={className}>{children}</div>;
+}

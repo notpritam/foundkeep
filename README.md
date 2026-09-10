@@ -2,7 +2,7 @@
 
 **Found it? Keep it.** Save readable pages, screenshots, highlights, images, and stray ideas with their original source in a private, searchable library.
 
-[Get Foundkeep](https://foundkeep.app) · [Add to Chrome](https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk) · [Privacy & data](https://foundkeep.app/privacy.html)
+[Get Foundkeep](https://foundkeep.app) · [Add to Chrome](https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk) · [Privacy & data](https://foundkeep.app/privacy)
 
 ## Start collecting
 
@@ -23,7 +23,8 @@ Before replacing an unpacked installation, connect it and sync any local-only ca
 ## Repository
 
 - `apps/extension` — Chromium MV3 capture popup, readable page extraction, durable account-bound sync queue, and local IndexedDB library.
-- `apps/web` — landing page, account setup, private dashboard, privacy policy, and downloads.
+- `apps/site` — React/Next customer website: static public pages, server-rendered auth/library, account-scoped queries, Motion interactions and a nonmodal saved-item reader.
+- `apps/web` — shared first-party assets, extension downloads, and the previous static website retained for compatibility and rollback.
 - `apps/backend` — Bun/Hono customer accounts, private capture APIs, SQLite storage, and bounded organization worker.
 - `packages/shared` — schemas used by server-backed clients.
 - Legacy companion, desktop, and browser-control integrations remain available for existing installations but are outside the customer onboarding flow.
@@ -42,3 +43,5 @@ bun run test:customer
 The customer integration test also needs Tesseract English OCR and util-linux (`prlimit`); see [customer operations](deploy/CUSTOMER_LAUNCH.md). Browser tests use temporary profiles and synthetic captures. `CHROMIUM_PATH` can select an installed Chromium executable.
 
 [Deployment and release guide](deploy/README.md)
+
+[React customer website deployment and tests](deploy/NEXT_WEB.md)

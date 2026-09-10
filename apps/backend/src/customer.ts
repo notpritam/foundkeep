@@ -27,6 +27,7 @@ import {
   writeCustomerFile,
 } from "./customer-files.ts";
 import { isExpoPushToken } from "./customer-notifications.ts";
+import { CustomerPreviewError, fetchCustomerPreview, MAX_PREVIEW_BYTES, PREVIEW_MIMES, previewSourceUrl, validatePreviewImage } from "./customer-preview.ts";
 import { registerCustomerOAuth, consumeDeletionProof, queueIdentityDeletion } from "./customer-oauth.ts";
 import { createSupabaseGateway, OAuthError, type OAuthGateway } from "./supabase-auth.ts";
 import { relatedCaptures, type RelatedMetadata } from "./customer-related.ts";
@@ -95,6 +96,9 @@ function encodeMobileCursor(row: CustomerCaptureRow) {
 function accountDto(row: AccountRow) { return { id: row.id, email: row.email, name: row.name, createdAt: row.created_at, hasPassword: !!row.password_hash }; }
 function connectionDto(row: ConnectionRow) { return { id: row.id, name: row.name, clientKind: row.client_kind, createdAt: row.created_at, lastSeenAt: row.last_seen_at }; }
 export function customerCaptureDto(row: CustomerCaptureRow) {
+  const provenance = parseStoredJson<CaptureProvenance | null>(row.provenance_json, null);
+  const hasPreview = (row.blob_mime && PREVIEW_MIMES.has(row.blob_mime) && row.blob_bytes > 0)
+    || (row.file_path && row.file_mime && PREVIEW_MIMES.has(row.file_mime)) || previewSourceUrl(provenance?.leadImageUrl);
   return {
     id: row.id, clientId: row.client_id, batchId: row.batch_id, type: row.type, status: row.status,
     sourceUrl: row.source_url, sourceTitle: row.source_title, selectionText: row.selection_text,
@@ -103,11 +107,12 @@ export function customerCaptureDto(row: CustomerCaptureRow) {
     userTags: JSON.parse(row.manual_tags || "[]") as string[], folderId: row.folder_id ?? null,
     folder: row.folder_id && row.folder_name ? { id: row.folder_id, name: row.folder_name } : null,
     blobUrl: row.blob_mime ? `/api/captures/${row.id}/blob` : null,
+    previewUrl: hasPreview ? `/api/captures/${row.id}/preview` : null,
     fileName: row.file_name, fileMime: row.file_mime, fileBytes: row.file_bytes,
     fileUrl: row.file_path ? `/api/captures/${row.id}/file` : null,
     width: row.width, height: row.height, capturedAt: row.captured_at, createdAt: row.created_at,
     updatedAt: row.updated_at, enrichError: row.enrich_error,
-    provenance: parseStoredJson<CaptureProvenance | null>(row.provenance_json, null),
+    provenance,
     processingOptions: parseStoredJson<ProcessingOptions>(row.processing_options_json, { ...DEFAULT_PROCESSING_OPTIONS }),
   };
 }
@@ -271,7 +276,7 @@ function decodeImage(raw: unknown): { data: Buffer | null; mime: string | null; 
   return { data, mime, bytes: data.byteLength, width, height };
 }
 
-export function customerRoutes(db: Database, oauthGateway: OAuthGateway = createSupabaseGateway()) {
+export function customerRoutes(db: Database, oauthGateway: OAuthGateway = createSupabaseGateway(), previewFetcher = fetchCustomerPreview) {
   const app = new Hono<CustomerEnv>();
   const origin = config.customerOrigin;
   const websiteOrigins = new Set(config.customerOrigins);
@@ -381,6 +386,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
   }
 
   app.onError((error, c) => {
+    if (error instanceof CustomerPreviewError) return c.json({ error: "preview_unavailable", message: error.message }, error.status);
     if (error instanceof OAuthError) return c.json({ error: error.code, message: error.message }, error.status);
     if (error instanceof CustomerOrganizationError) return c.json({ error: error.code, message: error.message }, error.status);
     if (error instanceof CustomerError) {
@@ -1092,6 +1098,38 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     c.header("Cross-Origin-Resource-Policy", "same-origin");
     return c.body(new Uint8Array(row.blob_data).buffer);
   }
+
+  app.get("/captures/:id/preview", async (c) => {
+    const current = auth(c, true);
+    const row = findCapture(c.req.param("id"), current.account.id);
+    rates.take(`preview:${current.account.id}`, 120, 60_000);
+    let image;
+    if (row.blob_mime && PREVIEW_MIMES.has(row.blob_mime) && row.blob_bytes > 0) {
+      if (row.blob_bytes > MAX_PREVIEW_BYTES) throw new CustomerPreviewError(404);
+      const stored = db.query("SELECT blob_data FROM customer_captures WHERE id=? AND account_id=?").get(row.id, current.account.id) as { blob_data: Uint8Array | null };
+      if (!stored.blob_data) throw new CustomerPreviewError(404);
+      image = validatePreviewImage(stored.blob_data, row.blob_mime);
+    } else if (row.file_path && row.file_mime && PREVIEW_MIMES.has(row.file_mime)) {
+      let file;
+      try { file = Bun.file(resolveCustomerFile(config.dataDir, row.file_path)); } catch { throw new CustomerPreviewError(404); }
+      if (!file.size || file.size > MAX_PREVIEW_BYTES) throw new CustomerPreviewError(404);
+      let bytes: Uint8Array;
+      try { bytes = new Uint8Array(await file.arrayBuffer()); } catch { throw new CustomerPreviewError(404); }
+      image = validatePreviewImage(bytes, row.file_mime);
+    } else {
+      const provenance = parseStoredJson<CaptureProvenance | null>(row.provenance_json, null);
+      // Only persisted capture metadata can choose the source. URL parameters,
+      // cookies, authorization and referer headers never reach the origin.
+      image = await previewFetcher(current.account.id, provenance?.leadImageUrl, c.req.raw.signal);
+    }
+    const verified = auth(c, true, false);
+    if (verified.account.id !== current.account.id || verified.credentialId !== current.credentialId) fail(401, "unauthorized", "Your session expired. Sign in again.");
+    findCapture(row.id, current.account.id);
+    c.header("Content-Type", image.mime);
+    c.header("Content-Security-Policy", "default-src 'none'; sandbox");
+    c.header("Cross-Origin-Resource-Policy", "same-origin");
+    return c.body(new Uint8Array(image.bytes).buffer);
+  });
 
   app.get("/captures/:id/blob", (c) => serveCustomerBlob(c, true));
   app.get("/mobile/captures/:id/blob", (c) => serveCustomerBlob(c, false));

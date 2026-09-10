@@ -24,3 +24,8 @@ web-extension.*
 
 # Compiled native-app browser verification
 apps/mobile/dist-gallery-preview/
+
+# Next customer web build artifacts
+apps/site/.next/
+apps/site/next-env.d.ts
+apps/site/tsconfig.tsbuildinfo

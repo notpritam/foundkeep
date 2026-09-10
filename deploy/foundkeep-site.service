@@ -1,0 +1,24 @@
+[Unit]
+Description=Foundkeep customer website (Next.js)
+After=network.target atlas-backend.service
+
+[Service]
+Type=simple
+User=pritam
+UMask=0077
+WorkingDirectory=/home/pritam/.local/share/foundkeep-site/current/apps/site
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=8791
+Environment=FOUNDKEEP_BACKEND_URL=http://127.0.0.1:8790
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pritam/.local/share/foundkeep-site
+
+[Install]
+WantedBy=multi-user.target

@@ -32,6 +32,7 @@ test('customer signs up, configures the real extension, captures a readable page
   const port=reserve.address().port; await new Promise(resolve=>reserve.close(resolve));
   // Opt-in production verification creates and deletes only its own QA account.
   const deployedOrigin=process.env.ATLAS_CUSTOMER_SITE_URL;
+  const nextWeb=process.env.FOUNDKEEP_NEXT_WEB==='1';
   const origin=deployedOrigin ? new URL(deployedOrigin).origin : `http://127.0.0.1:${port}`;
   const extension=path.join(directory,'extension');
   await cp(path.resolve('apps/extension'),extension,{recursive:true});
@@ -65,7 +66,7 @@ test('customer signs up, configures the real extension, captures a readable page
     assert.equal(id,'mjfcgmboaijfcaanepdipbgmipnccnpn');
     const account=await context.newPage();
     const errors=[]; account.on('pageerror',error=>errors.push(error.message));
-    await account.goto(origin+'/auth.html');
+    await account.goto(origin+(nextWeb?'/signup':'/auth.html'));
     await account.locator('#name').fill('Foundkeep customer');
     await account.locator('#email').fill(email);
     await account.locator('#password').fill('a-long-test-password-2026');
@@ -74,7 +75,7 @@ test('customer signs up, configures the real extension, captures a readable page
     assert.ok((await account.locator('#new-recovery-code').textContent()).length>20);
     await account.locator('#recovery-saved').check();
     await account.locator('#continue-dashboard').click();
-    await account.waitForURL('**/dashboard.html');
+    await account.waitForURL(nextWeb?'**/dashboard':'**/dashboard.html');
     const request=async(method,url,body)=>{
       const response=await context.request.fetch(origin+url,{method,headers:{Origin:origin},data:body});
       const data=await response.json();assert.ok(response.ok(),JSON.stringify(data));return data;

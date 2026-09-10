@@ -1,0 +1,51 @@
+{
+  "base": "http://127.0.0.1:18791",
+  "checks": [
+    "1440/768/390/320px: no horizontal overflow, one hero action, loaded images and no decorative toolbar",
+    "Menu: keyboard activation, visible blue focus, Escape restoration, outside click, resize and anchor dismissal",
+    "Reduced motion: static initial render, active Motion reveal stops immediately, native scrolling becomes instant",
+    "Landing login performs a full document navigation for the private CSP boundary",
+    "No browser page errors",
+    "Extension connected appears within 1.8 seconds despite a silent legacy ID; installed and connected remain distinct",
+    "Extension installed appears within 1.8 seconds despite a silent legacy ID; installed and connected remain distinct"
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "missingImages": [],
+      "primaryActions": 1,
+      "toolbar": 0
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "height": 1000,
+      "overflow": false,
+      "missingImages": [],
+      "primaryActions": 1,
+      "toolbar": 0
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "missingImages": [],
+      "primaryActions": 1,
+      "toolbar": 0
+    },
+    {
+      "name": "small",
+      "width": 320,
+      "height": 740,
+      "overflow": false,
+      "missingImages": [],
+      "primaryActions": 1,
+      "toolbar": 0
+    }
+  ],
+  "result": "pass"
+}

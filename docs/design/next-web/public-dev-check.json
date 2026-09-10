@@ -1,0 +1,102 @@
+[
+  {
+    "route": "/",
+    "device": "desktop",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Found it? Keep it.Let your mind wander.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/support",
+    "device": "desktop",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Help, from save to sync.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/privacy",
+    "device": "desktop",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Privacy & data.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/terms",
+    "device": "desktop",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Terms of use.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/open",
+    "device": "desktop",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Continue to your collection.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/",
+    "device": "mobile",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Found it? Keep it.Let your mind wander.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/support",
+    "device": "mobile",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Help, from save to sync.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/privacy",
+    "device": "mobile",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Privacy & data.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/terms",
+    "device": "mobile",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Terms of use.",
+    "secret": false,
+    "errors": []
+  },
+  {
+    "route": "/open",
+    "device": "mobile",
+    "status": 200,
+    "overflow": false,
+    "images": [],
+    "h1": "Continue to your collection.",
+    "secret": false,
+    "errors": []
+  }
+]
