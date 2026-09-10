@@ -1,6 +1,7 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { Folder, Organization } from '../api/types.ts';
 import { addUserTag, STARTER_TAGS, tagSuggestions } from '../collection/organization.ts';
 import { useSession } from '../session/SessionProvider.tsx';

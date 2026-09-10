@@ -1,6 +1,7 @@
+import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Brand, Button, Screen } from '../../components/ui.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
 import { colors, typography } from '../../theme.ts';

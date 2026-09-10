@@ -1,7 +1,8 @@
+import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import * as Crypto from 'expo-crypto';
 import { router, Stack, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, ScrollView, Text } from 'react-native';
+import { Linking, ScrollView } from 'react-native';
 import { createFoundkeepClient, FoundkeepApiError } from '../../api/client.ts';
 import { isOAuthProvider, OAUTH_NAMES, parseOAuthReturn, pendingOAuth, validAuthorizeUrl, type PendingOAuth } from '../../auth-oauth.ts';
 import { FrostedPanel } from '../../components/ScenicSurface.tsx';

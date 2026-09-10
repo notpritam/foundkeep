@@ -1,7 +1,8 @@
+import { AdaptiveText as Text } from '../../../components/AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import FoundkeepShared from '../../../../modules/foundkeep-shared/src';
 import { OAuthButtons } from '../../../components/OAuthButtons.tsx';
 import { useDock } from '../../../components/FloatingDock.tsx';

@@ -1,7 +1,8 @@
+import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import * as Clipboard from 'expo-clipboard';
 import { type Href, Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Brand, Button, Message, Screen } from '../../components/ui.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
 import { colors, typography } from '../../theme.ts';

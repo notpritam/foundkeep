@@ -1,8 +1,9 @@
+import { AdaptiveText as Text } from '../../../components/AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { Capture } from '../../../api/types.ts';
 import { CapturePreview, captureLabels } from '../../../components/CapturePreview.tsx';
 import { EditCaptureSheet } from '../../../components/EditCaptureSheet.tsx';

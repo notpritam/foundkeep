@@ -1,6 +1,7 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import { useCallback, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { FlatList, RefreshControl, StyleSheet, Text, useWindowDimensions, View, type ListRenderItemInfo, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, useWindowDimensions, View, type ListRenderItemInfo, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import type { Capture } from '../api/types.ts';
 import { galleryColumns } from '../collection/preview.ts';
 import { useCollection } from '../collection/useCollection.ts';

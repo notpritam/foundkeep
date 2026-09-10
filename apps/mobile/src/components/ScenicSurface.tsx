@@ -1,12 +1,13 @@
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Platform, StyleSheet, useColorScheme, View, type ViewProps, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Platform, StyleSheet, useColorScheme, useWindowDimensions, View, type ViewProps, type ViewStyle } from 'react-native';
 import { colors, palettes } from '../theme.ts';
 
-const MaterialContext = createContext({ opaque: true, scheme: 'light' as 'light' | 'dark' });
+const MaterialContext = createContext({ opaque: true, scheme: 'light' as 'light' | 'dark', fontScale: 1 });
 
 /** One accessibility subscription for all materials, never one blur per card. */
 export function MaterialProvider({ children }: { children: ReactNode }) {
+  const { fontScale } = useWindowDimensions();
   const scheme: 'light' | 'dark' = useColorScheme() === 'dark' ? 'dark' : 'light';
   const [transparency, setTransparency] = useState(true);
   const [contrast, setContrast] = useState(false);
@@ -26,7 +27,7 @@ export function MaterialProvider({ children }: { children: ReactNode }) {
     const increased = AccessibilityInfo.addEventListener('darkerSystemColorsChanged', setContrast);
     return () => { active = false; reduced.remove(); increased.remove(); };
   }, []);
-  const value = useMemo(() => ({ opaque: transparency || contrast, scheme }), [transparency, contrast, scheme]);
+  const value = useMemo(() => ({ opaque: transparency || contrast, scheme, fontScale }), [transparency, contrast, scheme, fontScale]);
   return <MaterialContext.Provider value={value}>
     {Platform.OS === 'web' ? <style>{`:root{${webPalette('light')}}@media(prefers-color-scheme:dark){:root{${webPalette('dark')}}}`}</style> : null}
     {children}

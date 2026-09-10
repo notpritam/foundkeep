@@ -1,6 +1,7 @@
+import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { FrostedPanel } from '../../components/ScenicSurface.tsx';
 import { Brand, Button, Field, Message, Screen } from '../../components/ui.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';

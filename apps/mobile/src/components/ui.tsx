@@ -1,5 +1,6 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, TextInput, type TextInputProps, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography } from '../theme.ts';
 
@@ -21,7 +22,7 @@ export function LegalFooter() {
 }
 
 export function Button({ label, onPress, loading = false, disabled = false, secondary = false, danger = false, icon }: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean; secondary?: boolean; danger?: boolean; icon?: ReactNode }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, danger && styles.buttonDanger, pressed && styles.buttonPressed, (disabled || loading) && styles.buttonDisabled]}>{loading ? <ActivityIndicator color={secondary && !danger ? colors.ink : danger ? colors.onError : colors.paper} /> : <><View style={styles.buttonIcon}>{icon}</View><Text style={[styles.buttonText, secondary && !danger && styles.buttonTextSecondary, danger && { color: colors.onError }]}>{label}</Text></>}</Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.buttonSecondary, danger && styles.buttonDanger, pressed && styles.buttonPressed, (disabled || loading) && styles.buttonDisabled]}>{loading ? <ActivityIndicator color={secondary && !danger ? colors.ink : danger ? colors.onError : colors.paper} /> : <View style={styles.buttonContent}>{icon ? <View style={styles.buttonIcon}>{icon}</View> : null}<Text style={[styles.buttonText, Boolean(icon) && styles.buttonIconText, secondary && !danger && styles.buttonTextSecondary, danger && { color: colors.onError }]}>{label}</Text>{icon ? <View style={styles.buttonIcon} /> : null}</View>}</Pressable>;
 }
 
 export function Field({ label, help, ...props }: TextInputProps & { label: string; help?: string }) {
@@ -46,8 +47,10 @@ const styles = StyleSheet.create({
   buttonDanger: { backgroundColor: colors.error },
   buttonPressed: { opacity: .78 },
   buttonDisabled: { opacity: .46 },
-  buttonIcon: { position: 'absolute', left: 18 },
-  buttonText: { color: colors.paper, fontSize: 15, fontWeight: '600' },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%' },
+  buttonIcon: { width: 20, alignItems: 'center' },
+  buttonIconText: { flex: 1 },
+  buttonText: { color: colors.paper, fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'center' },
   buttonTextSecondary: { color: colors.ink },
   field: { gap: 7 },
   input: { minHeight: 52, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface, paddingHorizontal: 14, color: colors.ink, fontSize: 17 },

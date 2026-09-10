@@ -1,6 +1,7 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { Capture } from '../api/types.ts';
 import { captureTitle } from '../collection/model.ts';
 import { CapturePreview, captureIcons, captureLabels } from './CapturePreview.tsx';

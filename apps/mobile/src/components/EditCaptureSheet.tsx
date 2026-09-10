@@ -1,5 +1,6 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import { useState } from 'react';
-import { Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import type { Capture } from '../api/types.ts';
 import { useSession } from '../session/SessionProvider.tsx';
 import { colors, typography } from '../theme.ts';

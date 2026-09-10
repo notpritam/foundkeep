@@ -1,7 +1,8 @@
+import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { router } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { OrganizationPicker, type OrganizationChoice } from '../../components/OrganizationPicker.tsx';
 import { Button, Field, Message, Screen } from '../../components/ui.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';

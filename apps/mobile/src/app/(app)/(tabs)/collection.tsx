@@ -1,7 +1,8 @@
+import { AdaptiveText as Text } from '../../../components/AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import type { CaptureType } from '../../../api/types.ts';
 import { Brand, Message, Screen } from '../../../components/ui.tsx';
 import { OrganizationPicker, type OrganizationChoice } from '../../../components/OrganizationPicker.tsx';

@@ -1,7 +1,8 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Tabs } from 'expo-router';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, Keyboard, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Animated, Keyboard, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '../session/SessionProvider.tsx';
 import { colors } from '../theme.ts';
