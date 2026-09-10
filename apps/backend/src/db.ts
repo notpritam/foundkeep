@@ -311,6 +311,10 @@ const MIGRATIONS: string[] = [
   // Client kind is recorded by the issuing route, never guessed from device names.
   `ALTER TABLE customer_connections ADD COLUMN client_kind TEXT NOT NULL DEFAULT 'unknown'
     CHECK(client_kind IN ('unknown','browser','mobile'));`,
+  // Collection arrival order and immutable saving-client metadata.
+  `ALTER TABLE customer_captures ADD COLUMN saved_via TEXT
+    CHECK(saved_via IN ('iphone','browser','dashboard'));
+   CREATE INDEX customer_captures_owner_saved ON customer_captures(account_id,created_at DESC,id DESC);`,
 ];
 
 function migrate(db: Database): void {

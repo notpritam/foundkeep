@@ -58,6 +58,26 @@ function heldUpload(cookie: string, target = app) {
   return { response, signal, controller, isCancelled: () => cancelled, close() { try { controller.close(); } catch {} } };
 }
 
+test("recent order uses collection arrival time and persists the saving platform", async () => {
+  const owner = await register();
+  const device = await connect(owner.cookie);
+  const first = (await (await capture(owner.cookie, { capturedAt: Date.now() + 60000 })).json()).capture;
+  const latest = (await (await capture(device.bearer, { capturedAt: 1000, savedVia: "iphone", sourceUrl: "https://youtube.com/watch?v=1" })).json()).capture;
+  db.query("UPDATE customer_captures SET created_at=10 WHERE id=?").run(first.id);
+  db.query("UPDATE customer_captures SET created_at=20 WHERE id=?").run(latest.id);
+  const page = await (await request("/captures?sort=recent&limit=1", "GET", undefined, owner.cookie)).json();
+  expect(page.captures[0].id).toBe(latest.id);
+  expect(page.captures[0].savedVia).toBe("browser");
+  const next = await (await request(`/captures?sort=recent&limit=1&cursor=${page.nextCursor}`, "GET", undefined, owner.cookie)).json();
+  expect(next.captures[0].id).toBe(first.id);
+  expect(next.captures[0].savedVia).toBe("dashboard");
+  expect(next.nextCursor).toBeNull();
+  const native = await (await mobile("/captures?sort=recent", "GET", undefined, device.bearer)).json();
+  expect(native.captures.map((item: any) => item.id)).toEqual([latest.id, first.id]);
+  expect((await request("/captures?sort=invalid", "GET", undefined, owner.cookie)).status).toBe(400);
+  expect((await mobile("/captures?sort=invalid", "GET", undefined, device.bearer)).status).toBe(400);
+});
+
 describe("customer account security", () => {
   test("article preview DTOs use an owned same-origin endpoint and ignore caller-selected URLs", async () => {
     const owner = await register();
@@ -897,6 +917,15 @@ describe("private customer captures", () => {
     expect(third.nextCursor).toBeNull();
     expect(new Set([...first.captures, ...second.captures, ...third.captures].map(item => item.id)).size).toBe(105);
     expect((await mobile("/captures?cursor=not-a-cursor", "GET", undefined, bearer)).status).toBe(400);
+    const recentFirst = await (await mobile("/captures?sort=recent", "GET", undefined, bearer)).json();
+    const recentSecond = await (await mobile(`/captures?sort=recent&cursor=${recentFirst.nextCursor}`, "GET", undefined, bearer)).json();
+    const recentThird = await (await mobile(`/captures?sort=recent&cursor=${recentSecond.nextCursor}`, "GET", undefined, bearer)).json();
+    const recent = [...recentFirst.captures, ...recentSecond.captures, ...recentThird.captures];
+    expect(new Set(recent.map(item => item.id)).size).toBe(105);
+    expect(recent.every(item => item.savedVia === "iphone")).toBe(true);
+    expect(recent.map(item => item.id)).toEqual(db.query("SELECT id FROM customer_captures ORDER BY created_at DESC,id DESC").all().map((item: any) => item.id));
+    expect((await mobile(`/captures?sort=recent&cursor=${first.nextCursor}`, "GET", undefined, bearer)).status).toBe(400);
+
   });
 
   test("models universal mobile items and preserves multi-share provenance", async () => {

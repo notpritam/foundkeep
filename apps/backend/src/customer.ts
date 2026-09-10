@@ -1,3 +1,4 @@
+import { savedVia, type SavedVia } from '../../../packages/shared/src/collection-presentation.ts';
 import type { Database } from "bun:sqlite";
 import { createHash, randomBytes } from "node:crypto";
 import { Hono, type Context } from "hono";
@@ -43,7 +44,7 @@ const MAX_IMAGE = 8 * 1024 * 1024;
 const MAX_CAPTURES = 1000;
 const MAX_BYTES = 200 * 1024 * 1024;
 const TYPES = new Set(["screenshot", "selection", "bookmark", "image", "note", "tweet", "video", "audio", "document", "file"]);
-const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json,manual_tags,folder_id,(SELECT name FROM customer_folders WHERE id=customer_captures.folder_id AND account_id=customer_captures.account_id) AS folder_name";
+const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,saved_via,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json,manual_tags,folder_id,(SELECT name FROM customer_folders WHERE id=customer_captures.folder_id AND account_id=customer_captures.account_id) AS folder_name";
 // List views need excerpts, not every article and OCR result in the account.
 // Keep the full representation as the default for installed older clients.
 const CARD_TEXT_COLUMNS = new Set(["selection_text", "note_text", "article_text", "summary", "ocr_text"]);
@@ -56,7 +57,7 @@ interface ConnectionRow { client_kind: "unknown" | "browser" | "mobile"; id: str
 interface CredentialRow { id: string; account_id: string; expires_at: number }
 export interface CustomerCaptureRow {
   id: string; account_id: string; client_id: string; type: string; status: string;
-  batch_id: string | null;
+  batch_id: string | null; saved_via: SavedVia | null;
   source_url: string | null; source_title: string | null; selection_text: string | null;
   note_text: string | null; article_text: string | null; blob_data?: Uint8Array | null;
   blob_mime: string | null; blob_bytes: number; storage_bytes: number;
@@ -77,21 +78,22 @@ class CustomerError extends Error {
 function fail(status: CustomerError["status"], code: string, message: string): never { throw new CustomerError(status, code, message); }
 function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
 function secret() { return randomBytes(32).toString("base64url"); }
-function mobileCursor(raw: string): { capturedAt: number; id: string } | null {
+function mobileCursor(raw: string, recent = false): { capturedAt: number; id: string } | null {
   if (!raw) return null;
   if (raw.length > 256 || !/^[A-Za-z0-9_-]+$/.test(raw)) fail(400, "invalid_cursor", "Refresh the collection and try again.");
   try {
     const data = Buffer.from(raw, "base64url");
     if (data.toString("base64url") !== raw) throw new Error();
     const value = JSON.parse(data.toString("utf8"));
+    const key = recent ? "createdAt" : "capturedAt";
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 2 ||
-        !Number.isSafeInteger(value.capturedAt) || value.capturedAt < 0 ||
+        !Number.isSafeInteger(value[key]) || value[key] < 0 ||
         typeof value.id !== "string" || !/^[A-Za-z0-9-]{1,80}$/.test(value.id)) throw new Error();
-    return value;
+    return { capturedAt: value[key], id: value.id };
   } catch { fail(400, "invalid_cursor", "Refresh the collection and try again."); }
 }
-function encodeMobileCursor(row: CustomerCaptureRow) {
-  return Buffer.from(JSON.stringify({ capturedAt: row.captured_at, id: row.id })).toString("base64url");
+function encodeMobileCursor(row: CustomerCaptureRow, recent = false) {
+  return Buffer.from(JSON.stringify({ [recent ? "createdAt" : "capturedAt"]: recent ? row.created_at : row.captured_at, id: row.id })).toString("base64url");
 }
 function accountDto(row: AccountRow) { return { id: row.id, email: row.email, name: row.name, createdAt: row.created_at, hasPassword: !!row.password_hash }; }
 function connectionDto(row: ConnectionRow) { return { id: row.id, name: row.name, clientKind: row.client_kind, createdAt: row.created_at, lastSeenAt: row.last_seen_at }; }
@@ -112,7 +114,7 @@ export function customerCaptureDto(row: CustomerCaptureRow) {
     fileUrl: row.file_path ? `/api/captures/${row.id}/file` : null,
     width: row.width, height: row.height, capturedAt: row.captured_at, createdAt: row.created_at,
     updatedAt: row.updated_at, enrichError: row.enrich_error,
-    provenance,
+    provenance, savedVia: savedVia({ savedVia: row.saved_via, provenance }),
     processingOptions: parseStoredJson<ProcessingOptions>(row.processing_options_json, { ...DEFAULT_PROCESSING_OPTIONS }),
   };
 }
@@ -744,8 +746,21 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     }
   });
 
+  function savingClient(current: Auth): SavedVia | null {
+    if (current.kind === "session") return "dashboard";
+    const row = db.query("SELECT client_kind FROM customer_connections WHERE id=? AND account_id=?").get(current.credentialId, current.account.id) as { client_kind: string } | null;
+    return row?.client_kind === "mobile" ? "iphone" : row?.client_kind === "browser" ? "browser" : null;
+  }
+  function recentOrder(c: C) {
+    const sort = c.req.query("sort") || "captured";
+    if (!["recent", "captured"].includes(sort)) fail(400, "invalid_sort", "Choose a valid save order.");
+    return sort === "recent";
+  }
+
   app.get("/captures", (c) => {
     const current = auth(c, true);
+    const recent = recentOrder(c);
+    const dateColumn = recent ? "created_at" : "captured_at";
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
     if (search.length > 200 || (type && !TYPES.has(type))) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
@@ -766,14 +781,14 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
       let value: unknown;
       try { if (cursor.length > 300) throw new Error(); value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")); } catch { fail(400, "invalid_cursor", "This page cursor is invalid."); }
       if (!Array.isArray(value) || value.length !== 2 || !Number.isSafeInteger(value[0]) || typeof value[1] !== "string" || value[1].length > 64) fail(400, "invalid_cursor", "This page cursor is invalid.");
-      where.push("(captured_at < ? OR (captured_at = ? AND id < ?))");
+      where.push(`(${dateColumn} < ? OR (${dateColumn} = ? AND id < ?))`);
       args.push(value[0], value[0], value[1]);
     }
-    const rows = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC, id DESC LIMIT ?`).all(...args, limit + 1) as CustomerCaptureRow[];
+    const rows = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY ${dateColumn} DESC, id DESC LIMIT ?`).all(...args, limit + 1) as CustomerCaptureRow[];
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
-    const nextCursor = hasMore && last ? Buffer.from(JSON.stringify([last.captured_at, last.id])).toString("base64url") : null;
+    const nextCursor = hasMore && last ? Buffer.from(JSON.stringify([recent ? last.created_at : last.captured_at, last.id])).toString("base64url") : null;
     return c.json({ captures: page.map(customerCaptureDto), nextCursor, total });
   });
 
@@ -834,7 +849,8 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
       const id = crypto.randomUUID();
       const now = Date.now();
       db.query("INSERT INTO customer_captures(id,account_id,client_id,batch_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,provenance_json,processing_options_json,folder_id,manual_tags) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, batchId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now, provenanceJson, processingOptionsJson, organization.folderId, organization.manualTags);
-      return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
+      db.query("UPDATE customer_captures SET saved_via=? WHERE id=? AND account_id=?").run(savingClient(current), id, current.account.id);
+        return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
     })();
     return c.json(result, result.duplicate ? 200 : 201);
     } finally { release(); }
@@ -916,6 +932,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
           storageBytes,capturedAt as number,now,now,provenanceJson,processingOptionsJson,
           fileName,stored!.relativePath,stored!.mime,stored!.bytes,organization.folderId,organization.manualTags,
         );
+        db.query("UPDATE customer_captures SET saved_via=? WHERE id=? AND account_id=?").run(savingClient(current), id, current.account.id);
         return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
       })();
       if (result.duplicate) removeCustomerFile(config.dataDir, stored.relativePath);
@@ -959,12 +976,14 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
 
   app.get("/mobile/captures", (c) => {
     const current = auth(c);
+    const recent = recentOrder(c);
+    const dateColumn = recent ? "created_at" : "captured_at";
     if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
     const view = c.req.query("view") || "full";
     const batchId = c.req.query("batchId");
-    const cursor = mobileCursor(c.req.query("cursor") || "");
+    const cursor = mobileCursor(c.req.query("cursor") || "", recent);
     if (search.length > 200 || (type && !TYPES.has(type)) || !["full", "cards"].includes(view)) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
     if (batchId !== undefined && !/^[A-Za-z0-9_-]{1,80}$/.test(batchId)) fail(400, "invalid_batch", "The shared collection identifier is invalid.");
     const where = ["account_id = ?"];
@@ -991,12 +1010,12 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     }
     const total = (db.query(`SELECT COUNT(*) count FROM customer_captures WHERE ${where.join(" AND ")}`).get(...args) as { count: number }).count;
     if (cursor) {
-      where.push("(captured_at < ? OR (captured_at = ? AND id < ?))");
+      where.push(`(${dateColumn} < ? OR (${dateColumn} = ? AND id < ?))`);
       args.push(cursor.capturedAt, cursor.capturedAt, cursor.id);
     }
-    const rows = db.query(`SELECT ${view === "cards" ? CARD_COLUMNS : CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC,id DESC LIMIT 51`).all(...args) as CustomerCaptureRow[];
+    const rows = db.query(`SELECT ${view === "cards" ? CARD_COLUMNS : CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY ${dateColumn} DESC,id DESC LIMIT 51`).all(...args) as CustomerCaptureRow[];
     const page = rows.slice(0, 50);
-    return c.json({ captures: page.map(row => ({ ...customerCaptureDto(row), contentView: view === "cards" ? "card" : "full" })), nextCursor: rows.length > 50 ? encodeMobileCursor(page.at(-1)!) : null, total });
+    return c.json({ captures: page.map(row => ({ ...customerCaptureDto(row), contentView: view === "cards" ? "card" : "full" })), nextCursor: rows.length > 50 ? encodeMobileCursor(page.at(-1)!, recent) : null, total });
   });
 
   function serveCustomerFile(c: C, cookieOnly: boolean) {
