@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light"><title>Foundkeep · Mobile directions</title>
+  <link rel="stylesheet" href="styles.css"><script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="lab-header"><a class="lab-brand" href="?screen=welcome"><img src="assets/mark.png" alt="" width="28" height="28">Foundkeep <span>/ Mobile directions</span></a><span class="preview-label">Design preview · sample content</span></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">A fresh direction</p><h1>A collection that feels like yours.</h1><p>Three complete visual directions. Compare a screen, try the flow, and save your favorites.</p></div><button id="review" class="quiet-button">Your choices <span id="choice-count">0 / 14</span></button></div>
+    <nav class="lab-controls" aria-label="Preview controls"><label for="screen">Screen <select id="screen"></select></label><div class="view-options" role="group" aria-label="Directions shown"><button data-view="all" aria-pressed="true">Compare all</button><button data-view="a" aria-pressed="false">A</button><button data-view="b" aria-pressed="false">B</button><button data-view="c" aria-pressed="false">C</button></div><button id="next" class="quiet-button">Next screen <span aria-hidden="true">→</span></button></nav>
+    <div id="screen-description" class="screen-description"></div>
+    <section id="variants" class="variants" aria-label="Screen alternatives"></section>
+    <p id="save-status" class="save-status" role="status" aria-live="polite">Choices stay in this browser until you press “Send choices”.</p>
+  </main>
+  <dialog id="choices"><form method="dialog"><div class="dialog-heading"><h2>Your direction</h2><button class="icon-button" aria-label="Close choices">×</button></div></form><p>Choose one direction for the whole app, or mix your favorite screens.</p><div id="choice-list"></div><button id="send" class="send-button">Send choices</button><p id="send-result" role="status"></p></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
