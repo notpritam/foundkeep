@@ -78,6 +78,8 @@ export default function CaptureDetail() {
   ]);
   const tags = [...new Set([...(capture.userTags || []), ...(capture.tags || [])])];
   const hasPreview = Boolean(capturePreviewSource(capture, token, account?.id));
+  const imageAspect = (capture.type === 'image' || capture.type === 'screenshot') && capture.width && capture.height
+    ? Math.max(.65, Math.min(1.9, capture.width / capture.height)) : 1.05;
   const publisher = capture.provenance?.siteName || capture.provenance?.sourceApplication;
   return <Screen top={false}>
     <Stack.Screen options={{ title: 'Saved item', headerRight: () => <View style={styles.actions}>
@@ -86,7 +88,7 @@ export default function CaptureDetail() {
       <QuickAction label="More saved item actions" icon="ellipsis-horizontal" onPress={more} />
     </View> }} />
     <ScrollView contentContainerStyle={styles.page}>
-      {hasPreview ? <CapturePreview capture={capture} contain={capture.type === 'image' || capture.type === 'screenshot'} style={styles.cover} /> : null}
+      {hasPreview ? <CapturePreview capture={capture} contain={capture.type === 'image' || capture.type === 'screenshot'} style={[styles.cover, { aspectRatio: imageAspect }]} /> : null}
       <FrostedPanel style={[styles.hero, hasPreview && styles.overlap]}>
         <Text selectable style={typography.title}>{captureTitle(capture)}</Text>
         <Text style={typography.small}>{publisher || captureLabels[capture.type]} · Saved {date(capture.capturedAt)}</Text>
