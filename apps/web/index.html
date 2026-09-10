@@ -54,7 +54,7 @@
       crossorigin
     />
     <link rel="stylesheet" href="landing.css?v=20260909" />
-    <script src="app.js?v=20260909" defer></script>
+    <script src="app.js?v=20260910-extension-fix" defer></script>
     <link
       rel="preload"
       as="image"
@@ -240,13 +240,14 @@
                   <use href="#i-arrow" /></svg></a
               ><a
                 class="button button-glass"
+                data-extension-install
                 href="https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk"
                 target="_blank"
                 rel="noopener noreferrer"
                 ><svg aria-hidden="true" viewBox="0 0 24 24">
                   <use href="#i-chrome" />
                 </svg>
-                Add to Chrome</a
+                <span data-extension-label>Add to Chrome</span></a
               >
             </div>
             <div class="capture-dock" aria-label="What you can save">
@@ -621,10 +622,11 @@
                 </p>
                 <a
                   class="text-link"
+                  data-extension-install
                   href="https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk"
                   target="_blank"
                   rel="noopener noreferrer"
-                  >Add to Chrome
+                  ><span data-extension-label>Add to Chrome</span>
                   <svg aria-hidden="true" viewBox="0 0 24 24">
                     <use href="#i-arrow" /></svg
                 ></a>
@@ -840,15 +842,15 @@
                 href="https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk"
                 target="_blank"
                 rel="noopener noreferrer"
-                >Add to Chrome
+                ><span data-extension-label>Add to Chrome</span>
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <use href="#i-arrow" /></svg></a
-              ><span class="download-note"
+              ><span class="download-note" role="status" aria-live="polite"
                 >Chrome Web Store · Version 1.0.0</span
               ><a
                 class="manual-link"
                 data-manual-install
-                href="foundkeep-extension.zip?build=1.6.1"
+                href="foundkeep-extension.zip?build=1.6.2"
                 download="foundkeep-extension.zip"
                 >Or download the manual browser ZIP
                 <svg aria-hidden="true" viewBox="0 0 24 24">

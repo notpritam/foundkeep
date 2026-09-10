@@ -78,7 +78,7 @@ test("capture demo saves and resets without requiring an account", async (t) => 
 test("installation offers the public Store release and a working manual package", async (t) => {
   const page = await pageFor(t);
   const storeHref = await page
-    .locator("[data-extension-install]")
+    .locator("[data-extension-install]").first()
     .getAttribute("href");
   assert.equal(
     storeHref,
@@ -262,11 +262,11 @@ test("landing page presents Foundkeep and its branded extension download", async
   const copy = await page.locator("body").textContent();
   assert.match(copy, /Foundkeep/);
   assert.doesNotMatch(copy, /\bAtlas\b/);
-  assert.equal(
+  assert.match(
     await page
       .locator('a[download="foundkeep-extension.zip"]')
       .getAttribute("href"),
-    "foundkeep-extension.zip?build=1.6.1",
+    /^foundkeep-extension\.zip\?build=\d+\.\d+\.\d+$/,
   );
   assert.equal(
     await page.locator('meta[property="og:image"]').getAttribute("content"),
@@ -284,4 +284,68 @@ test("legacy website redirects while extension compatibility routes stay live", 
     /handle @extension_compat\s*\{\s*reverse_proxy localhost:8790/s,
   );
   assert.match(caddy, /redir https:\/\/foundkeep\.app\{uri\} permanent/);
+});
+
+test('landing recognizes an installed browser and updates every Store call to action', async t => {
+  const context = await browser.newContext(); t.after(() => context.close());
+  await context.addInitScript(() => {
+    window.chrome = { runtime: { sendMessage(id, message, callback) {
+      callback(id === 'cficnecbdbiddngllpfbacabgbcjinmk' && message.kind === 'atlas-ping' ? { ok: true, version: '1.0.0', account: null } : undefined);
+    } } };
+  });
+  const page = await context.newPage(); await page.goto(base + '/');
+  await page.waitForFunction(() => /installed/i.test(document.querySelector('.download-note').textContent), null, { timeout: 3000 });
+  assert.equal(await page.locator('[data-extension-install][href*="chromewebstore.google.com/detail/"]').count(), 0, 'Installed users should not be asked to install again');
+  const links = page.locator('[data-extension-install]');
+  assert.equal(await links.count(), 3);
+  for (const link of await links.all()) {
+    assert.match(await link.textContent(), /Connect extension/);
+    assert.equal(await link.getAttribute('href'), 'dashboard.html');
+    assert.equal(await link.getAttribute('target'), null);
+  }
+});
+
+test('landing rechecks installation when returning and recovers from config failure', async t => {
+  const context = await browser.newContext(); t.after(() => context.close());
+  await context.route('**/customer-config.json', route => route.fulfill({ status: 503, body: 'Temporarily unavailable' }));
+  await context.addInitScript(() => {
+    window.__extensionInstalled = false;
+    window.chrome = { runtime: { sendMessage(id, message, callback) {
+      callback(window.__extensionInstalled && id === 'cficnecbdbiddngllpfbacabgbcjinmk' && message.kind === 'atlas-ping' ? { ok: true, version: '1.0.0', account: { id: 'paired-account' } } : undefined);
+    } } };
+  });
+  const page = await context.newPage(); await page.goto(base + '/');
+  assert.match(await page.locator('[data-extension-install]').first().getAttribute('href'), /chromewebstore.google.com/);
+  await page.evaluate(() => { window.__extensionInstalled = true; window.dispatchEvent(new Event('focus')); });
+  await page.waitForFunction(() => document.querySelector('[data-extension-install]').textContent.includes('Open dashboard'), null, { timeout: 3000 });
+  assert.match(await page.locator('.download-note').textContent(), /connected/i);
+  await page.evaluate(() => { window.__extensionInstalled = false; window.dispatchEvent(new Event('focus')); });
+  await page.waitForFunction(() => document.querySelector('[data-extension-install]').textContent.includes('Add to Chrome'), null, { timeout: 3000 });
+});
+
+test('returning from an explicit Store visit reloads a page without messaging only once', async t => {
+  const context = await browser.newContext(); t.after(() => context.close());
+  await context.addInitScript(() => {
+    const key = '__test_page_loads';
+    sessionStorage.setItem(key, String(Number(sessionStorage.getItem(key) || 0) + 1));
+  });
+  const page = await context.newPage(); await page.goto(base + '/');
+  // Wait for the module that binds installation events without opening the Store.
+  await page.waitForFunction(() => document.querySelector('.download-note').textContent.includes('Automatic updates'));
+  await page.evaluate(() => {
+    const install = document.querySelector('[data-extension-install]');
+    install.addEventListener('click', event => event.preventDefault(), { once: true });
+    install.click();
+  });
+  await Promise.all([
+    page.waitForEvent('load'),
+    page.evaluate(() => window.dispatchEvent(new Event('focus'))),
+  ]);
+  await page.waitForFunction(() => document.querySelector('.download-note').textContent.includes('Automatic updates'));
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('__test_page_loads')), '2');
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('foundkeep-install-return')), null);
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  // Allow a complete frame after the synchronous focus handler to detect a reload loop.
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('__test_page_loads')), '2');
 });

@@ -1,11 +1,13 @@
 export const EXTENSION_ID = 'mjfcgmboaijfcaanepdipbgmipnccnpn';
+const STORE_EXTENSION_ID = 'cficnecbdbiddngllpfbacabgbcjinmk';
+const STORE_URL = `https://chromewebstore.google.com/detail/${STORE_EXTENSION_ID}`;
 let accountContext = null;
 // Bound once by the dashboard's first authenticated account response. Auth pages
 // never set this context, and later cookie changes cannot overwrite its intent.
 export function setAccountContext(id) {
   if (accountContext === null && typeof id === 'string' && id) accountContext = id;
 }
-// Set only after a public listing is available. Until then, installation is manual.
+// Server configuration can add supported builds; the public Store remains the fallback.
 let configPromise;
 export function customerConfig() {
   return configPromise ||= fetch('/customer-config.json', { cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(5000) })
@@ -20,7 +22,7 @@ export function customerConfig() {
       } catch { /* No published listing configured. */ }
       return { extensionIds, storeUrl };
     })
-    .catch(() => ({ extensionIds: [EXTENSION_ID], storeUrl: null }));
+    .catch(() => ({ extensionIds: [STORE_EXTENSION_ID, EXTENSION_ID], storeUrl: STORE_URL }));
 }
 
 export class ApiError extends Error {

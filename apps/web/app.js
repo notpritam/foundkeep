@@ -19,33 +19,74 @@ function setDemoSaved(saved) {
 saveButton?.addEventListener("click", () => setDemoSaved(true));
 resetButton?.addEventListener("click", () => setDemoSaved(false));
 
-// A Web Store install button is shown only when a verified public listing is configured.
-import("./customer.js?v=1.5.0")
-  .then(({ customerConfig }) => customerConfig())
-  .then((config) => {
-    if (!config.storeUrl) return;
-    const install = document.querySelector("[data-extension-install]");
-    if (!install) return;
-    install.href = config.storeUrl;
-    install.removeAttribute("download");
-    install.target = "_blank";
-    install.rel = "noopener noreferrer";
-    install.textContent = "Add to Chrome";
-    document.querySelector(".download-note").textContent =
-      "Available now in the Chrome Web Store · Version 1.0.0 · Automatic updates";
-    if (!document.querySelector("[data-manual-install]")) {
-      const manual = document.createElement("a");
-      manual.href = "foundkeep-extension.zip?build=1.6.1";
-      manual.download = "foundkeep-extension.zip";
-      manual.dataset.manualInstall = "";
-      manual.className = "text-link local-install-choice";
-      manual.textContent = "Manual ZIP for Edge, Brave, Opera or Vivaldi";
-      install.after(manual);
-    }
+// Installation is detected by a real extension response, never a cached claim.
+import("./customer.js?v=20260910-extension-fix")
+  .then(async ({ customerConfig, extensionMessage }) => {
+    const config = await customerConfig();
+    const installs = [...document.querySelectorAll("[data-extension-install]")];
+    const note = document.querySelector(".download-note");
+    if (!installs.length) return;
+    const pendingInstall = "foundkeep-install-return";
+    let checkSequence = 0;
+    const render = (extension) => {
+      for (const install of installs) {
+        const label = install.querySelector("[data-extension-label]") || install;
+        if (extension) {
+          install.href = "dashboard.html";
+          install.removeAttribute("target");
+          install.removeAttribute("download");
+          label.textContent = extension.account ? "Open dashboard" : "Connect extension";
+        } else if (config.storeUrl) {
+          install.href = config.storeUrl;
+          install.removeAttribute("download");
+          install.target = "_blank";
+          install.rel = "noopener noreferrer";
+          label.textContent = "Add to Chrome";
+        }
+      }
+      if (note) note.textContent = extension
+        ? extension.account
+          ? "Foundkeep is installed and connected in this browser."
+          : "Foundkeep is installed. Connect your account to sync your saves."
+        : "Available now in the Chrome Web Store · Version 1.0.0 · Automatic updates";
+    };
+    const check = async () => {
+      const current = ++checkSequence;
+      let extension = null;
+      try {
+        // An unavailable legacy installation must not delay a working Store one.
+        extension = await Promise.any(config.extensionIds.map(id => extensionMessage({ kind: "atlas-ping" }, id)));
+      } catch { /* A missing or disabled extension keeps the install links. */ }
+      if (current === checkSequence) render(extension);
+    };
+    const recheck = () => {
+      if (document.visibilityState === "hidden") return;
+      let pending = false;
+      try {
+        const started = Number(sessionStorage.getItem(pendingInstall));
+        pending = started > Date.now() - 30 * 60 * 1000;
+        sessionStorage.removeItem(pendingInstall);
+      } catch { /* Detection also works when browser storage is unavailable. */ }
+      // Chrome may expose external messaging only after a document reload when
+      // an extension is installed in another tab. Reload once after an explicit
+      // Store visit; do not loop or reload ordinary returning visitors.
+      if (pending && !globalThis.chrome?.runtime?.sendMessage) {
+        location.reload();
+        return;
+      }
+      void check();
+    };
+    for (const install of installs) install.addEventListener("click", () => {
+      if (install.href !== config.storeUrl) return;
+      try { sessionStorage.setItem(pendingInstall, String(Date.now())); } catch {}
+    });
+    window.addEventListener("focus", recheck);
+    window.addEventListener("pageshow", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    render(null);
+    void check();
   })
-  .catch(() => {
-    /* Manual ZIP installation remains available without configuration. */
-  });
+  .catch(() => { /* Static Store and manual ZIP links remain available. */ });
 
 // The compact menu is progressively enhanced; without JS, hero and footer links remain usable.
 const menuToggle = document.querySelector(".menu-toggle");
