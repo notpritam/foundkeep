@@ -8,6 +8,7 @@ import { useSession } from '../session/SessionProvider.tsx';
 import { colors } from '../theme.ts';
 import { useMotionAllowed } from './motion.tsx';
 import { GlassSurface } from './ScenicSurface.tsx';
+import { createDockMotion, dockSpring } from './dockMotion.ts';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 const DockContext = createContext({ collapsed: false, setCollapsed: (_value: boolean) => {}, bottomSpace: 100, height: 60 });
@@ -47,8 +48,7 @@ export function FloatingDock({ state, descriptors, navigation, insets }: TabBarP
   const stacked = fontScale >= 1.3;
   const compact = collapsed && state.routes[state.index]?.name === 'collection' && !stacked && !screenReader;
   const expandedWidth = Math.min(120, (width - insets.left - insets.right - 32 - 60 - 10 - 12) / 2);
-  const tabWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [expandedWidth, 56] });
-  const labelWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [expandedWidth - 44, 0] });
+  const { tabWidth, labelWidth, labelOpacity } = useMemo(() => createDockMotion(progress, expandedWidth), [progress, expandedWidth]);
   const canWrite = policy.capture.note && !updateRequired;
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export function FloatingDock({ state, descriptors, navigation, insets }: TabBarP
     // Only the two small tab widths animate, once at a scroll-state boundary.
     // No opacity is applied to the glass or any of its ancestors.
     if (!motion) { progress.stopAnimation(); progress.setValue(compact ? 1 : 0); return; }
-    const animation = Animated.spring(progress, { toValue: compact ? 1 : 0, stiffness: 330, damping: 34, mass: 1, useNativeDriver: false });
+    const animation = Animated.spring(progress, { ...dockSpring, toValue: compact ? 1 : 0 });
     animation.start();
     return () => animation.stop();
   }, [compact, motion, progress]);
@@ -82,7 +82,7 @@ export function FloatingDock({ state, descriptors, navigation, insets }: TabBarP
             onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
             style={({ pressed }) => [styles.tab, stacked && styles.stacked, focused && styles.selected, pressed && styles.pressed]}>
             <Ionicons accessible={false} name={gallery ? focused ? 'grid' : 'grid-outline' : focused ? 'person-circle' : 'person-circle-outline'} size={24} color={focused ? colors.accent : colors.muted} />
-            <Animated.View accessible={false} importantForAccessibility="no-hide-descendants" style={stacked ? undefined : { width: labelWidth, overflow: 'hidden' }}>
+            <Animated.View accessible={false} importantForAccessibility="no-hide-descendants" style={stacked ? undefined : { width: labelWidth, opacity: labelOpacity, overflow: 'hidden' }}>
               <Text numberOfLines={1} maxFontSizeMultiplier={2} style={[styles.label, !stacked && { width: expandedWidth - 44, paddingLeft: 8 }, focused && styles.selectedLabel]}>{label}</Text>
             </Animated.View>
           </Pressable>
