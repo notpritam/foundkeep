@@ -10,10 +10,11 @@ export async function mountOAuthButtons(container, message, intent = 'sign-in') 
   try {
     const { providers } = await api('/auth/providers');
     if (!Array.isArray(providers)) return;
-    for (const provider of providers.filter(p => Object.hasOwn(names, p))) {
+    for (const provider of ['google', 'apple', 'github', 'twitter'].filter(p => providers.includes(p))) {
       const button = document.createElement('button');
-      button.type = 'button'; button.className = 'button secondary wide';
+      button.type = 'button'; button.className = 'button secondary wide oauth-provider'; button.dataset.provider = provider;
       button.textContent = intent === 'delete' ? `Verify with ${names[provider]}` : `Continue with ${names[provider]}`;
+      const icon = document.createElement('img'); icon.src = `/assets/provider-${provider}.svg`; icon.width = 20; icon.height = 20; icon.alt = ''; button.prepend(icon);
       button.addEventListener('click', async () => {
         container.querySelectorAll('button').forEach(b => { b.disabled = true; });
         setMessage(message, '');

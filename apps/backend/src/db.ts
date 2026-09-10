@@ -288,6 +288,26 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY(issuer,subject)
   );
   `,
+  // Several verified provider subjects may own the same Foundkeep library.
+  // The subject remains globally unique within its issuer; never rebind it.
+  `
+  CREATE TABLE customer_auth_identities_linked (
+    issuer TEXT NOT NULL, subject TEXT NOT NULL,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL, created_at INTEGER NOT NULL,
+    verified_email TEXT NOT NULL,
+    PRIMARY KEY(issuer,subject)
+  );
+  INSERT INTO customer_auth_identities_linked
+    SELECT i.issuer,i.subject,i.account_id,i.provider,i.created_at,''
+    FROM customer_auth_identities i JOIN customer_accounts a ON a.id=i.account_id;
+  DROP TABLE customer_auth_identities;
+  ALTER TABLE customer_auth_identities_linked RENAME TO customer_auth_identities;
+  CREATE INDEX customer_auth_verified_email ON customer_auth_identities(account_id,issuer,verified_email);
+  -- Legacy mappings remain valid, but need a new provider verification before
+  -- their email can authorize additional subjects. Pending old flows lack it.
+  DELETE FROM customer_oauth_flows;
+  `,
 ];
 
 function migrate(db: Database): void {

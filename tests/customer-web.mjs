@@ -196,6 +196,9 @@ test('bookmark details preserve a readable trail back to the original page', asy
   await openLibrary(page); await page.locator('.capture-open').click();
   await page.locator('#capture-origin').waitFor({ state: 'visible' });
   const origin = page.locator('#capture-origin');
+  assert.equal(await origin.getAttribute('open'), null);
+  assert.equal(await page.locator('#detail-body').evaluate(body => body.querySelector('.detail-section').compareDocumentPosition(body.querySelector('#capture-origin')) & Node.DOCUMENT_POSITION_FOLLOWING), 4);
+  await origin.locator(':scope > summary').click();
   assert.match(await origin.textContent(), /Example Review/);
   assert.match(await origin.textContent(), /Mina Vale/);
   assert.match(await origin.textContent(), /Saved from popup/);
@@ -347,15 +350,27 @@ test('customer screens fit phone and desktop; save visual review evidence', asyn
   const { page, model } = await pageFor(t, {
     extensionAccount: account,
     storeUrl: 'https://chromewebstore.google.com/detail/foundkeep/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    handler: ({ url }) => url.pathname === '/api/auth/providers' ? { body: { providers: ['apple', 'google'] } } : undefined,
   });
   await mkdir('.impeccable/review', { recursive: true });
-  for (const [surface, route] of [['auth', '/auth.html?mode=signup'], ['dashboard', '/dashboard.html']]) {
+  for (const [surface, route] of [['auth', '/auth.html?mode=signup'], ['dashboard', '/dashboard.html'], ['support', '/support.html'], ['privacy', '/privacy.html'], ['terms', '/terms.html']]) {
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: 1000 }); await page.goto(base + route); await page.evaluate(() => document.fonts.ready);
+      if (surface === 'auth') await page.getByRole('button', { name: 'Continue with Google' }).waitFor();
       if (surface === 'dashboard') { await page.locator('#capture-grid[aria-busy="false"]').waitFor({ state: 'attached' }); await page.evaluate(() => { for (const image of document.images) image.loading = 'eager'; }); await page.waitForFunction(() => [...document.images].every(image => image.complete)); }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${surface} overflows at ${width}`);
-      if (width !== 320) await page.screenshot({ path: `.impeccable/review/customer-${surface}-${width === 1440 ? 'desktop' : 'mobile'}.png`, fullPage: true });
+      if (width !== 320) await page.screenshot({ path: `.impeccable/review/customer-${surface}-${width === 1440 ? 'desktop' : 'mobile'}.png`, fullPage: ['auth','dashboard'].includes(surface) });
     }
+  }
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 }); await openLibrary(page);
+    await page.locator('#open-account').click();
+    await page.locator('#account-dialog').screenshot({ path: `.impeccable/review/customer-settings-${width === 1440 ? 'desktop' : 'mobile'}.png` });
+    await page.locator('[data-close="account-dialog"]').click();
+    await page.locator('.capture-card').filter({ hasText: 'A field guide' }).click();
+    await page.locator('#detail-title').filter({ hasText: 'A field guide' }).waitFor();
+    await page.locator('#detail-dialog').screenshot({ path: `.impeccable/review/customer-detail-${width === 1440 ? 'desktop' : 'mobile'}.png` });
+    await page.locator('[data-close="detail-dialog"]').click();
   }
   await mkdir('deploy/dist/store-assets', { recursive: true });
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -404,4 +419,41 @@ test('a social-only dashboard offers reauthentication instead of an unusable pas
   await page.locator('#open-delete-account').click();
   assert.equal(await page.locator('#delete-password').isVisible(), false);
   await page.getByRole('button', { name: 'Verify with Apple' }).waitFor({ state: 'visible' });
+});
+
+test('social methods lead sign-in and email is a deliberate secondary choice', async t => {
+  const { page } = await pageFor(t, { handler: ({ url }) => url.pathname === '/api/auth/providers' ? { body: { providers: ['apple', 'google'] } } : undefined });
+  await page.goto(`${base}/auth.html`);
+  await page.getByRole('button', { name: 'Continue with Google' }).waitFor();
+  assert.equal(await page.locator('#email').isVisible(), false);
+  assert.equal(await page.locator('#oauth-buttons button').first().textContent(), 'Continue with Google');
+  await page.locator('#email-signin summary').click();
+  assert.equal(await page.locator('#email').isVisible(), true);
+  await page.locator('[data-mode="recover"]').click();
+  assert.equal(await page.locator('#recovery-code').isVisible(), true);
+  assert.equal(await page.locator('#oauth-buttons').isVisible(), false);
+  await page.goBack();
+  await page.getByRole('button', { name: 'Continue with Google' }).waitFor();
+});
+
+test('provider discovery failure leaves working email sign-in', async t => {
+  const { page } = await pageFor(t, { handler: ({ url }) => url.pathname === '/api/auth/providers' ? { status: 503, body: { message: 'Unavailable' } } : undefined });
+  await page.goto(`${base}/auth.html?mode=login`);
+  await page.locator('#email').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#oauth-loading').count(), 1);
+  assert.equal(await page.locator('#oauth-loading').isVisible(), false);
+  assert.equal(await page.locator('#auth-submit').isEnabled(), true);
+});
+
+test('a failed provider start stays visible with email collapsed and can be retried', async t => {
+  const { page } = await pageFor(t, { handler: ({ url }) => {
+    if (url.pathname === '/api/auth/providers') return { body: { providers: ['google'] } };
+    if (url.pathname === '/api/auth/oauth/start') return { status: 503, body: { message: 'Google sign-in is temporarily unavailable. Try again.' } };
+  } });
+  await page.goto(`${base}/auth.html`);
+  await page.getByRole('button', { name: 'Continue with Google' }).click();
+  await page.locator('#auth-error').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#auth-error').textContent(), /temporarily unavailable/);
+  assert.equal(await page.locator('#email').isVisible(), false);
+  assert.equal(await page.getByRole('button', { name: 'Continue with Google' }).isEnabled(), true);
 });

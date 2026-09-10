@@ -12,7 +12,7 @@ Foundkeep is a customer capture product for saving readable pages, screenshots, 
 
 ## Customer flow
 
-Customers create an email/password account, save a recovery code, install the extension, and connect the browser from the dashboard. New captures save locally first and upload to that account when automatic sync is enabled. Existing local captures require explicit import consent. Website sessions and extension credentials are separate and revocable.
+Customers sign in or create an account with an enabled provider (Google and Apple in production). Email/password is a secondary option and asks customers to save a recovery code. They install the extension and connect the browser from the dashboard. New captures save locally first and upload to that account when automatic sync is enabled. Existing local captures require explicit import consent. Website sessions and extension credentials are separate and revocable.
 
 Each customer controls capture methods, readable bookmark extraction, page metadata, note source attachment, popup order, recent items, context menus, sync, OCR, summaries, tags, and success feedback from the dashboard. Preference changes do not require an extension release. Manifest permissions and executable features still do.
 
@@ -24,9 +24,15 @@ The selected mobile direction is **02 / Gallery**: a virtualized image-led colle
 
 Customers can save from the iOS Share menu, create notes in the app, view every item in a multi-item share, and edit titles/notes without replacing original provenance. Each save can belong to one optional folder and carry up to 20 personal tags. Reading, Projects, Inspiration, and starter tags are suggestions, created only when chosen. Folder names are account-owned and editable; deleting a folder keeps its captures. Personal tags remain separate from enrichment suggestions.
 
-The same private backend stores app, browser, and dashboard captures. Native previews use owner-authenticated routes. The app uses email/password and recovery codes today; social sign-in is planned and is not advertised as functional. The short legal footer is “By continuing, you agree to our Terms and Privacy Policy.”
+The same private backend stores app, browser, and dashboard captures. Native previews use owner-authenticated routes. The app supports backend-owned browser OAuth alongside email/password and recovery codes. Enabled providers are discovered from the backend. Supabase credentials and provider sessions stay server-side. The short legal footer is “By continuing, you agree to our Terms and Privacy Policy.”
 
 Application version stays 1.0.0. Compatible JavaScript and assets can use Expo Updates; Swift Share Extension, entitlements, and other native changes require a new App Store/TestFlight binary. Queued uploads are bound to their account; unscoped legacy records are retained for recovery instead of being assigned to a new account.
+
+## Account identity and customer web
+
+A verified provider email can connect several provider subjects to one private Foundkeep account. Supabase's top-level email confirmation alone is insufficient: the selected provider must attest the same email. An existing password-only account requires its password once to connect its first provider. Legacy social mappings require a fresh verified login before authorizing another subject. Established subjects never move accounts when email changes. Different addresses, including Apple private relay emails, remain separate.
+
+The web auth, library, setup, item detail and settings surfaces inherit the scenic landing's white/azure/sky/mint world with Clarity City and Geist. Social methods lead; email controls expand on request and remain available if providers cannot load. Support and policy pages share the web palette and typography. Native iPhone Gallery remains deep purple.
 
 ## Security and compatibility
 

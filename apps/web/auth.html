@@ -2,31 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Your account — Foundkeep</title><meta name="robots" content="noindex" /><meta name="theme-color" content="#f3f3f0" />
+  <title>Your account — Foundkeep</title><meta name="robots" content="noindex" /><meta name="theme-color" content="#f1f4f4" />
   <link rel="icon" href="assets/studio-mark.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=1.6.0" /><link rel="stylesheet" href="customer.css?v=1.6.0" />
-  <script type="module" src="auth.js?v=1.6.0"></script>
+  <link rel="stylesheet" href="styles.css?v=1.6.0" /><link rel="stylesheet" href="customer.css?v=20260910-scenic-auth" />
+  <script type="module" src="auth.js?v=20260910-scenic-auth"></script>
 </head>
 <body class="customer-body auth-body">
   <a class="skip-link" href="#main">Skip to account form</a>
   <header class="account-header"><a class="brand" href="/"><img src="assets/studio-mark.svg" width="36" height="36" alt="" /><span>Foundkeep</span></a><a class="text-link" href="/#get">Get the extension <span aria-hidden="true">↗</span></a></header>
   <main id="main" class="auth-layout">
-    <section class="auth-story" aria-label="Your Foundkeep collection"><h1>Good finds. <br />Always <br /><span>within reach.</span></h1><p>A private home for your screenshots, highlights and ideas. Connect your browser. Keep collecting.</p><div class="auth-art"><img src="assets/studio-architecture-640.webp" width="640" height="427" alt="Concrete steps, an olive tree and a vermilion doorway" /><span>Make room for your next idea.</span></div><p class="auth-local">Prefer to keep things local? <a href="/#get">Use the extension without an account.</a></p></section>
+    <section class="auth-story" aria-label="Your Foundkeep collection">
+      <img class="auth-landscape" src="assets/scenic-mountains-800.webp" srcset="assets/scenic-mountains-800.webp 800w, assets/scenic-mountains-1600.webp 1600w" sizes="(max-width: 680px) 100vw, 50vw" width="1600" height="1000" alt="" fetchpriority="high" />
+      <div class="auth-story-copy"><h1>Good finds.<br />A place to<br />come back to.</h1><p>Save what catches your eye.<br />Find it here, whenever you need it.</p></div>
+      <div class="auth-story-note"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4Z" /></svg><span>Your pages, pictures and ideas.<br /><strong>One personal collection.</strong></span></div>
+    </section>
     <section class="auth-panel" aria-labelledby="auth-title">
       <div id="auth-fields">
-        <div class="auth-tabs" aria-label="Account options"><a href="?mode=signup" data-mode="signup">Create account</a><a href="?mode=login" data-mode="login">Log in</a></div>
-        <h2 id="auth-title">Your collection starts here.</h2><p id="auth-description" class="muted">Create an account to save new captures to your private cloud library.</p>
+        <h2 id="auth-title">Keep the good things.</h2><p id="auth-description" class="muted">Sign in or create an account. Your collection comes with you.</p>
+        <div id="oauth-loading" class="oauth-loading" role="status"><span class="sr-only">Loading sign-in options…</span><span aria-hidden="true"></span><span aria-hidden="true"></span></div>
         <div id="oauth-buttons" class="oauth-buttons" hidden></div>
+        <p class="auth-identity-note" id="auth-identity-note" hidden>Same verified email. Same collection.</p>
+        <details class="email-signin" id="email-signin"><summary>Continue with email<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" /></svg></summary>
+        <div class="auth-tabs" aria-label="Account options"><a href="?mode=signup" data-mode="signup">Create account</a><a href="?mode=login" data-mode="login">Log in</a></div>
         <form id="auth-form">
           <div class="field" id="name-field"><label for="name">Your name</label><input id="name" name="name" autocomplete="name" maxlength="100" required /></div>
           <div class="field"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" required /></div>
           <div class="field" id="recovery-field" hidden><label for="recovery-code">Recovery code</label><input id="recovery-code" name="recoveryCode" autocomplete="off" spellcheck="false" maxlength="200" /><p class="field-help">Use the code you saved when you created your account or last changed your password.</p></div>
           <div class="field"><label for="password" id="password-label">Password</label><div class="password-input"><input id="password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required /><button class="password-toggle" id="show-password" type="button" aria-label="Show password" aria-pressed="false">Show</button></div><p class="field-help" id="password-help">Use 12–128 characters. A password manager is a good place to keep it.</p></div>
-          <p class="form-message" id="auth-error" role="alert" hidden></p>
           <button class="button primary wide" id="auth-submit" type="submit">Create account <span aria-hidden="true">↗</span></button>
         </form>
         <p class="auth-recover"><a href="?mode=recover" data-mode="recover">Recover your account</a></p>
-        <p class="auth-terms" id="auth-terms">By continuing, you agree to our <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.</p>
+        </details>
+        <p class="form-message" id="auth-error" role="alert" hidden></p>
+        <p class="auth-terms" id="auth-terms">By continuing, you accept our <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy</a>.</p>
       </div>
       <section id="oauth-completion" hidden aria-labelledby="oauth-title">
         <h2 id="oauth-title">Your Foundkeep account.</h2>
@@ -47,6 +55,6 @@
       <noscript><p class="form-message is-error">JavaScript is required to create an account or log in. Enable it, then reload this page.</p></noscript>
     </section>
   </main>
-  <footer class="account-footer"><span>A place for the things worth keeping.</span><a href="privacy.html">Privacy &amp; data</a></footer>
+  <footer class="account-footer"><span>Your collection, wherever you go.</span><a href="privacy.html">Privacy &amp; data</a></footer>
 </body>
 </html>

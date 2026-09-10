@@ -27,7 +27,7 @@ describe('server-only Supabase gateway', () => {
       n++;
       if(n===1)return Response.json({access_token:'PRIVATE_ACCESS',refresh_token:'PRIVATE_REFRESH',provider_token:'PRIVATE_PROVIDER',user:{email:'forged@example.com'}});
       expect(new Headers(init?.headers).get('authorization')).toBe('Bearer PRIVATE_ACCESS');
-      return Response.json({id:'d413e14e-7a08-4c8c-a4cf-c5ea9cfe171c',email:'real@example.com',email_confirmed_at:'2026-09-09T00:00:00Z',role:'authenticated',identities:[{provider:'google'}],user_metadata:{full_name:'Real Person'}});
+      return Response.json({id:'d413e14e-7a08-4c8c-a4cf-c5ea9cfe171c',email:'real@example.com',email_confirmed_at:'2026-09-09T00:00:00Z',role:'authenticated',identities:[{provider:'google',identity_data:{email:'real@example.com',email_verified:true}}],user_metadata:{full_name:'Real Person'}});
     });
     expect(await gateway.identity('code','v'.repeat(43),'google')).toEqual({subject:'d413e14e-7a08-4c8c-a4cf-c5ea9cfe171c',email:'real@example.com',name:'Real Person'});
   });
@@ -37,4 +37,11 @@ describe('server-only Supabase gateway', () => {
     const broken=createSupabaseGateway(env,async()=>new Response('sb_secret_PRIVATE',{status:500}));
     try{await broken.identity('code','v'.repeat(43),'google');throw Error('expected failure');}catch(e){expect(String(e)).not.toContain('sb_secret_PRIVATE');}
   });
+});
+
+test('automatic confirmation cannot substitute for the selected provider verifying the account email',async()=>{
+ for(const data of [{email:'real@example.com',email_verified:false},{email:'real@example.com'},{email:'other@example.com',email_verified:true},null]) {
+  const gateway=createSupabaseGateway(env,async url=>String(url).includes('/token')?Response.json({access_token:'private'}):Response.json({id:crypto.randomUUID(),email:'real@example.com',role:'authenticated',email_confirmed_at:'2026-09-10T00:00:00Z',identities:[{provider:'google',identity_data:data},{provider:'apple',identity_data:{email:'real@example.com',email_verified:true}}]}));
+  await expect(gateway.identity('code','v'.repeat(43),'google')).rejects.toBeInstanceOf(OAuthError);
+ }
 });

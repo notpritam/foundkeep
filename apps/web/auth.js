@@ -1,13 +1,22 @@
-import { mountOAuthButtons, completeOAuth } from './oauth.js';
+import { mountOAuthButtons, completeOAuth } from './oauth.js?v=20260910-scenic-auth';
 import { $, api, setMessage, recoveryDownload } from './customer.js?v=1.5.0';
 
 let mode = 'signup';
 let recoveryCode = '';
 let accountEmail = '';
 let busy = false;
+let providersReady = false;
+function updateSignInOptions() {
+  const hasProviders = $('#oauth-buttons').children.length > 0;
+  $('#oauth-buttons').hidden = mode === 'recover' || !hasProviders;
+  $('#oauth-loading').hidden = providersReady || mode === 'recover';
+  $('#auth-identity-note').hidden = mode === 'recover' || !hasProviders;
+  $('#email-signin').classList.toggle('email-only', mode === 'recover' || (providersReady && !hasProviders));
+  if (mode === 'recover' || (providersReady && !hasProviders)) $('#email-signin').open = true;
+}
 const views = {
-  signup: ['Your collection starts here.', 'Create an account to save new captures to your private cloud library.', 'Create account'],
-  login: ['Back to the good things.', 'Log in to pick up your collection where you left it.', 'Log in'],
+  signup: ['Keep the good things.', 'Sign in or create an account. Your collection comes with you.', 'Create account'],
+  login: ['Welcome back.', 'Your good finds are right where you left them.', 'Log in'],
   recover: ['A way back in.', 'Use your saved recovery code to choose a new password. This disconnects your browsers and signs out your other sessions.', 'Recover account'],
 };
 function setMode(value) {
@@ -24,7 +33,7 @@ function setMode(value) {
   $('#password-help').hidden = mode === 'login';
   $('#auth-terms').hidden = mode === 'recover';
   $('.auth-recover').hidden = mode === 'recover';
-  $('#oauth-buttons').hidden = mode === 'recover' || !$('#oauth-buttons').children.length;
+  updateSignInOptions();
   document.querySelectorAll('[data-mode]').forEach(link => {
     if (link.dataset.mode === mode) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
   });
@@ -77,4 +86,4 @@ $('#continue-dashboard').addEventListener('click', () => {
 });
 window.addEventListener('beforeunload', event => { if (recoveryCode && !$('#recovery-saved').checked) event.preventDefault(); });
 
-if (!completeOAuth()) void mountOAuthButtons($('#oauth-buttons'), $('#auth-error')).then(() => { $('#oauth-buttons').hidden = mode === 'recover' || !$('#oauth-buttons').children.length; });
+if (!completeOAuth()) void mountOAuthButtons($('#oauth-buttons'), $('#auth-error')).finally(() => { providersReady = true; updateSignInOptions(); });

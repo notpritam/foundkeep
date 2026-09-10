@@ -65,7 +65,10 @@ export function createSupabaseGateway(env: Record<string, string | undefined> = 
       const result = await json(await send('/token?grant_type=pkce', {method:'POST',body:JSON.stringify({auth_code:code,code_verifier:verifier})}));
       if (typeof result.access_token !== 'string' || result.access_token.length > 16_384) throw unavailable();
       const user = await json(await send('/user', {headers:{Authorization:'Bearer '+result.access_token}}));
-      if (!UUID.test(user.id || '') || user.role !== 'authenticated' || !user.email_confirmed_at || typeof user.email !== 'string' || user.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email) || !Array.isArray(user.identities) || !user.identities.some((x: any) => x.provider === provider)) {
+      const selected = Array.isArray(user.identities) ? user.identities.find((x: any) => x.provider === provider)?.identity_data : null;
+      // Supabase's email_confirmed_at can be populated by auto-confirm. Only
+      // the selected provider's verified email may establish local ownership.
+      if (!UUID.test(user.id || '') || user.role !== 'authenticated' || !user.email_confirmed_at || typeof user.email !== 'string' || user.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email) || selected?.email_verified !== true || typeof selected.email !== 'string' || selected.email.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
         throw new OAuthError('identity_unverified', 'Your provider must supply a verified email address. Use another sign-in method.', 403);
       }
       const name = typeof user.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : user.email.split('@')[0];

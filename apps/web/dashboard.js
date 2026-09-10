@@ -1,4 +1,4 @@
-import { mountOAuthButtons } from './oauth.js';
+import { mountOAuthButtons } from './oauth.js?v=20260910-scenic-auth';
 import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig, setAccountContext } from './customer.js?v=1.5.0';
 
 const state = { account: null, connections: [], usage: null, captures: [], cursor: null, total: 0, type: '', query: '', listRequest: 0, controller: null, detailRequest: 0, detail: null, extension: null, extensionId: null, expired: false, noteClientId: null, recoveryCode: '', connecting: false, preferences: null, preferenceRevision: 0 };
@@ -162,9 +162,12 @@ $('#open-setup').addEventListener('click', () => { if (state.expired) return; $(
 $('#hide-setup').addEventListener('click', () => { $('#onboarding').hidden = true; $('#open-setup').focus(); });
 
 function showLibraryState(title, description, { loading = false, retry, action, label } = {}) {
-  const holder = $('#library-state'); holder.replaceChildren(); holder.hidden = false;
-  if (loading) holder.append(textElement('span', '', 'loading-dot'));
+  const holder = $('#library-state'); holder.replaceChildren(); holder.hidden = false; holder.classList.toggle('is-loading', loading);
   holder.append(textElement('h2', title), textElement('p', description));
+  if (loading) {
+    const skeleton = document.createElement('div'); skeleton.className = 'library-skeleton'; skeleton.setAttribute('aria-hidden', 'true');
+    skeleton.append(...Array.from({ length: 3 }, () => document.createElement('span'))); holder.append(skeleton);
+  }
   if (retry || action) {
     const button = textElement('button', label || 'Try again', 'button secondary'); button.type = 'button';
     button.addEventListener('click', retry || action); holder.append(button);
@@ -194,8 +197,8 @@ function originLink(url, label) {
 function appendCaptureOrigin(body, capture) {
   const provenance = capture.provenance;
   if (!provenance || typeof provenance !== 'object') return;
-  const section = textElement('section', null, 'detail-origin'); section.id = 'capture-origin';
-  section.append(textElement('h3', 'Original source'), textElement('p', 'Foundkeep keeps this record with the capture so you can trace it back to where it came from.', 'detail-origin-intro'));
+  const section = textElement('details', null, 'detail-origin'); section.id = 'capture-origin';
+  section.append(textElement('summary', 'Source details'), textElement('p', 'Foundkeep keeps this record with the capture so you can trace it back to where it came from.', 'detail-origin-intro'));
   const list = textElement('dl');
   originValue(list, 'Original page', originLink(provenance.pageUrl, 'Original page'));
   if (provenance.canonicalUrl !== provenance.pageUrl) originValue(list, 'Canonical page', originLink(provenance.canonicalUrl, 'Canonical page'));
@@ -365,11 +368,11 @@ async function openCapture(id) {
       const link = textElement('a', capture.fileMime === 'application/octet-stream' ? 'Download saved file' : 'Open saved file', 'button secondary compact');
       link.href = fileUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; filePanel.append(link); body.append(filePanel);
     }
-    appendCaptureOrigin(body, capture);
     for (const [title, content] of [['Highlight', capture.selectionText], ['Note', capture.noteText], ['Summary', capture.summary], ['Article text', capture.articleText], ['Text in image', capture.ocrText]]) {
       if (!content) continue;
       const section = textElement('section', null, 'detail-section'); section.append(textElement('h3', title), textElement('p', content)); body.append(section);
     }
+    appendCaptureOrigin(body, capture);
     if (capture.category) body.append(textElement('p', `Category: ${capture.category}`, 'muted'));
     if (Array.isArray(capture.tags) && capture.tags.length) {
       const tags = textElement('ul', null, 'detail-tags'); tags.setAttribute('aria-label', 'Capture tags');

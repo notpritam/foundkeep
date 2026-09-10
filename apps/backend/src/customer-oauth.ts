@@ -30,6 +30,11 @@ export function registerCustomerOAuth(app:Hono<CustomerEnv>,db:Database,gateway:
     if(!flow||flow.issuer!==gateway.issuer||!available(flow.client).includes(flow.provider))throw invalid();
     return flow;
   };
+  // Only a previous provider verification of this exact email authorizes an
+  // automatic link. A local password registration alone never proves email.
+  const verifiedEmail=(accountId:string,email:string,issuer:string)=>!!db.query(
+    'SELECT 1 FROM customer_auth_identities WHERE account_id=? AND issuer=? AND verified_email=? LIMIT 1'
+  ).get(accountId,issuer,email);
   function browserBound(c:C,f:Flow){const cookie=getCookie(c,cookieName(f.id));if(!cookie||!f.browser_hash||digest(cookie)!==f.browser_hash)throw invalid();}
   function liveCredential(f:Flow){
     if(f.intent!=='delete')return;
@@ -105,10 +110,13 @@ export function registerCustomerOAuth(app:Hono<CustomerEnv>,db:Database,gateway:
       })();deleteCookie(c,cookieName(f.id),cookieOptions);return c.json({reauthToken:proof});
     }
     const collision=mapped?null:d.emailAccount(identity.email);
-    if(collision){
+    let passwordProven=false;
+    if(collision&&!verifiedEmail(collision.id,identity.email,f.issuer)){
+      if(!collision.password_hash)throw new OAuthError('account_link_unverified','Sign in once with your original provider to verify this collection, then try this sign-in method again.',409);
       if(typeof b.password!=='string'||!b.password)throw new OAuthError('account_link_required','This email already has a Foundkeep collection. Enter its current password to connect this sign-in method.',409);
       d.publicRate(c,'oauth-link',identity.email);
       if(b.password.length>128||!(await d.verifyPassword(b.password,collision.password_hash)))throw new OAuthError('invalid_credentials','The existing Foundkeep password is incorrect.',401);
+      passwordProven=true;
     }
     const result=db.transaction(()=>{
       const fresh=readFlow(f.id);if(fresh.stage!=='complete')throw invalid();
@@ -118,16 +126,18 @@ export function registerCustomerOAuth(app:Hono<CustomerEnv>,db:Database,gateway:
       if(!owner){
         const existing=d.emailAccount(identity.email);
         if(existing){
-          if(!collision||existing.id!==collision.id||existing.password_hash!==collision.password_hash)throw invalid();
-          if(db.query('SELECT subject FROM customer_auth_identities WHERE issuer=? AND account_id=?').get(f.issuer,existing.id))throw new OAuthError('identity_conflict','This collection is already connected to a different sign-in identity.',409);
+          // Recheck inside the write transaction after any password hashing.
+          if(!verifiedEmail(existing.id,identity.email,f.issuer)&&
+            (!passwordProven||!collision||existing.id!==collision.id||existing.password_hash!==collision.password_hash))throw invalid();
           owner=existing;
         }else{
           // A verified provider owns identity. Empty password hash explicitly
           // marks a social-only account; it is never a usable password.
           const id=crypto.randomUUID();db.query('INSERT INTO customer_accounts(id,email,name,password_hash,recovery_hash,created_at) VALUES(?,?,?,?,?,?)').run(id,identity.email,identity.name,'',digest(secret()),Date.now());owner=d.account(id)!;
         }
-        db.query('INSERT INTO customer_auth_identities(issuer,subject,account_id,provider,created_at) VALUES(?,?,?,?,?)').run(f.issuer,identity.subject,owner.id,f.provider,Date.now());
+        db.query('INSERT INTO customer_auth_identities(issuer,subject,account_id,provider,created_at,verified_email) VALUES(?,?,?,?,?,?)').run(f.issuer,identity.subject,owner.id,f.provider,Date.now(),identity.email);
       }
+      if(owner.email===identity.email)db.query('UPDATE customer_auth_identities SET verified_email=? WHERE issuer=? AND subject=? AND account_id=?').run(identity.email,f.issuer,identity.subject,owner.id);
       consumeFlow(f);
       if(f.client==='web'){d.session(c,owner.id);return {account:d.accountDto(owner)};}
       return {account:d.accountDto(owner),...d.issueConnection(owner.id,'Foundkeep for '+f.device_name)as object};

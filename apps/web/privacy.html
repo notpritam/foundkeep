@@ -6,16 +6,17 @@
   <title>Privacy &amp; data — Foundkeep</title>
   <meta name="description" content="How Foundkeep stores local and optional cloud captures, protects account access, and handles export and deletion." />
   <link rel="canonical" href="https://foundkeep.app/privacy.html" />
-  <meta name="theme-color" content="#f3f3f0" />
+  <meta name="theme-color" content="#f1f4f4" />
   <link rel="icon" href="assets/studio-mark.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css?v=1.6.0" />
+  <link rel="stylesheet" href="customer.css?v=20260910-scenic-auth" />
 </head>
-<body>
+<body class="customer-body reading-body">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header privacy-header wrap"><a class="brand" href="index.html"><img src="assets/studio-mark.svg" width="36" height="36" alt="" /><span>Foundkeep</span></a><a class="text-link" href="index.html">Back to Foundkeep</a></header>
   <main class="privacy-document" id="main">
     <h1>Privacy &amp; data.</h1>
-    <p class="updated">Updated 8 September 2026</p>
+    <p class="updated">Updated 10 September 2026</p>
     <p class="privacy-lead">Foundkeep keeps the items you explicitly save in one private collection. The browser extension can keep a local library and sync new captures after you connect it. The iPhone app saves the items you send to Foundkeep from the iOS Share menu directly to your account.</p>
     <h2>What you save</h2>
     <p>Foundkeep captures screenshots, highlighted text, bookmarks, images, posts on X, notes, videos, audio, documents and other files when you use its capture or share actions. Saving a page can collect a readable copy of its useful text; headings; visited and canonical URLs; title and description; publisher and author; published and modified dates; language; lead image and favicon; capture and extraction timestamps; the capture method; extractor version; extraction status; and a content fingerprint. A saved link or image also records its target URL. A shared file keeps its original filename, declared media type, byte size and available source context. Sites and sharing apps do not always provide every field.</p>
@@ -29,6 +30,7 @@
     <h2>Your optional cloud account</h2>
     <p>Creating an account stores your name and email address on Foundkeep’s server. If you use a password, your password and one-time recovery code are stored as hashes, rather than readable values. Browser login uses an HTTP-only session cookie. The browser extension and iPhone app receive separate revocable connection credentials stored in their protected platform storage.</p>
     <p>When social sign-in is available and you choose it, Supabase Auth processes the identity supplied by your selected provider for Foundkeep. Foundkeep receives your verified email, display name and account identifier; it does not request access to your emails, repositories or posts. Supabase credentials and provider session tokens are handled by Foundkeep’s backend and are not embedded in the app, extension or website. Your saved collection remains on Foundkeep. See <a href="https://supabase.com/privacy" target="_blank" rel="noreferrer">Supabase’s privacy policy</a> and your sign-in provider’s privacy policy.</p>
+    <p>Sign-in providers using the same verified email can connect to one Foundkeep account. Foundkeep stores each linked identity identifier and the email verified when it was linked. A password-only account requires its current password before the first provider is connected. Different addresses, including Apple private relay addresses, are kept separate.</p>
     <p>After you connect a browser from the dashboard, Foundkeep stores a browser-and-operating-system label and last-seen time so you can recognize and revoke that connection. New captures upload when automatic sync is enabled. Uploaded content can include screenshots and images, selected or readable page text, notes, the source record described above and the processing choices active when you saved it. Pending uploads remain in the browser and retry when a connection is available. You can explicitly import older local captures from the extension. Cloud captures and preferences are scoped to your account.</p>
     <p>The web dashboard uses your account to retrieve saved captures and images. It does not copy your browser’s local library unless you choose to import it. Cloud account limits are 1,000 captures and 200 MB; your account settings show current usage.</p>
     <h2>Cloud processing</h2>
@@ -52,7 +54,7 @@
     <p>Delete a capture in the web dashboard or iPhone app to remove it from your cloud library and delete its uploaded file, if any. Delete it in the extension’s local library to remove that local copy. These collections are separate; deleting one does not erase the other. Removing the extension also removes its local extension data.</p>
     <h2>Export and account deletion</h2>
     <p>Download your cloud library as a JSON export from account settings. Exports include saved text, source records, image data and capture preferences, and may contain private information. Deleting your account removes its active cloud captures, uploaded files, preferences and credentials and revokes its sessions and device connections. Local copies on your devices remain until you delete them there.</p>
-    <p>For a linked social account, Foundkeep also requests deletion of its Supabase identity and retries if that service is unavailable. A minimal identity identifier is retained while cleanup is pending, and a security marker is retained for up to 24 hours to prevent an unfinished sign-in from recreating the deleted account. Temporary sign-in records expire within 10 minutes and are cleared by the backend. Deleting Foundkeep does not delete your Google, Apple, GitHub or X account.</p>
+    <p>For a linked social account, Foundkeep also requests deletion of all its linked Supabase identities and retries if that service is unavailable. A minimal identity identifier is retained while cleanup is pending, and a security marker is retained for up to 24 hours to prevent an unfinished sign-in from recreating the deleted account. Temporary sign-in records expire within 10 minutes and are cleared by the backend. Deleting Foundkeep does not delete your Google, Apple, GitHub or X account.</p>
     <p>Operational backups may retain earlier copies until those backups are replaced. Account deletion does not erase files you previously exported.</p>
     <h2>Questions and source code</h2>
     <p>Visit <a href="support.html">Foundkeep Support</a> for installation, connection, capture, sync and account recovery help. Implementation details are available in <a href="https://github.com/notpritam/foundkeep" target="_blank" rel="noreferrer">the source repository</a>. Avoid posting private captures, passwords, recovery codes or connection credentials in public issues.</p>
