@@ -198,7 +198,7 @@ test("mobile handoff page creates only allowlisted Foundkeep links", async (t) =
   );
   assert.match(
     await page.locator(".open-private").textContent(),
-    /never includes your password/i,
+    /Get iPhone beta/i,
   );
 });
 
@@ -348,4 +348,38 @@ test('returning from an explicit Store visit reloads a page without messaging on
   // Allow a complete frame after the synchronous focus handler to detect a reload loop.
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   assert.equal(await page.evaluate(() => sessionStorage.getItem('__test_page_loads')), '2');
+});
+
+test('iPhone download links share verified distribution config and reject unsafe destinations', async t => {
+  const page = await pageFor(t, 390);
+  for (const [iphone, expected, label] of [
+    [{ distribution: 'private-beta' }, '/support.html#iphone-beta', 'Get iPhone beta'],
+    [{ distribution: 'testflight', url: 'https://testflight.apple.com/join/Example1' }, 'https://testflight.apple.com/join/Example1', 'Get iPhone beta'],
+    [{ distribution: 'app-store', url: 'https://apps.apple.com/app/id6809771188' }, 'https://apps.apple.com/app/id6809771188', 'Get the iPhone app'],
+    [{ distribution: 'app-store', url: 'https://apps.apple.com.evil.example/app/id6809771188' }, '/support.html#iphone-beta', 'Get iPhone beta'],
+    [{ distribution: 'testflight', url: 'javascript:alert(1)' }, '/support.html#iphone-beta', 'Get iPhone beta'],
+  ]) {
+    await page.route('**/customer-config.json', route => route.fulfill({ json: { extensionIds: [], iphone } }));
+    await page.goto(base + '/');
+    await page.waitForFunction(expected => [...document.querySelectorAll('[data-iphone-install]')].every(link => link.getAttribute('href') === expected), expected);
+    assert.equal(await page.locator('[data-iphone-install]').count(), 3);
+    assert.match(await page.locator('.hero-device-actions').innerText(), new RegExp(label));
+    assert.equal(await page.locator('.hero-device-actions [data-extension-install]').count(), 1);
+    await page.unroute('**/customer-config.json');
+  }
+  await page.route('**/customer-config.json', route => route.abort());
+  await page.goto(base + '/');
+  assert.match(await page.locator('.hero-device-actions').textContent(), /Get iPhone beta/);
+  await page.goto(base + '/support.html#iphone-beta');
+  assert.match(await page.locator('#iphone-beta').textContent(), /by invitation/);
+  assert.match(await page.locator('#iphone-beta a[data-private-beta]').getAttribute('href'), /^mailto:/);
+});
+
+test('iPhone visitors see the app before the desktop extension', async t => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1', reducedMotion: 'reduce' });
+  t.after(() => context.close());
+  const page = await context.newPage(); await page.goto(base + '/');
+  await page.waitForFunction(() => document.querySelector('.hero-device-actions').firstElementChild.hasAttribute('data-iphone-install'));
+  assert.equal(await page.locator('.platform-grid > :first-child .phone-art').count(), 1);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 });

@@ -3,5 +3,9 @@
     "cficnecbdbiddngllpfbacabgbcjinmk",
     "mjfcgmboaijfcaanepdipbgmipnccnpn"
   ],
-  "storeUrl": "https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk"
+  "storeUrl": "https://chromewebstore.google.com/detail/cficnecbdbiddngllpfbacabgbcjinmk",
+  "iphone": {
+    "distribution": "private-beta",
+    "url": "/support.html#iphone-beta"
+  }
 }

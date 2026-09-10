@@ -2431,3 +2431,13 @@ mark.is-saved {
     top: 105px;
   }
 }
+
+.hero-device-actions { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:10px; margin-top:14px; }
+.hero-device-actions .button { font-size:13px; min-height:44px; padding:11px 18px; }
+.hero-device-actions svg { width:18px; height:18px; }
+@media (max-width:540px) {
+  .hero-device-actions { gap:8px; margin-top:10px; }
+  .hero-device-actions .button { padding:10px 12px; font-size:12px; }
+  .hero-device-actions svg { width:16px; height:16px; }
+  .hero-copy>p { max-width:310px; margin-inline:auto; }
+}

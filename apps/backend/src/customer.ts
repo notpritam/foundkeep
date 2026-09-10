@@ -51,7 +51,7 @@ const CARD_COLUMNS = CAPTURE_COLUMNS.split(",").map(column =>
 ).join(",");
 
 export interface AccountRow { id: string; email: string; name: string; password_hash: string; recovery_hash: string; created_at: number }
-interface ConnectionRow { id: string; account_id: string; name: string; created_at: number; last_seen_at: number | null; expires_at: number }
+interface ConnectionRow { client_kind: "unknown" | "browser" | "mobile"; id: string; account_id: string; name: string; created_at: number; last_seen_at: number | null; expires_at: number }
 interface CredentialRow { id: string; account_id: string; expires_at: number }
 export interface CustomerCaptureRow {
   id: string; account_id: string; client_id: string; type: string; status: string;
@@ -93,7 +93,7 @@ function encodeMobileCursor(row: CustomerCaptureRow) {
   return Buffer.from(JSON.stringify({ capturedAt: row.captured_at, id: row.id })).toString("base64url");
 }
 function accountDto(row: AccountRow) { return { id: row.id, email: row.email, name: row.name, createdAt: row.created_at, hasPassword: !!row.password_hash }; }
-function connectionDto(row: ConnectionRow) { return { id: row.id, name: row.name, createdAt: row.created_at, lastSeenAt: row.last_seen_at }; }
+function connectionDto(row: ConnectionRow) { return { id: row.id, name: row.name, clientKind: row.client_kind, createdAt: row.created_at, lastSeenAt: row.last_seen_at }; }
 export function customerCaptureDto(row: CustomerCaptureRow) {
   return {
     id: row.id, clientId: row.client_id, batchId: row.batch_id, type: row.type, status: row.status,
@@ -325,18 +325,18 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     const device = (textField(body, "deviceName", 72) || "iPhone").trim() || "iPhone";
     return `Foundkeep for ${device}`;
   }
-  function issueConnection(accountId: string, name: string) {
+  function issueConnection(accountId: string, name: string, clientKind: "browser" | "mobile") {
     const now = Date.now();
     db.query("DELETE FROM customer_connections WHERE expires_at <= ?").run(now);
     const count = (db.query("SELECT COUNT(*) n FROM customer_connections WHERE account_id = ?").get(accountId) as { n: number }).n;
     if (count >= 20) fail(409, "connection_limit", "Remove an old connected device before connecting another.");
     const token = secret();
     const connection: ConnectionRow = {
-      id: crypto.randomUUID(), account_id: accountId, name,
+      id: crypto.randomUUID(), account_id: accountId, name, client_kind: clientKind,
       created_at: now, last_seen_at: null, expires_at: now + 90 * DAY,
     };
-    db.query("INSERT INTO customer_connections(id,account_id,name,token_hash,created_at,last_seen_at,expires_at) VALUES(?,?,?,?,?,?,?)")
-      .run(connection.id, accountId, name, hash(token), connection.created_at, null, connection.expires_at);
+    db.query("INSERT INTO customer_connections(id,account_id,name,token_hash,created_at,last_seen_at,expires_at,client_kind) VALUES(?,?,?,?,?,?,?,?)")
+      .run(connection.id, accountId, name, hash(token), connection.created_at, null, connection.expires_at, clientKind);
     return { token, connection: connectionDto(connection) };
   }
   async function destroyAccount(c: C, current: Auth) {
@@ -431,7 +431,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
       if (emailAccount(email)) fail(409, "email_in_use", "An account with this email already exists.");
       db.query("INSERT INTO customer_accounts(id,email,name,password_hash,recovery_hash,created_at) VALUES(?,?,?,?,?,?)")
         .run(id, email, name, passwordHash, hash(recoveryCode), Date.now());
-      return issueConnection(id, deviceName);
+      return issueConnection(id, deviceName, "mobile");
     })();
     return c.json({ account: accountDto(account(id)!), recoveryCode, ...connection }, 201);
   });
@@ -448,7 +448,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     const result = db.transaction(() => {
       const current = account(owner.id);
       if (!current || current.password_hash !== owner.password_hash) fail(401, "invalid_credentials", "Sign in again with your current password.");
-      return { account: accountDto(current), ...issueConnection(current.id, deviceName) };
+      return { account: accountDto(current), ...issueConnection(current.id, deviceName, "mobile") };
     })();
     return c.json(result);
   });
@@ -470,7 +470,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
         .run(passwordHash, hash(recoveryCode), owner.id, owner.recovery_hash);
       if (!updated.changes) fail(401, "invalid_credentials", "This recovery code has already been used.");
       revoke(owner.id);
-      return { account: accountDto(account(owner.id)!), recoveryCode, ...issueConnection(owner.id, deviceName) };
+      return { account: accountDto(account(owner.id)!), recoveryCode, ...issueConnection(owner.id, deviceName, "mobile") };
     })();
     return c.json(result);
   });
@@ -478,6 +478,8 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
   app.get("/mobile/me", (c) => {
     const current = auth(c);
     if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
+    // Existing app builds identify their live connection here without an app update.
+    db.query("UPDATE customer_connections SET client_kind = 'mobile' WHERE id = ? AND client_kind = 'unknown'").run(current.credentialId);
     return c.json({ account: accountDto(current.account), connectionId: current.credentialId, usage: usage(current.account.id) });
   });
 
@@ -600,7 +602,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
 
   app.get("/me", (c) => {
     const { account: owner } = auth(c, true);
-    const connections = db.query("SELECT id,account_id,name,created_at,last_seen_at,expires_at FROM customer_connections WHERE account_id = ? AND expires_at > ? ORDER BY created_at DESC").all(owner.id, Date.now()) as ConnectionRow[];
+    const connections = db.query("SELECT id,account_id,name,created_at,last_seen_at,expires_at,client_kind FROM customer_connections WHERE account_id = ? AND expires_at > ? ORDER BY created_at DESC").all(owner.id, Date.now()) as ConnectionRow[];
     return c.json({ account: accountDto(owner), connections: connections.map(connectionDto), usage: usage(owner.id) });
   });
 
@@ -692,7 +694,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
       const owner = account(pair.account_id);
       if (!owner) fail(401, "invalid_pairing", "This connection code is no longer valid.");
       db.query("DELETE FROM customer_pairings WHERE id = ?").run(pair.id);
-      return { account: accountDto(owner), ...issueConnection(owner.id, name) };
+      return { account: accountDto(owner), ...issueConnection(owner.id, name, "browser") };
     })();
     return c.json(result, 201);
   });

@@ -20,9 +20,38 @@ export function customerConfig() {
         const url = new URL(data.storeUrl);
         if (url.protocol === 'https:' && url.hostname === 'chromewebstore.google.com' && url.pathname.startsWith('/detail/')) storeUrl = url.href;
       } catch { /* No published listing configured. */ }
-      return { extensionIds, storeUrl };
+      return { extensionIds, storeUrl, iphone: iphoneConfig(data.iphone) };
     })
-    .catch(() => ({ extensionIds: [STORE_EXTENSION_ID, EXTENSION_ID], storeUrl: STORE_URL }));
+    .catch(() => ({ extensionIds: [STORE_EXTENSION_ID, EXTENSION_ID], storeUrl: STORE_URL, iphone: iphoneConfig() }));
+}
+
+// Distribution is data only. A private beta never points at an unpublished listing.
+function iphoneConfig(value) {
+  const fallback = { distribution: 'private-beta', url: '/support.html#iphone-beta', label: 'Get iPhone beta', badge: 'TestFlight beta', description: 'The iPhone app is in a private TestFlight beta. Request access to try it.' };
+  try {
+    const url = new URL(value?.url);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || url.search || url.hash) return fallback;
+    if (value.distribution === 'app-store' && url.hostname === 'apps.apple.com' && /\/id\d+$/.test(url.pathname))
+      return { distribution: 'app-store', url: url.href, label: 'Get the iPhone app', badge: 'App Store', description: 'Get Foundkeep for iPhone from the App Store.' };
+    if (value.distribution === 'testflight' && url.hostname === 'testflight.apple.com' && /^\/join\/[A-Za-z0-9]+$/.test(url.pathname))
+      return { distribution: 'testflight', url: url.href, label: 'Get iPhone beta', badge: 'TestFlight beta', description: 'Join the Foundkeep iPhone beta through TestFlight.' };
+  } catch { /* Safe, usable beta instructions remain available. */ }
+  return fallback;
+}
+export function renderIphoneLinks(config, root = document) {
+  for (const link of root.querySelectorAll('[data-iphone-install]')) {
+    link.href = config.iphone.url;
+    const label = link.querySelector('[data-iphone-label]') || link;
+    label.textContent = config.iphone.label;
+  }
+  root.querySelectorAll('[data-iphone-badge]').forEach(node => { node.textContent = config.iphone.badge; });
+  root.querySelectorAll('[data-iphone-availability]').forEach(node => { node.textContent = config.iphone.description; });
+}
+export function isIphoneBrowser() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+export function isMobileBrowser() {
+  return /Android/i.test(navigator.userAgent) || isIphoneBrowser();
 }
 
 export class ApiError extends Error {

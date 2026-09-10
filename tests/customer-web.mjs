@@ -41,8 +41,8 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.kill(); await rm(dataDir, { recursive: true, force: true }); });
 
-async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAccount = null, extensionAccountsById = null, extensionIds = ['mjfcgmboaijfcaanepdipbgmipnccnpn'], storeUrl = null, extensionInstalled = true, extensionPreferenceRevision = 1, width = 1440, handler } = {}) {
-  const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce', acceptDownloads: true });
+async function pageFor(t, { mock = true, captures = fixtureCaptures, extensionAccount = null, extensionAccountsById = null, extensionIds = ['mjfcgmboaijfcaanepdipbgmipnccnpn'], storeUrl = null, extensionInstalled = true, extensionPreferenceRevision = 1, width = 1440, userAgent, handler } = {}) {
+  const context = await browser.newContext({ ...(userAgent ? { userAgent } : {}), viewport: { width, height: 1000 }, reducedMotion: 'reduce', acceptDownloads: true });
   t.after(() => context.close());
   const requests = []; const model = { account, captures: [...captures], connections: extensionAccount?.id === account.id ? [{ id: 'connected-browser', name: 'Chrome', createdAt: now, lastSeenAt: now }] : [], usage: null, preferences: structuredClone(defaultPreferences), preferenceRevision: 0 };
   if (mock) await context.route('**/api/**', async route => {
@@ -299,7 +299,7 @@ test('a failed note save retains its text and idempotency key for retry', async 
 
 test('extension account switch requires confirmation before issuing or sending a pairing code', async t => {
   const { page, requests } = await pageFor(t, { captures: [], extensionAccount: { id: 'old-account', email: 'previous@example.test', name: 'Previous' } });
-  await openLibrary(page); await page.locator('#connect-extension').click(); await page.locator('#confirm-dialog').waitFor({ state: 'visible' });
+  await openLibrary(page); await page.locator('#open-setup').click(); await page.locator('#connect-extension').click(); await page.locator('#confirm-dialog').waitFor({ state: 'visible' });
   assert.match(await page.locator('#confirm-description').textContent(), /previous@example.test/);
   assert.equal(requests.filter(request => request.path === '/api/pairing').length, 0);
   await page.locator('#confirm-cancel').click(); assert.equal((await page.evaluate(() => window.__extensionMessages.filter(item => item.message.kind === 'atlas-connect'))).length, 0);
@@ -456,4 +456,50 @@ test('a failed provider start stays visible with email collapsed and can be retr
   assert.match(await page.locator('#auth-error').textContent(), /temporarily unavailable/);
   assert.equal(await page.locator('#email').isVisible(), false);
   assert.equal(await page.getByRole('button', { name: 'Continue with Google' }).isEnabled(), true);
+});
+
+test('apps and devices promotes the missing app and reflects connection changes', async t => {
+  const { page, model } = await pageFor(t, { extensionAccount: account });
+  await openLibrary(page);
+  await page.locator('#device-promotion').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#device-promotion-copy').textContent(), /iPhone/);
+  await page.locator('#show-devices').click();
+  assert.match(await page.locator('#iphone-status').textContent(), /No iPhone/);
+  assert.equal(await page.locator('#install-iphone').getAttribute('href'), '/support.html#iphone-beta');
+  assert.match(await page.locator('#browser-connection-badge').textContent(), /Connected here/);
+  model.connections.push({ id: 'phone', clientKind: 'mobile', name: 'My device', createdAt: now });
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await page.waitForFunction(() => document.querySelector('#iphone-status').textContent.startsWith('iPhone app connected'));
+  assert.equal(await page.locator('#install-iphone').isVisible(), true);
+  assert.equal(await page.locator('#install-iphone').textContent(), 'Install on another iPhone');
+  await page.locator('#hide-setup').click();
+  assert.equal(await page.locator('#device-promotion').isVisible(), false);
+  model.connections = [];
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await page.locator('#device-promotion').waitFor({ state: 'visible' });
+  await page.locator('#dismiss-device-promotion').click();
+  await page.locator('#refresh-library').click();
+  assert.equal(await page.locator('#device-promotion').isVisible(), false);
+});
+
+test('iPhone onboarding leads with Share and does not ask for Chrome pairing', async t => {
+  const { page, model } = await pageFor(t, { captures: [], width: 390, extensionInstalled: false, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1' });
+  model.connections = [{ id: 'legacy', name: 'Foundkeep for iPhone', createdAt: now }];
+  await openLibrary(page);
+  assert.equal(await page.locator('.device-options > :first-child').getAttribute('class'), 'device-option iphone-option');
+  assert.match(await page.locator('#iphone-status').textContent(), /No iPhone connection confirmed/);
+  assert.equal(await page.locator('#connect-extension').isVisible(), false);
+  assert.match(await page.locator('#extension-status').textContent(), /for your computer/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+});
+
+test('phone-only account suggests browser on desktop and can revisit setup', async t => {
+  const { page, model } = await pageFor(t, { extensionInstalled: false });
+  model.connections = [{ id: 'phone', clientKind: 'mobile', name: 'iPhone', createdAt: now }];
+  await openLibrary(page);
+  assert.match(await page.locator('#device-promotion-copy').textContent(), /computer/);
+  await page.locator('#open-setup').click();
+  assert.match(await page.locator('#iphone-status').textContent(), /^iPhone app connected/);
+  assert.equal(await page.locator('#open-iphone').getAttribute('href'), '/open?path=collection');
+  assert.equal(await page.locator('#install-extension').isVisible(), true);
 });

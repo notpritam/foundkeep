@@ -20,7 +20,7 @@ html { scrollbar-color:#91b2be var(--paper); }
 .customer-body .button { font-size:14px; min-height:46px; gap:10px; border-radius:999px; font-weight:500; }
 .customer-body .compact { min-height:38px; padding:8px 13px; font-size:13px; }
 .customer-body .primary { background:var(--accent); color:#fff; }
-.customer-body .primary:hover { background:var(--accent-hover); }
+.customer-body .primary:hover { background:var(--accent-hover); color:#fff; }
 .customer-body .secondary { background:transparent; border:1px solid var(--control-line); color:var(--ink); }
 .customer-body .secondary:hover { background:var(--sky); border-color:var(--control-line); }
 .customer-body .wide { width:100%; }
@@ -323,3 +323,47 @@ html { scrollbar-color:#91b2be var(--paper); }
 .reading-body .support-close .button { background:var(--accent); color:#fff; }
 .reading-body .support-close .button:hover { background:var(--accent-hover); }
 .reading-body .privacy-document a { text-decoration-color:var(--accent); }
+
+/* One collection, with a distinct setup path for each device. */
+.device-options { display:grid; grid-template-columns:1.12fr 1fr; gap:28px; margin-top:26px; }
+.device-option { min-width:0; padding:24px; border-radius:20px; background:var(--surface); border:1px solid var(--line); }
+.device-option.iphone-option { background:#e8f6e7; border-color:#c5dfc3; }
+.device-option-heading { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.device-option-heading>svg { width:22px; height:22px; flex-shrink:0; }
+.device-option-heading h3 { font-size:24px; margin:0; }
+.device-badge { font-size:11px; color:#37535d; background:#e0f0fc; padding:4px 8px; border-radius:7px; }
+.iphone-option .device-badge { color:#2a522d; background:#d3eace; }
+.device-option>p { font-size:13px; color:#42614c; line-height:1.7; margin-top:14px; }
+.browser-option>p { color:var(--muted); }
+.device-option .onboarding-steps { display:grid; grid-template-columns:1fr; gap:22px; margin-top:24px; }
+.device-option .onboarding-steps>li { padding:0; border:0; }
+.device-option .onboarding-steps h3 { font-size:16px; }
+.device-option .step-marker { width:26px; height:26px; font-size:12px; }
+.device-option .onboarding-steps p { max-width:60ch; }
+.device-option .step-note { font-size:12px; }
+.device-option .device-connection { font-size:13px; font-weight:600; margin-top:26px; }
+.device-actions { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:18px 0; }
+.device-actions .text-link { font-size:13px; }
+.iphone-share-steps { padding-left:19px; font-size:13px; line-height:1.65; margin:24px 0; color:#42614c; }
+.iphone-share-steps li+li { margin-top:8px; }
+.first-save-step { display:flex; align-items:flex-start; gap:14px; padding-top:24px; margin-top:26px; border-top:1px solid var(--line); }
+.first-save-step h3 { font-size:18px; }
+.first-save-step p { color:var(--muted); font-size:13px; margin:8px 0; }
+.first-save-step .text-link { font-size:13px; }
+.device-promotion { display:flex; align-items:center; gap:16px; padding:16px 18px; margin:0 0 24px; border-radius:16px; background:#e8f6e7; color:#254c34; }
+.device-promotion>svg { width:24px; height:24px; flex-shrink:0; }
+.device-promotion p { margin:0; flex:1; font-size:13px; line-height:1.5; }
+.device-promotion .text-link { font-size:12px; white-space:nowrap; }
+.device-promotion .icon-button { min-width:32px; }
+.customer-body.open-body { background:var(--paper); }
+.customer-body .open-card { border-radius:28px; background:var(--surface); border:1px solid var(--line); box-shadow:0 18px 50px #183b4b0d; }
+.customer-body .open-card h1 { font-family:'Clarity City',Geist,sans-serif; color:var(--ink); }
+@media (max-width:1180px) { .device-options { grid-template-columns:1fr; gap:16px; } }
+@media (max-width:680px) {
+  .device-option { padding:20px; }
+  .device-option-heading h3 { font-size:22px; }
+  .onboarding-heading p { font-size:13px; line-height:1.65; }
+  .device-promotion { flex-wrap:wrap; gap:12px; padding:14px; }
+  .device-promotion>p { flex-basis:calc(100% - 40px); }
+  .device-promotion .text-link { margin-left:36px; margin-right:auto; white-space:normal; text-align:left; }
+}

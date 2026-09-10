@@ -37,7 +37,7 @@ test('web login needs browser binding and local proof; handoff is one use',async
  expect((await req('/auth/oauth/exchange',body,flow.cookie)).status).toBe(401);
 });
 test('native login issues only Foundkeep connection after proof',async()=>{
- const flow=await begin('ios');const body=await finish(flow);const r=await req('/auth/oauth/exchange',body);expect(r.status).toBe(200);const data=await r.json()as any;expect(data.token).toMatch(/^[A-Za-z0-9_-]{43}$/);expect((await req('/mobile/me',undefined,undefined,data.token)).status).toBe(200);
+ const flow=await begin('ios');const body=await finish(flow);const r=await req('/auth/oauth/exchange',body);expect(r.status).toBe(200);const data=await r.json()as any;expect(data.token).toMatch(/^[A-Za-z0-9_-]{43}$/);expect(data.connection.clientKind).toBe('mobile');expect((await req('/mobile/me',undefined,undefined,data.token)).status).toBe(200);
 });
 test('matching email requires existing password before identity can be connected',async()=>{
  const existing=await register();const flow=await begin();const body=await finish(flow);
@@ -154,7 +154,8 @@ test('migration retains old identity and account ownership, then permits another
  try {
   let old=openDb(file);const id=crypto.randomUUID();const subject=crypto.randomUUID();
   old.query('INSERT INTO customer_accounts(id,email,name,password_hash,recovery_hash,created_at) VALUES(?,?,?,?,?,?)').run(id,identity.email,'Existing social user','','old-recovery',Date.now());
-  const previousVersion=(old.query('PRAGMA user_version').get()as any).user_version-1;
+  const previousVersion=11;
+  old.exec('ALTER TABLE customer_connections DROP COLUMN client_kind');
   // Reconstruct the previous identity table with a real pre-upgrade row.
   old.exec('DROP TABLE customer_auth_identities; CREATE TABLE customer_auth_identities(issuer TEXT NOT NULL,subject TEXT NOT NULL,account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,provider TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(issuer,subject),UNIQUE(account_id,issuer));');old.exec(`PRAGMA user_version=${previousVersion}`);
   old.query('INSERT INTO customer_auth_identities VALUES(?,?,?,?,?)').run(gateway.issuer,subject,id,'google',42);

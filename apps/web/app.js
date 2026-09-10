@@ -20,9 +20,18 @@ saveButton?.addEventListener("click", () => setDemoSaved(true));
 resetButton?.addEventListener("click", () => setDemoSaved(false));
 
 // Installation is detected by a real extension response, never a cached claim.
-import("./customer.js?v=20260910-extension-fix")
-  .then(async ({ customerConfig, extensionMessage }) => {
+import("./customer.js?v=20260910-platforms")
+  .then(async ({ customerConfig, extensionMessage, renderIphoneLinks, isIphoneBrowser }) => {
     const config = await customerConfig();
+    renderIphoneLinks(config);
+    if (isIphoneBrowser()) {
+      const actions = document.querySelector(".hero-device-actions");
+      const iphone = actions?.querySelector("[data-iphone-install]");
+      if (iphone) actions.prepend(iphone);
+      const platforms = document.querySelector(".platform-grid");
+      const phone = platforms?.querySelector(".phone-platform");
+      if (phone) platforms.prepend(phone);
+    }
     const installs = [...document.querySelectorAll("[data-extension-install]")];
     const note = document.querySelector(".download-note");
     if (!installs.length) return;

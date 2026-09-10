@@ -1098,3 +1098,28 @@ describe("private customer captures", () => {
     expect((await unknown.json()).message).toBeTruthy();
   });
 });
+
+test('device status comes from the issuing route and only lists live owned connections', async () => {
+  const owner = await register();
+  const other = await register();
+  const pair = await (await request('/pairing', 'POST', {}, owner.cookie)).json();
+  const browser = await (await request('/pairing/claim', 'POST', { code: pair.code, name: 'Foundkeep for iPhone' }, undefined, EXTENSION)).json();
+  expect(browser.connection.clientKind).toBe('browser');
+  const phone = await (await mobile('/login', 'POST', { email: owner.email, password: PASSWORD, deviceName: 'Chrome browser' })).json();
+  expect(phone.connection.clientKind).toBe('mobile');
+  let me = await (await request('/me', 'GET', undefined, owner.cookie)).json();
+  expect(me.connections.map((c: any) => c.clientKind).sort()).toEqual(['browser', 'mobile']);
+  expect(JSON.stringify(me.connections)).not.toContain(phone.token);
+  expect((await (await request('/me', 'GET', undefined, other.cookie)).json()).connections).toEqual([]);
+  db.query("UPDATE customer_connections SET client_kind = 'unknown' WHERE id = ?").run(phone.connection.id);
+  expect((await mobile('/me', 'GET', undefined, `Bearer ${phone.token}`)).status).toBe(200);
+  expect((db.query('SELECT client_kind FROM customer_connections WHERE id = ?').get(phone.connection.id) as any).client_kind).toBe('mobile');
+  // A known browser credential retains its classification even on a mobile route.
+  await mobile('/me', 'GET', undefined, `Bearer ${browser.token}`);
+  expect((db.query('SELECT client_kind FROM customer_connections WHERE id = ?').get(browser.connection.id) as any).client_kind).toBe('browser');
+  await request(`/connections/${phone.connection.id}`, 'DELETE', undefined, owner.cookie);
+  expect((await mobile('/me', 'GET', undefined, `Bearer ${phone.token}`)).status).toBe(401);
+  db.query('UPDATE customer_connections SET expires_at = 0 WHERE id = ?').run(browser.connection.id);
+  me = await (await request('/me', 'GET', undefined, owner.cookie)).json();
+  expect(me.connections).toEqual([]);
+});

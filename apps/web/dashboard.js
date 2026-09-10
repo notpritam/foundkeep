@@ -1,7 +1,7 @@
 import { mountOAuthButtons } from './oauth.js?v=20260910-scenic-auth';
-import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig, setAccountContext } from './customer.js?v=1.5.0';
+import { $, api, textElement, setMessage, downloadBlob, recoveryDownload, safeSource, safeBlob, dateLabel, extensionMessage, customerConfig, setAccountContext, renderIphoneLinks, isMobileBrowser, isIphoneBrowser } from './customer.js?v=20260910-platforms';
 
-const state = { account: null, connections: [], usage: null, captures: [], cursor: null, total: 0, type: '', query: '', listRequest: 0, controller: null, detailRequest: 0, detail: null, extension: null, extensionId: null, expired: false, noteClientId: null, recoveryCode: '', connecting: false, preferences: null, preferenceRevision: 0 };
+const state = { account: null, connections: [], usage: null, captures: [], cursor: null, total: 0, type: '', query: '', listRequest: 0, controller: null, detailRequest: 0, detail: null, extension: null, extensionId: null, expired: false, noteClientId: null, recoveryCode: '', connecting: false, preferences: null, preferenceRevision: 0, promotionDismissed: false };
 const kinds = { screenshot: 'Screenshot', selection: 'Highlight', bookmark: 'Bookmark', image: 'Image', video: 'Video', audio: 'Audio', document: 'Document', file: 'File', note: 'Note', tweet: 'Tweet' };
 let toastTimer, searchTimer, listRetry = () => loadCaptures();
 
@@ -31,7 +31,7 @@ function expireSession(event) {
   $('#toast').hidden = true; $('#toast').textContent = ''; setMessage($('#page-message'), '');
   $('#note-text').value = ''; $('#password-form').reset(); $('#delete-account-form').reset(); $('#preference-form').reset(); $('#preference-form').dataset.ready = 'false';
   document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
-  $('#library-state').hidden = true; $('#onboarding').hidden = true; $('#new-note').disabled = true;
+  $('#library-state').hidden = true; $('#onboarding').hidden = true; $('#device-promotion').hidden = true; $('#iphone-status').textContent = ''; $('#iphone-signin-note').textContent = ''; $('#new-note').disabled = true;
   if (event?.detail?.code === 'account_changed') $('#session-description').textContent = 'Your signed-in account changed in another tab. This action was stopped to protect your collection. Log in again to open the correct library.';
   openDialog('#session-dialog');
 }
@@ -63,18 +63,18 @@ function updateAccount() {
     $('#library-description').textContent = usage.captures ? `${usage.captures.toLocaleString()} ${usage.captures === 1 ? 'good thing' : 'good things'} worth coming back to.` : 'A place for the things worth keeping.';
   }
   $('#device-list').replaceChildren();
-  if (!connections.length) $('#device-list').append(textElement('li', 'No browsers connected yet.', 'muted device-empty'));
+  if (!connections.length) $('#device-list').append(textElement('li', 'No apps or browsers connected yet.', 'muted device-empty'));
   for (const connection of connections) {
     const row = textElement('li');
     const info = textElement('div');
-    info.append(textElement('strong', connection.name || 'Foundkeep browser'), textElement('span', `Connected ${dateLabel(connection.createdAt)} · ${connection.lastSeenAt ? `Last active ${dateLabel(connection.lastSeenAt, true)}` : 'Not used yet'}`));
-    const button = textElement('button', 'Revoke', 'subtle-button danger-text'); button.type = 'button'; button.setAttribute('aria-label', `Revoke ${connection.name || 'Foundkeep browser'}`);
+    info.append(textElement('strong', connection.name || 'Foundkeep device'), textElement('span', `Connected ${dateLabel(connection.createdAt)} · ${connection.lastSeenAt ? `Last active ${dateLabel(connection.lastSeenAt, true)}` : 'Not used yet'}`));
+    const button = textElement('button', 'Revoke', 'subtle-button danger-text'); button.type = 'button'; button.setAttribute('aria-label', `Revoke ${connection.name || 'Foundkeep device'}`);
     button.addEventListener('click', async () => {
-      if (!await confirmAction('Disconnect this browser?', `${connection.name || 'This browser'} will lose access to your cloud library. Its local captures remain on that device.`, 'Revoke access')) return;
+      if (!await confirmAction('Disconnect this device?', `${connection.name || 'This device'} will lose access to your cloud library. Its local captures remain on that device.`, 'Revoke access')) return;
       button.disabled = true;
       try {
         await api(`/connections/${encodeURIComponent(connection.id)}`, { method: 'DELETE' });
-        await refreshAccount(); await detectExtension(); toast('Browser access revoked.');
+        await refreshAccount(); await detectExtension(); toast('Device access revoked.');
       } catch (error) { if (!state.expired) setMessage($('#account-message'), error.message); }
       finally { button.disabled = false; }
     });
@@ -95,21 +95,35 @@ async function refreshAccount() {
   updateAccount();
 }
 function updateOnboarding() {
-  const connected = state.extension?.account?.id === state.account?.id;
+  const connected = !!state.account && state.extension?.account?.id === state.account.id;
+  const mobile = state.connections.filter(connection => connection.clientKind === 'mobile');
+  const unknown = state.connections.some(connection => !connection.clientKind || connection.clientKind === 'unknown');
+  $('#iphone-status').textContent = mobile.length ? `iPhone app connected to this account${mobile.length > 1 ? ` on ${mobile.length} devices` : ''}.` : unknown ? 'No iPhone connection confirmed yet. Open the app to refresh an existing connection.' : 'No iPhone app connected to this account yet.';
+  $('#iphone-status').classList.toggle('connection-success', !!mobile.length);
+  $('#iphone-signin-note').textContent = mobile.length ? 'Your app and this dashboard share one collection. New saves sync when you’re online.' : 'Sign in to the app with the same Foundkeep account. Your saves will appear here.';
+  $('#open-iphone').textContent = mobile.length ? 'Open the app on iPhone' : 'Already installed? Open app';
+  $('#open-iphone').className = mobile.length ? 'button primary compact' : 'text-link';
+  $('#install-iphone').className = mobile.length ? 'text-link' : 'button primary compact';
+  if (mobile.length) $('#install-iphone').textContent = 'Install on another iPhone';
+  else void customerConfig().then(config => { if (!state.expired && !state.connections.some(connection => connection.clientKind === 'mobile')) renderIphoneLinks(config); });
+  $('#browser-connection-badge').textContent = connected ? 'Connected here' : state.extension ? 'Installed here' : isMobileBrowser() ? 'For your computer' : 'Not connected here';
+  $('#device-promotion-copy').textContent = mobile.length ? 'Collect from your computer, too. Add Foundkeep to your browser.' : 'Your finds, on the go. Bring Foundkeep to your iPhone.';
+  $('#device-promotion').hidden = state.promotionDismissed || !state.usage?.captures || !$('#onboarding').hidden || (mobile.length > 0 && (connected || isMobileBrowser()));
   $('#install-marker').classList.toggle('step-done', !!state.extension);
   $('#connect-marker').classList.toggle('step-done', connected);
   $('#capture-marker').classList.toggle('step-done', !!state.usage?.captures);
   $('#connect-extension').textContent = connected ? 'Reconnect Foundkeep' : state.extension?.account ? 'Switch Foundkeep account' : 'Connect Foundkeep';
   if (state.usage?.captures) {
     $('#first-capture-title').textContent = 'Your collection has started';
-    $('#first-capture-description').textContent = 'Keep saving from the extension. Your new captures sync here when you’re online.';
+    $('#first-capture-description').textContent = 'Keep saving from your iPhone, browser or the web. New saves sync here when you’re online.';
   } else {
     $('#first-capture-title').textContent = 'Save your first find';
-    $('#first-capture-description').textContent = 'Open a page, click Foundkeep and save a screenshot, highlight or bookmark.';
+    $('#first-capture-description').textContent = 'Share something to Foundkeep on iPhone, save it with the extension, or write a note here.';
   }
 }
 async function detectExtension() {
   const config = await customerConfig();
+  renderIphoneLinks(config);
   if (config.storeUrl) {
     $('#install-extension').href = config.storeUrl; $('#install-extension').removeAttribute('download');
     $('#install-extension').target = '_blank'; $('#install-extension').rel = 'noopener noreferrer';
@@ -127,7 +141,7 @@ async function detectExtension() {
     $('#extension-status').classList.toggle('connection-success', account?.id === state.account?.id);
   } else {
     state.extension = null; state.extensionId = null;
-    $('#extension-status').textContent = 'Foundkeep isn’t detected. Install it in a supported Chromium browser, then reload this page. If it’s already installed, reload it from the browser’s extensions page.';
+    $('#extension-status').textContent = isMobileBrowser() ? 'The browser extension is for your computer. On iPhone, use the app and Share menu.' : 'Foundkeep isn’t detected. Install it in a supported Chromium browser, then reload this page. If it’s already installed, reload it from the browser’s extensions page.';
     $('#extension-status').classList.remove('connection-success');
   }
   updateOnboarding(); return state.extension;
@@ -158,8 +172,22 @@ $('#copy-extensions').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText('chrome://extensions'); $('#copy-result').textContent = 'Copied. Paste it into Chrome’s address bar.'; }
   catch { $('#copy-result').textContent = 'Copy chrome://extensions and paste it into Chrome’s address bar.'; }
 });
-$('#open-setup').addEventListener('click', () => { if (state.expired) return; $('#onboarding').hidden = false; $('#onboarding').scrollIntoView({ behavior: 'smooth', block: 'start' }); detectExtension(); });
-$('#hide-setup').addEventListener('click', () => { $('#onboarding').hidden = true; $('#open-setup').focus(); });
+function showDeviceSetup() {
+  if (state.expired) return;
+  $('#onboarding').hidden = false; updateOnboarding();
+  $('#onboarding').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+  void detectExtension();
+}
+window.addEventListener('hashchange', () => { if (location.hash === '#devices') showDeviceSetup(); });
+$('#open-setup').addEventListener('click', showDeviceSetup);
+$('#show-devices').addEventListener('click', showDeviceSetup);
+$('#dismiss-device-promotion').addEventListener('click', () => { state.promotionDismissed = true; updateOnboarding(); });
+$('#hide-setup').addEventListener('click', () => { $('#onboarding').hidden = true; updateOnboarding(); $('#open-setup').focus(); });
+if (isIphoneBrowser()) $('.device-options').prepend($('.iphone-option'));
+if (isMobileBrowser()) $('#connect-extension').hidden = true;
+window.addEventListener('focus', () => {
+  if (state.account && !state.expired) void Promise.allSettled([refreshAccount(), detectExtension()]);
+});
 
 function showLibraryState(title, description, { loading = false, retry, action, label } = {}) {
   const holder = $('#library-state'); holder.replaceChildren(); holder.hidden = false; holder.classList.toggle('is-loading', loading);
@@ -292,7 +320,7 @@ async function loadCaptures({ append = false, silent = false } = {}) {
     $('#results-count').textContent = `${state.total.toLocaleString()} ${state.total === 1 ? 'capture' : 'captures'}${state.query ? ` for “${state.query}”` : ''}`;
     if (!state.captures.length) {
       if (state.query || state.type) showLibraryState('No finds this time.', 'Try a different keyword or clear your filters to see your collection.', { action: resetFilters, label: 'Clear filters' });
-      else showLibraryState('Your first good find goes here.', 'Capture something with the Foundkeep extension, or write a note to get your collection started.', { action: openNote, label: 'Write a first note' });
+      else showLibraryState('Your first good find goes here.', 'Share something from iPhone, save it with the browser extension, or write a note to get your collection started.', { action: openNote, label: 'Write a first note' });
     }
     $('#load-more').hidden = !state.cursor; $('#load-more').textContent = 'Load more captures';
   } catch (error) {
@@ -551,12 +579,12 @@ document.addEventListener('keydown', event => {
   if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !document.querySelector('dialog[open]') && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) { event.preventDefault(); $('#search').focus(); }
 });
 window.addEventListener('online', () => { if (!state.expired) { toast('You’re back online. Refreshing your library.'); refreshLibrary(); } });
-window.addEventListener('offline', () => setMessage($('#page-message'), 'You’re offline. Reconnect to load or save cloud captures. Your extension can still save locally.'));
+window.addEventListener('offline', () => setMessage($('#page-message'), 'You’re offline. Reconnect to load or save cloud captures. Your iPhone app and extension keep pending saves on their devices.'));
 
 async function start() {
   try {
     await refreshAccount(); if (state.expired) return;
-    updateNoteAvailability(); $('#onboarding').hidden = !!(state.usage.captures && state.connections.length);
+    updateNoteAvailability(); $('#onboarding').hidden = !!state.usage.captures && location.hash !== '#devices'; updateOnboarding();
     await Promise.allSettled([loadCaptures(), detectExtension(), loadPreferences()]);
     updateNoteAvailability();
     if (location.hash === '#extension-settings' && !state.expired) {

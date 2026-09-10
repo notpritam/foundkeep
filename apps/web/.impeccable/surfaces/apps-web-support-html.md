@@ -19,6 +19,8 @@ Help a Foundkeep customer locate where installation, browser connection, capture
 
 Lead with the four-step Capture → Queue → Sync → Find route and five symptom links so readers can diagnose before reading. Follow with ordered, task-focused answers; use short inset notes for a consequential caveat or boundary. The primary action moves to symptom selection. The closing primary action opens the support email address, with the public issue tracker as a secondary destination and tells customers which diagnostic details to include and which private values to omit.
 
+The `#iphone-beta` section receives iPhone installation links and explains private TestFlight access. **Request beta access** opens an email request; an invitation is still required. Existing testers can open the app or continue to Share menu setup. Public installation replaces the request only when distribution configuration enables it. Primary beta actions retain white text on azure through hover for readable contrast.
+
 ## Direction and memorable moment
 
 Treat the page as an editorial field guide inside Foundkeep's white and scenic-blue web world. The first viewport pairs the direct “Help, from save to sync.” headline with the compact four-step route; that lifecycle diagram is the route's memorable diagnostic device. Fine rules, numbered steps, azure labels, and a sky closing panel extend established Foundkeep patterns without creating new global tokens or components.

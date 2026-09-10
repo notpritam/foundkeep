@@ -15,6 +15,8 @@ Persuade mode for `apps/web/index.html`. Frontmatter targets are relative to the
 
 Help visitors understand saving discoveries with their source, then choose installation or account creation. **Start collecting** opens signup. **Add to Chrome** opens the live Chrome Web Store listing. iPhone is **Beta**, with support as the route to TestFlight access.
 
+**Get iPhone beta** now appears alongside browser access in the hero, iPhone platform panel, and footer. Availability copy identifies the private TestFlight beta; installation links lead to the support page’s beta-access section until distribution configuration enables a public destination. Setup copy connects iPhone and browser saves to one collection and directs browser connection to **Apps & devices** in the dashboard.
+
 ## Direction and memorable moment
 
 The centered white “Found it? Keep it. Let your mind wander.” headline sits above an azure mountain horizon, with a small glass capture dock beneath the actions. Spacious white sections continue into rounded sky and mint panels with lightly rotated windows, a phone share sheet, and folder artwork. The closing CTA and footer repeat the mountain scenery.

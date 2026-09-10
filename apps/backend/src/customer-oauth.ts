@@ -7,7 +7,7 @@ import { challenge, isProvider, OAuthError, type OAuthGateway, type OAuthIdentit
 type C = Context<CustomerEnv>;
 type Deps = {
   origin:string; website(c:C):void; auth(c:C):Auth; account(id:string):AccountRow|null; emailAccount(email:string):AccountRow|null;
-  accountDto(row:AccountRow):unknown; session(c:C,id:string):void; issueConnection(id:string,name:string):unknown;
+  accountDto(row:AccountRow):unknown; session(c:C,id:string):void; issueConnection(id:string,name:string,clientKind:"browser"|"mobile"):unknown;
   jsonBody(c:C,max?:number):Promise<Record<string,unknown>>; verifyPassword(password:string,stored:string):Promise<boolean>;
   publicRate(c:C,action:string,email?:string):void;
 };
@@ -140,7 +140,7 @@ export function registerCustomerOAuth(app:Hono<CustomerEnv>,db:Database,gateway:
       if(owner.email===identity.email)db.query('UPDATE customer_auth_identities SET verified_email=? WHERE issuer=? AND subject=? AND account_id=?').run(identity.email,f.issuer,identity.subject,owner.id);
       consumeFlow(f);
       if(f.client==='web'){d.session(c,owner.id);return {account:d.accountDto(owner)};}
-      return {account:d.accountDto(owner),...d.issueConnection(owner.id,'Foundkeep for '+f.device_name)as object};
+      return {account:d.accountDto(owner),...d.issueConnection(owner.id,'Foundkeep for '+f.device_name,'mobile')as object};
     })();
     deleteCookie(c,cookieName(f.id),cookieOptions);return c.json(result);
   });

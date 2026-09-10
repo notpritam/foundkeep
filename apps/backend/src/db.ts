@@ -308,6 +308,9 @@ const MIGRATIONS: string[] = [
   -- their email can authorize additional subjects. Pending old flows lack it.
   DELETE FROM customer_oauth_flows;
   `,
+  // Client kind is recorded by the issuing route, never guessed from device names.
+  `ALTER TABLE customer_connections ADD COLUMN client_kind TEXT NOT NULL DEFAULT 'unknown'
+    CHECK(client_kind IN ('unknown','browser','mobile'));`,
 ];
 
 function migrate(db: Database): void {

@@ -1,0 +1,62 @@
+[
+  {
+    "name": "landing",
+    "label": "desktop",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "dashboard",
+    "label": "desktop",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "setup",
+    "label": "desktop",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "support",
+    "label": "desktop",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "open",
+    "label": "desktop",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "landing",
+    "label": "mobile",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "dashboard",
+    "label": "mobile",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "setup",
+    "label": "mobile",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "support",
+    "label": "mobile",
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "name": "open",
+    "label": "mobile",
+    "overflow": false,
+    "errors": []
+  }
+]
