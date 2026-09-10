@@ -9,7 +9,7 @@ related_targets: ["landing.css", "app.js"]
 
 ## Scope and mode
 
-Persuade mode for `apps/web/index.html`. Frontmatter targets are relative to the `apps/web` project root. This brief records the implemented redesign from the user's scenic reference and [implementation brief](../../../../docs/design/scenic-landing/brief.md). Separate `landing.css` prevents style bleed: auth, dashboard, support, and extension retain current themes; mobile retains the approved deep-purple gallery and floating dock.
+Persuade mode for `apps/web/index.html`. Frontmatter targets are relative to the `apps/web` project root. This brief records the implemented redesign from the user's scenic reference and [implementation brief](../../../../docs/design/scenic-landing/brief.md). Separate `landing.css` retains marketing layout rules. Customer auth, dashboard, support and policies now inherit its visual world through `customer.css`; the extension retains its theme and native mobile retains the approved deep-purple Gallery and floating dock.
 
 ## Audience and job
 

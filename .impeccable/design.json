@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-10T05:22:27.042363+00:00",
+  "title": "Foundkeep Design System",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "customer-card-hover",
+        "value": "0 8px 24px #12394a12",
+        "purpose": "Gallery hover depth."
+      },
+      {
+        "name": "customer-dialog",
+        "value": "0 24px 90px #183b4b30",
+        "purpose": "Focused native dialogs."
+      }
+    ],
+    "motion": [
+      {
+        "name": "customer-shimmer",
+        "value": "1.5s ease-in-out infinite",
+        "purpose": "Pending provider and gallery slots; disabled by reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "customer-phone",
+        "value": "680px"
+      },
+      {
+        "name": "single-column-gallery",
+        "value": "420px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "description": "Extracted customer-web pattern.",
+      "html": "<button class=\"ds-action ds-primary\">Save note</button>",
+      "css": ".ds-action{font:500 14px Geist,sans-serif;min-height:46px;padding:12px 22px;border-radius:999px;border:1px solid transparent;cursor:pointer}.ds-action:focus-visible{outline:2px solid var(--accent,#086ca8);outline-offset:4px}.ds-action:disabled{opacity:.55;cursor:default}.ds-primary{background:var(--accent,#086ca8);color:white}.ds-primary:hover{background:var(--accent-hover,#075888)}"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "description": "Extracted customer-web pattern.",
+      "html": "<button class=\"ds-action ds-secondary\">Refresh</button>",
+      "css": ".ds-action{font:500 14px Geist,sans-serif;min-height:46px;padding:12px 22px;border-radius:999px;border:1px solid transparent;cursor:pointer}.ds-action:focus-visible{outline:2px solid var(--accent,#086ca8);outline-offset:4px}.ds-action:disabled{opacity:.55;cursor:default}.ds-secondary{background:transparent;border-color:var(--control-line,#708f9a);color:var(--ink,#182b30)}.ds-secondary:hover{background:var(--sky,#e0f0fc)}"
+    },
+    {
+      "name": "Email input",
+      "kind": "input",
+      "description": "Extracted customer-web pattern.",
+      "html": "<label class=\"ds-field\">Email address<input type=\"email\" autocomplete=\"email\"></label>",
+      "css": ".ds-field{display:grid;gap:8px;font:500 13px Geist,sans-serif;color:var(--ink,#182b30)}.ds-field input{font:400 14px Geist,sans-serif;padding:12px 14px;border:1px solid var(--control-line,#708f9a);border-radius:12px;caret-color:var(--accent,#086ca8)}.ds-field input:focus-visible{outline:2px solid var(--accent,#086ca8);outline-offset:3px}"
+    },
+    {
+      "name": "Selected library navigation",
+      "kind": "nav",
+      "description": "Extracted customer-web pattern.",
+      "html": "<button class=\"ds-nav\" aria-current=\"page\">My library</button>",
+      "css": ".ds-nav{font:400 13px Geist,sans-serif;text-align:left;padding:11px;min-height:45px;border:0;border-radius:12px;background:var(--sky,#e0f0fc);color:var(--accent,#086ca8)}.ds-nav:hover{background:var(--paper,#f1f4f4)}.ds-nav:focus-visible{outline:2px solid var(--accent,#086ca8);outline-offset:4px}"
+    },
+    {
+      "name": "Capture filter",
+      "kind": "chip",
+      "description": "Extracted customer-web pattern.",
+      "html": "<button class=\"ds-filter\" aria-pressed=\"true\">All captures</button>",
+      "css": ".ds-filter{font:600 11px Geist,sans-serif;padding:7px 11px;min-height:40px;border:0;border-radius:999px;background:var(--sky,#e0f0fc);color:var(--accent,#086ca8)}.ds-filter:hover{background:var(--paper,#f1f4f4)}.ds-filter:focus-visible{outline:2px solid var(--accent,#086ca8);outline-offset:4px}"
+    },
+    {
+      "name": "Saved note",
+      "kind": "card",
+      "description": "Extracted customer-web pattern.",
+      "html": "<article class=\"ds-card\"><button>Keep a thought worth returning to.</button></article>",
+      "css": ".ds-card{border:1px solid var(--line,#dfe8e9);border-radius:20px;background:var(--sky,#e0f0fc);overflow:hidden}.ds-card button{padding:18px;border:0;background:transparent;text-align:left;color:var(--ink,#182b30);font:500 19px/1.25 \"Clarity City\",sans-serif}.ds-card:hover{box-shadow:0 8px 24px #12394a12}.ds-card button:focus-visible{outline:2px solid var(--accent,#086ca8);outline-offset:-3px}"
+    }
+  ],
+  "narrative": {
+    "overview": "Scenic customer web extends the approved landing; native Gallery and extension retain their themes.",
+    "keyCharacteristics": [
+      "White surfaces and azure actions",
+      "Sky notes and mint highlights",
+      "Readable saved content before source metadata"
+    ],
+    "dos": [
+      "Preserve canonical bookmark geometry and real account behavior."
+    ],
+    "donts": [
+      "Do not apply the web theme to native mobile or invent release availability."
+    ]
+  }
+}

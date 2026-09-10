@@ -32,3 +32,11 @@ Existing mountain assets are reused from the landing; provenance is in `../sceni
 A real successful Google/Apple login and cross-provider login should still be exercised by the account owner. Automated tests use verified gateway fixtures and check account/data ownership end to end. Supabase keys and provider tokens remain backend-only.
 
 This release does not publish the separately prepared Chrome Store popup hotfix. The public Store 1.0.0 popup still requires a Store update; its proposed internal revision 1.0.0.1 and the GitHub publication permission issue are tracked in `../../bugs/2026-09-10-extension/verification.md`.
+
+## Live deployment
+
+Code commit `29b10fa` pushed to main and fast-forwarded into production. Backend restarted successfully. Live database is schema 12, integrity check `ok`, and protected row counts match the pre-deploy snapshot; the one pre-existing orphan-connection foreign-key finding is unchanged.
+
+`live-verification.json` records the September 10 production browser check: auth/dashboard/support/privacy/terms return 200, Apple and Google are available, email is secondary and expands, final theme token is present, and no browser script errors occurred. `live-auth-mobile.png` is the actual public sign-in page with no signed-in customer data. No interactive provider authentication was performed.
+
+Design documentation was completed by the primary agent after the independent documenter produced no files within its bounded pass. No implementation changes followed the final visual verdict. Existing raster metadata omissions were not adopted as a design rule.

@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-09-10T05:15:17.721Z",
+  "auth": 200,
+  "providers": [
+    "apple",
+    "google"
+  ],
+  "emailSecondary": true,
+  "emailFallbackOpens": true,
+  "theme": "scenic",
+  "pages": {
+    "dashboard": 200,
+    "privacy": 200,
+    "support": 200,
+    "terms": 200
+  },
+  "browserErrors": 0,
+  "interactiveProviderLogin": "not performed"
+}
