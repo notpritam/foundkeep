@@ -41,3 +41,7 @@ The popup CSS is bundled code. This fix cannot be delivered to existing Store in
 ## Production verification
 
 Commit `9e25fdb` was pushed to main and deployed. All 15 landing checks passed against `https://foundkeep.app`. The actual public Store package was loaded with its original public key/Store ID; the live website detected version `1.0.0` and changed all three install actions to connect the extension. Existing Apple/Google provider discovery remains active. The new manual ZIP is served by the site.
+
+The live manual ZIP was downloaded through Chromium and matched the verified build byte-for-byte (106,162 bytes, SHA-256 `ee3027b9615db2b0ff486266e8178bf981352477490728c29a4b0c0aa6a980ce`).
+
+The GitHub Actions run `34438273155` failed only on the existing five-second fingerprint timeout. Commit `5a627af` fixes that timeout; the complete 161-test suite then passed locally. Attempting to dispatch the updated workflow returned HTTP 403 (admin rights required), and creating the signed GitHub release was rejected for missing workflow scope. No alternate authorization route was attempted. Consequently the public manual ZIP is updated, but the GitHub `ext-v1.6.2` auto-update release has **not** been published. A repository owner must run the updated release workflow or grant the appropriate GitHub permission. Chrome Web Store publication also remains pending as described above.
