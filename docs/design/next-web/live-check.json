@@ -1,0 +1,102 @@
+{
+  "origin": "https://foundkeep.app",
+  "checkedAt": "2026-09-10T06:52:07.150Z",
+  "results": [
+    {
+      "device": "desktop",
+      "route": "/",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Foundkeep — A place for the things worth keeping"
+    },
+    {
+      "device": "desktop",
+      "route": "/login",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Log in — Foundkeep"
+    },
+    {
+      "device": "desktop",
+      "route": "/support",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Support — Foundkeep"
+    },
+    {
+      "device": "desktop",
+      "route": "/privacy",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Privacy — Foundkeep"
+    },
+    {
+      "device": "desktop",
+      "route": "/terms",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Terms — Foundkeep"
+    },
+    {
+      "device": "desktop",
+      "route": "/open?path=collection",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Open Foundkeep — Foundkeep"
+    },
+    {
+      "device": "mobile",
+      "route": "/",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Foundkeep — A place for the things worth keeping"
+    },
+    {
+      "device": "mobile",
+      "route": "/login",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Log in — Foundkeep"
+    },
+    {
+      "device": "mobile",
+      "route": "/support",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Support — Foundkeep"
+    },
+    {
+      "device": "mobile",
+      "route": "/privacy",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Privacy — Foundkeep"
+    },
+    {
+      "device": "mobile",
+      "route": "/terms",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Terms — Foundkeep"
+    },
+    {
+      "device": "mobile",
+      "route": "/open?path=collection",
+      "status": 200,
+      "overflow": false,
+      "brokenImages": [],
+      "title": "Open Foundkeep — Foundkeep"
+    }
+  ]
+}

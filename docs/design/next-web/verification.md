@@ -38,4 +38,8 @@ No extension/native package version changed. The iPhone call to action remains e
 
 ## Live release
 
-Live cutover verification will be recorded after the scoped service and routing switch. The database backup before deployment passed integrity checking at schema13. The previous static customer website is retained for rollback.
+Released commit `085d4f2` on `https://foundkeep.app`. The immutable standalone artifact is `/home/pritam/.local/share/foundkeep-site/releases/085d4f2-20260910`; `foundkeep-site` listens only on127.0.0.1:8791. `atlas-backend` and Caddy remain healthy. Only the Foundkeep Caddy block changed; unrelated hosts were byte-compared before applying.
+
+Live read-only verification passed12page/browser checks across desktop and mobile, with no horizontal overflow, broken images, page exceptions or private-page CSP errors. `/dashboard` redirects to `/login`; legacy `.html` URLs retain query parameters; extension ZIP downloads, customer configuration, health, Apple app association and the Atlas-domain redirect all remain available. See [live results](live-check.json), [landing desktop](live-landing-desktop.png), [landing phone](live-landing-mobile.png), [auth desktop](live-auth-desktop.png) and [auth phone](live-auth-mobile.png).
+
+The before/after production database counts match:4accounts,16captures,4connections,8sessions,1folder. Integrity check passed at schema13. Backup: `/home/pritam/.local/share/foundkeep-site/backups/atlas-before-next-20260910T064815Z.sqlite`. The previous static customer website and Caddy backup are retained for rollback.
