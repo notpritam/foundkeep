@@ -1,13 +1,15 @@
 import {chromium} from 'playwright-core';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
-const base='http://127.0.0.1:18791';
+const base=new URL(process.env.FOUNDKEEP_SERVICES_TEST_URL||'http://127.0.0.1:18791').origin;
+assert.ok(['127.0.0.1','localhost'].includes(new URL(base).hostname)||process.env.FOUNDKEEP_ALLOW_LIVE_QA==='1','Live QA requires explicit opt-in and deletes only its own temporary account.');
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 const context=await browser.newContext({viewport:{width:1280,height:950},reducedMotion:'reduce'});
 const password='Collection-service-test-only-92617';let owner;
 try{
  const registered=await context.request.post(base+'/api/auth/register',{headers:{Origin:base},data:{name:'Alex Morgan',email:'services-'+crypto.randomUUID()+'@example.test',password}});assert.equal(registered.status(),201);owner=(await registered.json()).account;
  const page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ const html=await (await context.request.get(base+'/dashboard?panel=settings')).text();assert.equal(html.includes('data-cfemail'),false,'The CDN must not rewrite private React HTML.');
  await page.goto(base+'/dashboard?panel=settings');await page.getByRole('heading',{name:'A collection, freely yours.'}).waitFor();
  assert.equal(await page.getByRole('button',{name:'Pro checkout coming soon'}).isDisabled(),true);
  await page.getByText('Connect an agent',{exact:true}).click();await page.getByLabel('Connection name').fill('Research assistant');
