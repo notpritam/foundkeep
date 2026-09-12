@@ -28,7 +28,7 @@ Interfaces: `parseBookmarkHtml(html) -> {entries,warnings}`, `flattenBookmarkTre
 - [x] Test account boundaries, replay and changed-payload conflict, existing-save deduplication, folder paths, and quota rollback.
 - [x] Implement parser, migration, account-scoped import transactions, and optional-permission import UI with durable chunk progress.
 - [ ] Run `node --test tests/bookmark-import.mjs` and `bun test apps/backend/test/customer-imports.test.ts`; inspect a real packaged extension import.
-- [ ] Commit the integrated release after cross-client verification.
+- [x] Commit the integrated release after cross-client verification.
 
 ## 2. Sidebar and popup
 
@@ -40,7 +40,7 @@ Interfaces: allowlisted `library-*` messages proxy typed collection, organizatio
 - [x] Implement the compact sidebar and quick-save popup using existing Foundkeep fonts/tokens, source labels, restrained motion, and keyboard controls.
 - [x] Test spoofed senders, path injection, account switches during requests, denied permission, and popup-height constraints.
 - [ ] Inspect light/dark sidebar at 320/400/600 px and popup at Chromium's height limit; build both extension distribution archives.
-- [ ] Include the extension in the integrated release commit.
+- [x] Include the extension in the integrated release commit.
 
 ## 3. Hosted processing
 
@@ -52,7 +52,7 @@ Interfaces: `enqueueProcessing(accountId,captureId,reason)`; lease-based queue; 
 - [x] Implement the server-only OpenAI Responses adapter, account controls, usage/activity, and worker integration.
 - [x] Add bounded webpage/social extraction and non-destructive supported media derivatives with public-network and native-process tests.
 - [ ] Verify provider requests using fake transports, then perform a small real call when the secure operator key is supplied.
-- [ ] Include processing in the integrated release commit.
+- [x] Include processing in the integrated release commit.
 
 ## 4. Customer MCP
 
@@ -63,7 +63,7 @@ Interfaces: scoped revocable agent tokens, `/api/mcp` JSON-RPC tools/resources, 
 - [x] Test initialization/tool discovery, read-only/write grants, other-account IDs, expired/revoked tokens, change pagination/deletions, file bounds, and stale edit conflicts.
 - [x] Implement account connection UI with one-time token display, copyable MCP configuration, change-driven runner instructions, activity, and revocation.
 - [x] Exercise the endpoint with a real MCP client against an isolated account.
-- [ ] Include MCP in the integrated release commit.
+- [x] Include MCP in the integrated release commit.
 
 ## 5. Pro billing and release
 
@@ -73,8 +73,8 @@ Interfaces: server checkout/portal sessions; signed webhook event ingestion with
 
 - [x] Test signed/unsigned and replayed webhooks, out-of-order subscription updates, customer mapping, cancellation, failed payments, and client-selected price/redirect rejection.
 - [x] Implement USD 5/month checkout, portal, plan controls and honest unavailable states without configured keys.
-- [ ] Complete cross-client checks, migration backup/upgrade checks, production packaging and account-safe deployment.
-- [ ] Prepare the required Chrome Store update; document external account/credential blockers precisely if any remain.
+- [x] Complete web/extension checks, migration backup/upgrade checks, production packaging and account-safe deployment; native build is tracked below.
+- [x] Prepare the required Chrome Store update and submission kit; document external account/credential blockers.
 
 ## RevenueCat addition and release checkpoint
 
@@ -85,8 +85,8 @@ Interfaces: server checkout/portal sessions; signed webhook event ingestion with
 - [x] Build the production Next site; verify web/backend/mobile TypeScript; inspect desktop/phone account controls.
 - [x] Back up production schema 14 and trial schema 23; original account/capture/session/connection rows remain byte-identical. The backup already contains one orphan connection FK; the migration introduces none.
 - [x] Finish installed-extension import smoke and package final archives.
-- [ ] Deploy the reviewed backend/site and verify the live domain.
+- [x] Deploy the reviewed backend/site and verify the live domain.
 - [ ] Build and upload a fresh native binary using personal Expo owner notpritam.
 - [ ] Configure OpenAI, Stripe and RevenueCat/Apple products, then run real provider/sandbox purchases. These keys/products are not supplied yet.
 
-Verified before integration: 180 backend tests, 59 extension tests, 60 mobile tests; installed Chromium capture/import flow and account-control browser flow; backend/site/mobile TypeScript; production Next build. Code review closed all reported important findings. Real optional permission grant and StoreKit sandbox payment remain device/provider checks.
+Verified before integration: 181 backend tests, 59 extension tests, 60 mobile tests; installed Chromium capture/import flow and account-control browser flow; backend/site/mobile TypeScript; production Next build. Code review closed all reported important findings. Real optional permission grant and StoreKit sandbox payment remain device/provider checks.

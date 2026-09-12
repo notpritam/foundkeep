@@ -27,6 +27,7 @@ function equalSecret(a:string,b:string) { const x=Buffer.from(a); const y=Buffer
 const billingOperations = new WeakMap<Database, Map<string, Promise<unknown>>>();
 export function createBillingService(db:Database, env:Environment=process.env, fetcher:(input:string|URL|Request,init?:RequestInit)=>Promise<Response>=fetch) {
   const rc={ entitlement:env.REVENUECAT_ENTITLEMENT_ID||'pro', product:env.REVENUECAT_MONTHLY_PRODUCT_ID||'app.foundkeep.pro.monthly', allowSandbox:env.REVENUECAT_ALLOW_SANDBOX==='true' };
+  const sandboxAccounts=new Set((env.REVENUECAT_SANDBOX_ACCOUNT_IDS||'').split(',').map(value=>value.trim()).filter(Boolean));
   const publicKey=/^appl_[A-Za-z0-9]+$/.test(env.REVENUECAT_IOS_PUBLIC_KEY||'') ? env.REVENUECAT_IOS_PUBLIC_KEY! : null;
   const rcAvailable=!!(publicKey && env.REVENUECAT_SECRET_KEY && env.REVENUECAT_WEBHOOK_AUTH);
   const stripe=env.STRIPE_SECRET_KEY ? new Stripe(env.STRIPE_SECRET_KEY,{ maxNetworkRetries:1,timeout:15_000,httpClient:Stripe.createFetchHttpClient(fetcher as typeof fetch) }) : null;
@@ -61,7 +62,7 @@ export function createBillingService(db:Database, env:Environment=process.env, f
       if (!response.ok) moduleFail(503,'verification_pending','Your purchase is safe. Subscription verification is temporarily unavailable; try restoring again shortly.');
       let data:any; try { data=JSON.parse(await boundedText(response)); } catch { moduleFail(503,'verification_pending','Could not verify the subscription. Try again shortly.'); }
       if (!data?.subscriber || typeof data.subscriber!=='object') moduleFail(503,'verification_pending','Could not verify the subscription. Try again shortly.');
-      const snapshot=revenueCatSnapshot(data.subscriber,rc);
+      const snapshot=revenueCatSnapshot(data.subscriber,{...rc,allowSandbox:rc.allowSandbox||sandboxAccounts.has(accountId)});
       writeSubscription(db,accountId,'revenuecat',snapshot);
       if(snapshot.status==='active' && owned.checkout_id){
         if(!stripe)moduleFail(503,'verification_pending','An existing web checkout needs reconciliation.');

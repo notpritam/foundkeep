@@ -39,7 +39,8 @@ Provide these through the private server environment, never a committed file or 
 | `REVENUECAT_WEBHOOK_AUTH` | A new random authorization string, identical to the webhook configuration |
 | `REVENUECAT_ENTITLEMENT_ID` | `pro` |
 | `REVENUECAT_MONTHLY_PRODUCT_ID` | `app.foundkeep.pro.monthly` |
-| `REVENUECAT_ALLOW_SANDBOX` | `true` only in the test environment; default `false` |
+| `REVENUECAT_ALLOW_SANDBOX` | `true` only in an isolated test environment; default `false` |
+| `REVENUECAT_SANDBOX_ACCOUNT_IDS` | Optional comma-separated Foundkeep account IDs allowed to verify TestFlight purchases on the production API; empty by default |
 
 The public SDK key is intentionally returned to the iPhone app. It is a publishable identifier, not a provider secret. The server secret, webhook authorization, OpenAI key, Supabase keys and Stripe secret never reach the app. The SDK's customer ID is a random `fk_…` identity mapped by our backend; it is not the account email or account UUID.
 
@@ -52,7 +53,7 @@ RevenueCat → Integrations → Webhooks → Add configuration:
 - Authorization header: exact value of `REVENUECAT_WEBHOOK_AUTH`
 - App: Foundkeep
 - Events: all subscription and transfer events
-- Environment: production; use a separate test backend/integration for sandbox purchase testing
+- Environment: production and sandbox when testing with explicitly allowlisted Foundkeep accounts; otherwise production only
 
 The endpoint authenticates the request, looks up known opaque identities, fetches the current RevenueCat subscriber state, and updates the shared Pro entitlement. It does not trust a client claim that a purchase succeeded. Repeated events are idempotent. Unknown customer IDs do not gain access.
 
@@ -62,7 +63,9 @@ Webhook instructions: https://www.revenuecat.com/docs/integrations/webhooks
 
 Build and install a fresh native binary under Expo owner **notpritam**, project **33362145-2b45-4d86-bb08-cd10c6bfae61**.
 
-On a sandbox-configured backend, test: sign in → You → Your plan → localized monthly offering → purchase → verified Pro. Restore after reinstalling; switch Foundkeep accounts during a pending action; leave web checkout open and start purchase/restore on iPhone; cancel one attempt while another restore is running; cancel renewal; allow sandbox expiration; test a refund/transfer event; verify the dashboard sees the same Pro state. Revoking a Foundkeep device must remove its account access. Deleting the app/account does not cancel Apple billing; the app points users to Apple subscription settings.
+The current app and native share extension use `https://foundkeep.app`. To test this binary, keep global sandbox access off and add only the dedicated test account IDs to `REVENUECAT_SANDBOX_ACCOUNT_IDS`. Include sandbox events in the webhook integration. Other production accounts still reject sandbox entitlements. Remove test access when testing ends. A separate staging backend requires a matching app/auth/share environment build; changing only the API URL is insufficient.
+
+With the test accounts configured, test: sign in → You → Your plan → localized monthly offering → purchase → verified Pro. Restore after reinstalling; switch Foundkeep accounts during a pending action; leave web checkout open and start purchase/restore on iPhone; cancel one attempt while another restore is running; cancel renewal; allow sandbox expiration; test a refund/transfer event; verify the dashboard sees the same Pro state. Revoking a Foundkeep device must remove its account access. Deleting the app/account does not cancel Apple billing; the app points users to Apple subscription settings.
 
 Update App Privacy with **Purchases / Purchase History**, linked to user, used for app functionality, not tracking. Existing account and user-content disclosures remain. The app includes an updated privacy manifest. Add the subscription to App Review and update the reviewer instructions before submission.
 

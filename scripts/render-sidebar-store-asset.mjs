@@ -1,0 +1,11 @@
+import {chromium} from 'playwright-core';
+import {readFile,mkdir} from 'node:fs/promises';
+const data=async(path,mime)=>`data:${mime};base64,${(await readFile(path)).toString('base64')}`;
+const [sidebar,mark,font]=await Promise.all([data('docs/agentic-preview/sidebar-light.png','image/png'),data('apps/web/assets/studio-mark.svg','image/svg+xml'),data('apps/web/assets/fonts/ClarityCity-SemiBold.woff2','font/woff2')]);
+const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+try{
+ const page=await browser.newPage({viewport:{width:1280,height:800},deviceScaleFactor:1});
+ await page.setContent(`<!doctype html><style>@font-face{font-family:Clarity;src:url(${font})}*{box-sizing:border-box}body{margin:0;background:#eaf4f8;color:#17303b;font-family:Clarity,Arial}main{height:800px;display:grid;grid-template-columns:1fr 400px;gap:70px;padding:45px 80px}section{align-self:center}.brand{display:flex;gap:12px;align-items:center;font-size:27px}.brand img{width:40px;height:40px}h1{font-size:66px;letter-spacing:-3px;line-height:1.02;margin:60px 0 25px}p{font:22px/1.5 Arial;color:#466574;max-width:490px}ul{padding:0;list-style:none;font:18px/2.2 Arial;color:#24566f}.window{height:710px;border:1px solid #d1e2e9;border-radius:24px;overflow:hidden;box-shadow:0 24px 60px #254b6620;background:#fff}.window>img{width:100%;display:block}.eyebrow{font:13px Arial;letter-spacing:2px;color:#197caa;margin-top:22px}</style><main><section><div class="brand"><img src="${mark}" alt="">Foundkeep</div><h1>All your saves.<br>Right beside you.</h1><p>A private collection that stays close to what you’re reading.</p><ul><li>Browse folders and tags in the sidebar</li><li>Bring your bookmarks from other browsers</li><li>Keep the original link and useful context</li></ul><div class="eyebrow">FOUNDKEEP FOR CHROME</div></section><div class="window"><img src="${sidebar}" alt="Foundkeep collection sidebar"></div></main>`);
+ await page.evaluate(()=>document.fonts.ready);await mkdir('deploy/dist/store-assets',{recursive:true});await page.screenshot({path:'deploy/dist/store-assets/collection-sidebar.png'});
+}finally{await browser.close();}
+console.log('Rendered 1280 × 800 collection-sidebar.png from the verified sidebar UI.');

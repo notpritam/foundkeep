@@ -182,3 +182,10 @@ test('stale purchase cancellation cannot remove a newer restore reservation',asy
  await service.cancelMobilePurchase(id,first.purchaseAttemptId!);await service.cancelMobilePurchase(id,first.purchaseAttemptId!);
  expect(db.query('SELECT id FROM customer_purchase_attempts WHERE account_id=?').all(id)).toEqual([{id:restored.purchaseAttemptId}]);
 });
+
+test('production sandbox purchases grant Pro only to explicitly allowed test accounts',async()=>{
+ const other=crypto.randomUUID();db.query("INSERT INTO customer_accounts(id,email,name,password_hash,recovery_hash,created_at) VALUES(?,?,'Other','','',0)").run(other,other+'@example.test');
+ const service=createBillingService(db,{REVENUECAT_SECRET_KEY:'secret',REVENUECAT_SANDBOX_ACCOUNT_IDS:id},async()=>Response.json({subscriber:subscriber({is_sandbox:true})}));
+ await service.syncRevenueCat(id);await service.syncRevenueCat(other);
+ expect(accountPlan(db,id).pro).toBe(true);expect(accountPlan(db,other).pro).toBe(false);
+});
