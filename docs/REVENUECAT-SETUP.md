@@ -1,17 +1,24 @@
 # Foundkeep mobile subscriptions — RevenueCat setup
 
-The implementation is in the iPhone app and backend. Purchases are disabled until configuration is present. A new native build is required to include `react-native-purchases`; the public app version stays **1.0.0**. Existing native build 15 cannot receive this SDK through an OTA update.
+The implementation is in the iPhone app and live backend. **1.0.0 (18)** includes `react-native-purchases`, has passed Apple processing, and is assigned to **Foundkeep Internal** in TestFlight. Purchases are disabled until RevenueCat configuration is present. Existing native build 15 cannot receive this SDK through an OTA update; install build 18 first.
 
 ## 1. App Store Connect
 
 Open Foundkeep (`app.foundkeep.ios`, App Store ID `6809771188`) → Monetization → Subscriptions.
 
-1. Create one subscription group named **Foundkeep Pro**.
-2. Create an auto-renewable subscription: reference name **Foundkeep Pro Monthly**, product ID **`app.foundkeep.pro.monthly`**, duration **1 month**.
-3. Choose the available US base price closest to the approved $5/month price (normally **$4.99**); the app uses Apple's localized price, never a hard-coded dollar amount. The web plan remains exactly USD $5.
-4. Add localization: display name **Foundkeep Pro**; description **Automatic tags, summaries and linked saves.**
-5. Add the subscription review screenshot from the new app's subscription screen, complete availability and required review fields, and ensure Paid Apps agreements, tax and banking information are active.
-6. Attach this first subscription to the new app version when submitting for App Review.
+Already created through your App Store Connect API access:
+
+- Subscription group **Foundkeep Pro**, Apple group ID **22378877**, with an English display name.
+- Auto-renewable **Foundkeep Pro Monthly**, product ID **`app.foundkeep.pro.monthly`**, Apple product ID **6811311907**, duration **1 month**.
+- US monthly price **$4.99**, with Apple-equalized prices across **175 territories**. The app uses Apple's localized price; the web plan remains exactly USD $5.
+- English product display name **Foundkeep Pro** and description **Automatic tags, summaries and linked saves.**
+
+Before App Review:
+
+1. Review regional prices and availability. This is an ordinary renewable one-month subscription, without an annual payment commitment.
+2. Ensure Paid Apps agreements, tax and banking information are active.
+3. After configuring RevenueCat and verifying sandbox purchases, add a review screenshot showing the actual localized offering. The current unavailable screen is not a purchase review screenshot.
+4. Attach this first subscription to the app version when submitting for App Review. The product remains a draft until its remaining metadata and review requirements are complete.
 
 Apple's subscription setup: https://developer.apple.com/app-store/subscriptions/
 
@@ -31,6 +38,8 @@ Expo SDK instructions: https://www.revenuecat.com/docs/getting-started/installat
 ## 3. Backend configuration
 
 Provide these through the private server environment, never a committed file or public build variable:
+
+The private BB credential form writes the three credentials to `/home/pritam/.config/foundkeep/revenuecat.env`. The production service has an optional `EnvironmentFile` entry for this path. After the project/product/webhook are configured and credentials supplied, restart the backend to load them and verify the offering. Do not read or print that file into chat or logs.
 
 | Variable | Value |
 | --- | --- |
@@ -61,7 +70,7 @@ Webhook instructions: https://www.revenuecat.com/docs/integrations/webhooks
 
 ## 5. Test before submitting
 
-Build and install a fresh native binary under Expo owner **notpritam**, project **33362145-2b45-4d86-bb08-cd10c6bfae61**.
+Install **1.0.0 (18)** from [Foundkeep TestFlight](https://appstoreconnect.apple.com/apps/6809771188/testflight/ios). It was built and uploaded under Expo owner **notpritam**, project **33362145-2b45-4d86-bb08-cd10c6bfae61**, using `notpritamsharma@gmail.com`. Its fingerprint runtime is `f82707b954c566999320c3a2a6352710a0f40abb`.
 
 The current app and native share extension use `https://foundkeep.app`. To test this binary, keep global sandbox access off and add only the dedicated test account IDs to `REVENUECAT_SANDBOX_ACCOUNT_IDS`. Include sandbox events in the webhook integration. Other production accounts still reject sandbox entitlements. Remove test access when testing ends. A separate staging backend requires a matching app/auth/share environment build; changing only the API URL is insufficient.
 

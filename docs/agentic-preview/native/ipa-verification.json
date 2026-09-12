@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "build": "18",
+  "runtime": "f82707b954c566999320c3a2a6352710a0f40abb",
+  "sha256": "1c3c48e8a181efb57e4d0a2a5baafeb19089b5b83985a88e0f400f6e06abb94b",
+  "bytes": 23773820,
+  "entitlements": {
+    "app": {
+      "application-identifier": "6HVH7CKN3M.app.foundkeep.ios",
+      "com.apple.security.application-groups": [
+        "group.app.foundkeep.ios"
+      ],
+      "aps-environment": "production",
+      "com.apple.developer.associated-domains": [
+        "applinks:foundkeep.app"
+      ]
+    },
+    "share": {
+      "application-identifier": "6HVH7CKN3M.app.foundkeep.ios.ShareExtension",
+      "com.apple.security.application-groups": [
+        "group.app.foundkeep.ios"
+      ],
+      "aps-environment": null,
+      "com.apple.developer.associated-domains": null
+    }
+  },
+  "revenueCatBundled": true
+}

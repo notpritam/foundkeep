@@ -27,7 +27,7 @@ Interfaces: `parseBookmarkHtml(html) -> {entries,warnings}`, `flattenBookmarkTre
 - [x] Test nested exports/tree nodes, Unicode entities, unsafe URLs, original dates, malformed input, and bounds.
 - [x] Test account boundaries, replay and changed-payload conflict, existing-save deduplication, folder paths, and quota rollback.
 - [x] Implement parser, migration, account-scoped import transactions, and optional-permission import UI with durable chunk progress.
-- [ ] Run `node --test tests/bookmark-import.mjs` and `bun test apps/backend/test/customer-imports.test.ts`; inspect a real packaged extension import.
+- [x] Run the bookmark/import suites and inspect an installed Chromium extension importing a nested HTML export.
 - [x] Commit the integrated release after cross-client verification.
 
 ## 2. Sidebar and popup
@@ -51,7 +51,8 @@ Interfaces: `enqueueProcessing(accountId,captureId,reason)`; lease-based queue; 
 - [x] Test idempotent enqueue, lease recovery, limits, cancellation/account deletion, malformed model output, manual-edit races, and failures without data loss.
 - [x] Implement the server-only OpenAI Responses adapter, account controls, usage/activity, and worker integration.
 - [x] Add bounded webpage/social extraction and non-destructive supported media derivatives with public-network and native-process tests.
-- [ ] Verify provider requests using fake transports, then perform a small real call when the secure operator key is supplied.
+- [x] Verify provider requests, bounds, malformed output and failure handling using fake transports.
+- [ ] Perform a small real call when the secure operator key is supplied.
 - [x] Include processing in the integrated release commit.
 
 ## 4. Customer MCP
@@ -86,7 +87,9 @@ Interfaces: server checkout/portal sessions; signed webhook event ingestion with
 - [x] Back up production schema 14 and trial schema 23; original account/capture/session/connection rows remain byte-identical. The backup already contains one orphan connection FK; the migration introduces none.
 - [x] Finish installed-extension import smoke and package final archives.
 - [x] Deploy the reviewed backend/site and verify the live domain.
-- [ ] Build and upload a fresh native binary using personal Expo owner notpritam.
-- [ ] Configure OpenAI, Stripe and RevenueCat/Apple products, then run real provider/sandbox purchases. These keys/products are not supplied yet.
+- [x] Build and upload a fresh native binary using personal Expo owner notpritam. Apple processed 1.0.0 (18), and it is assigned to Foundkeep Internal.
+- [x] Verify the signed device IPA and exercise native sign-in, plan navigation, unavailable purchase/restore controls and refresh in the iPhone simulator. Save screenshots and remove the temporary account.
+- [x] Create the Apple subscription draft, English metadata, US $4.99 monthly price and Apple-equalized regional prices in 175 territories.
+- [ ] Supply OpenAI/Stripe credentials, connect the RevenueCat project and Apple product, finish purchase review metadata, then run real provider/sandbox purchases. Provider credentials are still outstanding.
 
 Verified before integration: 181 backend tests, 59 extension tests, 60 mobile tests; installed Chromium capture/import flow and account-control browser flow; backend/site/mobile TypeScript; production Next build. Code review closed all reported important findings. Real optional permission grant and StoreKit sandbox payment remain device/provider checks.
