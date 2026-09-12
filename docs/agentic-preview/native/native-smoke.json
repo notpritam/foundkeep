@@ -1,0 +1,20 @@
+{
+  "device": "iPhone 17",
+  "os": "iOS 26.5",
+  "configuration": "Release",
+  "source": "9a93b05",
+  "checks": [
+    "email sign-in",
+    "gallery and account navigation",
+    "server Free entitlement",
+    "subscription features",
+    "purchase unavailable without RevenueCat credentials",
+    "restore unavailable without RevenueCat credentials",
+    "refresh subscription",
+    "terms and privacy links"
+  ],
+  "result": "pass",
+  "temporaryAccountDeleted": true,
+  "deletedCredentialStatus": 401,
+  "realPurchaseTested": false
+}

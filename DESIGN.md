@@ -76,7 +76,7 @@ Preserve keyboard navigation, visible focus, semantic headings, native disclosur
 
 Carry the scenic direction through customer web, while preserving the approved native Gallery and extension themes. Keep the bookmark mark unchanged; do not add gradients, sparkles, orbit symbols, religious imagery, or generic cloud/magnifying-glass substitutions to it.
 
-The Chrome Web Store listing is live; iPhone access is TestFlight beta. Retain demo/collection disclosures, the actual browser screenshot, support, legal, and manual installation links. Do not invent App Store availability, Android/native desktop apps, pricing, metrics, testimonials, tracking, or unsupported claims. Customer setup asks for an account and browser connection, never developer tokens, relay configuration, or an agent.
+The Chrome Web Store listing is live; iPhone access is TestFlight beta. Retain demo/collection disclosures, the actual browser screenshot, support, legal, and manual installation links. Do not invent App Store availability, Android/native desktop apps, unapproved pricing, metrics, testimonials, tracking, or unsupported claims. Core setup asks for an account and browser connection. Optional account settings expose customer-scoped MCP connections and the approved $5/month Pro plan; operator credentials and relay configuration never appear in customer setup.
 
 ### Apps and devices
 

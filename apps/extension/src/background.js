@@ -1,6 +1,9 @@
+import { trustedLibrarySender } from "./library-api.js";
+import { startBookmarkImport, resumeBookmarkImport, cancelBookmarkImport, importProgress } from "./import-queue.js";
 import { drainQueue, saveCapture } from "./capture.js";
 import { extractPageDocument } from "./page-extractor.js";
 import {
+  libraryRequest,
   protectCloudStorage,
   handleExternalMessage,
   getCloudStatus,
@@ -233,6 +236,7 @@ chrome.runtime.onInstalled.addListener(() => {
     .catch(() => reconcileContextMenus());
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
   drainQueue().catch(() => {});
+  resumeBookmarkImport().catch(() => {});
 });
 chrome.runtime.onStartup?.addListener(() => {
   getEffectivePreferences()
@@ -240,6 +244,7 @@ chrome.runtime.onStartup?.addListener(() => {
     .catch(() => reconcileContextMenus());
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
   drainQueue().catch(() => {});
+  resumeBookmarkImport().catch(() => {});
 });
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === "atlas-drain") {
@@ -247,6 +252,7 @@ chrome.alarms.onAlarm.addListener((a) => {
       .then((state) => reconcileContextMenus(state.preferences))
       .catch(() => {});
     drainQueue().catch(() => {});
+    resumeBookmarkImport().catch(() => {});
   }
 });
 
@@ -310,6 +316,22 @@ chrome.commands.onCommand.addListener(async (command) => {
 // Messages from popup / content scripts
 // ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.kind === "library-request" || msg?.kind?.startsWith("bookmark-import-")) {
+    if (!trustedLibrarySender(sender, chrome.runtime)) { sendResponse({ok:false,error:"Open your Foundkeep library to continue."}); return; }
+    (async()=>{
+      try {
+        let data;
+        if(msg.kind==="library-request") data=await libraryRequest(msg.operation,msg.args,msg.accountId);
+        else if(msg.kind==="bookmark-import-start") data=await startBookmarkImport(msg);
+        else if(msg.kind==="bookmark-import-status") data=await importProgress(msg.accountId);
+        else if(msg.kind==="bookmark-import-retry") { void resumeBookmarkImport(); data=await importProgress(msg.accountId); }
+        else if(msg.kind==="bookmark-import-cancel") { await cancelBookmarkImport(); data=null; }
+        else throw new Error("Unknown import action.");
+        sendResponse({ok:true,data});
+      }catch(error){sendResponse({ok:false,error:error.message||"Please try again."});}
+    })();return true;
+  }
+
   if (msg?.kind === "feature-status") {
     getEffectivePreferences()
       .then((state) => sendResponse({ ok: true, enabled: !!state.preferences.capture[msg.feature] }))

@@ -1,16 +1,21 @@
+import { useBilling } from '../../../billing/BillingProvider.tsx';
+import { AdaptiveText as Text } from '../../../components/AdaptiveText.tsx';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import FoundkeepShared from '../../../../modules/foundkeep-shared/src';
 import { OAuthButtons } from '../../../components/OAuthButtons.tsx';
 import { useDock } from '../../../components/FloatingDock.tsx';
 import { Brand, Button, Field, Message, Screen } from '../../../components/ui.tsx';
 import { useSession } from '../../../session/SessionProvider.tsx';
+import { FrostedPanel } from '../../../components/ScenicSurface.tsx';
 import { colors, typography } from '../../../theme.ts';
 import { disableNotifications, enableNotifications, notificationState, type NotificationState } from '../../../notifications/notifications.ts';
 
 const usage = (value = 0) => `${(value / 1048576).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 export default function Settings() {
+  const { plan } = useBilling();
   const { bottomSpace } = useDock();
   const { account, usage: storage, policy, updateRequired, logout, deleteAccount, client } = useSession(); const [error, setError] = useState('');
   const [pending, setPending] = useState(0);
@@ -43,20 +48,56 @@ export default function Settings() {
       try { setNotification(await notificationState(client)); } catch {}
     } finally { setChangingNotification(false); }
   };
-  const signOut = () => Alert.alert('Sign out of this iPhone?', 'Foundkeep will stop saving from the Share sheet until you sign in again.', [{ text: 'Stay signed in', style: 'cancel' }, { text: 'Sign out', style: 'destructive', onPress: async () => { try { await logout(); router.replace('/(auth)/welcome'); } catch (value) { setError((value as Error).message); } } }]);
+  const signOut = () => Alert.alert('Sign out of this iPhone?', 'Foundkeep will stop saving from the Share sheet until you sign in again.', [{ text: 'Stay signed in', style: 'cancel' }, { text: 'Sign out', style: 'destructive', onPress: async () => { try { await logout(); router.replace('/(auth)/sign-in'); } catch (value) { setError((value as Error).message); } } }]);
   const confirmDeletion = () => {
     if (!password) { setError('Enter your password to delete this account.'); return; }
     Alert.alert('Permanently delete this account?', 'Every cloud capture and uploaded file will be deleted. This cannot be undone.', [
       { text: 'Keep account', style: 'cancel' },
       { text: 'Delete permanently', style: 'destructive', onPress: () => void (async () => {
         setDeleting(true); setError('');
-        try { await deleteAccount(password); router.replace('/(auth)/welcome'); }
+        try { await deleteAccount(password); router.replace('/(auth)/sign-in'); }
         catch (value) { setError((value as Error).message); setDeleting(false); }
       })() },
     ]);
   };
   const notificationCopy = !policy.features.notifications ? 'Capture alerts are temporarily unavailable.' : notification === 'on' ? 'On. A private alert opens the saved item when processing finishes.' : notification === 'blocked' ? 'Off in iPhone Settings. Allow Foundkeep alerts there to turn them back on.' : notification === 'unavailable' ? 'Push alerts are available on a physical iPhone.' : 'Off. Turn this on to hear when a shared item is ready.';
   const notificationAction = notification === 'on' ? 'Turn off capture alerts' : notification === 'blocked' ? 'Open iPhone Settings' : 'Turn on capture alerts';
-  return <Screen><ScrollView contentContainerStyle={[styles.page, { paddingBottom: bottomSpace }]}><Brand compact /><Button label="How to save from other apps" secondary onPress={() => router.push('/(app)/onboarding')} /><View style={styles.heading}><Text style={typography.title}>Settings.</Text><Text style={typography.body}>Your account, storage and share connection.</Text></View>{updateRequired ? <Message error>A newer Foundkeep version is required. Update it from the App Store to resume saving.</Message> : <Message>{policy.notice}</Message>}<View style={styles.panel}><Text style={typography.label}>Signed in as</Text><Text style={styles.account}>{account?.name}</Text><Text style={typography.small}>{account?.email}</Text></View><View style={styles.panel}><Text style={typography.label}>Collection storage</Text><Text style={styles.storage}>{storage?.captures.toLocaleString() || 0} items</Text><Text style={typography.small}>{usage(storage?.bytes)} of {usage(storage?.maxBytes)} used</Text></View>{pending > 0 ? <View style={styles.panel}><Text style={typography.label}>Waiting to upload</Text><Text style={typography.body}>{pending} {pending === 1 ? 'save is' : 'saves are'} kept safely on this iPhone.</Text>{blocked > 0 ? <><Text style={typography.small}>{blocked} need a new home because their folder was deleted.</Text><Button secondary label="Save blocked items to Unfiled" loading={resolving} onPress={recoverBlocked} /></> : <Text style={typography.small}>They’ll upload when Foundkeep reconnects.</Text>}</View> : null}<View style={styles.panel}><Text style={typography.label}>Capture-ready alerts</Text><Text style={typography.body}>{notificationCopy}</Text><Text style={typography.small}>Alerts never include your saved title, text, source, or account details.</Text><Button label={notificationAction} secondary={notification !== 'off'} loading={changingNotification} disabled={!policy.features.notifications || notification === 'unavailable'} onPress={() => void changeNotifications()} /></View><View style={styles.panel}><Text style={typography.label}>Share from any app</Text><Text style={typography.body}>In an iPhone Share menu, choose Foundkeep. If it is hidden, tap More and add it to Favorites.</Text><Text style={typography.small}>Links, text, images, videos, audio, PDFs and other files are supported.</Text></View><View style={styles.panel}><Text style={typography.label}>Live configuration</Text><Text style={typography.body}>Policy revision {policy.revision}</Text><Text style={typography.small}>Availability and safe limits sync automatically. App UI and copy can update over the air.</Text></View><Message error>{error}</Message><View style={styles.links}><Button label="Support" secondary onPress={() => void Linking.openURL('https://foundkeep.app/support.html')} /><Button label="Privacy policy" secondary onPress={() => void Linking.openURL('https://foundkeep.app/privacy.html')} /><Button label="Terms" secondary onPress={() => void Linking.openURL('https://foundkeep.app/terms.html')} /><Button label="Open web dashboard" secondary onPress={() => void Linking.openURL('https://foundkeep.app/dashboard.html')} /></View><Button label="Sign out" secondary onPress={signOut} />{showDelete ? <View style={styles.deletePanel}><Text style={typography.heading}>Delete your account?</Text><Text style={typography.small}>This permanently removes every cloud capture, uploaded file, connection, and account credential. Export anything you need first.</Text>{account?.hasPassword === false ? <OAuthButtons intent="delete" /> : <><Field label="Password" value={password} onChangeText={setPassword} textContentType="password" secureTextEntry autoCapitalize="none" /><Button label="Delete account permanently" danger loading={deleting} onPress={confirmDeletion} /></>}<Button label="Cancel" secondary disabled={deleting} onPress={() => { setShowDelete(false); setPassword(''); setError(''); }} /></View> : <Button label="Delete account" secondary onPress={() => setShowDelete(true)} />}<Text style={styles.version}>Foundkeep 1.0.0 · Updates delivered securely through the App Store and EAS Update.</Text></ScrollView></Screen>;
+  return <Screen><ScrollView contentContainerStyle={[styles.page, { paddingBottom: bottomSpace }]}>
+    <Brand compact />
+    <View style={styles.heading}><Text style={typography.title}>Settings.</Text><Text style={[typography.body, { color: colors.muted }]}>A little space for you.</Text></View>
+    {updateRequired ? <Message error>Update Foundkeep from the App Store to keep saving.</Message> : <Message>{policy.notice}</Message>}
+    <View style={styles.profile}><View style={styles.avatar}><Text style={styles.initial}>{(account?.name || 'F').slice(0, 1).toUpperCase()}</Text></View><View style={{ flex: 1, gap: 4 }}><Text style={styles.account}>{account?.name}</Text><Text style={typography.small}>{account?.email}</Text></View></View>
+    <View style={styles.section}><View style={styles.storageRow}><Text style={typography.heading}>Your collection</Text><Text style={typography.small}>{storage?.captures.toLocaleString() || 0} saves</Text></View><View style={styles.meter}><View style={[styles.meterFill, { width: `${storage?.maxBytes ? Math.min(100, storage.bytes / storage.maxBytes * 100) : 0}%` }]} /></View><Text style={typography.small}>{usage(storage?.bytes)} of {usage(storage?.maxBytes)} used</Text></View>
+    <SettingsRow icon="sparkles-outline" label="Your plan" title={plan?.pro ? 'Foundkeep Pro' : 'Your free collection'} detail={plan?.pro ? 'Manage your subscription and processing allowance.' : 'Explore Pro, or restore an App Store purchase.'} onPress={() => router.push('/(app)/subscription')} />
+    {pending > 0 ? <FrostedPanel><Text style={typography.label}>Waiting to upload</Text><Text style={typography.body}>{pending} {pending === 1 ? 'save is' : 'saves are'} kept safely on this iPhone.</Text>{blocked > 0 ? <><Text style={typography.small}>{blocked} need a new home because their folder was deleted.</Text><Button secondary label="Save blocked items to Unfiled" loading={resolving} onPress={recoverBlocked} /></> : <Text style={typography.small}>They’ll upload when Foundkeep reconnects.</Text>}</FrostedPanel> : null}
+    <View style={styles.section}>
+      <SettingsRow icon="notifications-outline" label={notificationAction} title="Capture-ready alerts" detail={notificationCopy} value={notification === 'on' ? 'On' : 'Off'} loading={changingNotification} disabled={!policy.features.notifications || notification === 'unavailable'} onPress={() => void changeNotifications()} />
+      <SettingsRow icon="share-outline" label="How to save from other apps" title="Save from other apps" detail="A quick guide to your iPhone Share menu." onPress={() => router.push('/(app)/onboarding')} />
+    </View>
+    <Message error>{error}</Message>
+    <View style={styles.section}>
+      <SettingsRow icon="help-circle-outline" label="Support" onPress={() => void Linking.openURL('https://foundkeep.app/support')} />
+      <SettingsRow icon="shield-checkmark-outline" label="Privacy policy" onPress={() => void Linking.openURL('https://foundkeep.app/privacy')} />
+      <SettingsRow icon="document-text-outline" label="Terms" onPress={() => void Linking.openURL('https://foundkeep.app/terms')} />
+      <SettingsRow icon="globe-outline" label="Open web dashboard" onPress={() => void Linking.openURL('https://foundkeep.app/dashboard')} />
+    </View>
+    <SettingsRow icon="log-out-outline" label="Sign out" onPress={signOut} />
+    {showDelete ? <View style={styles.deletePanel}><Text style={typography.heading}>Delete your account?</Text><Text style={typography.small}>This permanently removes your account and every save. Export anything you need first. Deleting your Foundkeep account does not cancel an App Store subscription; cancel it in your Apple Account settings.</Text>{account?.hasPassword === false ? <OAuthButtons intent="delete" /> : <><Field label="Password" value={password} onChangeText={setPassword} textContentType="password" secureTextEntry autoCapitalize="none" /><Button label="Delete account permanently" danger loading={deleting} onPress={confirmDeletion} /></>}<Button label="Cancel" secondary disabled={deleting} onPress={() => { setShowDelete(false); setPassword(''); setError(''); }} /></View> : <SettingsRow icon="trash-outline" label="Delete account" onPress={() => setShowDelete(true)} />}
+    <Text style={styles.version}>Foundkeep 1.0.0</Text>
+  </ScrollView></Screen>;
 }
-const styles = StyleSheet.create({ page: { padding: 22, paddingBottom: 48, gap: 16 }, heading: { gap: 9, marginVertical: 14 }, panel: { gap: 7, padding: 18, borderWidth: 1, borderColor: colors.line, borderRadius: 11, backgroundColor: colors.surface }, account: { color: colors.ink, fontSize: 21, fontWeight: '700' }, storage: { color: colors.ink, fontSize: 23, fontWeight: '700' }, links: { gap: 10 }, deletePanel: { gap: 12, padding: 18, borderWidth: 1, borderColor: '#D9AAA4', borderRadius: 11, backgroundColor: colors.errorSurface }, version: { ...typography.small, textAlign: 'center', marginTop: 8 } });
+function SettingsRow({ icon, label, title, detail, value, onPress, disabled = false, loading = false }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; title?: string; detail?: string; value?: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint={detail} accessibilityState={{ disabled: disabled || loading }} disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.row, (pressed || disabled || loading) && { opacity: .5 }]}>
+    <Ionicons name={icon} size={22} color={colors.muted} /><View style={{ flex: 1, gap: 4 }}><Text style={styles.rowTitle}>{title || label}</Text>{detail ? <Text style={typography.small}>{detail}</Text> : null}</View>
+    {loading ? <ActivityIndicator color={colors.accent} /> : <>{value ? <Text style={typography.small}>{value}</Text> : null}<Ionicons name="chevron-forward" size={16} color={colors.muted} /></>}
+  </Pressable>;
+}
+const styles = StyleSheet.create({
+  page: { padding: 24, gap: 20 }, heading: { gap: 9, marginTop: 14 },
+  profile: { flexDirection: 'row', gap: 14, alignItems: 'center', paddingVertical: 8 },
+  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.accentSoft, justifyContent: 'center', alignItems: 'center' }, initial: { color: colors.accent, fontSize: 22, fontWeight: '600' }, account: { color: colors.ink, fontSize: 20, fontWeight: '600' },
+  section: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, paddingTop: 16, gap: 10 }, storageRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  meter: { height: 4, borderRadius: 2, backgroundColor: colors.line, overflow: 'hidden', marginVertical: 4 }, meterFill: { height: '100%', backgroundColor: colors.accent },
+  row: { flexDirection: 'row', minHeight: 52, alignItems: 'center', gap: 12, paddingVertical: 10 }, rowTitle: { color: colors.ink, fontSize: 16, lineHeight: 22 },
+  deletePanel: { gap: 12, padding: 18, borderWidth: 1, borderColor: colors.line, borderRadius: 13, backgroundColor: colors.errorSurface }, version: { ...typography.small, textAlign: 'center', marginTop: 8 },
+});

@@ -1,3 +1,7 @@
+import {registerCustomerProcessing,createProcessingService} from './customer-processing.ts';
+import {registerAgentAccess} from './customer-agent-access.ts';
+import {registerCustomerMcp} from './customer-mcp.ts';
+import { savedVia, type SavedVia } from '../../../packages/shared/src/collection-presentation.ts';
 import type { Database } from "bun:sqlite";
 import { createHash, randomBytes } from "node:crypto";
 import { Hono, type Context } from "hono";
@@ -36,14 +40,18 @@ import {
   folderIdentifier, organizationBytes, organizationName, readOrganization, renameFolder, requireFolder,
 } from "./customer-organization.ts";
 
+import { registerCustomerImports, importOrigins } from "./customer-imports.ts";
+import { registerCustomerBilling } from "./customer-billing.ts";
+import { accountPlan } from "./customer-plans.ts";
+import { CustomerModuleError } from "./customer-modules.ts";
+
 const DAY = 86_400_000;
 const MAX_BODY = 12 * 1024 * 1024;
 const BODY_READ_DEADLINE_MS = 30_000;
 const MAX_IMAGE = 8 * 1024 * 1024;
-const MAX_CAPTURES = 1000;
-const MAX_BYTES = 200 * 1024 * 1024;
+const MAX_CAPTURES = 10_000;
 const TYPES = new Set(["screenshot", "selection", "bookmark", "image", "note", "tweet", "video", "audio", "document", "file"]);
-const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json,manual_tags,folder_id,(SELECT name FROM customer_folders WHERE id=customer_captures.folder_id AND account_id=customer_captures.account_id) AS folder_name";
+const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,saved_via,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json,manual_tags,folder_id,(SELECT name FROM customer_folders WHERE id=customer_captures.folder_id AND account_id=customer_captures.account_id) AS folder_name,(SELECT 1 FROM customer_derivatives WHERE capture_id=customer_captures.id AND account_id=customer_captures.account_id AND kind='preview') AS has_derived_preview,(SELECT json_extract(source_json,'$.imageUrl') FROM customer_processing_results WHERE capture_id=customer_captures.id AND account_id=customer_captures.account_id) AS generated_image_url";
 // List views need excerpts, not every article and OCR result in the account.
 // Keep the full representation as the default for installed older clients.
 const CARD_TEXT_COLUMNS = new Set(["selection_text", "note_text", "article_text", "summary", "ocr_text"]);
@@ -55,8 +63,9 @@ export interface AccountRow { id: string; email: string; name: string; password_
 interface ConnectionRow { client_kind: "unknown" | "browser" | "mobile"; id: string; account_id: string; name: string; created_at: number; last_seen_at: number | null; expires_at: number }
 interface CredentialRow { id: string; account_id: string; expires_at: number }
 export interface CustomerCaptureRow {
+  has_derived_preview?: number; generated_image_url?: string | null;
   id: string; account_id: string; client_id: string; type: string; status: string;
-  batch_id: string | null;
+  batch_id: string | null; saved_via: SavedVia | null;
   source_url: string | null; source_title: string | null; selection_text: string | null;
   note_text: string | null; article_text: string | null; blob_data?: Uint8Array | null;
   blob_mime: string | null; blob_bytes: number; storage_bytes: number;
@@ -77,27 +86,28 @@ class CustomerError extends Error {
 function fail(status: CustomerError["status"], code: string, message: string): never { throw new CustomerError(status, code, message); }
 function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
 function secret() { return randomBytes(32).toString("base64url"); }
-function mobileCursor(raw: string): { capturedAt: number; id: string } | null {
+function mobileCursor(raw: string, recent = false): { capturedAt: number; id: string } | null {
   if (!raw) return null;
   if (raw.length > 256 || !/^[A-Za-z0-9_-]+$/.test(raw)) fail(400, "invalid_cursor", "Refresh the collection and try again.");
   try {
     const data = Buffer.from(raw, "base64url");
     if (data.toString("base64url") !== raw) throw new Error();
     const value = JSON.parse(data.toString("utf8"));
+    const key = recent ? "createdAt" : "capturedAt";
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 2 ||
-        !Number.isSafeInteger(value.capturedAt) || value.capturedAt < 0 ||
+        !Number.isSafeInteger(value[key]) || value[key] < 0 ||
         typeof value.id !== "string" || !/^[A-Za-z0-9-]{1,80}$/.test(value.id)) throw new Error();
-    return value;
+    return { capturedAt: value[key], id: value.id };
   } catch { fail(400, "invalid_cursor", "Refresh the collection and try again."); }
 }
-function encodeMobileCursor(row: CustomerCaptureRow) {
-  return Buffer.from(JSON.stringify({ capturedAt: row.captured_at, id: row.id })).toString("base64url");
+function encodeMobileCursor(row: CustomerCaptureRow, recent = false) {
+  return Buffer.from(JSON.stringify({ [recent ? "createdAt" : "capturedAt"]: recent ? row.created_at : row.captured_at, id: row.id })).toString("base64url");
 }
 function accountDto(row: AccountRow) { return { id: row.id, email: row.email, name: row.name, createdAt: row.created_at, hasPassword: !!row.password_hash }; }
 function connectionDto(row: ConnectionRow) { return { id: row.id, name: row.name, clientKind: row.client_kind, createdAt: row.created_at, lastSeenAt: row.last_seen_at }; }
 export function customerCaptureDto(row: CustomerCaptureRow) {
   const provenance = parseStoredJson<CaptureProvenance | null>(row.provenance_json, null);
-  const hasPreview = (row.blob_mime && PREVIEW_MIMES.has(row.blob_mime) && row.blob_bytes > 0)
+  const hasPreview = row.has_derived_preview || previewSourceUrl(row.generated_image_url) || (row.blob_mime && PREVIEW_MIMES.has(row.blob_mime) && row.blob_bytes > 0)
     || (row.file_path && row.file_mime && PREVIEW_MIMES.has(row.file_mime)) || previewSourceUrl(provenance?.leadImageUrl);
   return {
     id: row.id, clientId: row.client_id, batchId: row.batch_id, type: row.type, status: row.status,
@@ -112,7 +122,7 @@ export function customerCaptureDto(row: CustomerCaptureRow) {
     fileUrl: row.file_path ? `/api/captures/${row.id}/file` : null,
     width: row.width, height: row.height, capturedAt: row.captured_at, createdAt: row.created_at,
     updatedAt: row.updated_at, enrichError: row.enrich_error,
-    provenance,
+    provenance, savedVia: savedVia({ savedVia: row.saved_via, provenance }),
     processingOptions: parseStoredJson<ProcessingOptions>(row.processing_options_json, { ...DEFAULT_PROCESSING_OPTIONS }),
   };
 }
@@ -368,11 +378,18 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     if (keepSession) db.query("DELETE FROM customer_sessions WHERE account_id = ? AND id != ?").run(accountId, keepSession);
     else db.query("DELETE FROM customer_sessions WHERE account_id = ?").run(accountId);
     db.query("DELETE FROM customer_connections WHERE account_id = ?").run(accountId);
+    db.query("DELETE FROM customer_agent_tokens WHERE account_id = ?").run(accountId);
     db.query("DELETE FROM customer_pairings WHERE account_id = ?").run(accountId);
   }
   function usage(accountId: string) {
     const row = db.query("SELECT COUNT(*) captures, COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures WHERE account_id = ?").get(accountId) as { captures: number; bytes: number };
-    return { ...row, maxCaptures: MAX_CAPTURES, maxBytes: MAX_BYTES };
+    return { ...row, maxCaptures: accountPlan(db, accountId).limits.maxCaptures, maxBytes: accountPlan(db, accountId).limits.maxBytes };
+  }
+  function captureImportDetails(id: string, accountId: string) {
+    const origins = importOrigins(db, id, accountId);
+    const processing = createProcessingService(db).details(accountId, id);
+    const derivatives = db.query('SELECT kind,mime,bytes FROM customer_derivatives WHERE capture_id=? AND account_id=?').all(id,accountId);
+    return { ...(origins.length ? {importOrigins: origins} : {}), ...(processing ? {processing} : {}), ...(derivatives.length ? {derivatives} : {}) };
   }
   function findCapture(id: string, accountId: string) {
     const row = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE id = ? AND account_id = ?`).get(id, accountId) as CustomerCaptureRow | null;
@@ -388,6 +405,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
   app.onError((error, c) => {
     if (error instanceof CustomerPreviewError) return c.json({ error: "preview_unavailable", message: error.message }, error.status);
     if (error instanceof OAuthError) return c.json({ error: error.code, message: error.message }, error.status);
+    if (error instanceof CustomerModuleError) return c.json({ error: error.code, message: error.message }, error.status);
     if (error instanceof CustomerOrganizationError) return c.json({ error: error.code, message: error.message }, error.status);
     if (error instanceof CustomerError) {
       if (error.retryAfter !== undefined) c.header("Retry-After", String(error.retryAfter));
@@ -421,6 +439,12 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
   });
 
   registerCustomerOAuth(app, db, oauthGateway, { origin, website, auth, account, emailAccount, accountDto, session, issueConnection, jsonBody, verifyPassword, publicRate });
+
+  registerCustomerImports(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
+  registerCustomerBilling(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
+  registerCustomerProcessing(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
+  registerAgentAccess(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
+  registerCustomerMcp(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
 
   app.post("/mobile/register", async (c) => {
     publicRate(c, "mobile-register");
@@ -744,8 +768,23 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     }
   });
 
+  function savingClient(current: Auth): SavedVia | null {
+    if (current.kind === "session") return "dashboard";
+    const row = db.query("SELECT client_kind FROM customer_connections WHERE id=? AND account_id=?").get(current.credentialId, current.account.id) as { client_kind: string } | null;
+    return row?.client_kind === "mobile" ? "iphone" : row?.client_kind === "browser" ? "browser" : null;
+  }
+  function recentOrder(c: C) {
+    const sort = c.req.query("sort") || "captured";
+    if (!["recent", "captured"].includes(sort)) fail(400, "invalid_sort", "Choose a valid save order.");
+    return sort === "recent";
+  }
+
   app.get("/captures", (c) => {
     const current = auth(c, true);
+    const recent = recentOrder(c);
+    const dateColumn = recent ? "created_at" : "captured_at";
+    const view = c.req.query("view") || "full";
+    if (!["full", "cards"].includes(view)) fail(400, "invalid_view", "Choose a valid collection view.");
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
     if (search.length > 200 || (type && !TYPES.has(type))) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
@@ -766,14 +805,14 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
       let value: unknown;
       try { if (cursor.length > 300) throw new Error(); value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")); } catch { fail(400, "invalid_cursor", "This page cursor is invalid."); }
       if (!Array.isArray(value) || value.length !== 2 || !Number.isSafeInteger(value[0]) || typeof value[1] !== "string" || value[1].length > 64) fail(400, "invalid_cursor", "This page cursor is invalid.");
-      where.push("(captured_at < ? OR (captured_at = ? AND id < ?))");
+      where.push(`(${dateColumn} < ? OR (${dateColumn} = ? AND id < ?))`);
       args.push(value[0], value[0], value[1]);
     }
-    const rows = db.query(`SELECT ${CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC, id DESC LIMIT ?`).all(...args, limit + 1) as CustomerCaptureRow[];
+    const rows = db.query(`SELECT ${view === "cards" ? CARD_COLUMNS : CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY ${dateColumn} DESC, id DESC LIMIT ?`).all(...args, limit + 1) as CustomerCaptureRow[];
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
-    const nextCursor = hasMore && last ? Buffer.from(JSON.stringify([last.captured_at, last.id])).toString("base64url") : null;
+    const nextCursor = hasMore && last ? Buffer.from(JSON.stringify([recent ? last.created_at : last.captured_at, last.id])).toString("base64url") : null;
     return c.json({ captures: page.map(customerCaptureDto), nextCursor, total });
   });
 
@@ -828,13 +867,14 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
       const organization = captureOrganization(db, current.account.id, body);
       const storageBytes = baseStorageBytes + organizationBytes(organization.folderId, organization.manualTags);
       const used = usage(current.account.id);
-      if (used.captures >= MAX_CAPTURES || used.bytes + storageBytes > MAX_BYTES) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
+      if (used.captures >= used.maxCaptures || used.bytes + storageBytes > used.maxBytes) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
       const global = db.query("SELECT COUNT(*) captures, COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures").get() as { captures: number; bytes: number };
       if (global.captures >= globalMaxCaptures || global.bytes + storageBytes > globalMaxBytes) fail(503, "storage_unavailable", "Foundkeep storage is temporarily full. Your extension will keep this capture locally.");
       const id = crypto.randomUUID();
       const now = Date.now();
       db.query("INSERT INTO customer_captures(id,account_id,client_id,batch_id,type,source_url,source_title,selection_text,note_text,article_text,blob_data,blob_mime,blob_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,provenance_json,processing_options_json,folder_id,manual_tags) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, current.account.id, clientId, batchId, type, sourceUrl, sourceTitle, selectionText, noteText, articleText, image.data, image.mime, image.bytes, storageBytes, width, height, capturedAt as number, now, now, provenanceJson, processingOptionsJson, organization.folderId, organization.manualTags);
-      return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
+      db.query("UPDATE customer_captures SET saved_via=? WHERE id=? AND account_id=?").run(savingClient(current), id, current.account.id);
+        return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
     })();
     return c.json(result, result.duplicate ? 200 : 201);
     } finally { release(); }
@@ -902,7 +942,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
         const organization = captureOrganization(db, current.account.id, body);
         const storageBytes = baseStorageBytes + organizationBytes(organization.folderId, organization.manualTags);
         const used = usage(current.account.id);
-        if (used.captures >= MAX_CAPTURES || used.bytes + storageBytes > MAX_BYTES) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
+        if (used.captures >= used.maxCaptures || used.bytes + storageBytes > used.maxBytes) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
         const global = db.query("SELECT COUNT(*) captures, COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures").get() as { captures: number; bytes: number };
         if (global.captures >= globalMaxCaptures || global.bytes + storageBytes > globalMaxBytes) fail(503, "storage_unavailable", "Foundkeep storage is temporarily full. Your device will keep this capture queued.");
         const id = crypto.randomUUID();
@@ -916,6 +956,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
           storageBytes,capturedAt as number,now,now,provenanceJson,processingOptionsJson,
           fileName,stored!.relativePath,stored!.mime,stored!.bytes,organization.folderId,organization.manualTags,
         );
+        db.query("UPDATE customer_captures SET saved_via=? WHERE id=? AND account_id=?").run(savingClient(current), id, current.account.id);
         return { capture: customerCaptureDto(findCapture(id, current.account.id)), duplicate: false };
       })();
       if (result.duplicate) removeCustomerFile(config.dataDir, stored.relativePath);
@@ -927,7 +968,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     }
   });
 
-  app.get("/mobile/organization", (c) => {
+  app.on("GET", ["/organization", "/mobile/organization"], (c) => {
     const current = auth(c);
     return c.json(readOrganization(db, current.account.id));
   });
@@ -937,7 +978,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     const name = organizationName(body.name, 80, "A folder name");
     const result = db.transaction(() => {
       auth(c, false, false);
-      return createFolder(db, current.account.id, name);
+      return createFolder(db, current.account.id, name, body.parentId === undefined ? null : folderIdentifier(body.parentId));
     }).immediate();
     return c.json({ folder: result.folder }, result.created ? 201 : 200);
   });
@@ -959,12 +1000,14 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
 
   app.get("/mobile/captures", (c) => {
     const current = auth(c);
+    const recent = recentOrder(c);
+    const dateColumn = recent ? "created_at" : "captured_at";
     if (current.kind !== "connection") fail(403, "mobile_connection_required", "Connect Foundkeep on this device to continue.");
     const search = c.req.query("q") || "";
     const type = c.req.query("type") || "";
     const view = c.req.query("view") || "full";
     const batchId = c.req.query("batchId");
-    const cursor = mobileCursor(c.req.query("cursor") || "");
+    const cursor = mobileCursor(c.req.query("cursor") || "", recent);
     if (search.length > 200 || (type && !TYPES.has(type)) || !["full", "cards"].includes(view)) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
     if (batchId !== undefined && !/^[A-Za-z0-9_-]{1,80}$/.test(batchId)) fail(400, "invalid_batch", "The shared collection identifier is invalid.");
     const where = ["account_id = ?"];
@@ -991,12 +1034,12 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     }
     const total = (db.query(`SELECT COUNT(*) count FROM customer_captures WHERE ${where.join(" AND ")}`).get(...args) as { count: number }).count;
     if (cursor) {
-      where.push("(captured_at < ? OR (captured_at = ? AND id < ?))");
+      where.push(`(${dateColumn} < ? OR (${dateColumn} = ? AND id < ?))`);
       args.push(cursor.capturedAt, cursor.capturedAt, cursor.id);
     }
-    const rows = db.query(`SELECT ${view === "cards" ? CARD_COLUMNS : CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY captured_at DESC,id DESC LIMIT 51`).all(...args) as CustomerCaptureRow[];
+    const rows = db.query(`SELECT ${view === "cards" ? CARD_COLUMNS : CAPTURE_COLUMNS} FROM customer_captures WHERE ${where.join(" AND ")} ORDER BY ${dateColumn} DESC,id DESC LIMIT 51`).all(...args) as CustomerCaptureRow[];
     const page = rows.slice(0, 50);
-    return c.json({ captures: page.map(row => ({ ...customerCaptureDto(row), contentView: view === "cards" ? "card" : "full" })), nextCursor: rows.length > 50 ? encodeMobileCursor(page.at(-1)!) : null, total });
+    return c.json({ captures: page.map(row => ({ ...customerCaptureDto(row), contentView: view === "cards" ? "card" : "full" })), nextCursor: rows.length > 50 ? encodeMobileCursor(page.at(-1)!, recent) : null, total });
   });
 
   function serveCustomerFile(c: C, cookieOnly: boolean) {
@@ -1016,7 +1059,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
 
   app.get("/captures/:id/file", (c) => serveCustomerFile(c, true));
   app.get("/mobile/captures/:id/file", (c) => serveCustomerFile(c, false));
-  app.get("/mobile/captures/:id/related", (c) => {
+  app.on("GET", ["/captures/:id/related", "/mobile/captures/:id/related"], (c) => {
     const current = auth(c);
     const columns = `id,account_id,captured_at,batch_id,folder_id,source_url,manual_tags,tags,
       json_extract(provenance_json,'$.canonicalUrl') AS canonical_url,
@@ -1029,13 +1072,16 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     const metadata = db.query(`SELECT ${columns}
       FROM customer_captures WHERE account_id=? ORDER BY captured_at DESC,id DESC LIMIT ?`)
       .all(current.account.id, MAX_CAPTURES) as RelatedMetadata[];
-    const matches = relatedCaptures(capture, metadata);
+    const explicit = db.query(`SELECT DISTINCT CASE WHEN source_id=? THEN target_id ELSE source_id END id
+      FROM customer_capture_links WHERE account_id=? AND (source_id=? OR target_id=?) LIMIT 6`).all(capture.id,current.account.id,capture.id,capture.id) as {id:string}[];
+    const matches = [...explicit.map(item=>({id:item.id,reasons:[{kind:'agent' as const,label:'Linked in your collection'}]})),
+      ...relatedCaptures(capture, metadata).filter(item=>!explicit.some(link=>link.id===item.id))].slice(0,6);
     const read = db.query(`SELECT ${CARD_COLUMNS} FROM customer_captures WHERE id=? AND account_id=?`);
     return c.json({ items: matches.map(match => ({ capture: { ...customerCaptureDto(read.get(match.id, current.account.id) as CustomerCaptureRow), contentView: "card" }, reasons: match.reasons })) });
   });
   app.get("/mobile/captures/:id", (c) => {
     const current = auth(c);
-    return c.json({ capture: customerCaptureDto(findCapture(c.req.param("id"), current.account.id)) });
+    return c.json({ capture: { ...customerCaptureDto(findCapture(c.req.param("id"), current.account.id)), ...captureImportDetails(c.req.param("id"), current.account.id) } });
   });
   app.put("/mobile/captures/:id", async (c) => {
     const current = auth(c);
@@ -1067,7 +1113,7 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
           - Buffer.byteLength(row.source_title || "", "utf8") - Buffer.byteLength(row.note_text || "", "utf8")
           + organizationBytes(organization.folderId, organization.manualTags) - organizationBytes(row.folder_id, row.manual_tags);
         if (delta > 0) {
-          if (usage(current.account.id).bytes + delta > MAX_BYTES) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
+          if (usage(current.account.id).bytes + delta > usage(current.account.id).maxBytes) fail(409, "quota_exceeded", "Your Foundkeep storage is full. Export or delete some captures to continue.");
           const global = db.query("SELECT COALESCE(SUM(storage_bytes),0) bytes FROM customer_captures").get() as { bytes: number };
           if (global.bytes + delta > globalMaxBytes) fail(503, "storage_unavailable", "Foundkeep storage is temporarily full. Please try saving your edits later.");
         }
@@ -1099,12 +1145,16 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     return c.body(new Uint8Array(row.blob_data).buffer);
   }
 
-  app.get("/captures/:id/preview", async (c) => {
-    const current = auth(c, true);
+  app.on("GET", ["/captures/:id/preview", "/mobile/captures/:id/preview"], async (c) => {
+    const cookieOnly = !c.req.path.includes("/mobile/");
+    const current = auth(c, cookieOnly);
     const row = findCapture(c.req.param("id"), current.account.id);
     rates.take(`preview:${current.account.id}`, 120, 60_000);
     let image;
-    if (row.blob_mime && PREVIEW_MIMES.has(row.blob_mime) && row.blob_bytes > 0) {
+    const derivative = db.query("SELECT data,mime FROM customer_derivatives WHERE capture_id=? AND account_id=? AND kind='preview'").get(row.id,current.account.id) as {data:Uint8Array;mime:string}|null;
+    if (derivative) {
+      image = validatePreviewImage(derivative.data, derivative.mime);
+    } else if (row.blob_mime && PREVIEW_MIMES.has(row.blob_mime) && row.blob_bytes > 0) {
       if (row.blob_bytes > MAX_PREVIEW_BYTES) throw new CustomerPreviewError(404);
       const stored = db.query("SELECT blob_data FROM customer_captures WHERE id=? AND account_id=?").get(row.id, current.account.id) as { blob_data: Uint8Array | null };
       if (!stored.blob_data) throw new CustomerPreviewError(404);
@@ -1120,9 +1170,9 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
       const provenance = parseStoredJson<CaptureProvenance | null>(row.provenance_json, null);
       // Only persisted capture metadata can choose the source. URL parameters,
       // cookies, authorization and referer headers never reach the origin.
-      image = await previewFetcher(current.account.id, provenance?.leadImageUrl, c.req.raw.signal);
+      image = await previewFetcher(current.account.id, provenance?.leadImageUrl || row.generated_image_url, c.req.raw.signal);
     }
-    const verified = auth(c, true, false);
+    const verified = auth(c, cookieOnly, false);
     if (verified.account.id !== current.account.id || verified.credentialId !== current.credentialId) fail(401, "unauthorized", "Your session expired. Sign in again.");
     findCapture(row.id, current.account.id);
     c.header("Content-Type", image.mime);
@@ -1131,12 +1181,20 @@ export function customerRoutes(db: Database, oauthGateway: OAuthGateway = create
     return c.body(new Uint8Array(image.bytes).buffer);
   });
 
+  app.on("GET", ["/captures/:id/derivatives/:kind", "/mobile/captures/:id/derivatives/:kind"], c => {
+    const owner=auth(c,!c.req.path.includes('/mobile/')).account.id;
+    const row=db.query('SELECT mime,data FROM customer_derivatives WHERE account_id=? AND capture_id=? AND kind=?').get(owner,c.req.param('id'),c.req.param('kind')) as {mime:string;data:Uint8Array}|null;
+    if(!row)fail(404,'not_found','Processed file not found.');
+    c.header('Content-Type',row.mime);c.header('Content-Security-Policy',"default-src 'none'; sandbox");c.header('Cross-Origin-Resource-Policy','same-origin');
+    return c.body(new Uint8Array(row.data).buffer);
+  });
+
   app.get("/captures/:id/blob", (c) => serveCustomerBlob(c, true));
   app.get("/mobile/captures/:id/blob", (c) => serveCustomerBlob(c, false));
 
   app.get("/captures/:id", (c) => {
     const current = auth(c, true);
-    return c.json({ capture: customerCaptureDto(findCapture(c.req.param("id"), current.account.id)) });
+    return c.json({ capture: { ...customerCaptureDto(findCapture(c.req.param("id"), current.account.id)), ...captureImportDetails(c.req.param("id"), current.account.id) } });
   });
   app.delete("/captures/:id", (c) => {
     const current = auth(c, true);

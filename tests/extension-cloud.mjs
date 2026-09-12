@@ -635,3 +635,20 @@ test("reconnecting the same account preserves idempotency across credential rota
     ["Bearer credential-account-a"],
   );
 });
+
+test('sidebar requests keep their account binding and never let callers override the API origin',async t=>{
+  const page=await fixture(t);await pair(page);
+  const result=await page.evaluate(async()=>{
+    const original=window.fetch;window.fetch=async(url,options)=>{
+      if(String(url).includes('/api/mobile/captures?')){window.libraryRequestOptions={url,headers:options.headers,credentials:options.credentials};await new Promise(resolve=>{window.releaseLibrary=resolve;});return Response.json({captures:[{sourceTitle:'Private A'}]});}
+      return original(url,options);
+    };
+    window.pendingLibrary=cloud.libraryRequest('list',{url:'https://evil.test'},'account-a').then(value=>({value}),error=>({error:error.message}));
+    return true;
+  });assert.equal(result,true);
+  await page.waitForFunction(()=>!!window.releaseLibrary);await pair(page,codeB);
+  const value=await page.evaluate(async()=>{window.releaseLibrary();return{response:await window.pendingLibrary,request:window.libraryRequestOptions};});
+  assert.match(value.response.error,/account changed/i);assert.equal(value.response.value,undefined);
+  assert.match(value.request.url,/^https:\/\/foundkeep\.app\/api\/mobile\/captures\?/);assert.equal(value.request.credentials,'omit');
+  assert.equal(value.request.headers.Authorization,'Bearer credential-account-a');
+});

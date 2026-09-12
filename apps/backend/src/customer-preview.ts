@@ -61,7 +61,7 @@ export function previewSourceUrl(raw: unknown): URL | null {
   } catch { return null; }
 }
 
-async function resolvePublicHost(hostname: string, signal: AbortSignal): Promise<PreviewAddress[]> {
+export async function resolvePublicHost(hostname: string, signal: AbortSignal): Promise<PreviewAddress[]> {
   const resolver = new Resolver({ timeout: 1500, tries: 1 });
   const cancel = () => resolver.cancel();
   signal.addEventListener("abort", cancel, { once: true });
@@ -98,10 +98,10 @@ export function previewRequestOptions(target: PreviewTarget): RequestOptions {
   };
 }
 
-async function requestPinned(target: PreviewTarget, signal: AbortSignal): Promise<PreviewUpstream> {
+export async function requestPinned(target: PreviewTarget, signal: AbortSignal, accept?: string): Promise<PreviewUpstream> {
   return new Promise((resolve, reject) => {
     const request = (target.url.protocol === "https:" ? httpsRequest : httpRequest)(
-      { ...previewRequestOptions(target), signal },
+      { ...previewRequestOptions(target), ...(accept ? { headers: { ...previewRequestOptions(target).headers, Accept: accept } } : {}), signal },
       response => {
         const headers = new Headers();
         for (const [key, value] of Object.entries(response.headers)) {

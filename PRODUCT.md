@@ -40,7 +40,7 @@ Customer queries, images, preferences, and credentials are owner scoped. Local I
 
 The primary origin is `https://foundkeep.app`. Human-facing requests to `https://atlas.notpritam.in` redirect to the matching Foundkeep path, while its API and relay endpoints remain a temporary compatibility origin for version 1.5 clients. Cross-domain website cookies cannot migrate, so existing customers sign in once on Foundkeep; their accounts and captures remain in the same database.
 
-There is no customer agent setup, semantic-search claim, conversational assistant, advertising tracker, or email reset delivery. Search is keyword based. Local capture remains available without an account. Cloud and local deletion are separate. Quotas are 1,000 captures and 200 MiB per account.
+Customer agents connect through scoped, revocable MCP credentials. Free includes imports and MCP access; optional Pro adds consented managed processing. External agents own their model and schedule. Search remains keyword based, without an embedding or semantic-search claim. There is no advertising tracker or email reset delivery. Local capture remains available without an account. Cloud and local deletion are separate. Free allows 10,000 captures and 200 MiB; Pro allows 10,000 captures, 2 GiB and 500 managed-processing credits per UTC calendar month. Web Pro is USD $5/month via Stripe; native subscriptions use RevenueCat and Apple In-App Purchase.
 
 ## Evidence
 

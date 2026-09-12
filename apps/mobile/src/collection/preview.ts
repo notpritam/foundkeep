@@ -4,7 +4,7 @@ type PreviewSource = { uri: string; headers?: Record<string, string> };
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif']);
 
 export function capturePreviewSource(capture: Partial<Capture>, token: string | null, accountId: string | undefined): PreviewSource | null {
-  const kind = capture.blobUrl ? 'blob' : capture.fileUrl && IMAGE_MIMES.has(capture.fileMime || '') ? 'file' : null;
+  const kind = capture.blobUrl ? 'blob' : capture.fileUrl && IMAGE_MIMES.has(capture.fileMime || '') ? 'file' : capture.previewUrl ? 'preview' : null;
   if (kind) {
     if (!token || !accountId || !capture.id) return null;
     const query = new URLSearchParams({ account: accountId, v: String(capture.updatedAt || 0) });

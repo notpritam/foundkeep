@@ -1,4 +1,5 @@
 import type { Account, Capture, CaptureList, Folder, Organization, NativeSession, Usage, RelatedSave } from './types.ts';
+import type { Plan, AutomationState } from '../billing/types.ts';
 import type { OAuthIntent, OAuthProvider } from '../auth-oauth.ts';
 
 const API_ORIGIN = 'https://foundkeep.app';
@@ -101,6 +102,13 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
   const devicePayload = <T extends { deviceName?: string }>(value: T) => ({ ...value, deviceName: value.deviceName?.trim() || 'iPhone' });
   return {
     invalidate,
+    plan: () => json<Plan>('/api/plan'),
+    purchaseCheck: (intent?:'purchase'|'restore') => json<Plan>('/api/billing/purchase-check',{method:'POST',body:{intent}}),
+    cancelMobilePurchase: (attemptId:string) => json('/api/billing/revenuecat/purchase-cancelled',{method:'POST',body:{attemptId}}),
+    automation: () => json<AutomationState>('/api/automation'),
+    updateAutomation: (value:Partial<Pick<AutomationState,'enabled'|'fetchLinks'|'images'|'consentVersion'>>) => json<AutomationState>('/api/automation', {method:'PUT',body:value}),
+    processCapture: (id:string) => json<{id:string;status:string}>('/api/captures/'+encodeURIComponent(id)+'/process',{method:'POST',body:{}}),
+    syncRevenueCat: () => json<Omit<Plan, 'billing'>>('/api/billing/revenuecat/sync', { method: 'POST' }),
     subscribeInvalidation(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     oauthProviders: () => json<{ providers: OAuthProvider[] }>('/api/auth/providers?client=ios', { authenticated: false }),
     startOAuth(value: { provider: OAuthProvider; intent: OAuthIntent; codeChallenge: string }) {
@@ -125,7 +133,7 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     logout: () => json<{ ok: true }>('/api/mobile/logout', { method: 'POST' }),
     deleteAccount: (proof: string | { reauthToken: string }) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: typeof proof === 'string' ? { password: proof } : proof }),
     listCaptures(filters: { q?: string; type?: string; cursor?: string; batchId?: string; folderId?: string; tag?: string }, options: ReadOptions = {}) {
-      const query = new URLSearchParams({ view: 'cards' });
+      const query = new URLSearchParams({ view: 'cards', sort: 'recent' });
       if (filters.q) query.set('q', filters.q);
       if (filters.type) query.set('type', filters.type);
       if (filters.cursor) query.set('cursor', filters.cursor);

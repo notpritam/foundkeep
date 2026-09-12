@@ -7,7 +7,7 @@ import { chromium } from 'playwright-core';
 const root = path.resolve('dist-gallery-preview');
 const output = path.resolve('../../.impeccable/review/gallery');
 await mkdir(output, { recursive: true });
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.ttf': 'font/ttf', '.json': 'application/json' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.webp': 'image/webp', '.ttf': 'font/ttf', '.json': 'application/json' };
 const server = createServer(async (request, response) => {
   try {
     const requested = decodeURIComponent(new URL(request.url || '/', 'http://local').pathname);
@@ -51,6 +51,11 @@ const makeContext = async signedIn => {
   await context.route('https://foundkeep.app/**', async route => {
     const url = new URL(route.request().url());
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (url.pathname === '/api/mobile/login' || url.pathname === '/api/mobile/register') {
+      assert.equal(route.request().postDataJSON().email, 'review@example.com');
+      return json({ token: 'fixture-account-token', account, recoveryCode: url.pathname.endsWith('register') ? 'FK-fixture-recovery-code' : undefined });
+    }
+    if (url.pathname === '/api/auth/providers') return json({ providers: ['apple', 'google'] });
     if (url.pathname === '/mobile-policy.json') return json(policy);
     if (url.pathname === '/api/mobile/me') return json({ account, connectionId: 'review-device', usage: { captures: captures.length, bytes: 13_081_673, maxCaptures: 1000, maxBytes: 209_715_200 } });
     if (url.pathname === '/api/mobile/organization') return json({ folders, tags: [{ name: 'Inspiration', count: 1 }], suggestedTags: ['Work', 'Personal'], suggestedFolders: ['Reading', 'Projects'] });
@@ -84,6 +89,14 @@ try {
   await page.getByRole('progressbar', { name: 'Loading your collection' }).waitFor();
   await shot(page, '01-shimmer.png');
   await page.getByRole('button', { name: /Open Link A field guide/ }).waitFor(); await ready(page);
+  await page.getByTestId('masonry-gallery').waitFor();
+  const geometry = await page.locator('[data-testid^="gallery-cell-"]').evaluateAll(nodes => nodes.map(node => { const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; }));
+  assert.ok(new Set(geometry.map(item => Math.round(item.height))).size > 1, 'cards use their own content height');
+  for (const x of new Set(geometry.map(item => item.x))) {
+    const column = geometry.filter(item => Math.abs(item.x - x) < 1).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < column.length; i++) assert.ok(Math.abs(column[i].y - column[i - 1].y - column[i - 1].height - 12) <= 1, 'each consecutive card sits 12px below the previous card, without row-height holes');
+  }
+
   const dock = page.getByTestId('floating-dock');
   const galleryTab = page.getByRole('tab', { name: 'Gallery', exact: true });
   assert.equal(await galleryTab.getAttribute('aria-selected'), 'true');
@@ -94,8 +107,35 @@ try {
   await page.getByRole('tab', { name: 'You', exact: true }).click();
   await page.getByText('Settings.', { exact: true }).waitFor();
   assert.equal(await page.getByRole('tab', { name: 'You', exact: true }).getAttribute('aria-selected'), 'true');
+  await page.getByText('Settings.', { exact: true }).evaluate(el => { let parent = el.parentElement; while (parent && getComputedStyle(parent).overflowY !== 'auto') parent = parent.parentElement; if (parent) parent.scrollTop = 0; });
+  await ready(page); await shot(page, '13-settings.png');
+  await page.getByRole('button', { name: 'How to save from other apps' }).click();
+  await page.getByText('Keep a good find.', { exact: false }).waitFor();
+  await shot(page, '14-share-guide.png');
+  await page.getByRole('button', { name: 'Got it', exact: true }).click();
   await galleryTab.click(); await page.getByTestId('collection-header').waitFor();
   await shot(page, '02-gallery.png');
+  await page.goto(base + '/sign-in');
+  await page.waitForURL('**/collection');
+  assert.equal(await page.getByRole('button', { name: 'Continue with email' }).count(), 0);
+  await page.getByRole('button', { name: /Open Link A field guide/ }).waitFor();
+  // Accessibility changes must update every shared material without a reload.
+  const material = page.getByTestId('dock-material');
+  assert.match(await material.evaluate(el => getComputedStyle(el).backdropFilter), /blur/);
+  const media = await context.newCDPSession(page);
+  for (const preference of ['prefers-reduced-transparency', 'prefers-contrast']) {
+    await media.send('Emulation.setEmulatedMedia', { features: [{ name: preference, value: preference === 'prefers-contrast' ? 'more' : 'reduce' }] });
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backdropFilter === 'none');
+    assert.equal(await material.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    assert.equal(await page.getByTestId('scenic-backdrop').count(), 0);
+  }
+  await shot(page, '11-solid-accessibility.png');
+  await media.send('Emulation.setEmulatedMedia', { features: [] });
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backdropFilter.includes('blur'));
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="dock-material"]')).backgroundColor === 'rgba(34, 48, 53, 0.88)');
+  await shot(page, '10-dark-gallery.png');
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
   const header = page.getByTestId('collection-header'); const before = await header.boundingBox(); const list = page.getByTestId('gallery-list');
   await list.evaluate(el => { el.scrollTop = 650; }); await page.waitForTimeout(200);
   assert.ok(await list.evaluate(el => el.scrollTop) > 0); const after = await header.boundingBox(); assert.equal(before.y, after.y); assert.equal(before.height, after.height);
@@ -122,12 +162,15 @@ try {
   }
   await shot(page, '09-narrow-floating-dock.png');
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Show search and filters' }).click();
+  await page.getByRole('textbox', { name: 'Search saved items' }).blur();
   await page.getByRole('button', { name: 'Filter by folder or tag' }).click();
   await page.getByRole('button', { name: 'Reading', exact: true }).click();
   await page.getByRole('button', { name: 'Done', exact: true }).click(); await page.waitForTimeout(1000);
   assert.equal(await page.getByRole('button', { name: /^Open Link/ }).count(), 1);
   await page.getByRole('button', { name: /Open Link A field guide/ }).click();
   await page.getByText('Original source', { exact: true }).waitFor();
+  await ready(page); await shot(page, '16-glass-reader.png');
   assert.ok((await page.getByText('A saved article.', { exact: false }).textContent()).length > 64000);
   const related = page.getByRole('button', { name: /^Open related save Autumn research brief/ });
   await related.waitFor();
@@ -147,6 +190,7 @@ try {
   await page.getByRole('textbox', { name: 'Your note', exact: true }).waitFor();
   assert.equal(await page.getByTestId('floating-dock').isVisible(), false, 'dock should stay within its tab screens');
   await page.getByRole('textbox', { name: 'Your note', exact: true }).fill('Remember this gallery idea');
+  await shot(page, '15-new-note.png');
   await page.getByRole('button', { name: 'Choose folder and tags' }).click();
   await page.getByRole('textbox', { name: 'Create a folder', exact: true }).fill('Weekend ideas');
   await page.getByRole('button', { name: 'Create folder', exact: true }).click();
@@ -159,9 +203,70 @@ try {
   assert.equal(captures[0].folder.name, 'Weekend ideas'); assert.deepEqual(captures[0].userTags, ['my idea']); assert.equal(writes, 2);
   await shot(page, '05-organized-save.png'); assert.deepEqual(errors, []); await context.close();
   const signedOut = await makeContext(false); const login = await signedOut.newPage();
-  await login.goto(base + '/sign-in'); await login.getByText('Welcome back.', { exact: true }).waitFor(); await ready(login);
+  await login.goto(base + '/sign-in'); await login.getByText('Your collection awaits.', { exact: true }).waitFor(); await login.getByRole('button', { name: 'Continue with Apple' }).waitFor(); await ready(login);
   await shot(login, '06-sign-in.png');
-  assert.ok((await login.getByText('By continuing,', { exact: false }).textContent()).includes('Terms and Privacy Policy'));
-  await login.goto(base); await login.getByText('Found it?', { exact: false }).waitFor(); await ready(login); await shot(login, '07-welcome.png'); await signedOut.close();
-  console.log('Gallery checks passed: floating dock navigation, narrow layout, footer clearance, quick-add, shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy. Synthetic fixtures; native checks separate.');
+  assert.ok((await login.getByText('By continuing,', { exact: false }).textContent()).includes('Terms and Privacy'));
+  assert.equal(await login.getByRole('textbox', { name: 'Email', exact: true }).count(), 0);
+  await login.getByRole('button', { name: 'Continue with email' }).click();
+  await login.getByRole('textbox', { name: 'Email', exact: true }).fill('review@example.com');
+  await login.getByRole('textbox', { name: 'Password', exact: true }).fill('example password');
+  assert.equal(await login.getByRole('button', { name: 'Continue with email' }).getAttribute('aria-expanded'), 'true');
+  await login.setViewportSize({ width: 320, height: 568 });
+  await ready(login); await shot(login, '17-email-narrow.png');
+  assert.ok(await login.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await login.getByRole('button', { name: 'New here? Create an account' }).click();
+  await login.getByText('Make it yours.', { exact: true }).waitFor();
+  await login.getByRole('button', { name: 'Continue with email' }).click();
+  await login.getByRole('textbox', { name: 'Name', exact: true }).waitFor();
+  await login.getByRole('textbox', { name: 'Email', exact: true }).waitFor();
+  await shot(login, '18-register-narrow.png');
+  await login.getByRole('textbox', { name: 'Name', exact: true }).fill('Review');
+  await login.getByRole('textbox', { name: 'Email', exact: true }).fill('review@example.com');
+  await login.getByRole('textbox', { name: 'Password', exact: true }).fill('fixture long password');
+  await login.getByRole('button', { name: 'Create account', exact: true }).click();
+  await login.getByText('Keep this somewhere safe.', { exact: true }).waitFor();
+  await login.getByRole('button', { name: 'I saved the code', exact: true }).click();
+  await login.getByRole('button', { name: 'Continue to Foundkeep', exact: true }).click();
+  await login.getByRole('button', { name: 'Got it', exact: true }).click();
+  await login.getByTestId('collection-header').waitFor();
+  await login.goto(base + '/register'); await login.waitForURL('**/collection');
+  await login.evaluate(() => localStorage.removeItem('foundkeep-device-token'));
+  for (const route of ['', '/welcome']) {
+    await login.goto(base + route); await login.waitForURL('**/sign-in');
+    await login.getByText('Your collection awaits.', { exact: true }).waitFor();
+    assert.equal(await login.getByRole('button', { name: 'Get started', exact: true }).count(), 0);
+  }
+  await login.setViewportSize({ width: 390, height: 844 });
+  await ready(login); await shot(login, '07-direct-sign-in.png');
+  await login.getByRole('button', { name: 'Continue with email' }).click();
+  await login.getByRole('textbox', { name: 'Email', exact: true }).fill('review@example.com');
+  await login.getByRole('textbox', { name: 'Password', exact: true }).fill('fixture long password');
+  await login.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await login.waitForURL('**/collection'); await login.getByTestId('collection-header').waitFor();
+  captures.unshift({ ...baseCapture, id: 'latest-arrival', type: 'bookmark', sourceTitle: 'Newest save from another device', sourceUrl: 'https://youtube.com/watch?v=latest', savedVia: 'browser', capturedAt: 1, createdAt: Date.now() });
+  await login.getByRole('button', { name: /Open Link Newest save from another device/ }).waitFor({ timeout: 22000 });
+  assert.equal(await login.locator('[data-testid^="gallery-cell-"]').first().getAttribute('data-testid'), 'gallery-cell-latest-arrival');
+  await login.getByText('YouTube', { exact: true }).waitFor();
+  await login.getByText(/Browser extension · Just now/).waitFor();
+  await shot(login, '19-recent-masonry.png');
+  await signedOut.close();
+  // Regression: the reported short/tall X bookmark pair must pack independently.
+  captures.splice(0, captures.length, ...['Just testing', 'Agentic AI Improvements Workflow', 'Make a video on it, launching', 'Launch video'].map((sourceTitle, index) => ({
+    ...baseCapture, id: `gap-${index}`, type: 'bookmark', sourceTitle, sourceUrl: 'https://x.com/example/status/1', capturedAt: now - index, createdAt: now - index,
+    savedVia: 'iphone', batchId: 'gap-report', ...(index === 1 ? { folder: { id: 'inspiration', name: 'Inspiration' }, userTags: ['craft'] } : {}),
+  })));
+  const gapContext = await makeContext(true); const gapPage = await gapContext.newPage();
+  await gapPage.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await gapPage.goto(base + '/collection');
+  await gapPage.getByRole('button', { name: 'Open Link Just testing', exact: true }).waitFor(); await ready(gapPage);
+  const cells = await gapPage.locator('[data-testid^="gallery-cell-"]').evaluateAll(nodes => nodes.map(node => { const box = node.getBoundingClientRect(); return { id: node.dataset.testid, x: box.x, y: box.y, bottom: box.bottom, height: box.height }; }));
+  const short = cells.find(cell => cell.id === 'gallery-cell-gap-0'); const tall = cells.find(cell => cell.id === 'gallery-cell-gap-1'); const next = cells.find(cell => cell.id === 'gallery-cell-gap-2');
+  assert.ok(tall.height > short.height + 40, 'fixture reproduces the unequal card heights');
+  assert.equal(next.x, short.x);
+  assert.ok(Math.abs(next.y - short.bottom - 12) <= 1, 'next left card follows the short card immediately');
+  assert.ok(next.y < tall.bottom, 'next left card starts before the taller right card finishes');
+  await shot(gapPage, '20-reported-card-gap-fixed.png');
+  console.log('Reported card-gap check passed:', JSON.stringify({ shortHeight: short.height, tallHeight: tall.height, leftGap: next.y - short.bottom }));
+  await gapContext.close();
+  console.log('Gallery checks passed: floating dock navigation, narrow layout, footer clearance, quick-add, shimmer, collapsing/revealing header, compact actions, related navigation, private-safe images, folder filter, full article, edit invalidation, organized note save, legal copy, onboarding, live reduced-transparency and increased-contrast fallbacks, dark palette. Synthetic fixtures; native checks separate.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

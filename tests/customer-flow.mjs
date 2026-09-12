@@ -135,10 +135,23 @@ test('customer signs up, configures the real extension, captures a readable page
     assert.equal((await fetch(origin+'/api/captures/'+screenshot.id)).status,401);
     assert.equal((await fetch(origin+screenshot.blobUrl)).status,401);
     const after=await request('GET','/api/me');assert.equal(after.connections.length,1);assert.equal(after.usage.captures,4);
+    // Exercise the real service worker import queue and backend from the installed sidebar.
+    const library=await context.newPage();await library.goto(`chrome-extension://${id}/src/library.html`);
+    await library.waitForFunction(()=>document.querySelector('.save-card')||!document.querySelector('#notice').hidden);
+    assert.equal(await library.locator('#notice').innerText(),'');await library.locator('.save-card').first().waitFor();await library.locator('#openImport').click();
+    await library.locator('#importFile').setInputFiles({name:'bookmarks.html',mimeType:'text/html',buffer:Buffer.from('<!DOCTYPE NETSCAPE-Bookmark-file-1><DL><DT><H3>Reading</H3><DL><DT><A HREF="https://example.com/imported-one" ADD_DATE="1000">Imported one</A><DT><A HREF="https://example.com/imported-two">Imported two</A></DL></DL>')});
+    await library.waitForFunction(()=>!document.querySelector('#confirmImport').disabled);
+    assert.match(await library.locator('#importPreview').innerText(),/2 new bookmark/);
+    await library.locator('#confirmImport').click();
+    await poll(async()=>{const state=await request('GET','/api/captures');return state.captures.filter(c=>c.sourceTitle?.startsWith('Imported ')).length===2;});
+    const imported=(await request('GET','/api/captures')).captures.find(c=>c.sourceTitle==='Imported one');
+    assert.equal(imported.capturedAt,1_000_000);assert.ok(imported.folderId);
+    const importedDetail=await request('GET','/api/captures/'+imported.id);assert.ok(importedDetail.capture.importOrigins?.length);
+    await library.reload();await library.locator('.save-card').filter({hasText:'Imported one'}).waitFor();
     await request('DELETE','/api/connections/'+after.connections[0].id);
     await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'saveNote',text:'Saved safely after connection revoked'}));
     await sleep(1500);
-    assert.equal((await request('GET','/api/me')).usage.captures,4);
+    assert.equal((await request('GET','/api/me')).usage.captures,6);
     // A revoked upload never discards the local copy.
     const local=await popup.evaluate(async()=>{const db=await import('./db.js');return db.listCaptures();});
     assert.ok(local.some(c=>c.noteText==='Saved safely after connection revoked'));

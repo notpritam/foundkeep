@@ -58,6 +58,30 @@ function heldUpload(cookie: string, target = app) {
   return { response, signal, controller, isCancelled: () => cancelled, close() { try { controller.close(); } catch {} } };
 }
 
+test("recent order uses collection arrival time and persists the saving platform", async () => {
+  const owner = await register();
+  const device = await connect(owner.cookie);
+  const first = (await (await capture(owner.cookie, { capturedAt: Date.now() + 60000 })).json()).capture;
+  const latest = (await (await capture(device.bearer, { capturedAt: 1000, savedVia: "iphone", sourceUrl: "https://youtube.com/watch?v=1" })).json()).capture;
+  db.query("UPDATE customer_captures SET created_at=10 WHERE id=?").run(first.id);
+  db.query("UPDATE customer_captures SET created_at=20 WHERE id=?").run(latest.id);
+  const page = await (await request("/captures?sort=recent&limit=1", "GET", undefined, owner.cookie)).json();
+  expect(page.captures[0].id).toBe(latest.id);
+  expect(page.captures[0].savedVia).toBe("browser");
+  const next = await (await request(`/captures?sort=recent&limit=1&cursor=${page.nextCursor}`, "GET", undefined, owner.cookie)).json();
+  expect(next.captures[0].id).toBe(first.id);
+  expect(next.captures[0].savedVia).toBe("dashboard");
+  expect(next.nextCursor).toBeNull();
+  db.query("UPDATE customer_captures SET article_text=? WHERE id=?").run("a".repeat(2000), latest.id);
+  const cards = await (await request("/captures?sort=recent&view=cards", "GET", undefined, owner.cookie)).json();
+  expect(cards.captures[0].articleText.length).toBe(480);
+  expect((await (await request(`/captures/${latest.id}`, "GET", undefined, owner.cookie)).json()).capture.articleText.length).toBe(2000);
+  const native = await (await mobile("/captures?sort=recent", "GET", undefined, device.bearer)).json();
+  expect(native.captures.map((item: any) => item.id)).toEqual([latest.id, first.id]);
+  expect((await request("/captures?sort=invalid", "GET", undefined, owner.cookie)).status).toBe(400);
+  expect((await mobile("/captures?sort=invalid", "GET", undefined, device.bearer)).status).toBe(400);
+});
+
 describe("customer account security", () => {
   test("article preview DTOs use an owned same-origin endpoint and ignore caller-selected URLs", async () => {
     const owner = await register();
@@ -547,7 +571,7 @@ describe("customer account security", () => {
     expect(JSON.stringify(stored)).not.toContain(a.recoveryCode);
     const me = await (await request("/me", "GET", undefined, a.cookie)).json();
     expect(me.account).toEqual(a.account);
-    expect(me.usage).toEqual({ captures: 0, bytes: 0, maxCaptures: 1000, maxBytes: 209715200 });
+    expect(me.usage).toEqual({ captures: 0, bytes: 0, maxCaptures: 10000, maxBytes: 209715200 });
     expect(JSON.stringify(me)).not.toContain("hash");
     expect((await request("/me")).status).toBe(401);
   });
@@ -897,6 +921,15 @@ describe("private customer captures", () => {
     expect(third.nextCursor).toBeNull();
     expect(new Set([...first.captures, ...second.captures, ...third.captures].map(item => item.id)).size).toBe(105);
     expect((await mobile("/captures?cursor=not-a-cursor", "GET", undefined, bearer)).status).toBe(400);
+    const recentFirst = await (await mobile("/captures?sort=recent", "GET", undefined, bearer)).json();
+    const recentSecond = await (await mobile(`/captures?sort=recent&cursor=${recentFirst.nextCursor}`, "GET", undefined, bearer)).json();
+    const recentThird = await (await mobile(`/captures?sort=recent&cursor=${recentSecond.nextCursor}`, "GET", undefined, bearer)).json();
+    const recent = [...recentFirst.captures, ...recentSecond.captures, ...recentThird.captures];
+    expect(new Set(recent.map(item => item.id)).size).toBe(105);
+    expect(recent.every(item => item.savedVia === "iphone")).toBe(true);
+    expect(recent.map(item => item.id)).toEqual(db.query("SELECT id FROM customer_captures ORDER BY created_at DESC,id DESC").all().map((item: any) => item.id));
+    expect((await mobile(`/captures?sort=recent&cursor=${first.nextCursor}`, "GET", undefined, bearer)).status).toBe(400);
+
   });
 
   test("models universal mobile items and preserves multi-share provenance", async () => {
@@ -1159,16 +1192,16 @@ describe("private customer captures", () => {
     expect(valid.capture.height).toBe(1);
   });
 
-  test("a full 1000 capture export completes and concurrent last-slot uploads obey quota", async () => {
+  test("a full 10000 capture export completes and concurrent last-slot uploads obey quota", async () => {
     const a = await register();
     db.transaction(() => {
       const insert = db.query("INSERT INTO customer_captures(id,account_id,client_id,type,storage_bytes,captured_at,created_at,updated_at) VALUES(?,?,?,'note',1,1,1,1)");
-      for (let i = 0; i < 999; i++) insert.run(`seed-${i}`, a.account.id, `seed-${i}`);
+      for (let i = 0; i < 9999; i++) insert.run(`seed-${i}`, a.account.id, `seed-${i}`);
     })();
     const attempts = await Promise.all([capture(a.cookie), capture(a.cookie)]);
     expect(attempts.map((r) => r.status).sort()).toEqual([201, 409]);
     const exported = await (await request("/account/export", "GET", undefined, a.cookie)).json();
-    expect(exported.captures.length).toBe(1000);
+    expect(exported.captures.length).toBe(10000);
   });
 
   test("global storage ceiling rejects a new owner without blocking deletion or duplicate retries", async () => {

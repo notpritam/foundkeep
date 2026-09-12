@@ -12,8 +12,8 @@
     "verify:oauth": "expo export --platform web --output-dir .expo/oauth-preview && node scripts/verify-oauth.mjs",
     "verify:ios": "node scripts/verify-ios-project.mjs",
     "store:screenshots": "expo export --platform web --output-dir dist-store-preview && node scripts/render-store-screenshots.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test scripts/config.test.mjs scripts/runtime.test.mjs src/api/client.test.ts src/auth-oauth.test.ts src/collection/model.test.ts src/collection/scrollChrome.test.ts src/collection/preview.test.ts src/collection/organization.test.ts src/linking/deepLinks.test.ts src/policy/mobilePolicy.test.ts src/share/queue.test.ts src/share/safariPreprocessor.test.mjs"
+    "typecheck": "node scripts/generate-routes.mjs && tsc --noEmit",
+    "test": "node --test scripts/config.test.mjs scripts/runtime.test.mjs src/api/client.test.ts src/auth-oauth.test.ts src/collection/model.test.ts src/collection/scrollChrome.test.ts src/collection/preview.test.ts src/collection/organization.test.ts src/linking/deepLinks.test.ts src/policy/mobilePolicy.test.ts src/share/queue.test.ts src/share/safariPreprocessor.test.mjs src/billing/controller.test.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -35,6 +35,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-purchases": "10.9.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-web": "^0.21.2"

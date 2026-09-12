@@ -2,7 +2,7 @@
 
 Use these values for the first iPhone release. Text marked **account-owner action** depends on the legal Apple Developer account and cannot be inferred from the codebase.
 
-Current submission: **1.0.0 (14)** is selected in App Store Connect, with the five Gallery screenshots processed and automatic release after approval selected. Submission is **not sent**: Apple requires the review contact phone number and published App Privacy answers. See [verified status](submission-status.json).
+Historical submission (before the RevenueCat integration; requires a new native binary and updated purchase/privacy metadata): **1.0.0 (14)** is selected in App Store Connect, with the five Gallery screenshots processed and automatic release after approval selected. Submission is **not sent**: Apple requires the review contact phone number and published App Privacy answers. See [verified status](submission-status.json).
 
 Expo ownership is `@notpritam/foundkeep`, signed in as `notpritam` using `notpritamsharma@gmail.com`. The account has no additional members or pending invitations. The project ID is `33362145-2b45-4d86-bb08-cd10c6bfae61`.
 
@@ -53,7 +53,7 @@ Apple should calculate the lowest general rating. Do not manually promise a nume
 | Field | Enter |
 | --- | --- |
 | Price | Free |
-| In-App Purchases | None |
+| In-App Purchases | Auto-renewable Foundkeep Pro, product `app.foundkeep.pro.monthly`; see [RevenueCat setup](../REVENUECAT-SETUP.md) before submitting this new binary |
 | Availability | All intended countries/regions; omit any country where the account owner cannot meet local obligations |
 | App release | Automatically release after Apple approves this version (user-authorized launch) |
 | Apple silicon Mac availability | Disable for 1.0.0; the Share Extension and interface are designed and tested for iPhone |
@@ -100,9 +100,9 @@ bookmark,read later,save links,collection,notes,share sheet,documents,highlights
 
 | Field | Enter |
 | --- | --- |
-| Support URL | `https://foundkeep.app/support.html` |
+| Support URL | `https://foundkeep.app/support` |
 | Marketing URL | `https://foundkeep.app/` |
-| Privacy Policy URL | `https://foundkeep.app/privacy.html` |
+| Privacy Policy URL | `https://foundkeep.app/privacy` |
 | Privacy Choices URL | `https://foundkeep.app/dashboard.html` |
 
 The privacy-choices page requires the customer to sign in because it exports private account data. Permanent deletion is also available directly in the iPhone app under Settings.
@@ -199,7 +199,7 @@ To test the Share Extension:
 
 The Share Extension also accepts selected text, images, video, audio, PDFs, documents, and other files up to 50 MiB each. It receives only items the reviewer explicitly shares. Source links open in the system browser. The app has no embedded unrestricted browser, advertising, social feed, messaging, purchases, or tracking.
 
-Account export is available after signing in at https://foundkeep.app/dashboard.html. Permanent account deletion is available directly in the app under Settings. Privacy details are at https://foundkeep.app/privacy.html and support is at https://foundkeep.app/support.html.
+Account export is available after signing in at https://foundkeep.app/dashboard.html. Permanent account deletion is available directly in the app under Settings. Privacy details are at https://foundkeep.app/privacy and support is at https://foundkeep.app/support.
 ```
 
 ## 9. Build and submission order

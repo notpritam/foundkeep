@@ -28,7 +28,7 @@ try{
  await page.getByRole('textbox',{name:'Foundkeep password',exact:true}).waitFor({timeout:10000}).catch(async error=>{console.log(JSON.stringify({url:page.url(),body:await page.locator('body').innerText(),errors,exchange:!!exchange}));throw error;});
  assert.match(exchange.verifier,/^[a-f0-9]{64}$/);assert.equal(exchange.code,code);
  const evidence=path.resolve('../../.impeccable/review/oauth');await mkdir(evidence,{recursive:true});await page.screenshot({path:path.join(evidence,'iphone-connect-existing.png')});
- await page.getByRole('button',{name:'Back to sign in'}).click();await page.getByText('Welcome back.',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Back to sign in'}).click();await page.getByText('Your collection awaits.',{exact:true}).waitFor();
  await page.goto(base+'/oauth/complete?flow='+flow+'&code='+code);await page.getByText('This sign-in expired or the app restarted. Please start again.',{exact:true}).waitFor();
  assert.deepEqual(errors,[]);console.log('PASS compiled mobile: provider start, browser handoff, callback proof, existing-account confirmation, cancel, cold-start rejection');
 }finally{await browser.close();server.close();}

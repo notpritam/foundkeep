@@ -1,4 +1,5 @@
 'use client';
+import { previewRatio } from '../../../../packages/shared/src/collection-presentation';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 
@@ -57,7 +58,7 @@ export function DashboardImage({ src, alt, mode, width, height, kind = 'Capture'
   }, [remote, visible, queue, identity]);
   useEffect(() => { if (started && image.current?.complete && image.current.naturalWidth) { setLoaded(identity); finish(); } }, [started, identity]);
   const ratio = width && height && width > 0 && height > 0 ? `${width}/${height}` : '8/5';
-  return <div ref={holder} data-local-image={!remote} className={`capture-image-frame ${mode === 'card' ? 'capture-preview-shell' : 'detail-image-frame'}${!isLoaded && !isFailed ? ' is-loading' : ''}`} style={mode === 'detail' && !isLoaded ? { aspectRatio: ratio } : undefined} aria-busy={!isLoaded && !isFailed}>
+  return <div ref={holder} data-local-image={!remote} className={`capture-image-frame ${mode === 'card' ? 'capture-preview-shell' : 'detail-image-frame'}${!isLoaded && !isFailed ? ' is-loading' : ''}`} style={mode === 'card' ? { aspectRatio: previewRatio(width, height) } : !isLoaded ? { aspectRatio: ratio } : undefined} aria-busy={!isLoaded && !isFailed}>
     {isFailed ? <div className="image-unavailable capture-preview-placeholder"><span>{kind}</span><p>Preview unavailable</p>{mode === 'detail' ? <button type="button" className="subtle-button" onClick={() => setAttempt(value => value + 1)}>Retry image</button> : <small>Open to retry</small>}</div> : <>
       {!isLoaded ? <div className="capture-image-skeleton" aria-hidden="true">{reducedMotion ? null : <motion.span className="capture-image-shimmer" initial={{ x: '-120%' }} animate={{ x: '320%' }} transition={{ duration: 1.4, ease: 'linear', repeat: Infinity }} />}</div> : null}
       {started ? <img ref={image} key={identity} src={src} alt={alt} className={mode === 'card' ? 'capture-preview' : 'detail-image'} width={width || undefined} height={height || undefined} loading={mode === 'card' && !remote ? 'lazy' : 'eager'} decoding="async" style={{ opacity: isLoaded ? 1 : 0 }} onLoad={() => { setLoaded(identity); finish(); }} onError={() => { setFailed(identity); finish(); }} /> : null}

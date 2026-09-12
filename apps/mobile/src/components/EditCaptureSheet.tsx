@@ -1,5 +1,6 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import { useState } from 'react';
-import { Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import type { Capture } from '../api/types.ts';
 import { useSession } from '../session/SessionProvider.tsx';
 import { colors, typography } from '../theme.ts';
@@ -37,4 +38,4 @@ export function EditCaptureSheet({ capture, onClose }: { capture: Capture; onClo
     <Screen keyboard={Platform.OS !== 'ios'}><ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled"><View style={styles.heading}><Text style={typography.title}>Make it yours.</Text><Text style={typography.small}>Edit the title or add a note. The original source stays attached.</Text></View><Field label="Title" value={title} onChangeText={setTitle} maxLength={1000} /><Field label="Your note" value={note} onChangeText={setNote} multiline maxLength={50_000} /><OrganizationPicker manageFolders={false} value={organization} onChange={setOrganization} /><Message error>{error}</Message>{conflict ? <Button label="Reload latest version" secondary onPress={() => void reload()} loading={saving} /> : <Button label="Save changes" onPress={() => void save()} loading={saving} />}<Button label="Cancel" secondary disabled={saving} onPress={onClose} /></ScrollView></Screen>
   </Modal>;
 }
-const styles = StyleSheet.create({ page: { padding: 24, paddingBottom: 48, gap: 20, backgroundColor: colors.paper }, heading: { gap: 10, paddingVertical: 12 } });
+const styles = StyleSheet.create({ page: { padding: 24, paddingBottom: 48, gap: 20 }, heading: { gap: 10, paddingVertical: 12 } });

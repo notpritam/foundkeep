@@ -28,7 +28,7 @@ const readOnly = mintDevice(db, {
 function call(
   method: string,
   path: string,
-  opts: { token?: string; json?: unknown; body?: BodyInit } = {},
+  opts: { token?: string; json?: unknown; body?: RequestInit['body'] } = {},
 ) {
   const headers = new Headers();
   if (opts.token) headers.set("authorization", `Bearer ${opts.token}`);
@@ -54,7 +54,7 @@ test("health works with a valid token", async () => {
   const res = await call("GET", "/v1/health", { token: full });
   expect(res.status).toBe(200);
   expect(res.headers.get("strict-transport-security")).toBe("max-age=31536000");
-  const body = await res.json();
+  const body = await res.json() as Record<string, any>;
   expect(body.ok).toBe(true);
   expect(body.service).toBe("atlas");
 });
@@ -89,12 +89,12 @@ test("ingest a note, then list it back", async () => {
     json: { type: "note", noteText: "buy oat milk", sourceTitle: "errand" },
   });
   expect(created.status).toBe(201);
-  const capture = await created.json();
+  const capture = await created.json() as Record<string, any>;
   expect(capture.type).toBe("note");
   expect(capture.status).toBe("pending");
 
   const list = await call("GET", "/v1/captures?type=note", { token: full });
-  const body = await list.json();
+  const body = await list.json() as Record<string, any>;
   expect(body.captures.some((x: { id: string }) => x.id === capture.id)).toBe(true);
 });
 
@@ -108,7 +108,7 @@ test("FTS search finds a highlight by content", async () => {
     },
   });
   const res = await call("GET", "/v1/captures?q=mitochondria", { token: full });
-  const body = await res.json();
+  const body = await res.json() as Record<string, any>;
   expect(body.captures.length).toBeGreaterThan(0);
   expect(body.captures[0].selectionText).toContain("mitochondria");
 });
@@ -126,7 +126,7 @@ test("multipart image capture stores and serves a blob", async () => {
   fd.set("blob", new File([png], "dot.png", { type: "image/png" }));
   const created = await call("POST", "/v1/captures", { token: full, body: fd });
   expect(created.status).toBe(201);
-  const capture = await created.json();
+  const capture = await created.json() as Record<string, any>;
   expect(capture.hasBlob).toBe(true);
 
   const blob = await call("GET", `/v1/captures/${capture.id}/blob`, {
@@ -159,13 +159,13 @@ test("claim → enrichment queue lifecycle", async () => {
     token: full,
     json: { type: "bookmark", sourceUrl: "https://ex.com", sourceTitle: "Ex" },
   });
-  const capture = await created.json();
+  const capture = await created.json() as Record<string, any>;
 
   const claimed = await call("POST", "/v1/captures/claim", {
     token: full,
     json: { owner: "worker-1", limit: 5 },
   });
-  const claimBody = await claimed.json();
+  const claimBody = await claimed.json() as Record<string, any>;
   const mine = claimBody.captures.find((x: { id: string }) => x.id === capture.id);
   expect(mine).toBeDefined();
   expect(mine.status).toBe("processing");
@@ -183,12 +183,12 @@ test("claim → enrichment queue lifecycle", async () => {
       },
     },
   );
-  const done = await enriched.json();
+  const done = await enriched.json() as Record<string, any>;
   expect(done.status).toBe("done");
   expect(done.tags).toEqual(["example", "web"]);
   expect(done.category).toBe("reference");
 
   const byTag = await call("GET", "/v1/captures?tag=example", { token: full });
-  const tagged = await byTag.json();
+  const tagged = await byTag.json() as Record<string, any>;
   expect(tagged.captures.some((x: { id: string }) => x.id === capture.id)).toBe(true);
 });

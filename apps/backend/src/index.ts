@@ -1,3 +1,6 @@
+import {createProcessingService} from './customer-processing.ts';
+import {pruneCustomerChanges} from './customer-changes.ts';
+import { processBillingCleanup, reconcileBilling } from "./customer-billing.ts";
 import { createApp } from "./app.ts";
 import { config } from "./config.ts";
 import { openDb } from "./db.ts";
@@ -10,12 +13,17 @@ const db = openDb();
 const app = createApp(db);
 const hub = new RelayHub(db);
 const stopCustomerWorker = startCustomerWorker(db);
+const managedProcessing = createProcessingService(db);
+const processingTimer = setInterval(() => { void managedProcessing.tick().catch(() => {}); }, 10_000);
+processingTimer.unref();
+const changesTimer = setInterval(() => pruneCustomerChanges(db), 3600_000);
+changesTimer.unref();
 const authGateway = createSupabaseGateway();
 let cleaningAuth = false;
 const cleanAuth = async () => {
   if (cleaningAuth) return;
   cleaningAuth = true;
-  try { await processAuthCleanup(db, authGateway); } catch { /* Durable outbox retries without logging identities or tokens. */ }
+  try { await processAuthCleanup(db, authGateway); await processBillingCleanup(db); await reconcileBilling(db); } catch { /* Durable outbox retries without logging identities or tokens. */ }
   finally { cleaningAuth = false; }
 };
 void cleanAuth();
@@ -57,6 +65,8 @@ console.log(`  relay:    wss://<host>/agent`);
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     stopCustomerWorker();
+    clearInterval(processingTimer);
+    clearInterval(changesTimer);
     clearInterval(authCleanupTimer);
     server.stop(true);
     process.exit(0);

@@ -54,7 +54,7 @@ test('authenticated requests stay on the Foundkeep origin and encode collection 
   };
   const client = createFoundkeepClient({ getToken: async () => 'test-token', fetcher });
   await client.listCaptures({ q: 'small details', type: 'document', cursor: 'next_page' });
-  assert.equal(calls[0]?.url, 'https://foundkeep.app/api/mobile/captures?view=cards&q=small+details&type=document&cursor=next_page');
+  assert.equal(calls[0]?.url, 'https://foundkeep.app/api/mobile/captures?view=cards&sort=recent&q=small+details&type=document&cursor=next_page');
   assert.equal(new Headers(calls[0]?.init?.headers).get('authorization'), 'Bearer test-token');
 });
 

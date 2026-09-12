@@ -1,6 +1,7 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { Animated, Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Shimmer } from './Shimmer.tsx';
 import { useMotionAllowed } from './motion.tsx';
 import type { Capture } from '../api/types.ts';

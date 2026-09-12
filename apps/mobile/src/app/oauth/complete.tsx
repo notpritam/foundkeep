@@ -1,9 +1,11 @@
+import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import * as Crypto from 'expo-crypto';
 import { router, Stack, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, ScrollView, Text, View } from 'react-native';
+import { Linking, ScrollView } from 'react-native';
 import { createFoundkeepClient, FoundkeepApiError } from '../../api/client.ts';
 import { isOAuthProvider, OAUTH_NAMES, parseOAuthReturn, pendingOAuth, validAuthorizeUrl, type PendingOAuth } from '../../auth-oauth.ts';
+import { FrostedPanel } from '../../components/ScenicSurface.tsx';
 import { Brand, Button, Field, Message, Screen } from '../../components/ui.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
 import { typography } from '../../theme.ts';
@@ -109,9 +111,9 @@ export default function OAuthComplete() {
   const remove = async () => {
     if (!proof || busy) return;
     setBusy(true); setError('');
-    try { await session.deleteAccount({ reauthToken: proof }); setProof(null); router.replace('/(auth)/welcome'); }
+    try { await session.deleteAccount({ reauthToken: proof }); setProof(null); router.replace('/(auth)/sign-in'); }
     catch (value) { setError((value as Error).message); }
     finally { setBusy(false); }
   };
-  return <Screen keyboard><Stack.Screen options={{ gestureEnabled: !busy }} /><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, padding: 24, gap: 24 }}><Brand compact /><Text style={typography.title}>{deletingIntent ? 'Verify your account.' : 'Your collection awaits.'}</Text><Message>{message}</Message><Message error>{error}</Message>{needsPassword ? <View style={{ gap: 14 }}><Text style={typography.body}>Connect this sign-in method to your existing Foundkeep collection using its current password.</Text><Field label="Foundkeep password" value={password} onChangeText={setPassword} textContentType="password" secureTextEntry autoCapitalize="none" /><Button label="Connect to my existing collection" loading={busy} disabled={!password} onPress={() => { if (handoff && !busy) void exchange(handoff, password); }} /></View> : null}{proof ? <Button label="Delete account permanently" danger loading={busy} onPress={() => void remove()} /> : null}<Button label={deletingIntent ? 'Keep my account' : 'Back to sign in'} secondary disabled={busy} onPress={cancel} /></ScrollView></Screen>;
+  return <Screen keyboard><Stack.Screen options={{ gestureEnabled: !busy }} /><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, padding: 24, gap: 24 }}><Brand compact /><Text style={typography.title}>{deletingIntent ? 'Verify your account.' : 'Your collection awaits.'}</Text><Message>{message}</Message><Message error>{error}</Message>{needsPassword ? <FrostedPanel><Text style={typography.body}>Connect this sign-in method to your existing Foundkeep collection using its current password.</Text><Field label="Foundkeep password" value={password} onChangeText={setPassword} textContentType="password" secureTextEntry autoCapitalize="none" /><Button label="Connect to my existing collection" loading={busy} disabled={!password} onPress={() => { if (handoff && !busy) void exchange(handoff, password); }} /></FrostedPanel> : null}{proof ? <Button label="Delete account permanently" danger loading={busy} onPress={() => void remove()} /> : null}<Button label={deletingIntent ? 'Keep my account' : 'Back to sign in'} secondary disabled={busy} onPress={cancel} /></ScrollView></Screen>;
 }

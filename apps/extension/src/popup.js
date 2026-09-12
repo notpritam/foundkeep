@@ -18,7 +18,7 @@ const cloud = bindCloud($("cloudSummary"), {
   compact: true,
   onStatus: (state) => {
     cloudState = state;
-    $("openLib").innerHTML = (state.account ? "Open dashboard" : "Open library") + " " + icon("arrow");
+    $("openLib").innerHTML = "Open collection" + " " + icon("arrow");
     $("openLocalLib").hidden = !state.account;
     $("storageState").dataset.state = state.status === "reconnect" ? "reconnect" : state.pending ? "waiting" : "ready";
     $("storageState").lastChild.textContent = state.status === "reconnect"
@@ -178,12 +178,18 @@ $("note").addEventListener("keydown", (event) => {
 $("save").onclick = saveNote;
 document.querySelectorAll("[data-act]").forEach((button) => { button.onclick = () => runCapture(button); });
 
-$("openLib").onclick = () => cloudState?.account
-  ? chrome.tabs.create({ url: CUSTOMER_ORIGIN + "/dashboard.html" }).then(() => window.close()).catch(() => message($("saveFeedback"), "Could not open Foundkeep. Your local library is still available.", "error"))
-  : openLibrary();
+let currentWindowId;
+function openSidebar(){
+  const fallback=()=>chrome.tabs.create({url:chrome.runtime.getURL("src/library.html")}).then(()=>window.close());
+  if(chrome.sidePanel?.open && Number.isInteger(currentWindowId)){
+    // Do not await storage or tabs before calling open: this must retain the click gesture.
+    chrome.sidePanel.open({windowId:currentWindowId}).then(()=>window.close()).catch(fallback);
+  }else void fallback();
+}
+$("openLib").onclick = openSidebar;
 $("openLocalLib").onclick = () => openLibrary();
-$("brandLibrary").onclick = (event) => { event.preventDefault(); openLibrary(); };
-$("openPreferenceDashboard").onclick = () => chrome.tabs.create({ url: CUSTOMER_ORIGIN + "/dashboard.html#extension-settings" }).then(() => window.close());
+$("brandLibrary").onclick = (event) => { event.preventDefault(); openSidebar(); };
+$("openPreferenceDashboard").onclick = () => chrome.tabs.create({ url: CUSTOMER_ORIGIN + "/dashboard#extension-settings" }).then(() => window.close());
 
 $("openSettings").onclick = async () => {
   $("view-main").hidden = true;
@@ -212,6 +218,7 @@ window.addEventListener("pagehide", () => blobUrls.forEach(URL.revokeObjectURL))
 async function init() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    currentWindowId = tab?.windowId;
     if (tab && /^https?:\/\//.test(tab.url || "")) {
       $("page-domain").textContent = domain(tab.url);
       $("page-title").textContent = tab.title || tab.url;

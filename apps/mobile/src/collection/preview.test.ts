@@ -26,3 +26,8 @@ test('unsafe cover URLs are rejected and large text uses one accessible column',
   assert.equal(galleryColumns(390, 1.4), 1);
   assert.equal(galleryColumns(300, 1), 1);
 });
+test('generated previews use the owned backend route, never a returned origin with credentials',()=>{
+ const result=capturePreviewSource({id:'video-id',previewUrl:'https://evil.example/preview',updatedAt:18},'secret','account-a');
+ assert.match(result!.uri,/^https:\/\/foundkeep\.app\/api\/mobile\/captures\/video-id\/preview\?/);
+ assert.equal(result!.headers?.Authorization,'Bearer secret');
+});

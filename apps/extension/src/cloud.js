@@ -1,6 +1,7 @@
 // Customer credentials and a durable, account-bound outbox. Only the background
 // worker calls mutating operations; pages ask it for a credential-free status.
 import * as db from "./db.js";
+import { libraryOperation } from "./library-api.js";
 import { clearPreferenceCache, getEffectivePreferences } from "./preferences.js";
 import { CUSTOMER_ORIGIN, CUSTOMER_ORIGINS } from "./product.js";
 import { cloudImageMime } from "./image-formats.js";
@@ -431,4 +432,45 @@ export async function retryCloudSync() {
     }
   }
   return drainCloudQueue({ force: true });
+}
+
+// Sidebar responses stay bound to the connection which started the operation.
+export async function libraryRequest(operation, args, accountId) {
+  const request=libraryOperation(operation,args);
+  const connection=await readState();
+  if (!accountId || connection?.account?.id!==accountId || !connection.token || connection.status==='reconnect') throw new Error('Connect your Foundkeep account to open its collection.');
+  const response=await fetch(CUSTOMER_ORIGIN+request.path,{
+    method:request.method,credentials:'omit',redirect:'error',signal:AbortSignal.timeout(30_000),
+    headers:{Authorization:'Bearer '+connection.token,...(request.body?{'Content-Type':'application/json'}:{})},
+    body:request.body?JSON.stringify(request.body):undefined,
+  });
+  if (!sameConnection(connection,await readState())) throw new Error('Your account changed. Open the collection again.');
+  if (response.status===401) {
+    await updateConnection(connection,{status:'reconnect',error:'Reconnect this browser to continue.'});
+    throw new Error('Reconnect this browser to continue.');
+  }
+  const reader=response.body?.getReader(); const chunks=[];let length=0;
+  try {
+    if (reader) while (true) { const result=await reader.read();if(result.done)break;length+=result.value.byteLength;if(length>12*1024*1024)throw new Error('This saved item is too large to preview. Open it in your dashboard.');chunks.push(result.value); }
+  } finally {void reader?.cancel().catch(()=>{});}
+  if (!sameConnection(connection,await readState())) throw new Error('Your account changed. Open the collection again.');
+  const blob=new Blob(chunks,{type:response.headers.get('Content-Type')||''});
+  if (request.image && response.ok) {
+    if (!['image/png','image/jpeg','image/webp'].includes(blob.type)) throw new Error('No preview available.');
+    const bitmap=await createImageBitmap(blob);
+    try {
+      const ratio=Math.min(1,480/bitmap.width,640/bitmap.height);
+      const canvas=new OffscreenCanvas(Math.max(1,Math.round(bitmap.width*ratio)),Math.max(1,Math.round(bitmap.height*ratio)));
+      canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+      const preview=await canvas.convertToBlob({type:'image/webp',quality:.75});
+      const bytes=new Uint8Array(await preview.arrayBuffer());let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);
+      if(!sameConnection(connection,await readState()))throw new Error('Your account changed.');
+      return {dataUrl:'data:image/webp;base64,'+btoa(binary)};
+    } finally {bitmap.close();}
+  }
+  let data;try{data=JSON.parse(await blob.text());}catch{throw new Error('Foundkeep could not read the collection response.');}
+  if(!sameConnection(connection,await readState()))throw new Error('Your account changed. Open the collection again.');
+  if(!response.ok)throw new Error(String(data?.message||'Foundkeep could not complete this action.').slice(0,300));
+  if(request.method!=='GET')announce();
+  return data;
 }

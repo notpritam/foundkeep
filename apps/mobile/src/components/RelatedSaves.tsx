@@ -1,7 +1,8 @@
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import type { Capture, RelatedSave } from '../api/types.ts';
 import { captureTitle } from '../collection/model.ts';
 import { useSession } from '../session/SessionProvider.tsx';

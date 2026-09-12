@@ -70,7 +70,7 @@ describe("customer folders and personal tags", () => {
     expect((await request("/captures", "POST", { clientId: "foreign", type: "note", folderId: foreign.id }, a.token)).status).toBe(404);
     expect((await request("/captures", "POST", { clientId: "invalid", type: "note", folderId: "../bad" }, a.token)).status).toBe(400);
     expect((db.query("SELECT COUNT(*) n FROM customer_captures").get() as any).n).toBe(0);
-    for (let index = 0; index < 100; index++) await folder(a.token, `Folder ${index}`);
+    for (let index = 0; index < 1000; index++) db.query("INSERT INTO customer_folders(id,account_id,name,normalized_name,created_at,updated_at) VALUES(?,?,?,?,0,0)").run(crypto.randomUUID(), a.account.id, `Folder ${index}`, `folder ${index}`);
     const full = await request("/mobile/folders", "POST", { name: "Overflow" }, a.token);
     expect(full.status).toBe(409);
     expect((await full.json()).error).toBe("folder_limit");

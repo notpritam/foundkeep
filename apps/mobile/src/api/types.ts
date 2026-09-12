@@ -46,6 +46,7 @@ export type Capture = {
   userTags?: string[];
   folderId?: string | null;
   folder?: Folder | null;
+  previewUrl?: string | null;
   blobUrl: string | null;
   fileName: string | null;
   fileMime: string | null;
@@ -55,6 +56,7 @@ export type Capture = {
   height: number | null;
   capturedAt: number;
   createdAt: number;
+  savedVia?: 'iphone' | 'browser' | 'dashboard' | null;
   updatedAt: number;
   enrichError: string | null;
   provenance: CaptureProvenance | null;
@@ -68,7 +70,7 @@ export type NativeSession = {
 };
 
 export type CaptureList = { captures: Capture[]; nextCursor: string | null; total: number };
-export type RelatedSave = { capture: Capture; reasons: { kind: 'batch' | 'source' | 'tag' | 'folder'; label: string }[] };
+export type RelatedSave = { capture: Capture; reasons: { kind: 'batch' | 'source' | 'tag' | 'folder' | 'agent'; label: string }[] };
 
-export type Folder = { id: string; name: string; count?: number };
+export type Folder = { id: string; name: string; displayName?: string; parentId?: string; path?: string[]; count?: number };
 export type Organization = { folders: Folder[]; tags: { name: string; count: number }[]; suggestedTags: string[]; suggestedFolders: string[] };

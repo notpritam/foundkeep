@@ -3,7 +3,7 @@ import type { Database } from "bun:sqlite";
 export class CustomerOrganizationError extends Error {
   constructor(readonly status: 400 | 404 | 409, readonly code: string, message: string) { super(message); }
 }
-type Folder = { id: string; name: string };
+type Folder = { id: string; name: string; parent_id: string | null };
 type TaggedCapture = { id: string; manual_tags: string; tags: string };
 export const foldName = (value: string) => value.normalize("NFC").toLowerCase();
 
@@ -23,7 +23,7 @@ export function folderIdentifier(value: unknown): string | null {
   return value;
 }
 export function requireFolder(db: Database, accountId: string, id: string): Folder {
-  const row = db.query("SELECT id,name FROM customer_folders WHERE id=? AND account_id=?").get(id, accountId) as Folder | null;
+  const row = db.query("SELECT id,name,parent_id FROM customer_folders WHERE id=? AND account_id=?").get(id, accountId) as Folder | null;
   if (!row) throw new CustomerOrganizationError(404, "folder_not_found", "Folder not found.");
   return row;
 }
@@ -57,14 +57,26 @@ export function capturesWithTag(db: Database, accountId: string, tag: string) {
   // also handles Unicode consistently; SQLite NOCASE only handles ASCII.
   return taggedCaptures(db, accountId).filter(row => tags(row).some(name => foldName(name) === folded)).map(row => row.id);
 }
+function folderPath(db: Database, accountId: string, folder: Folder): string[] {
+  const path = [folder.name];
+  let parent = folder.parent_id;
+  while (parent && path.length <= 20) {
+    const ancestor = requireFolder(db, accountId, parent);
+    path.unshift(ancestor.name);
+    parent = ancestor.parent_id;
+  }
+  if (parent || path.length > 20) throw new CustomerOrganizationError(400, "folder_depth", "Use at most 20 folder levels.");
+  return path;
+}
 export function folderDto(db: Database, accountId: string, folder: Folder) {
   const { count } = db.query("SELECT COUNT(*) count FROM customer_captures WHERE account_id=? AND folder_id=?").get(accountId, folder.id) as { count: number };
-  return { ...folder, count };
+  if (!folder.parent_id) return { id: folder.id, name: folder.name, count };
+  const path = folderPath(db, accountId, folder);
+  return { id: folder.id, name: folder.name, displayName: path.join(" / "), parentId: folder.parent_id, path, count };
 }
 export function readOrganization(db: Database, accountId: string) {
-  const folders = db.query(`SELECT f.id,f.name,COUNT(c.id) count FROM customer_folders f
-    LEFT JOIN customer_captures c ON c.folder_id=f.id AND c.account_id=f.account_id
-    WHERE f.account_id=? GROUP BY f.id ORDER BY f.normalized_name,f.id`).all(accountId) as (Folder & { count: number })[];
+  const stored = db.query("SELECT id,name,parent_id FROM customer_folders WHERE account_id=? ORDER BY normalized_name,id").all(accountId) as Folder[];
+  const folders = stored.map(folder => folderDto(db, accountId, folder)).sort((a,b) => a.name.localeCompare(b.name));
   const rows = taggedCaptures(db, accountId);
   const preferred = new Map<string, string>();
   for (const row of rows) for (const name of JSON.parse(row.manual_tags) as string[]) {
@@ -87,29 +99,43 @@ export function readOrganization(db: Database, accountId: string) {
     suggestedTags: ["Read later", "Inspiration", "Work", "Personal"], suggestedFolders: ["Reading", "Projects", "Inspiration"],
   };
 }
-export function createFolder(db: Database, accountId: string, name: string) {
-  const normalized = foldName(name);
-  const existing = db.query("SELECT id,name FROM customer_folders WHERE account_id=? AND normalized_name=?").get(accountId, normalized) as Folder | null;
+export function createFolder(db: Database, accountId: string, rawName: string, parentId: string | null = null) {
+  const name = organizationName(rawName, 80, "A folder name");
+  if (parentId && folderPath(db, accountId, requireFolder(db, accountId, parentId)).length >= 20) {
+    throw new CustomerOrganizationError(400, "folder_depth", "Use at most 20 folder levels.");
+  }
+  const normalized = (parentId ? parentId + "\u001f" : "") + foldName(name);
+  const existing = db.query("SELECT id,name,parent_id FROM customer_folders WHERE account_id=? AND normalized_name=?").get(accountId, normalized) as Folder | null;
   if (existing) return { folder: folderDto(db, accountId, existing), created: false };
   const { count } = db.query("SELECT COUNT(*) count FROM customer_folders WHERE account_id=?").get(accountId) as { count: number };
-  if (count >= 100) throw new CustomerOrganizationError(409, "folder_limit", "You can create up to 100 folders.");
-  const folder = { id: crypto.randomUUID(), name };
+  if (count >= 1000) throw new CustomerOrganizationError(409, "folder_limit", "You can create up to 1,000 folders.");
+  const folder = { id: crypto.randomUUID(), name, parent_id: parentId };
   const now = Date.now();
-  db.query("INSERT INTO customer_folders(id,account_id,name,normalized_name,created_at,updated_at) VALUES(?,?,?,?,?,?)").run(folder.id, accountId, name, normalized, now, now);
-  return { folder: { ...folder, count: 0 }, created: true };
+  db.query("INSERT INTO customer_folders(id,account_id,name,normalized_name,created_at,updated_at,parent_id) VALUES(?,?,?,?,?,?,?)").run(folder.id, accountId, name, normalized, now, now, parentId);
+  return { folder: folderDto(db, accountId, folder), created: true };
+}
+function descendants(db: Database, accountId: string, id: string): string[] {
+  return (db.query(`WITH RECURSIVE tree(id) AS (SELECT id FROM customer_folders WHERE id=? AND account_id=?
+    UNION ALL SELECT f.id FROM customer_folders f JOIN tree t ON f.parent_id=t.id WHERE f.account_id=?)
+    SELECT id FROM tree`).all(id,accountId,accountId) as {id:string}[]).map(row => row.id);
 }
 export function renameFolder(db: Database, accountId: string, id: string, name: string) {
-  requireFolder(db, accountId, id);
-  const duplicate = db.query("SELECT id FROM customer_folders WHERE account_id=? AND normalized_name=? AND id<>?").get(accountId, foldName(name), id);
+  const current = requireFolder(db, accountId, id);
+  const normalized = (current.parent_id ? current.parent_id + "\u001f" : "") + foldName(name);
+  const duplicate = db.query("SELECT id FROM customer_folders WHERE account_id=? AND normalized_name=? AND id<>?").get(accountId, normalized, id);
   if (duplicate) throw new CustomerOrganizationError(409, "folder_exists", "A folder with this name already exists.");
   const now = Date.now();
-  db.query("UPDATE customer_folders SET name=?,normalized_name=?,updated_at=MAX(updated_at+1,?) WHERE id=? AND account_id=?").run(name, foldName(name), now, id, accountId);
-  db.query("UPDATE customer_captures SET updated_at=MAX(updated_at+1,?) WHERE folder_id=? AND account_id=?").run(now, id, accountId);
-  return folderDto(db, accountId, { id, name });
+  db.query("UPDATE customer_folders SET name=?,normalized_name=?,updated_at=MAX(updated_at+1,?) WHERE id=? AND account_id=?").run(name, normalized, now, id, accountId);
+  for (const child of descendants(db,accountId,id)) {
+    db.query("UPDATE customer_captures SET updated_at=MAX(updated_at+1,?) WHERE folder_id=? AND account_id=?").run(now, child, accountId);
+  }
+  return folderDto(db, accountId, { ...current, name });
 }
 export function deleteFolder(db: Database, accountId: string, id: string) {
   requireFolder(db, accountId, id);
-  db.query("UPDATE customer_captures SET folder_id=NULL,storage_bytes=storage_bytes-?,updated_at=MAX(updated_at+1,?) WHERE folder_id=? AND account_id=?")
-    .run(Buffer.byteLength(id, "utf8"), Date.now(), id, accountId);
-  db.query("DELETE FROM customer_folders WHERE id=? AND account_id=?").run(id, accountId);
+  for (const child of descendants(db,accountId,id).reverse()) {
+    db.query("UPDATE customer_captures SET folder_id=NULL,storage_bytes=MAX(0,storage_bytes-?),updated_at=MAX(updated_at+1,?) WHERE folder_id=? AND account_id=?")
+      .run(Buffer.byteLength(child, "utf8"), Date.now(), child, accountId);
+    db.query("DELETE FROM customer_folders WHERE id=? AND account_id=?").run(child, accountId);
+  }
 }

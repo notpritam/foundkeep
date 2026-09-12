@@ -19,6 +19,7 @@ store_zip = os.path.join(dist, f"foundkeep-store-{version}.zip")
 assets = os.path.join(dist, "store-assets")
 required_assets = [
     "extension-popup.png",
+    "collection-sidebar.png",
     "customer-dashboard.png",
     "customer-browser-setup.png",
     "promo-small.png",
@@ -37,8 +38,8 @@ with tempfile.TemporaryDirectory() as temporary:
         (os.path.join(root, "deploy", "STORE_LISTING.md"), "STORE_LISTING.md"),
         (os.path.join(root, "deploy", "STORE_REVIEWER_GUIDE.md"), "STORE_REVIEWER_GUIDE.md"),
         (os.path.join(root, "docs", "extension-configuration-and-updates.md"), "EXTENSION_CONFIGURATION_AND_UPDATES.md"),
-        (os.path.join(root, "docs", "extension-audit-1.0.0.md"), "EXTENSION_AUDIT_1.0.0.md"),
-        (os.path.join(root, "docs", "extension-store-launch-1.0.0.md"), "STORE_LAUNCH_1.0.0.md"),
+        (os.path.join(root, "docs", "extension-audit-1.0.1.md"), "EXTENSION_AUDIT_1.0.1.md"),
+        (os.path.join(root, "docs", "AGENTIC-COLLECTIONS-OPERATIONS.md"), "AGENTIC_COLLECTIONS_OPERATIONS.md"),
     ]
     files += [(os.path.join(assets, name), os.path.join("assets", name)) for name in required_assets]
     for source, relative in files:

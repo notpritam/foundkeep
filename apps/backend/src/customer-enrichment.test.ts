@@ -6,6 +6,7 @@ function fixture() {
   const db = new Database(":memory:");
   db.exec(`CREATE TABLE customer_accounts (id TEXT PRIMARY KEY);
     INSERT INTO customer_accounts(id) VALUES('owner-a'),('owner-b');
+    CREATE TABLE customer_subscriptions (account_id TEXT,provider TEXT,status TEXT,expires_at INTEGER,renews INTEGER,sandbox INTEGER,updated_at INTEGER,PRIMARY KEY(account_id,provider));
     CREATE TABLE customer_captures (
     id TEXT PRIMARY KEY, account_id TEXT, type TEXT, status TEXT DEFAULT 'pending',
     source_title TEXT, source_url TEXT, note_text TEXT, selection_text TEXT,
