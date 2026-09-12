@@ -12,7 +12,7 @@ import {
 
 const exec = promisify(execFile);
 const root = path.resolve(".");
-const archive = path.join(root, "deploy/dist/foundkeep-store-1.0.0.zip");
+const archive = path.join(root, "deploy/dist/foundkeep-store-1.0.1.zip");
 
 test("cloud image capture accepts exactly the formats supported by the API", () => {
   assert.deepEqual(CLOUD_IMAGE_MIME_TYPES, [
@@ -28,10 +28,10 @@ test("cloud image capture accepts exactly the formats supported by the API", () 
   assert.throws(() => cloudImageMime(new Blob([])), /unsupported format/i);
 });
 
-test("Chrome Web Store package is a focused version 1.0.0 MV3 build", async () => {
+test("Chrome Web Store package is a focused version 1.0.1 MV3 build", async () => {
   assert.equal(
     (await readFile("deploy/store-version.txt", "utf8")).trim(),
-    "1.0.0",
+    "1.0.1",
   );
   await exec("bash", ["deploy/pack-store.sh"], { cwd: root });
   const firstHash = createHash("sha256")
@@ -60,7 +60,7 @@ test("Chrome Web Store package is a focused version 1.0.0 MV3 build", async () =
   ]);
   const manifest = JSON.parse(manifestText);
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.0.0");
+  assert.equal(manifest.version, "1.0.1");
   assert.ok(
     [...manifest.description].length <= 132,
     `manifest description is ${[...manifest.description].length} characters; Chrome Web Store allows 132`,
@@ -73,7 +73,11 @@ test("Chrome Web Store package is a focused version 1.0.0 MV3 build", async () =
     "contextMenus",
     "storage",
     "alarms",
+    "sidePanel",
   ]);
+  assert.deepEqual(manifest.optional_permissions, ["bookmarks"]);
+  assert.equal(manifest.side_panel.default_path,"src/library.html");
+  assert.ok(files.includes("src/bookmark-import.js"));
   assert.deepEqual(manifest.host_permissions, ["https://foundkeep.app/*"]);
   assert.deepEqual(manifest.optional_host_permissions, [
     "http://*/*",

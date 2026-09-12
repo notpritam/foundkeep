@@ -1,0 +1,71 @@
+# Foundkeep mobile subscriptions — RevenueCat setup
+
+The implementation is in the iPhone app and backend. Purchases are disabled until configuration is present. A new native build is required to include `react-native-purchases`; the public app version stays **1.0.0**. Existing native build 15 cannot receive this SDK through an OTA update.
+
+## 1. App Store Connect
+
+Open Foundkeep (`app.foundkeep.ios`, App Store ID `6809771188`) → Monetization → Subscriptions.
+
+1. Create one subscription group named **Foundkeep Pro**.
+2. Create an auto-renewable subscription: reference name **Foundkeep Pro Monthly**, product ID **`app.foundkeep.pro.monthly`**, duration **1 month**.
+3. Choose the available US base price closest to the approved $5/month price (normally **$4.99**); the app uses Apple's localized price, never a hard-coded dollar amount. The web plan remains exactly USD $5.
+4. Add localization: display name **Foundkeep Pro**; description **Automatic tags, summaries and linked saves.**
+5. Add the subscription review screenshot from the new app's subscription screen, complete availability and required review fields, and ensure Paid Apps agreements, tax and banking information are active.
+6. Attach this first subscription to the new app version when submitting for App Review.
+
+Apple's subscription setup: https://developer.apple.com/app-store/subscriptions/
+
+## 2. RevenueCat project
+
+1. Create a project named **Foundkeep** in your own RevenueCat account.
+2. Add an **App Store** app using bundle ID **`app.foundkeep.ios`**.
+3. Follow RevenueCat's App Store connection instructions for App Store Connect API / In-App Purchase credentials. The earlier Sign in with Apple `.p8` is an authentication key, not a replacement for Apple purchase credentials.
+4. Import product **`app.foundkeep.pro.monthly`** into Product catalog.
+5. Create entitlement **`pro`** and attach this product.
+6. Create an offering **`default`**, make it current, and add the product as its monthly package.
+7. Review restore/transfer behavior for your account policy. Foundkeep handles RevenueCat transfer notifications by verifying both known account identities. A purchase can only grant access to the account RevenueCat currently associates with it.
+
+Entitlement instructions: https://www.revenuecat.com/docs/getting-started/entitlements
+Expo SDK instructions: https://www.revenuecat.com/docs/getting-started/installation/expo
+
+## 3. Backend configuration
+
+Provide these through the private server environment, never a committed file or public build variable:
+
+| Variable | Value |
+| --- | --- |
+| `REVENUECAT_IOS_PUBLIC_KEY` | RevenueCat App Store public SDK key beginning `appl_` |
+| `REVENUECAT_SECRET_KEY` | Server secret with permission to read subscribers and delete customers using RevenueCat API v1 |
+| `REVENUECAT_WEBHOOK_AUTH` | A new random authorization string, identical to the webhook configuration |
+| `REVENUECAT_ENTITLEMENT_ID` | `pro` |
+| `REVENUECAT_MONTHLY_PRODUCT_ID` | `app.foundkeep.pro.monthly` |
+| `REVENUECAT_ALLOW_SANDBOX` | `true` only in the test environment; default `false` |
+
+The public SDK key is intentionally returned to the iPhone app. It is a publishable identifier, not a provider secret. The server secret, webhook authorization, OpenAI key, Supabase keys and Stripe secret never reach the app. The SDK's customer ID is a random `fk_…` identity mapped by our backend; it is not the account email or account UUID.
+
+## 4. Webhook
+
+RevenueCat → Integrations → Webhooks → Add configuration:
+
+- Name: **Foundkeep backend**
+- URL: **`https://foundkeep.app/api/billing/webhooks/revenuecat`**
+- Authorization header: exact value of `REVENUECAT_WEBHOOK_AUTH`
+- App: Foundkeep
+- Events: all subscription and transfer events
+- Environment: production; use a separate test backend/integration for sandbox purchase testing
+
+The endpoint authenticates the request, looks up known opaque identities, fetches the current RevenueCat subscriber state, and updates the shared Pro entitlement. It does not trust a client claim that a purchase succeeded. Repeated events are idempotent. Unknown customer IDs do not gain access.
+
+Webhook instructions: https://www.revenuecat.com/docs/integrations/webhooks
+
+## 5. Test before submitting
+
+Build and install a fresh native binary under Expo owner **notpritam**, project **33362145-2b45-4d86-bb08-cd10c6bfae61**.
+
+On a sandbox-configured backend, test: sign in → You → Your plan → localized monthly offering → purchase → verified Pro. Restore after reinstalling; switch Foundkeep accounts during a pending action; leave web checkout open and start purchase/restore on iPhone; cancel one attempt while another restore is running; cancel renewal; allow sandbox expiration; test a refund/transfer event; verify the dashboard sees the same Pro state. Revoking a Foundkeep device must remove its account access. Deleting the app/account does not cancel Apple billing; the app points users to Apple subscription settings.
+
+Update App Privacy with **Purchases / Purchase History**, linked to user, used for app functionality, not tracking. Existing account and user-content disclosures remain. The app includes an updated privacy manifest. Add the subscription to App Review and update the reviewer instructions before submission.
+
+## OTA boundaries
+
+Once this native binary is installed, compatible JavaScript UI and logic may ship through EAS Update for its fingerprint runtime. Offerings, prices, product availability, Pro status and feature controls refresh from Apple, RevenueCat and the backend. Native SDK upgrades, StoreKit/native changes, entitlements and manifest changes need a new Store build. The app does not load remote executable code from RevenueCat.

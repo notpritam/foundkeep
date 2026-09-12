@@ -152,12 +152,8 @@ test('migration retains old identity and account ownership, then permits another
  const {mkdtempSync,rmSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
  const dir=mkdtempSync(join(tmpdir(),'foundkeep-link-migration-'));const file=join(dir,'test.db');
  try {
-  let old=openDb(file);const id=crypto.randomUUID();const subject=crypto.randomUUID();
+  let old=openDb(file,11);const id=crypto.randomUUID();const subject=crypto.randomUUID();
   old.query('INSERT INTO customer_accounts(id,email,name,password_hash,recovery_hash,created_at) VALUES(?,?,?,?,?,?)').run(id,identity.email,'Existing social user','','old-recovery',Date.now());
-  const previousVersion=11;
-  old.exec('ALTER TABLE customer_connections DROP COLUMN client_kind');
-  // Reconstruct the previous identity table with a real pre-upgrade row.
-  old.exec('DROP TABLE customer_auth_identities; CREATE TABLE customer_auth_identities(issuer TEXT NOT NULL,subject TEXT NOT NULL,account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,provider TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(issuer,subject),UNIQUE(account_id,issuer));');old.exec(`PRAGMA user_version=${previousVersion}`);
   old.query('INSERT INTO customer_auth_identities VALUES(?,?,?,?,?)').run(gateway.issuer,subject,id,'google',42);
   old.query('INSERT INTO customer_captures(id,account_id,client_id,type,note_text,storage_bytes,captured_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run('old-capture',id,'old-client','note','Existing saved note',100,42,42,42);
   old.close();old=openDb(file);

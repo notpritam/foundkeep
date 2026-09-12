@@ -1,3 +1,4 @@
+import { BillingProvider } from '../../billing/BillingProvider.tsx';
 import { Redirect, Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { useSession } from '../../session/SessionProvider.tsx';
@@ -10,11 +11,12 @@ export default function AppLayout() {
   const motion = useMotionAllowed();
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.accent} /></View>;
   if (!account) return <Redirect href="/(auth)/sign-in" />;
-  return <Stack screenOptions={{ headerStyle: { backgroundColor: colors.paper }, headerTintColor: colors.accent, headerTitleStyle: { color: colors.ink, fontSize: 17, fontWeight: '600' }, headerShadowVisible: false, contentStyle: { backgroundColor: colors.paper }, animation: motion ? 'default' : 'fade', headerBackButtonDisplayMode: 'minimal' }}>
+  return <BillingProvider><Stack screenOptions={{ headerStyle: { backgroundColor: colors.paper }, headerTintColor: colors.accent, headerTitleStyle: { color: colors.ink, fontSize: 17, fontWeight: '600' }, headerShadowVisible: false, contentStyle: { backgroundColor: colors.paper }, animation: motion ? 'default' : 'fade', headerBackButtonDisplayMode: 'minimal' }}>
     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     <Stack.Screen name="capture/[id]" options={{ title: 'Saved item' }} />
     <Stack.Screen name="batch/[id]" options={{ title: 'Saved together' }} />
     <Stack.Screen name="new-note" options={{ title: 'New note', presentation: 'modal' }} />
     <Stack.Screen name="onboarding" options={{ title: 'Save from anywhere', presentation: 'modal' }} />
-  </Stack>;
+    <Stack.Screen name="subscription" options={{ title: 'Your plan' }} />
+  </Stack></BillingProvider>;
 }

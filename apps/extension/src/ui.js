@@ -33,6 +33,12 @@ export function ago(ts) {
 }
 // The extension's existing stroke icon vocabulary, centralized for consistency.
 const paths = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+  refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/>',
+  folder: '<path d="M3 7V5h7l2 3h9v12H3z"/>',
+  trash: '<path d="M4 7h16M9 7V3h6v4M6 7l1 14h10l1-14M10 11v6M14 11v6"/>',
+
   screenshot:
     '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M14 3h7v7M10 21H3v-7"/>',
   image:

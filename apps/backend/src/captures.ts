@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database, SQLQueryBindings } from "bun:sqlite";
 import { Hono } from "hono";
 import {
   CaptureIngest,
@@ -131,7 +131,7 @@ export function listCaptures(
 ): { captures: Capture[]; nextCursor: string | null } {
   const limit = Math.min(Math.max(p.limit ?? 30, 1), 100);
   const where: string[] = [];
-  const args: unknown[] = [];
+  const args: SQLQueryBindings[] = [];
   if (p.type) {
     where.push("c.type = ?");
     args.push(p.type);
@@ -232,8 +232,8 @@ export function applyEnrichment(
   if (!getCaptureRow(db, id)) return null;
   const now = Date.now();
   const sets: string[] = [];
-  const args: unknown[] = [];
-  const set = (col: string, val: unknown) => {
+  const args: SQLQueryBindings[] = [];
+  const set = (col: string, val: SQLQueryBindings) => {
     sets.push(`${col} = ?`);
     args.push(val);
   };
@@ -273,8 +273,8 @@ export function patchCapture(
 ): Capture | null {
   if (!getCaptureRow(db, id)) return null;
   const sets: string[] = [];
-  const args: unknown[] = [];
-  const set = (col: string, val: unknown) => {
+  const args: SQLQueryBindings[] = [];
+  const set = (col: string, val: SQLQueryBindings) => {
     sets.push(`${col} = ?`);
     args.push(val);
   };

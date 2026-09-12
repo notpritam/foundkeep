@@ -6,7 +6,7 @@ export default function Page(){return <div className="customer-body reading-body
   <header className="site-header privacy-header wrap"><Link className="brand" href="/"><img src="/assets/studio-mark.svg" width="36" height="36" alt="" /><span>Foundkeep</span></Link><Link className="text-link" href="/">Back to Foundkeep</Link></header>
   <main className="privacy-document" id="main">
     <h1>Terms of use.</h1>
-    <p className="updated">Updated 8 September 2026</p>
+    <p className="updated">Updated 12 September 2026</p>
     <p className="privacy-lead">These terms govern your use of Foundkeep's website, cloud account, browser extension, iPhone app and Share Extension. By creating an account or using the service, you agree to them.</p>
     <h2>Your account</h2>
     <p>Provide accurate account information, keep your password and recovery code private, and tell Foundkeep promptly if you believe your account has been compromised. You are responsible for activity performed through your account and connected devices.</p>
@@ -15,6 +15,11 @@ export default function Page(){return <div className="customer-body reading-body
     <p>You may save content only when you own it, have permission, or are otherwise allowed to do so under applicable law and the source service's terms. Do not use Foundkeep to infringe intellectual-property or privacy rights, distribute unlawful material, abuse the service, bypass access controls, or harm other people or systems.</p>
     <h2>Private use</h2>
     <p>Foundkeep is designed as a private personal collection. It does not publish your captures to other customers. Source links can take you to third-party sites and apps; their content, availability and terms remain the responsibility of those third parties.</p>
+    <h2>Optional Pro subscription</h2>
+    <p>The core collection, imports and customer-connected MCP agents are available on Free. Pro includes 500 managed processing credits per calendar month in UTC and 2 GiB of storage. Credits reserve when work is queued and are consumed only when a result is applied. Failed or cancelled work releases its reservation. Unused monthly credits do not roll over. Subscriptions are optional; limits are shown in your account.</p>
+    <p>Web Pro costs USD $5 per month. The iPhone app displays the localized App Store price before purchase. Subscriptions renew automatically unless cancelled through the provider. Manage web subscriptions from account settings and App Store subscriptions through your Apple Account. Apple controls App Store billing and refund requests. Cancelling renewal normally retains access until the paid period ends. If a subscription expires, existing saves remain, but new uploads can be limited if storage exceeds the Free allowance. Deleting your Foundkeep account does not cancel App Store billing.</p>
+    <h2>Processing and connected agents</h2>
+    <p>Managed processing is enabled only with your permission and can produce inaccurate summaries, tags or relationships. Public-source and media extraction depend on source availability and processing limits. Foundkeep does not promise access to private social posts or complete video transcripts. Your original saved content and personal tags are preserved. You control which external agents can access your collection and are responsible for their instructions and any provider costs.</p>
     <h2>Service changes and availability</h2>
     <p>Foundkeep may improve, limit or discontinue features and may use data-only policy updates, EAS Update and Store releases as described in the <Link href="/privacy">Privacy Policy</Link>. Keep a separate copy of anything you cannot afford to lose. Reasonable efforts are made to keep the service available, but uninterrupted or error-free operation is not guaranteed.</p>
     <h2>Suspension</h2>

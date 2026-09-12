@@ -4,7 +4,7 @@ export type RelatedMetadata = {
   folder_id: string | null; source_url: string | null; canonical_url: string | null;
   page_url: string | null; manual_tags: string; tags: string;
 };
-export type RelatedReason = { kind: 'batch' | 'source' | 'tag' | 'folder'; label: string };
+export type RelatedReason = { kind: 'batch' | 'source' | 'tag' | 'folder' | 'agent'; label: string };
 
 function tags(raw: string): Map<string, string> {
   try {

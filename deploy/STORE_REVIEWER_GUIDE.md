@@ -1,11 +1,11 @@
-# Foundkeep 1.0.0 — Chrome Web Store reviewer guide
+# Foundkeep 1.0.1 — Chrome Web Store reviewer guide
 
 Use this with the private reviewer credential file generated for the release. Do not add passwords or recovery codes to this repository, a GitHub release, or the public listing.
 
 ## Before submitting
 
-1. Upload `foundkeep-store-1.0.0.zip` in the Chrome Web Store dashboard.
-2. Copy the 32-character extension ID assigned by Google.
+1. Upload `foundkeep-store-1.0.1.zip` in the Chrome Web Store dashboard.
+2. Update the existing item `cficnecbdbiddngllpfbacabgbcjinmk`; keep its established ID.
 3. Add the ID alongside the existing self-hosted ID in `apps/web/customer-config.json` and the production `ATLAS_CUSTOMER_EXTENSION_IDS` value.
 4. Deploy those two allowlist changes and verify `https://foundkeep.app/customer-config.json` returns both IDs.
 5. Install the exact uploaded package from the dashboard's trusted-tester flow and run the release checks below.
@@ -19,7 +19,7 @@ Paste the sign-in URL, email, and password from the private `REVIEWER-CREDENTIAL
 ## Reviewer path
 
 1. Install and pin Foundkeep.
-2. Sign in at `https://foundkeep.app/auth.html?mode=login` with the supplied reviewer account.
+2. Sign in at `https://foundkeep.app/login` with the supplied reviewer account.
 3. On the dashboard, choose **Connect this browser**. The page creates a short-lived, single-use pairing code; the extension claims it and stores a scoped browser credential.
 4. Open any public HTTP(S) page and open the extension popup.
 5. Choose **Save page**. Foundkeep stores the readable page text plus the original and canonical URLs, title, site, description, author, dates, language, lead image URL, favicon URL, heading outline, timestamps, extraction status, capture method, and a SHA-256 content fingerprint when available.
@@ -38,8 +38,16 @@ Paste the sign-in URL, email, and password from the private `REVIEWER-CREDENTIAL
 
 ## Browser support
 
-The submitted store package targets Chromium desktop browsers. Chrome is the reviewed distribution channel. Edge, Brave, Opera, Vivaldi, and Chromium support the same MV3 APIs and can use the manual package while their own store channels are prepared. Firefox and Safari are not included in 1.0.0.
+The submitted store package targets Chromium desktop browsers. Chrome is the reviewed distribution channel. Edge, Brave, Opera, Vivaldi, and Chromium support the same MV3 APIs and can use the manual package while their own store channels are prepared. Firefox and Safari extension builds are not included. Their exported bookmark HTML can be imported.
 
 ## Remote configuration and updates
 
 Foundkeep does not download or execute remote code. Twenty account settings and a narrowly scoped operator policy are data-only controls delivered over HTTPS and validated by the extension. The operator policy can disable packaged features and lower packaged safety limits; it cannot add behavior, permissions, origins, or code. Changes to JavaScript, permissions, content scripts, manifest fields, security behavior, or executable UI logic require a new reviewed store version. Chrome Web Store then distributes approved updates automatically.
+
+## New in 1.0.1
+
+Open the popup → Open collection to browse and edit the private library in the side panel. Search, switch list/gallery, filter folders or tags, create a note, and open an existing save. On browsers without the side panel API, the bundled library opens in a tab.
+
+Choose Import bookmarks. Current-browser import requests optional `bookmarks` permission only after the explicit action. Declining it leaves HTML import available. Select a browser-exported HTML file, inspect the preview, then confirm. Nested folders, original timestamps, source URLs and import provenance are preserved; repeated URLs do not create duplicate captures. Browser bookmarks are never edited.
+
+Free import and MCP access do not require a subscription. Managed processing is optional and requires Pro plus explicit account consent. Billing stays unavailable until the operator has configured the providers. There is no remotely executed extension code.

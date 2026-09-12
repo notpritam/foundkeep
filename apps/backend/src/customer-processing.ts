@@ -1,0 +1,150 @@
+import {processCustomerMedia,type MediaResult} from './customer-media.ts';
+import {createHash,randomUUID} from 'node:crypto';
+import type {Database} from 'bun:sqlite';
+import type {Hono} from 'hono';
+import type {CustomerEnv} from './customer.ts';
+import type {CustomerServices} from './customer-modules.ts';
+import {moduleFail} from './customer-modules.ts';
+import {accountPlan} from './customer-plans.ts';
+import {createCustomerAi,type AiInput,type AiResult,validateAiResult} from './customer-ai.ts';
+import {fetchCustomerSource,type SourceSnapshot} from './customer-source.ts';
+
+export const CONSENT_VERSION='2026-09-12';
+const LEASE_MS=180_000;
+const FAILURE='Processing could not finish. Your original is safe.';
+type Save={id:string;account_id:string;type:string;source_title:string|null;source_url:string|null;note_text:string|null;selection_text:string|null;article_text:string|null;ocr_text:string|null;blob_data:Uint8Array|null;blob_mime:string|null;file_path:string|null;file_mime:string|null;file_bytes:number;summary:string|null;category:string|null;tags:string;storage_bytes:number;status:string;enrich_attempts:number;created_at:number;provenance_json:string|null};
+type Job={id:string;account_id:string;capture_id:string;source_hash:string;status:string;attempts:number;cycle:string;credit:number;lease_token:string|null};
+type SettingsRow={enabled:number;fetch_links:number;images:number;consent_version:string|null;enabled_at:number};
+type Options={ai?:{available:boolean;model:string;organize(input:AiInput):Promise<AiResult>};source?:(url:string)=>Promise<SourceSnapshot>;now?:()=>number;globalMaxBytes?:number;dailyAttempts?:number;media?:(save:Save)=>Promise<MediaResult>};
+const bytes=(value:unknown)=>Buffer.byteLength(typeof value==='string'?value:JSON.stringify(value),'utf8');
+function fingerprint(row:Save){return createHash('sha256').update(JSON.stringify([row.type,row.source_title,row.source_url,row.note_text,row.selection_text,row.article_text,row.ocr_text,row.file_path,row.file_bytes,row.blob_mime])).update(row.blob_data||new Uint8Array()).digest('hex');}
+const derived=(row:Save)=>bytes(row.summary||'')+bytes(row.category||'')+(row.tags&&row.tags!=='[]'?bytes(row.tags):0);
+export function createProcessingService(db:Database,options:Options={}){
+ const ai=options.ai||createCustomerAi(),now=options.now||Date.now;
+ const getSave=(owner:string,id:string)=>db.query('SELECT * FROM customer_captures WHERE id=? AND account_id=?').get(id,owner) as Save|null;
+ const prefs=(owner:string)=>db.query('SELECT * FROM customer_automation WHERE account_id=?').get(owner) as SettingsRow|null;
+ function settle(job:Job,status:string,error:string|null,success=false){
+  const changed=db.query('UPDATE customer_processing_jobs SET status=?,error=?,lease_token=NULL,lease_until=NULL,credit=0,updated_at=? WHERE id=? AND credit=? AND lease_token IS ?').run(status,error,now(),job.id,job.credit,job.lease_token);
+  if(changed.changes&&job.credit===1)db.query('UPDATE customer_processing_usage SET reserved=MAX(0,reserved-1),used=used+? WHERE account_id=? AND cycle=?').run(Number(success),job.account_id,job.cycle);
+ }
+ function settings(owner:string){
+  const row=prefs(owner),plan=accountPlan(db,owner,now()),cycle=new Date(now()).toISOString().slice(0,7);
+  const usage=db.query('SELECT used,reserved FROM customer_processing_usage WHERE account_id=? AND cycle=?').get(owner,cycle) as {used:number;reserved:number}|null;
+  return {available:ai.available,enabled:!!row?.enabled,fetchLinks:!!row?.fetch_links,images:!!row?.images,consentVersion:CONSENT_VERSION,provider:'OpenAI',model:ai.model,pro:plan.pro,
+   usage:{cycle,used:usage?.used||0,reserved:usage?.reserved||0,limit:plan.limits.monthlyProcessing},
+   activity:db.query('SELECT id,capture_id AS captureId,status,attempts,error,created_at AS createdAt,updated_at AS updatedAt FROM customer_processing_jobs WHERE account_id=? ORDER BY created_at DESC LIMIT 30').all(owner)};
+ }
+ function configure(owner:string,value:Record<string,unknown>){
+  for(const key of Object.keys(value))if(!['enabled','fetchLinks','images','consentVersion'].includes(key))moduleFail(400,'invalid_preferences','Unknown processing preference.');
+  for(const key of ['enabled','fetchLinks','images'])if(value[key]!==undefined&&typeof value[key]!=='boolean')moduleFail(400,'invalid_preferences','Use true or false for processing preferences.');
+  const previous=prefs(owner);const enabled=value.enabled===undefined?!!previous?.enabled:!!value.enabled;
+  if(enabled&&value.consentVersion!==CONSENT_VERSION&&previous?.consent_version!==CONSENT_VERSION)moduleFail(400,'consent_required','Confirm that selected content can be sent to OpenAI for organization.');
+  db.transaction(()=>{
+   db.query(`INSERT INTO customer_automation(account_id,enabled,fetch_links,images,consent_version,enabled_at,updated_at) VALUES(?,?,?,?,?,?,?)
+     ON CONFLICT(account_id) DO UPDATE SET enabled=excluded.enabled,fetch_links=excluded.fetch_links,images=excluded.images,consent_version=excluded.consent_version,enabled_at=excluded.enabled_at,updated_at=excluded.updated_at`)
+    .run(owner,Number(enabled),Number(value.fetchLinks??!!previous?.fetch_links),Number(value.images??!!previous?.images),enabled?CONSENT_VERSION:previous?.consent_version||null,enabled&&!previous?.enabled?now():previous?.enabled_at||now(),now());
+   if(!enabled || previous?.fetch_links && value.fetchLinks===false || previous?.images && value.images===false){const jobs=db.query("SELECT * FROM customer_processing_jobs WHERE account_id=? AND status IN ('pending','running')").all(owner) as Job[];for(const job of jobs)settle(job,'cancelled',null);}
+  }).immediate();return settings(owner);
+ }
+ function enqueue(owner:string,id:string,reason:'manual'|'new-save'|'agent'){
+  return db.transaction(()=>{
+   const row=getSave(owner,id);if(!row)moduleFail(404,'not_found','Saved item not found.');
+   if(!accountPlan(db,owner,now()).pro)moduleFail(403,'pro_required','Pro is required for managed processing.');
+   const preference=prefs(owner);if(!preference?.enabled||preference.consent_version!==CONSENT_VERSION)moduleFail(409,'consent_required','Enable managed processing before sending content to OpenAI.');
+   if(!ai.available)moduleFail(503,'processing_unavailable','Managed processing is not configured yet.');
+   if(row.status!=='done' && !(row.status==='failed' && row.enrich_attempts>=3))moduleFail(409,'capture_busy','This item is still being saved. Try again shortly.');
+   const sourceHash=fingerprint(row);let existing=db.query('SELECT * FROM customer_processing_jobs WHERE account_id=? AND capture_id=? AND source_hash=?').get(owner,id,sourceHash) as Job|null;
+   if(existing&&!['failed','cancelled'].includes(existing.status))return {id:existing.id,status:existing.status};
+   const cycle=new Date(now()).toISOString().slice(0,7);
+   db.query('INSERT OR IGNORE INTO customer_processing_usage(account_id,cycle) VALUES(?,?)').run(owner,cycle);
+   const reserved=db.query('UPDATE customer_processing_usage SET reserved=reserved+1 WHERE account_id=? AND cycle=? AND used+reserved<500').run(owner,cycle);
+   if(!reserved.changes)moduleFail(429,'processing_quota','Your monthly processing allowance is full.');
+   const jobId=existing?.id||randomUUID();
+   if(existing)db.query("UPDATE customer_processing_jobs SET status='pending',attempts=0,credit=1,cycle=?,error=NULL,updated_at=? WHERE id=?").run(cycle,now(),jobId);
+   else db.query('INSERT INTO customer_processing_jobs(id,account_id,capture_id,source_hash,reason,cycle,credit,created_at,updated_at) VALUES(?,?,?,?,?,?,1,?,?)').run(jobId,owner,id,sourceHash,reason,cycle,now(),now());
+   return {id:jobId,status:'pending'};
+  }).immediate();
+ }
+ function details(owner:string,id:string){
+  const row=db.query('SELECT source_hash,model,result_json,source_json,created_at FROM customer_processing_results WHERE account_id=? AND capture_id=?').get(owner,id) as {source_hash:string;model:string;result_json:string;source_json:string|null;created_at:number}|null;
+  return row?{derivatives:db.query('SELECT kind,mime,bytes FROM customer_derivatives WHERE account_id=? AND capture_id=?').all(owner,id),sourceHash:row.source_hash,model:row.model,result:JSON.parse(row.result_json),source:row.source_json?JSON.parse(row.source_json):null,processedAt:row.created_at}:null;
+ }
+ let running=false;let lastOwner='';
+ async function tick(){
+  if(running||!ai.available)return 0;running=true;
+  try{
+   // Only new saves after consent are automatic. Historical libraries require explicit requests.
+   const owners=db.query('SELECT account_id,enabled_at FROM customer_automation WHERE enabled=1 AND consent_version=? AND account_id>? ORDER BY account_id LIMIT 100').all(CONSENT_VERSION,lastOwner) as {account_id:string;enabled_at:number}[];
+   lastOwner=owners.length===100?owners.at(-1)!.account_id:'';
+   for(const owner of owners){if(!accountPlan(db,owner.account_id,now()).pro)continue;
+    const saves=db.query(`SELECT id FROM customer_captures c WHERE account_id=? AND created_at>=? AND (status='done' OR (status='failed' AND enrich_attempts>=3))
+      AND NOT EXISTS(SELECT 1 FROM customer_processing_jobs j WHERE j.capture_id=c.id) ORDER BY created_at LIMIT 10`).all(owner.account_id,owner.enabled_at) as {id:string}[];
+    for(const save of saves){try{enqueue(owner.account_id,save.id,'new-save');}catch{break;}}
+   }
+   const job=db.transaction(()=>{
+    const stale=db.query("SELECT * FROM customer_processing_jobs WHERE status='running' AND lease_until<? AND attempts>=3").all(now()) as Job[];for(const row of stale)settle(row,'failed',FAILURE);
+    const day=new Date(now()).toISOString().slice(0,10);db.query('INSERT OR IGNORE INTO customer_processing_budget(day) VALUES(?)').run(day);
+    const budget=db.query('SELECT attempts FROM customer_processing_budget WHERE day=?').get(day) as {attempts:number};
+    if(budget.attempts>=(options.dailyAttempts||Number(process.env.FOUNDKEEP_AI_DAILY_ATTEMPTS)||2000))return null;
+    const claim=db.query(`UPDATE customer_processing_jobs SET status='running',attempts=attempts+1,lease_token=?,lease_until=?,updated_at=?
+      WHERE id=(SELECT id FROM customer_processing_jobs WHERE attempts<3 AND ((status='pending' AND (attempts=0 OR updated_at<?)) OR (status='running' AND lease_until<?)) ORDER BY created_at LIMIT 1) RETURNING *`)
+     .get(randomUUID(),now()+LEASE_MS,now(),now()-120_000,now()) as Job|null;
+    if(claim)db.query('UPDATE customer_processing_budget SET attempts=attempts+1 WHERE day=?').run(day);return claim;
+   }).immediate();
+   if(!job)return 0;
+   const valid=()=>{
+    const current=db.query("SELECT * FROM customer_processing_jobs WHERE id=? AND status='running' AND lease_token=?").get(job.id,job.lease_token) as Job|null;
+    const row=getSave(job.account_id,job.capture_id),preference=prefs(job.account_id);
+    return current&&row&&preference?.enabled&&preference.consent_version===CONSENT_VERSION&&accountPlan(db,job.account_id,now()).pro&&fingerprint(row)===job.source_hash?{row,preference}:null;
+   };
+   try{
+    const initial=valid();if(!initial){db.transaction(()=>settle(job,'cancelled',null)).immediate();return 1;}
+    const {row,preference}=initial;let source:SourceSnapshot|null=null;let sourceError:string|null=null;
+    if(preference.fetch_links&&row.source_url){try{source=await (options.source||fetchCustomerSource)(row.source_url);}catch{sourceError='The source did not expose readable public content.';}}
+    if(!valid()){db.transaction(()=>settle(job,'cancelled',null)).immediate();return 1;}
+    const media=await (options.media||processCustomerMedia)(row);
+    const candidates=db.query('SELECT id,source_title AS title,summary FROM customer_captures WHERE account_id=? AND id<>? ORDER BY created_at DESC LIMIT 40').all(job.account_id,row.id) as {id:string;title:string|null;summary:string|null}[];
+    const input:AiInput={title:row.source_title||source?.title||row.type,url:row.source_url,text:[row.note_text,row.selection_text,row.article_text||source?.text,row.ocr_text,media.text].filter(Boolean).join('\n\n'),candidates:candidates.map(value=>({id:value.id,title:value.title||'',summary:value.summary||''}))};
+    if(preference.images){if(media.image)input.image=media.image;else if(row.blob_data&&row.blob_data.byteLength<=4*1024*1024&&row.blob_mime)input.image={mime:row.blob_mime,base64:Buffer.from(row.blob_data).toString('base64')};}
+    if(!valid()){db.transaction(()=>settle(job,'cancelled',null)).immediate();return 1;}
+    const result=validateAiResult(await ai.organize(input),candidates.map(value=>value.id));
+    db.transaction(()=>{
+     const current=valid();if(!current){settle(job,'cancelled',null);return;}
+     const resultJson=JSON.stringify({...result,sourceError,mediaNote:media.note||null,extractedText:media.text||null}),sourceJson=source?JSON.stringify(source):null;
+     const old=db.query('SELECT storage_bytes FROM customer_processing_results WHERE capture_id=? AND account_id=?').get(row.id,job.account_id) as {storage_bytes:number}|null;
+     const generated=bytes(resultJson)+bytes(sourceJson||'');const nextTags=JSON.stringify(result.tags);
+     const oldMedia=(db.query('SELECT COALESCE(SUM(bytes),0) bytes FROM customer_derivatives WHERE capture_id=? AND account_id=?').get(row.id,job.account_id) as {bytes:number}).bytes;
+     const nextMedia=media.derivatives||[];
+     const mediaDelta=nextMedia.reduce((sum,item)=>sum+item.data.byteLength,0)-oldMedia;
+     const delta=mediaDelta+generated-(old?.storage_bytes||0)+bytes(result.summary)+bytes(result.category)+(nextTags==='[]'?0:bytes(nextTags))-derived(current.row);
+     const usage=db.query('SELECT COALESCE(SUM(storage_bytes),0) total,COALESCE(SUM(CASE WHEN account_id=? THEN storage_bytes ELSE 0 END),0) owned FROM customer_captures').get(job.account_id) as {total:number;owned:number};
+     if(usage.owned+delta>accountPlan(db,job.account_id,now()).limits.maxBytes||usage.total+delta>(options.globalMaxBytes||Number(process.env.ATLAS_CUSTOMER_GLOBAL_MAX_BYTES)||2*1024**3)){settle(job,'failed','Storage is full. Your original is safe.');return;}
+     db.query(`INSERT INTO customer_processing_results(capture_id,account_id,source_hash,model,result_json,source_json,storage_bytes,created_at) VALUES(?,?,?,?,?,?,?,?)
+       ON CONFLICT(capture_id) DO UPDATE SET source_hash=excluded.source_hash,model=excluded.model,result_json=excluded.result_json,source_json=excluded.source_json,storage_bytes=excluded.storage_bytes,created_at=excluded.created_at`)
+       .run(row.id,job.account_id,job.source_hash,ai.model,resultJson,sourceJson,generated,now());
+     db.query('DELETE FROM customer_derivatives WHERE capture_id=? AND account_id=?').run(row.id,job.account_id);
+     for(const item of nextMedia)db.query('INSERT INTO customer_derivatives(account_id,capture_id,kind,mime,data,bytes,source_hash,created_at) VALUES(?,?,?,?,?,?,?,?)').run(job.account_id,row.id,item.kind,item.mime,item.data,item.data.byteLength,job.source_hash,now());
+     db.query('UPDATE customer_captures SET summary=?,category=?,tags=?,storage_bytes=MAX(0,storage_bytes+?),updated_at=MAX(updated_at+1,?) WHERE id=? AND account_id=?').run(result.summary,result.category,nextTags,delta,now(),row.id,job.account_id);
+     db.query("DELETE FROM customer_capture_links WHERE account_id=? AND source_id=? AND origin='hosted'").run(job.account_id,row.id);
+     for(const target of result.relatedIds)if(getSave(job.account_id,target))db.query("INSERT OR IGNORE INTO customer_capture_links(account_id,source_id,target_id,origin,created_at) VALUES(?,?,?,'hosted',?)").run(job.account_id,row.id,target,now());
+     settle(job,'done',null,true);
+    }).immediate();
+   }catch{
+    db.transaction(()=>{
+     const current=db.query("SELECT * FROM customer_processing_jobs WHERE id=? AND status='running' AND lease_token=?").get(job.id,job.lease_token) as Job|null;
+     if(!current)return;if(current.attempts>=3)settle(current,'failed',FAILURE);
+     else db.query("UPDATE customer_processing_jobs SET status='pending',error=?,lease_token=NULL,lease_until=NULL,updated_at=? WHERE id=?").run(FAILURE,now(),job.id);
+    }).immediate();
+   }
+   return 1;
+  }finally{running=false;}
+ }
+ return {settings,configure,enqueue,details,tick};
+}
+export function registerCustomerProcessing(app:Hono<CustomerEnv>,db:Database,services:CustomerServices){
+ const processing=createProcessingService(db);
+ app.get('/automation',c=>c.json(processing.settings(services.auth(c).account.id)));
+ app.put('/automation',async c=>{services.auth(c);const body=await services.jsonBody(c);return c.json(processing.configure(services.auth(c).account.id,body));});
+ app.post('/captures/:id/process',async c=>{services.auth(c);const body=await services.jsonBody(c);if(Object.keys(body).length)moduleFail(400,'invalid_input','This action takes no options.');const owner=services.auth(c).account.id;services.rate('process:'+owner,20,60_000);return c.json(processing.enqueue(owner,c.req.param('id'),'manual'),202);});
+ app.get('/captures/:id/processing',c=>{const owner=services.auth(c).account.id;if(!db.query('SELECT 1 FROM customer_captures WHERE id=? AND account_id=?').get(c.req.param('id'),owner))moduleFail(404,'not_found','Saved item not found.');return c.json({processing:processing.details(owner,c.req.param('id'))});});
+}

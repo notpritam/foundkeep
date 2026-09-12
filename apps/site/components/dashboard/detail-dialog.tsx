@@ -9,6 +9,7 @@ import { captureTitle, dateLabel, capturePreview, savedCaptureHref, rememberLibr
 import { useDashboard } from './context';
 import { CloseIcon } from './dialog';
 import { DashboardImage } from './dashboard-image';
+import { ProcessingDetails } from './processing-details';
 const captureMethods: Record<string, string> = {
   'popup-save-page': 'Saved from popup', 'popup-highlight': 'Highlight from popup', 'popup-region': 'Region from popup', 'popup-full-page': 'Full page from popup',
   'keyboard-highlight': 'Highlight keyboard shortcut', 'keyboard-region': 'Region keyboard shortcut', 'keyboard-full-page': 'Full page keyboard shortcut',
@@ -52,6 +53,7 @@ export default function DetailPanel({ id, fullPage = false, initialCapture, init
       {file ? <>{capture.fileMime?.startsWith('image/') ? null : capture.fileMime?.startsWith('video/') ? <video src={file} className="detail-media" controls preload="metadata" /> : capture.fileMime?.startsWith('audio/') ? <audio src={file} className="detail-audio" controls preload="metadata" /> : null}<section className="detail-file"><h3>{capture.fileName || 'Shared file'}</h3><p>{capture.fileMime || 'File'} · {fileBytes(capture.fileBytes)}</p><a href={file} target="_blank" rel="noopener noreferrer" className="button secondary compact">{capture.fileMime === 'application/octet-stream' ? 'Download saved file' : 'Open saved file'}</a></section></> : null}
       {([['Highlight', capture.selectionText], ['Note', capture.noteText], ['Summary', capture.summary], ['Article text', capture.articleText], ['Text in image', capture.ocrText]] as const).filter(([, content]) => content).map(([title, content]) => <section className="detail-section" key={title}><h3>{title}</h3><p>{content}</p></section>)}
       {capture.provenance && typeof capture.provenance === 'object' ? <Origin value={capture.provenance} capture={capture} /> : null}
+      <ProcessingDetails key={capture.id} id={capture.id} />
       {capture.category ? <p className="muted">Category: {capture.category}</p> : null}{Array.isArray(capture.tags) && capture.tags.length ? <ul className="detail-tags" aria-label="Capture tags">{capture.tags.map((tag, index) => <li key={index}>{String(tag)}</li>)}</ul> : null}
       {['pending', 'processing'].includes(capture.status) ? <p className="detail-processing">Your capture is saved. Foundkeep is still adding context; reopen it in a moment to see updates.</p> : capture.status === 'failed' ? <p className="detail-processing">Your capture is safe. Automatic context could not be added.</p> : null}{capture.enrichError ? <p className="detail-processing">{capture.enrichError}</p> : null}
     </> : detail.isError ? <><h2 id="detail-title">Capture unavailable</h2><p>{missing ? 'This capture may have been deleted. Refresh your library to see your current collection.' : messageFor(detail.error)}</p><button className="button secondary" type="button" onClick={() => { if (missing) { closePanel(); void refresh(); } else void detail.refetch(); }}>{missing ? 'Refresh library' : 'Try again'}</button></> : <h2 id="detail-title">Opening capture…</h2>}

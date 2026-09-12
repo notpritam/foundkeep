@@ -26,7 +26,9 @@ A customer can nudge an agent through a stored request. External agents consume 
 
 Free includes capture, organization, import, and customer MCP. Pro is USD 5/month and adds Foundkeep-hosted automation while retaining MCP. Enforce storage/capture/processing allowances server-side and expose actual remaining use. Billing uses server-created checkout and customer-portal sessions; verified, idempotent webhooks own entitlements. No client-provided plan or return URL grants paid access.
 
-AI and checkout remain explicitly unavailable until their operator credentials are configured. Test provider and billing behavior with deterministic transports and isolated accounts; real provider/billing smoke checks require those credentials. Publish only verified capabilities and update privacy, support, extension permission justifications, and plan copy to match.
+Mobile purchases and restores use RevenueCat's native SDK and App Store products. The backend maps each authenticated Foundkeep account to a stable, random RevenueCat app user ID; it is distinct from the public account UUID. This prevents another customer from guessing the purchase identity. Server-verified RevenueCat subscription events and Stripe events share the same account entitlement, retaining access if either valid subscription remains active. Native purchase state alone never grants server processing access. A new TestFlight binary is required for the SDK; the app version stays 1.0.0. The public RevenueCat SDK key is separate from secret RevenueCat server/webhook credentials.
+
+The user authorized locating their existing OpenAI key in their Mac Electron project/Downloads configuration and transferring it privately. Stripe flow is implemented but its key will be supplied later. AI and checkout remain explicitly unavailable until their operator credentials are configured. Test provider and billing behavior with deterministic transports and isolated accounts; real provider/billing smoke checks require those credentials. Publish only verified capabilities and update privacy, support, extension permission justifications, and plan copy to match.
 
 ## References
 

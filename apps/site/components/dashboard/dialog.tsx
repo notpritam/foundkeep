@@ -12,7 +12,7 @@ export function Dialog({ id, className, labelledBy, children, open = true, onClo
     if (!open && dialog.open) dialog.close();
     return () => { if (dialog.open) dialog.close(); };
   }, [open, initialFocus]);
-  return <dialog ref={ref} className={`atlas-dialog ${className}`} id={id} aria-labelledby={labelledBy} onCancel={event => { event.preventDefault(); if (!preventClose) onCloseRef.current?.(); }} onClose={() => { if (open && !preventClose) onCloseRef.current?.(); }}>{children}</dialog>;
+  return <dialog ref={ref} className={`atlas-dialog ${className}`} id={id} aria-labelledby={labelledBy} onCancel={event => { event.preventDefault(); if (!preventClose) onCloseRef.current?.(); }} onClose={event => { if (!event.currentTarget.open && open && !preventClose) onCloseRef.current?.(); }}>{children}</dialog>;
 }
 export interface Confirmation { title: string; description: string; label: string; resolve: (accepted: boolean) => void }
 export function ConfirmDialog({ confirmation, finish }: { confirmation: Confirmation | null; finish: (accepted: boolean) => void }) {

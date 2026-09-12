@@ -1,3 +1,4 @@
+import { useBilling } from '../../../billing/BillingProvider.tsx';
 import { AdaptiveText as Text } from '../../../components/AdaptiveText.tsx';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
@@ -14,6 +15,7 @@ import { disableNotifications, enableNotifications, notificationState, type Noti
 
 const usage = (value = 0) => `${(value / 1048576).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 export default function Settings() {
+  const { plan } = useBilling();
   const { bottomSpace } = useDock();
   const { account, usage: storage, policy, updateRequired, logout, deleteAccount, client } = useSession(); const [error, setError] = useState('');
   const [pending, setPending] = useState(0);
@@ -66,6 +68,7 @@ export default function Settings() {
     {updateRequired ? <Message error>Update Foundkeep from the App Store to keep saving.</Message> : <Message>{policy.notice}</Message>}
     <View style={styles.profile}><View style={styles.avatar}><Text style={styles.initial}>{(account?.name || 'F').slice(0, 1).toUpperCase()}</Text></View><View style={{ flex: 1, gap: 4 }}><Text style={styles.account}>{account?.name}</Text><Text style={typography.small}>{account?.email}</Text></View></View>
     <View style={styles.section}><View style={styles.storageRow}><Text style={typography.heading}>Your collection</Text><Text style={typography.small}>{storage?.captures.toLocaleString() || 0} saves</Text></View><View style={styles.meter}><View style={[styles.meterFill, { width: `${storage?.maxBytes ? Math.min(100, storage.bytes / storage.maxBytes * 100) : 0}%` }]} /></View><Text style={typography.small}>{usage(storage?.bytes)} of {usage(storage?.maxBytes)} used</Text></View>
+    <SettingsRow icon="sparkles-outline" label="Your plan" title={plan?.pro ? 'Foundkeep Pro' : 'Your free collection'} detail={plan?.pro ? 'Manage your subscription and processing allowance.' : 'Explore Pro, or restore an App Store purchase.'} onPress={() => router.push('/(app)/subscription')} />
     {pending > 0 ? <FrostedPanel><Text style={typography.label}>Waiting to upload</Text><Text style={typography.body}>{pending} {pending === 1 ? 'save is' : 'saves are'} kept safely on this iPhone.</Text>{blocked > 0 ? <><Text style={typography.small}>{blocked} need a new home because their folder was deleted.</Text><Button secondary label="Save blocked items to Unfiled" loading={resolving} onPress={recoverBlocked} /></> : <Text style={typography.small}>They’ll upload when Foundkeep reconnects.</Text>}</FrostedPanel> : null}
     <View style={styles.section}>
       <SettingsRow icon="notifications-outline" label={notificationAction} title="Capture-ready alerts" detail={notificationCopy} value={notification === 'on' ? 'On' : 'Off'} loading={changingNotification} disabled={!policy.features.notifications || notification === 'unavailable'} onPress={() => void changeNotifications()} />
@@ -79,7 +82,7 @@ export default function Settings() {
       <SettingsRow icon="globe-outline" label="Open web dashboard" onPress={() => void Linking.openURL('https://foundkeep.app/dashboard')} />
     </View>
     <SettingsRow icon="log-out-outline" label="Sign out" onPress={signOut} />
-    {showDelete ? <View style={styles.deletePanel}><Text style={typography.heading}>Delete your account?</Text><Text style={typography.small}>This permanently removes your account and every save. Export anything you need first.</Text>{account?.hasPassword === false ? <OAuthButtons intent="delete" /> : <><Field label="Password" value={password} onChangeText={setPassword} textContentType="password" secureTextEntry autoCapitalize="none" /><Button label="Delete account permanently" danger loading={deleting} onPress={confirmDeletion} /></>}<Button label="Cancel" secondary disabled={deleting} onPress={() => { setShowDelete(false); setPassword(''); setError(''); }} /></View> : <SettingsRow icon="trash-outline" label="Delete account" onPress={() => setShowDelete(true)} />}
+    {showDelete ? <View style={styles.deletePanel}><Text style={typography.heading}>Delete your account?</Text><Text style={typography.small}>This permanently removes your account and every save. Export anything you need first. Deleting your Foundkeep account does not cancel an App Store subscription; cancel it in your Apple Account settings.</Text>{account?.hasPassword === false ? <OAuthButtons intent="delete" /> : <><Field label="Password" value={password} onChangeText={setPassword} textContentType="password" secureTextEntry autoCapitalize="none" /><Button label="Delete account permanently" danger loading={deleting} onPress={confirmDeletion} /></>}<Button label="Cancel" secondary disabled={deleting} onPress={() => { setShowDelete(false); setPassword(''); setError(''); }} /></View> : <SettingsRow icon="trash-outline" label="Delete account" onPress={() => setShowDelete(true)} />}
     <Text style={styles.version}>Foundkeep 1.0.0</Text>
   </ScrollView></Screen>;
 }

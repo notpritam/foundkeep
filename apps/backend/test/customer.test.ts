@@ -571,7 +571,7 @@ describe("customer account security", () => {
     expect(JSON.stringify(stored)).not.toContain(a.recoveryCode);
     const me = await (await request("/me", "GET", undefined, a.cookie)).json();
     expect(me.account).toEqual(a.account);
-    expect(me.usage).toEqual({ captures: 0, bytes: 0, maxCaptures: 1000, maxBytes: 209715200 });
+    expect(me.usage).toEqual({ captures: 0, bytes: 0, maxCaptures: 10000, maxBytes: 209715200 });
     expect(JSON.stringify(me)).not.toContain("hash");
     expect((await request("/me")).status).toBe(401);
   });
@@ -1192,16 +1192,16 @@ describe("private customer captures", () => {
     expect(valid.capture.height).toBe(1);
   });
 
-  test("a full 1000 capture export completes and concurrent last-slot uploads obey quota", async () => {
+  test("a full 10000 capture export completes and concurrent last-slot uploads obey quota", async () => {
     const a = await register();
     db.transaction(() => {
       const insert = db.query("INSERT INTO customer_captures(id,account_id,client_id,type,storage_bytes,captured_at,created_at,updated_at) VALUES(?,?,?,'note',1,1,1,1)");
-      for (let i = 0; i < 999; i++) insert.run(`seed-${i}`, a.account.id, `seed-${i}`);
+      for (let i = 0; i < 9999; i++) insert.run(`seed-${i}`, a.account.id, `seed-${i}`);
     })();
     const attempts = await Promise.all([capture(a.cookie), capture(a.cookie)]);
     expect(attempts.map((r) => r.status).sort()).toEqual([201, 409]);
     const exported = await (await request("/account/export", "GET", undefined, a.cookie)).json();
-    expect(exported.captures.length).toBe(1000);
+    expect(exported.captures.length).toBe(10000);
   });
 
   test("global storage ceiling rejects a new owner without blocking deletion or duplicate retries", async () => {

@@ -315,12 +315,167 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE customer_captures ADD COLUMN saved_via TEXT
     CHECK(saved_via IN ('iphone','browser','dashboard'));
    CREATE INDEX customer_captures_owner_saved ON customer_captures(account_id,created_at DESC,id DESC);`,
+  // Folder hierarchy and bounded, resumable bookmark imports.
+  `ALTER TABLE customer_folders ADD COLUMN parent_id TEXT REFERENCES customer_folders(id);
+   CREATE INDEX customer_folders_parent ON customer_folders(account_id,parent_id);
+   CREATE INDEX customer_captures_source ON customer_captures(account_id,source_url);
+   CREATE TABLE customer_import_chunks (
+     account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     import_id TEXT NOT NULL, chunk INTEGER NOT NULL, digest TEXT NOT NULL,
+     result_json TEXT NOT NULL, created_at INTEGER NOT NULL,
+     PRIMARY KEY(account_id,import_id,chunk)
+   );
+   CREATE TABLE customer_import_origins (
+     capture_id TEXT NOT NULL REFERENCES customer_captures(id) ON DELETE CASCADE,
+     fingerprint TEXT NOT NULL, origin_json TEXT NOT NULL,
+     PRIMARY KEY(capture_id,fingerprint)
+   );`,
+  // Keep each purchase provider authoritative for its own entitlement.
+  `CREATE TABLE customer_billing_identities (
+    account_id TEXT PRIMARY KEY REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    revenuecat_id TEXT NOT NULL UNIQUE, stripe_id TEXT UNIQUE,
+    created_at INTEGER NOT NULL
+   );
+   CREATE TABLE customer_subscriptions (
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL CHECK(provider IN ('stripe','revenuecat')),
+    status TEXT NOT NULL, expires_at INTEGER NOT NULL, renews INTEGER NOT NULL DEFAULT 0,
+    sandbox INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL,
+    PRIMARY KEY(account_id,provider)
+   );
+   CREATE TABLE customer_billing_events (
+    provider TEXT NOT NULL, event_id TEXT NOT NULL, processed_at INTEGER NOT NULL,
+    PRIMARY KEY(provider,event_id)
+   );`,
+
+  // Account removal must not orphan a renewing web subscription or provider identity.
+  `CREATE TABLE customer_billing_cleanup (
+     provider TEXT NOT NULL, external_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+     attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY(provider,external_id)
+   );
+   CREATE TRIGGER customer_billing_identity_cleanup BEFORE DELETE ON customer_billing_identities BEGIN
+     INSERT OR IGNORE INTO customer_billing_cleanup(provider,external_id,created_at)
+       SELECT 'stripe',OLD.stripe_id,CAST(strftime('%s','now') AS INTEGER)*1000 WHERE OLD.stripe_id IS NOT NULL;
+     INSERT OR IGNORE INTO customer_billing_cleanup(provider,external_id,created_at)
+       VALUES('revenuecat',OLD.revenuecat_id,CAST(strftime('%s','now') AS INTEGER)*1000);
+   END;`,
+
+  `ALTER TABLE customer_billing_identities ADD COLUMN checkout_id TEXT;
+   ALTER TABLE customer_billing_identities ADD COLUMN checkout_attempt TEXT;`,
+
+  // Hosted processing is explicit, account-scoped and separate from original saves.
+  `CREATE TABLE customer_automation (
+     account_id TEXT PRIMARY KEY REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     enabled INTEGER NOT NULL DEFAULT 0, fetch_links INTEGER NOT NULL DEFAULT 0,
+     images INTEGER NOT NULL DEFAULT 0, consent_version TEXT, enabled_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   );
+   CREATE TABLE customer_processing_jobs (
+     id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     capture_id TEXT NOT NULL REFERENCES customer_captures(id) ON DELETE CASCADE,
+     source_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT NOT NULL,
+     attempts INTEGER NOT NULL DEFAULT 0, lease_token TEXT, lease_until INTEGER,
+     cycle TEXT NOT NULL, credit INTEGER NOT NULL DEFAULT 0, error TEXT,
+     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+     UNIQUE(account_id,capture_id,source_hash)
+   );
+   CREATE INDEX customer_processing_pending ON customer_processing_jobs(status,updated_at);
+   CREATE TABLE customer_processing_usage (
+     account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     cycle TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0, reserved INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY(account_id,cycle)
+   );
+   CREATE TABLE customer_processing_budget (day TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0);
+   CREATE TABLE customer_processing_results (
+     capture_id TEXT PRIMARY KEY REFERENCES customer_captures(id) ON DELETE CASCADE,
+     account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     source_hash TEXT NOT NULL, model TEXT NOT NULL, result_json TEXT NOT NULL,
+     source_json TEXT, storage_bytes INTEGER NOT NULL, created_at INTEGER NOT NULL
+   );
+   CREATE TABLE customer_capture_links (
+     account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     source_id TEXT NOT NULL REFERENCES customer_captures(id) ON DELETE CASCADE,
+     target_id TEXT NOT NULL REFERENCES customer_captures(id) ON DELETE CASCADE,
+     origin TEXT NOT NULL, created_at INTEGER NOT NULL,
+     PRIMARY KEY(account_id,source_id,target_id,origin), CHECK(source_id<>target_id)
+   );
+   CREATE TRIGGER customer_processing_release BEFORE DELETE ON customer_processing_jobs WHEN OLD.credit=1 BEGIN
+     UPDATE customer_processing_usage SET reserved=MAX(0,reserved-1) WHERE account_id=OLD.account_id AND cycle=OLD.cycle;
+   END;`,
+
+  // Customer agent credentials never reuse browser or mobile session tokens.
+  `CREATE TABLE customer_agent_tokens (
+     id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     name TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, scopes_json TEXT NOT NULL,
+     created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, last_seen_at INTEGER
+   );
+   CREATE TABLE customer_agent_nudges (
+     id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     text TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL, completed_at INTEGER
+   );
+   CREATE TABLE customer_changes (
+     seq INTEGER PRIMARY KEY AUTOINCREMENT,
+     account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     entity TEXT NOT NULL, entity_id TEXT NOT NULL, operation TEXT NOT NULL, revision INTEGER NOT NULL
+   );
+   CREATE INDEX customer_changes_owner ON customer_changes(account_id,seq);
+   CREATE TABLE customer_change_floor (
+     account_id TEXT PRIMARY KEY REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     seq INTEGER NOT NULL DEFAULT 0
+   );
+   INSERT INTO customer_changes(account_id,entity,entity_id,operation,revision)
+     SELECT account_id,'capture',id,'upsert',updated_at FROM customer_captures ORDER BY created_at,id;
+   CREATE TRIGGER customer_changes_capture_insert AFTER INSERT ON customer_captures BEGIN
+     INSERT INTO customer_changes(account_id,entity,entity_id,operation,revision)
+       SELECT NEW.account_id,'capture',NEW.id,'upsert',NEW.updated_at WHERE EXISTS(SELECT 1 FROM customer_accounts WHERE id=NEW.account_id);
+   END;
+   CREATE TRIGGER customer_changes_capture_update AFTER UPDATE ON customer_captures BEGIN
+     INSERT INTO customer_changes(account_id,entity,entity_id,operation,revision)
+       SELECT NEW.account_id,'capture',NEW.id,'upsert',NEW.updated_at WHERE EXISTS(SELECT 1 FROM customer_accounts WHERE id=NEW.account_id);
+   END;
+   CREATE TRIGGER customer_changes_capture_delete AFTER DELETE ON customer_captures BEGIN
+     INSERT INTO customer_changes(account_id,entity,entity_id,operation,revision)
+       SELECT OLD.account_id,'capture',OLD.id,'delete',OLD.updated_at WHERE EXISTS(SELECT 1 FROM customer_accounts WHERE id=OLD.account_id);
+   END;
+   CREATE TRIGGER customer_changes_folder_insert AFTER INSERT ON customer_folders BEGIN
+     INSERT INTO customer_changes(account_id,entity,entity_id,operation,revision)
+       SELECT NEW.account_id,'folder',NEW.id,'upsert',NEW.updated_at WHERE EXISTS(SELECT 1 FROM customer_accounts WHERE id=NEW.account_id);
+   END;
+   CREATE TRIGGER customer_changes_folder_update AFTER UPDATE ON customer_folders BEGIN
+     INSERT INTO customer_changes(account_id,entity,entity_id,operation,revision)
+       SELECT NEW.account_id,'folder',NEW.id,'upsert',NEW.updated_at WHERE EXISTS(SELECT 1 FROM customer_accounts WHERE id=NEW.account_id);
+   END;
+   CREATE TRIGGER customer_changes_folder_delete AFTER DELETE ON customer_folders BEGIN
+     INSERT INTO customer_changes(account_id,entity,entity_id,operation,revision)
+       SELECT OLD.account_id,'folder',OLD.id,'delete',OLD.updated_at WHERE EXISTS(SELECT 1 FROM customer_accounts WHERE id=OLD.account_id);
+   END;
+   CREATE TRIGGER customer_nudge_changes AFTER INSERT ON customer_agent_nudges BEGIN
+     INSERT INTO customer_changes(account_id,entity,entity_id,operation,revision) VALUES(NEW.account_id,'nudge',NEW.id,'upsert',NEW.created_at);
+   END;`,
+
+  `CREATE TABLE customer_derivatives (
+     account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+     capture_id TEXT NOT NULL REFERENCES customer_captures(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL, bytes INTEGER NOT NULL,
+     source_hash TEXT NOT NULL, created_at INTEGER NOT NULL,
+     PRIMARY KEY(capture_id,kind)
+   );`,
+
+  `ALTER TABLE customer_subscriptions ADD COLUMN next_check_at INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE customer_purchase_attempts (
+    id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK(kind IN ('purchase','restore')), expires_at INTEGER NOT NULL
+  ); CREATE INDEX customer_purchase_attempts_owner ON customer_purchase_attempts(account_id,expires_at);`,
+
 ];
 
-function migrate(db: Database): void {
+export const DATABASE_SCHEMA_VERSION = MIGRATIONS.length;
+function migrate(db: Database, targetVersion = DATABASE_SCHEMA_VERSION): void {
   const row = db.query("PRAGMA user_version").get() as { user_version: number };
   const current = row.user_version;
-  for (let i = current; i < MIGRATIONS.length; i++) {
+  if (!Number.isInteger(targetVersion) || targetVersion < current || targetVersion > DATABASE_SCHEMA_VERSION) throw new Error("Invalid database migration target.");
+  for (let i = current; i < targetVersion; i++) {
     const sql = MIGRATIONS[i]!;
     db.transaction(() => {
       db.exec(sql);
@@ -329,13 +484,13 @@ function migrate(db: Database): void {
   }
 }
 
-export function openDb(path = join(config.dataDir, "atlas.db")): Database {
+export function openDb(path = join(config.dataDir, "atlas.db"), targetVersion = DATABASE_SCHEMA_VERSION): Database {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true });
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA busy_timeout = 5000;");
   db.exec("PRAGMA foreign_keys = ON;");
-  migrate(db);
+  migrate(db, targetVersion);
   return db;
 }
 

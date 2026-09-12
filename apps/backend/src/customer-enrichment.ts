@@ -1,3 +1,4 @@
+import { accountPlan } from "./customer-plans.ts";
 import type { Database } from "bun:sqlite";
 import { DEFAULT_PROCESSING_OPTIONS, parseStoredJson, type ProcessingOptions } from "./customer-provenance.ts";
 import { deliverCaptureNotification } from "./customer-notifications.ts";
@@ -89,7 +90,6 @@ type Options = {
 };
 const RETRY_MS = 120_000;
 const LEASE_MS = 120_000;
-const ACCOUNT_MAX_BYTES = 200 * 1024 * 1024;
 const RECOGNITION_ERROR = "Saved safely. Text recognition could not finish. Search by the page title or source.";
 const STORAGE_ERROR = "Saved safely. Some searchable text was omitted because storage is full.";
 
@@ -147,7 +147,7 @@ function finalizeCapture(db: Database, row: Row, stamp: number, updatedAt: numbe
       ? Number(configured) : 2 * 1024 * 1024 * 1024;
     const previousBytes = derivedBytes(current);
     const baseBytes = Math.max(0,current.storage_bytes - previousBytes);
-    const available = Math.max(0,Math.min(ACCOUNT_MAX_BYTES-used.owner,globalMax-used.total)+previousBytes);
+    const available = Math.max(0,Math.min(accountPlan(db,row.account_id).limits.maxBytes-used.owner,globalMax-used.total)+previousBytes);
     const kept = fitDerived(wanted,available);
     const omitted = kept.summary !== wanted.summary || kept.ocr_text !== wanted.ocr_text
       || kept.category !== wanted.category || kept.tags !== wanted.tags;

@@ -1,0 +1,64 @@
+{
+  "base": "http://127.0.0.1:18791",
+  "checkedAt": "2026-09-12T05:59:29.051Z",
+  "results": [
+    {
+      "name": "Server redirects an unauthenticated dashboard request",
+      "passed": true
+    },
+    {
+      "name": "Initial HTML contains the authenticated account",
+      "passed": true
+    },
+    {
+      "name": "Failed note retry retains its draft, identity, provenance and processing choices",
+      "passed": true
+    },
+    {
+      "name": "Server-rendered stored screenshot is visible without JavaScript",
+      "passed": true
+    },
+    {
+      "name": "Actual stored screenshot loads and the nonmodal pane switches between cards",
+      "passed": true
+    },
+    {
+      "name": "Capture expands to its reading route and returns to the collection",
+      "passed": true
+    },
+    {
+      "name": "Search, filters, Back and expanded-reader return preserve URL state",
+      "passed": true
+    },
+    {
+      "name": "Preferences, confirmed export/logout and recovery acknowledgement work",
+      "passed": true
+    },
+    {
+      "name": "Dashboard fits desktop, phone and narrow phone widths",
+      "passed": true
+    },
+    {
+      "name": "Eight delayed previews load through the bounded queue (maximum 2 concurrent)",
+      "passed": true
+    },
+    {
+      "name": "Newest cross-device save appears automatically with platform and saving-device labels",
+      "passed": true
+    },
+    {
+      "name": "Phone card opens the dedicated reading page",
+      "passed": true
+    },
+    {
+      "name": "Dependent API calls retain their account guard without browser exceptions",
+      "passed": true
+    },
+    {
+      "name": "Delete the disposable QA account",
+      "passed": true,
+      "status": 200
+    }
+  ],
+  "errors": []
+}
