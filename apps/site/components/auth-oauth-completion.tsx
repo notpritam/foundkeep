@@ -42,7 +42,7 @@ export function OAuthCompletion() {
         setStage('delete');
         setMessage('Identity verified. Permanently delete your account, cloud collection, and connections? This cannot be undone.');
       } else if (current.intent === 'sign-in' && result.account) {
-        window.location.replace('/dashboard');
+        window.location.replace(current.next || '/dashboard');
       } else {
         throw new Error('Sign-in could not be completed. Start again.');
       }

@@ -9,9 +9,10 @@ interface Props {
   disabled?: boolean;
   onError?: (message: string) => void;
   onProviders?: (providers: OAuthProvider[]) => void;
+  next?: string;
 }
 
-export function OAuthButtons({intent = 'sign-in', accountId, disabled = false, onError, onProviders}: Props) {
+export function OAuthButtons({intent = 'sign-in', accountId, disabled = false, onError, onProviders, next}: Props) {
   const [providers, setProviders] = useState<OAuthProvider[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [startError, setStartError] = useState('');
@@ -46,7 +47,7 @@ export function OAuthButtons({intent = 'sign-in', accountId, disabled = false, o
     setBusyProvider(provider);
     setStartError('');
     onError?.('');
-    try { await startOAuth(provider, intent, accountId); }
+    try { await startOAuth(provider, intent, accountId, next); }
     catch (error) {
       const message = error instanceof Error ? error.message : 'Sign-in could not be started. Please try again.';
       if (onError) onError(message); else setStartError(message);

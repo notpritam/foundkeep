@@ -14,7 +14,7 @@ export const authViews = {
   recover: {title: 'A way back in.', description: 'Use your saved recovery code to choose a new password. This disconnects your browsers and signs out your other sessions.', action: 'Recover account'},
 };
 
-function RecoverySave({code, email}: {code: string; email: string}) {
+function RecoverySave({code, email, next}: {code: string; email: string; next?: string}) {
   const [saved, setSaved] = useState(false);
   const [downloadError, setDownloadError] = useState('');
   const title = useRef<HTMLHeadingElement>(null);
@@ -42,12 +42,12 @@ function RecoverySave({code, email}: {code: string; email: string}) {
     <button className="button secondary wide" id="download-recovery" type="button" onClick={download}>Download recovery code <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg></button>
     {downloadError ? <p className="form-message is-error" role="alert">{downloadError}</p> : null}
     <label className="check-field"><input id="recovery-saved" type="checkbox" checked={saved} onChange={event => setSaved(event.target.checked)}/><span>I saved my recovery code somewhere safe.</span></label>
-    <button className="button primary wide" id="continue-dashboard" type="button" disabled={!saved} onClick={() => { if (saved) window.location.assign('/dashboard'); }}>Open my library <span aria-hidden="true">↗</span></button>
+    <button className="button primary wide" id="continue-dashboard" type="button" disabled={!saved} onClick={() => { if (saved) window.location.assign(next || '/dashboard'); }}>Open my library <span aria-hidden="true">↗</span></button>
     <p className="field-help">Anyone with this code and your email can recover your account.</p>
   </div>;
 }
 
-export function AuthForm({mode: initialMode, deleted = false}: {mode: AuthMode; deleted?: boolean}) {
+export function AuthForm({mode: initialMode, deleted = false, next}: {mode: AuthMode; deleted?: boolean; next?: string}) {
   const [mode, setMode] = useState(initialMode);
   const view = authViews[mode];
   const [name, setName] = useState('');
@@ -107,7 +107,7 @@ export function AuthForm({mode: initialMode, deleted = false}: {mode: AuthMode; 
       const result = await api<{account: Account; recoveryCode?: string}>(`/auth/${mode === 'signup' ? 'register' : mode}`, {method: 'POST', body});
       setPassword('');
       setRecoveryInput('');
-      if (mode === 'login') { window.location.assign('/dashboard'); return; }
+      if (mode === 'login') { window.location.assign(next || '/dashboard'); return; }
       if (!result.recoveryCode) throw new Error('Your account was updated, but a recovery code was not returned. Log in and change your password to create one.');
       setRecovery({code: result.recoveryCode, email: result.account.email});
     } catch (cause) {
@@ -118,11 +118,11 @@ export function AuthForm({mode: initialMode, deleted = false}: {mode: AuthMode; 
     }
   }
 
-  if (recovery) return <section aria-labelledby="recovery-title"><RecoverySave code={recovery.code} email={recovery.email}/></section>;
+  if (recovery) return <section aria-labelledby="recovery-title"><RecoverySave code={recovery.code} email={recovery.email} next={next}/></section>;
 
   return <div id="auth-fields">
     <h2 id="auth-title">{view.title}</h2><p id="auth-description" className="muted">{view.description}</p>
-    {mode !== 'recover' ? <OAuthButtons disabled={busy} onError={setError} onProviders={setProviders}/> : null}
+    {mode !== 'recover' ? <OAuthButtons disabled={busy} onError={setError} onProviders={setProviders} next={next}/> : null}
     <p className="auth-identity-note" id="auth-identity-note" hidden={mode === 'recover' || !providers?.length}>Same verified email. Same collection.</p>
     <details className={`email-signin${emailOnly ? ' email-only' : ''}`} id="email-signin" open={emailOnly || emailOpen} onToggle={event => { if (!emailOnly) setEmailOpen(event.currentTarget.open); }}>
       <summary>Continue with email<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></summary>

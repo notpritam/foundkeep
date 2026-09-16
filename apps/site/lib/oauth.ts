@@ -1,9 +1,10 @@
 import {api} from './api';
+import {safeNextTarget} from './next-target';
 
 export const oauthProviderNames = {google: 'Google', apple: 'Apple', github: 'GitHub', twitter: 'X'} as const;
 export type OAuthProvider = keyof typeof oauthProviderNames;
 export type OAuthIntent = 'sign-in' | 'delete';
-export interface OAuthHandoff {flow: string; code: string; verifier: string; intent: OAuthIntent; accountId?: string}
+export interface OAuthHandoff {flow: string; code: string; verifier: string; intent: OAuthIntent; accountId?: string; next?: string}
 
 const flowPattern = /^[a-f0-9]{32}$/;
 const proofPattern = /^[A-Za-z0-9_-]{43}$/;
@@ -18,7 +19,7 @@ export async function getOAuthProviders(signal?: AbortSignal): Promise<OAuthProv
   return (Object.keys(oauthProviderNames) as OAuthProvider[]).filter(provider => providers.includes(provider));
 }
 
-export async function startOAuth(provider: OAuthProvider, intent: OAuthIntent = 'sign-in', accountId?: string): Promise<void> {
+export async function startOAuth(provider: OAuthProvider, intent: OAuthIntent = 'sign-in', accountId?: string, next?: string): Promise<void> {
   const verifier = encode(crypto.getRandomValues(new Uint8Array(32)));
   const codeChallenge = encode(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
   const result = await api<{flow: string; authorizeUrl: string}>('/auth/oauth/start', {
@@ -27,9 +28,13 @@ export async function startOAuth(provider: OAuthProvider, intent: OAuthIntent = 
   if (!flowPattern.test(result.flow) || result.authorizeUrl !== `${window.location.origin}/api/auth/oauth/authorize/${result.flow}`) {
     throw new Error('Sign-in could not be started. Open foundkeep.app and try again.');
   }
+  // The provider round-trip returns to /auth without our `next`, so stash a
+  // validated same-origin target alongside the browser proof and read it back
+  // in the completion step.
+  const target = intent === 'sign-in' ? safeNextTarget(next, [window.location.origin]) : null;
   // Keep the existing browser proof format so provider handoffs survive migration.
   for (const key of Object.keys(sessionStorage)) if (key.startsWith('foundkeep-oauth-')) sessionStorage.removeItem(key);
-  sessionStorage.setItem(storageKey(result.flow), JSON.stringify({verifier, intent, expires: Date.now() + 600000, ...(intent === 'delete' && accountId ? {accountId} : {})}));
+  sessionStorage.setItem(storageKey(result.flow), JSON.stringify({verifier, intent, expires: Date.now() + 600000, ...(intent === 'delete' && accountId ? {accountId} : {}), ...(target ? {next: target} : {})}));
   window.location.assign(result.authorizeUrl);
 }
 
@@ -40,7 +45,7 @@ export function clearOAuthHandoff(flow: string): void {
 export function readOAuthHandoff(params: URLSearchParams): OAuthHandoff | null {
   const flow = params.get('flow') || '';
   const code = params.get('code') || '';
-  let pending: {verifier?: unknown; intent?: unknown; expires?: unknown; accountId?: unknown} | null = null;
+  let pending: {verifier?: unknown; intent?: unknown; expires?: unknown; accountId?: unknown; next?: unknown} | null = null;
   try { pending = JSON.parse(sessionStorage.getItem(storageKey(flow)) || 'null'); } catch { /* Invalid or unavailable browser proof. */ }
   if (params.has('error') || !flowPattern.test(flow) || !proofPattern.test(code) || !pending
       || typeof pending.expires !== 'number' || !Number.isFinite(pending.expires) || pending.expires < Date.now()
@@ -49,6 +54,9 @@ export function readOAuthHandoff(params: URLSearchParams): OAuthHandoff | null {
     clearOAuthHandoff(flow);
     return null;
   }
+  // Re-validate the stashed return target defensively before honouring it.
+  const next = pending.intent === 'sign-in' ? safeNextTarget(pending.next, [window.location.origin]) : null;
   return {flow, code, verifier: pending.verifier, intent: pending.intent as OAuthIntent,
-    ...(pending.intent === 'delete' && typeof pending.accountId === 'string' && pending.accountId ? {accountId: pending.accountId} : {})};
+    ...(pending.intent === 'delete' && typeof pending.accountId === 'string' && pending.accountId ? {accountId: pending.accountId} : {}),
+    ...(next ? {next} : {})};
 }

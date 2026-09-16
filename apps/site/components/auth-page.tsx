@@ -1,5 +1,6 @@
 import {redirect} from 'next/navigation';
 import {getSession} from '@/lib/server';
+import {safeNextTarget} from '@/lib/next-target';
 import {AuthForm, type AuthMode} from './auth-form';
 import {OAuthCompletion} from './auth-oauth-completion';
 import {AuthSessionRetry} from './auth-session-retry';
@@ -12,12 +13,17 @@ export async function AuthPage({searchParams, mode = 'signup', legacyMode = fals
   const params = await searchParams;
   const requestedMode = params.mode;
   const selectedMode: AuthMode = legacyMode && (requestedMode === 'login' || requestedMode === 'signup' || requestedMode === 'recover') ? requestedMode : mode;
+  // A validated same-origin return target (e.g. the MCP OAuth /authorize URL a
+  // signed-out user was bounced here from). Falls back to /dashboard.
+  const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
+  const next = safeNextTarget(rawNext) ?? undefined;
   const hasHandoff = ['flow', 'code', 'error'].some(key => params[key] !== undefined);
   // A signed-in browser still needs its provider return to finish deletion or linking.
+  // OAuthCompletion honours a `next` it stashed at sign-in start (see lib/oauth).
   if (hasHandoff) return <AuthShell headingId="oauth-title"><OAuthCompletion/></AuthShell>;
   let session;
   try { session = await getSession(); }
   catch { return <AuthShell><AuthSessionRetry/></AuthShell>; }
-  if (session) redirect('/dashboard');
-  return <AuthShell><AuthForm key={selectedMode} mode={selectedMode} deleted={params.deleted === '1'}/></AuthShell>;
+  if (session) redirect(next ?? '/dashboard');
+  return <AuthShell><AuthForm key={selectedMode} mode={selectedMode} deleted={params.deleted === '1'} next={next}/></AuthShell>;
 }
