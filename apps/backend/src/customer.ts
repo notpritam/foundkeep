@@ -497,7 +497,7 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
   registerCustomerMcp(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) },dispatchAgentRequest);
   registerCustomerGraph(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
   registerCustomerCollections(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) }, c => { try { return auth(c); } catch(error) { if(error instanceof CustomerError && error.status===401)return null; throw error; } });
-  registerAdmin(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
+  registerAdmin(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) }, oauthGateway);
   registerSupport(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
 
   app.post("/mobile/register", async (c) => {

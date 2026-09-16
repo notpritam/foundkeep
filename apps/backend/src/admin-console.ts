@@ -3,6 +3,10 @@ import type { Database } from 'bun:sqlite';
 import type { Auth, CustomerEnv } from './customer';
 import { moduleFail as fail, type CustomerServices, type CustomerContext as C } from './customer-modules';
 import { accountPlan } from './customer-plans';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
+import { randomBytes, createHash } from 'node:crypto';
+import { config } from './config';
+import { type OAuthGateway } from './supabase-auth';
 
 const DAY = 86_400_000;
 const KINDS = ['support', 'feedback', 'bug', 'idea'] as const;
@@ -20,11 +24,27 @@ export const isAdminEmail = (email: string): boolean => adminEmails().has(email.
 
 const n = (row: unknown): number => (row as { n: number }).n;
 
+// --- Admin console single sign-on (server-side Google via the Supabase gateway) ---
+// The standalone admin app (admin.foundkeep.app) can't reach FoundKeep's __Host-
+// session cookie across subdomains, and we don't want a second OAuth client. So
+// the backend runs the whole Google flow with its existing secret key, verifies
+// the email is an admin, then hands a one-time ticket to the admin app, which
+// exchanges it server-to-server. Ephemeral state lives in-process (single backend).
+const adminSsoFlows = new Map<string, { verifier: string; browser: string; exp: number }>();
+const adminSsoTickets = new Map<string, { email: string; name: string; exp: number }>();
+const ssoDigest = (s: string) => createHash('sha256').update(s).digest('hex');
+const ssoRand = (bytes = 32) => randomBytes(bytes).toString('base64url');
+function ssoSweep<T extends { exp: number }>(m: Map<string, T>) {
+  const now = Date.now();
+  for (const [k, v] of m) if (v.exp <= now) m.delete(k);
+}
+const adminAppUrl = () => (process.env.FOUNDKEEP_ADMIN_APP_URL || 'https://admin.foundkeep.app').replace(/\/$/, '');
+
 type TicketRow = { id: string; account_id: string | null; email: string; kind: Kind; subject: string; body: string; status: Status; created_at: number; updated_at: number };
 const ticketDto = (t: TicketRow) => ({ id: t.id, accountId: t.account_id, email: t.email, kind: t.kind, subject: t.subject, body: t.body, status: t.status, createdAt: t.created_at, updatedAt: t.updated_at });
 
 /** Admin analytics + support triage. All routes require an allowlisted admin. */
-export function registerAdmin(app: Hono<CustomerEnv>, db: Database, services: CustomerServices) {
+export function registerAdmin(app: Hono<CustomerEnv>, db: Database, services: CustomerServices, gateway: OAuthGateway) {
   const { auth, jsonBody } = services;
   // Admin access: either a signed-in allowlisted account (the in-site /console),
   // or a server-to-server token (the standalone admin app calling from its server).
@@ -36,6 +56,63 @@ export function registerAdmin(app: Hono<CustomerEnv>, db: Database, services: Cu
     if (!isAdminEmail(current.account.email)) fail(403, 'admin_required', 'This area is for FoundKeep administrators.');
     return { email: current.account.email };
   }
+
+  // Admin SSO — public (they ARE the sign-in). Security: PKCE verifier held
+  // server-side, a __Host- browser-binding cookie, the admin email allow-list,
+  // and a single-use short-lived ticket. Google Cloud + Supabase need no change
+  // (same secret key + already-allowlisted foundkeep.app redirect origin).
+  const OAUTH_COOKIE = '__Host-fk_admin_oauth';
+  app.get('/admin/auth/login', async c => {
+    const id = randomBytes(16).toString('hex');
+    const verifier = ssoRand(48);
+    const browser = ssoRand(32);
+    ssoSweep(adminSsoFlows);
+    if (adminSsoFlows.size >= 500) fail(503, 'sso_busy', 'Sign-in is busy. Try again shortly.');
+    adminSsoFlows.set(id, { verifier, browser: ssoDigest(browser), exp: Date.now() + 600_000 });
+    const secure = config.customerOrigin.startsWith('https://');
+    setCookie(c, OAUTH_COOKIE, browser, { httpOnly: true, secure, sameSite: 'Lax', path: '/', maxAge: 600 });
+    try {
+      const url = await gateway.authorize('google', config.customerOrigin + '/api/admin/auth/callback/' + id, verifier);
+      return c.redirect(url, 302);
+    } catch {
+      adminSsoFlows.delete(id);
+      return c.redirect(adminAppUrl() + '/auth/sso?error=unavailable', 302);
+    }
+  });
+
+  app.get('/admin/auth/callback/:flow', async c => {
+    const id = c.req.param('flow');
+    const flow = adminSsoFlows.get(id);
+    adminSsoFlows.delete(id);
+    const back = (err: string) => c.redirect(adminAppUrl() + '/auth/sso?error=' + err, 302);
+    const cookie = getCookie(c, OAUTH_COOKIE);
+    deleteCookie(c, OAUTH_COOKIE, { path: '/' });
+    if (!flow || flow.exp < Date.now() || !cookie || ssoDigest(cookie) !== flow.browser) return back('expired');
+    const code = c.req.query('code');
+    if (!code || c.req.query('error')) return back('denied');
+    let identity;
+    try { identity = await gateway.identity(code, flow.verifier, 'google'); }
+    catch { return back('failed'); }
+    if (!isAdminEmail(identity.email)) return back('denied');
+    const ticket = ssoRand(32);
+    ssoSweep(adminSsoTickets);
+    adminSsoTickets.set(ssoDigest(ticket), { email: identity.email, name: identity.name, exp: Date.now() + 90_000 });
+    return c.redirect(adminAppUrl() + '/auth/sso?ticket=' + ticket, 302);
+  });
+
+  // Server-to-server: the admin app exchanges the one-time ticket for the
+  // verified identity, then sets its own session. Requires the shared token.
+  app.post('/admin/auth/ticket', async c => {
+    const token = c.req.header('x-admin-token');
+    const configured = process.env.FOUNDKEEP_ADMIN_API_TOKEN;
+    if (!configured || !token || token.length < 24 || token !== configured) fail(403, 'admin_required', 'Server token required.');
+    const body = await jsonBody(c);
+    const key = ssoDigest(String(body.ticket ?? ''));
+    const t = adminSsoTickets.get(key);
+    adminSsoTickets.delete(key);
+    if (!t || t.exp < Date.now() || !isAdminEmail(t.email)) fail(401, 'ticket_invalid', 'This sign-in expired. Start again.');
+    return c.json({ email: t!.email, name: t!.name });
+  });
 
   app.get('/admin/me', c => {
     const current = admin(c);
