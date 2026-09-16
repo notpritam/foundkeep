@@ -28,3 +28,10 @@ test('many unique tags remain bounded and every returned edge has visible endpoi
  const graph=buildCustomerGraph(db,owner);expect(graph.totalTags).toBe(121);expect(graph.shownTags).toBe(100);expect(graph.nodes).toHaveLength(220);expect(graph.nodes.some(node=>node.kind==='tag'&&node.label==='shared')).toBe(true);
  const ids=new Set(graph.nodes.map(node=>node.id));expect(graph.edges.every(edge=>ids.has(edge.source)&&ids.has(edge.target))).toBe(true);
 });
+
+test('save nodes carry createdAt so the client can play a timelapse in creation order',()=>{
+ const older=save(owner,'Older',[],10),newer=save(owner,'Newer',[],20);
+ const graph=buildCustomerGraph(db,owner),byId=new Map(graph.nodes.map(node=>[node.saveId,node]));
+ expect(byId.get(older)?.createdAt).toBe(10);expect(byId.get(newer)?.createdAt).toBe(20);
+ expect(graph.nodes.filter(node=>node.kind==='tag').every(node=>node.createdAt===undefined)).toBe(true);
+});

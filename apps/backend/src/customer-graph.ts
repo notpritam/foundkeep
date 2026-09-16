@@ -5,11 +5,11 @@ import type {CustomerEnv} from './customer.ts';
 import {moduleFail,type CustomerServices} from './customer-modules.ts';
 import {foldName} from './customer-organization.ts';
 
-export type CustomerGraphNode={id:string;kind:'save'|'tag';label:string;saveId?:string;type?:string;sourceUrl?:string|null;summary?:string|null;tags?:string[];revision?:number};
+export type CustomerGraphNode={id:string;kind:'save'|'tag';label:string;saveId?:string;type?:string;sourceUrl?:string|null;summary?:string|null;tags?:string[];revision?:number;createdAt?:number};
 export type CustomerGraphEdge={id:string;source:string;target:string;kind:'tag'|'agent'|'hosted'|'manual';label:string};
 export type CustomerGraph={nodes:CustomerGraphNode[];edges:CustomerGraphEdge[];totalSaves:number;matchingSaves:number;shownSaves:number;truncated:boolean;totalTags:number;shownTags:number;focus:string|null;query:string};
 type GraphOptions={q?:string;focus?:string;limit?:number};
-type Save={id:string;type:string;source_title:string|null;source_url:string|null;note_text:string|null;summary:string|null;tags:string;manual_tags:string;updated_at:number};
+type Save={id:string;type:string;source_title:string|null;source_url:string|null;note_text:string|null;summary:string|null;tags:string;manual_tags:string;created_at:number;updated_at:number};
 function tags(raw:string){try{const value:unknown=JSON.parse(raw);return Array.isArray(value)?value.filter((item):item is string=>typeof item==='string'&&item.trim().length>0).slice(0,32).map(item=>item.trim().slice(0,40)):[];}catch{return [];}}
 
 /** Only account-owned, bounded metadata is loaded; originals/files never enter the graph. */
@@ -24,11 +24,11 @@ export function buildCustomerGraph(db:Database,owner:string,options:GraphOptions
  const predicate=where.join(' AND ');
  const totalSaves=(db.query('SELECT COUNT(*) n FROM customer_captures WHERE account_id=?').get(owner) as {n:number}).n;
  const matchingSaves=(db.query(`SELECT COUNT(*) n FROM customer_captures c WHERE ${predicate}`).get(...bindings) as {n:number}).n;
- const rows=db.query(`SELECT c.id,c.type,c.source_title,c.source_url,substr(c.note_text,1,120) note_text,substr(c.summary,1,400) summary,c.tags,c.manual_tags,c.updated_at FROM customer_captures c WHERE ${predicate} ORDER BY CASE WHEN c.id=? THEN 0 ELSE 1 END,c.created_at DESC,c.id DESC LIMIT ?`).all(...bindings,focus||'',limit) as Save[];
+ const rows=db.query(`SELECT c.id,c.type,c.source_title,c.source_url,substr(c.note_text,1,120) note_text,substr(c.summary,1,400) summary,c.tags,c.manual_tags,c.created_at,c.updated_at FROM customer_captures c WHERE ${predicate} ORDER BY CASE WHEN c.id=? THEN 0 ELSE 1 END,c.created_at DESC,c.id DESC LIMIT ?`).all(...bindings,focus||'',limit) as Save[];
  const nodes:CustomerGraphNode[]=[],edges:CustomerGraphEdge[]=[],tagNodes=new Map<string,CustomerGraphNode>();
  for(const row of rows){
   const rowTags=[...new Map([...tags(row.manual_tags),...tags(row.tags)].map(tag=>[foldName(tag),tag])).values()];
-  nodes.push({id:'save:'+row.id,kind:'save',label:row.source_title||row.note_text||'Saved '+row.type,saveId:row.id,type:row.type,sourceUrl:row.source_url,summary:row.summary,tags:rowTags,revision:row.updated_at});
+  nodes.push({id:'save:'+row.id,kind:'save',label:row.source_title||row.note_text||'Saved '+row.type,saveId:row.id,type:row.type,sourceUrl:row.source_url,summary:row.summary,tags:rowTags,revision:row.updated_at,createdAt:row.created_at});
   for(const tag of rowTags){const key=foldName(tag);let node=tagNodes.get(key);if(!node){node={id:'tag:'+createHash('sha256').update(key).digest('hex').slice(0,24),kind:'tag',label:tag};tagNodes.set(key,node);}
    edges.push({id:`tag:${row.id}:${node.id}`,source:'save:'+row.id,target:node.id,kind:'tag',label:'Tagged '+node.label});
   }
