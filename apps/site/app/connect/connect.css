@@ -1,0 +1,24 @@
+.connect-code {
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: color-mix(in oklab, currentColor 6%, transparent);
+  border: 1px solid color-mix(in oklab, currentColor 14%, transparent);
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.connect-code code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  white-space: pre;
+}
+.beta-footer {
+  max-width: 60rem;
+  margin: 2rem auto 3rem;
+  padding: 1.5rem 1.25rem 0;
+  border-top: 1px solid color-mix(in oklab, currentColor 12%, transparent);
+  text-align: center;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+.beta-footer a { color: inherit; }
