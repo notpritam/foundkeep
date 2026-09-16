@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { openDb } from '../src/db.ts';
 import { createApp } from '../src/app.ts';
 import { config } from '../src/config.ts';
-import { SCOPES } from '../src/customer-mcp-oauth.ts';
+import { SCOPES, oauthMetadata } from '../src/customer-mcp-oauth.ts';
 
 let db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>;
 
@@ -55,4 +55,37 @@ test('migration creates both OAuth tables and SCOPES matches the supported set',
   expect(names).toContain('customer_oauth_clients');
   expect(names).toContain('customer_oauth_refresh');
   expect(SCOPES).toEqual(['library:read', 'library:write', 'files:read']);
+});
+
+// --- Task 2: discovery metadata + WWW-Authenticate ---
+test('oauthMetadata derives every URL from the issuer origin', () => {
+  const m = oauthMetadata('https://foundkeep.app');
+  expect(m.authorizationServer.issuer).toBe('https://foundkeep.app');
+  expect(m.authorizationServer.authorization_endpoint).toBe('https://foundkeep.app/api/oauth/authorize');
+  expect(m.authorizationServer.token_endpoint).toBe('https://foundkeep.app/api/oauth/token');
+  expect(m.authorizationServer.registration_endpoint).toBe('https://foundkeep.app/api/oauth/register');
+  expect(m.authorizationServer.code_challenge_methods_supported).toContain('S256');
+  expect(m.authorizationServer.token_endpoint_auth_methods_supported).toEqual(['none']);
+  expect(m.authorizationServer.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
+  expect(m.protectedResource.resource).toBe('https://foundkeep.app/api/mcp');
+  expect(m.protectedResource.authorization_servers).toEqual(['https://foundkeep.app']);
+  expect(m.protectedResource.scopes_supported).toEqual(['library:read', 'library:write', 'files:read']);
+});
+
+test('metadata endpoints serve the documents at the root with no-store', async () => {
+  const as = await root('/.well-known/oauth-authorization-server');
+  expect(as.status).toBe(200);
+  expect(as.headers.get('cache-control')).toContain('no-store');
+  expect((await as.json()).authorization_endpoint).toBe(ORIGIN + '/api/oauth/authorize');
+  const pr = await root('/.well-known/oauth-protected-resource');
+  expect(pr.status).toBe(200);
+  expect((await pr.json()).resource).toBe(ORIGIN + '/api/mcp');
+});
+
+test('/api/mcp 401 carries the WWW-Authenticate discovery header', async () => {
+  const r = await api('/mcp', { method: 'POST', headers: { Origin: ORIGIN, 'Content-Type': 'application/json' }, body: '{}' });
+  expect(r.status).toBe(401);
+  const header = r.headers.get('www-authenticate') || '';
+  expect(header).toContain('Bearer');
+  expect(header).toContain(`resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource"`);
 });

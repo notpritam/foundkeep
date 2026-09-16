@@ -15,6 +15,7 @@ import { deviceRoutes } from "./devices.ts";
 import { inviteRoutes } from "./invites.ts";
 import { buildCaptureGraph } from "./graph.ts";
 import { customerRoutes } from "./customer.ts";
+import { oauthMetadata } from "./customer-mcp-oauth.ts";
 
 function count(db: Database, sql: string): number {
   return (db.query(sql).get() as { n: number }).n;
@@ -41,7 +42,7 @@ export function createApp(db: Database): Hono<Env> {
   app.use("*", async (c, next) => {
     await next();
     c.header("X-Content-Type-Options", "nosniff");
-    c.header("Referrer-Policy", c.req.path.startsWith("/api/auth/oauth/") || c.req.path === "/auth.html" ? "no-referrer" : "strict-origin-when-cross-origin");
+    c.header("Referrer-Policy", c.req.path.startsWith("/api/auth/oauth/") || c.req.path.startsWith("/api/oauth/") || c.req.path === "/auth.html" ? "no-referrer" : "strict-origin-when-cross-origin");
     c.header("X-Frame-Options", "SAMEORIGIN");
     c.header("Strict-Transport-Security", "max-age=31536000");
     if (["/customer-config.json", "/extension-policy.json", "/foundkeep-extension.zip", "/atlas-extension.zip"].includes(c.req.path) || /^\/ext\/[^/]+\.zip$/.test(c.req.path)) {
@@ -77,6 +78,17 @@ export function createApp(db: Database): Hono<Env> {
     const fingerprints=[...new Set((process.env.ATLAS_ANDROID_SHA256_CERT_FINGERPRINTS||'').split(',').map(value=>value.trim().toUpperCase()).filter(value=>/^(?:[A-F0-9]{2}:){31}[A-F0-9]{2}$/.test(value)))];
     c.header('Cache-Control','public, max-age=3600');
     return c.json(fingerprints.length?[{relation:['delegate_permission/common.handle_all_urls'],target:{namespace:'android_app',package_name:customerNativeIdentity().androidPackage,sha256_cert_fingerprints:fingerprints}}]:[]);
+  });
+
+  // OAuth 2.1 discovery documents for the MCP endpoint. Registered on the outer
+  // app (like the other /.well-known/* handlers) so they sit at the origin root.
+  app.get("/.well-known/oauth-protected-resource", (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json(oauthMetadata(config.customerOrigin).protectedResource);
+  });
+  app.get("/.well-known/oauth-authorization-server", (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json(oauthMetadata(config.customerOrigin).authorizationServer);
   });
 
   app.get("/open", (c) => {

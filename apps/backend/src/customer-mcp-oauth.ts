@@ -26,6 +26,34 @@ const rand = (bytes = 32): string => randomBytes(bytes).toString('base64url');
 const isUnauthorized = (error: unknown): boolean =>
   !!error && typeof error === 'object' && (error as { status?: unknown }).status === 401;
 
+/** The two discovery documents, derived entirely from the issuer origin.
+ *  `protectedResource` → /.well-known/oauth-protected-resource;
+ *  `authorizationServer` → /.well-known/oauth-authorization-server. */
+export function oauthMetadata(origin: string): {
+  protectedResource: Record<string, unknown>;
+  authorizationServer: Record<string, unknown>;
+} {
+  return {
+    protectedResource: {
+      resource: origin + '/api/mcp',
+      authorization_servers: [origin],
+      scopes_supported: [...SCOPES],
+      bearer_methods_supported: ['header'],
+    },
+    authorizationServer: {
+      issuer: origin,
+      authorization_endpoint: origin + '/api/oauth/authorize',
+      token_endpoint: origin + '/api/oauth/token',
+      registration_endpoint: origin + '/api/oauth/register',
+      scopes_supported: [...SCOPES],
+      response_types_supported: ['code'],
+      grant_types_supported: ['authorization_code', 'refresh_token'],
+      code_challenge_methods_supported: ['S256'],
+      token_endpoint_auth_methods_supported: ['none'],
+    },
+  };
+}
+
 // --- In-memory single-use authorization codes (mirrors the admin SSO pattern) ---
 // A single backend process holds these; 60s TTL makes restart durability moot.
 type AuthCodeRecord = {

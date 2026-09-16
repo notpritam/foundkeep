@@ -117,7 +117,18 @@ function configuredGlobalCaptures(){const value=process.env.ATLAS_CUSTOMER_GLOBA
 export function registerCustomerMcp(app:Hono<CustomerEnv>,db:Database,services:CustomerServices,dispatch?:AgentRequest){
  app.all('/mcp',async c=>{
   const origin=c.req.header('origin');if(origin&&!config.customerOrigins.includes(origin))moduleFail(403,'invalid_origin','This origin cannot access the agent endpoint.');
-  const header=c.req.header('authorization')||'';const identity=agentAccess(db,header);
+  const header=c.req.header('authorization')||'';
+  let identity;
+  try{identity=agentAccess(db,header);}
+  catch(error){
+   // Point unauthenticated MCP clients at OAuth discovery (RFC 9728) so they can
+   // start the browser connect flow instead of demanding a pasted token.
+   if(error instanceof CustomerModuleError&&error.status===401){
+    c.header('WWW-Authenticate',`Bearer resource_metadata="${config.customerOrigin}/.well-known/oauth-protected-resource"`);
+    return c.json({error:error.code,message:error.message},401);
+   }
+   throw error;
+  }
   services.rate('mcp:'+identity.accountId,120,60_000);
   c.header('Cache-Control','private, no-store');
   if(c.req.method!=='POST')return c.body(null,405,{'Allow':'POST'});
