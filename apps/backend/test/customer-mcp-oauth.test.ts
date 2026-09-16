@@ -4,6 +4,9 @@ import { openDb } from '../src/db.ts';
 import { createApp } from '../src/app.ts';
 import { config } from '../src/config.ts';
 import { SCOPES, oauthMetadata, validRedirectUri } from '../src/customer-mcp-oauth.ts';
+import { agentAccess } from '../src/customer-agent-access.ts';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 let db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>;
 
@@ -278,4 +281,36 @@ test('refresh rotates the pair, and reusing a consumed refresh revokes the famil
   const after = await token({ grant_type: 'refresh_token', refresh_token: refresh2, client_id: client.client_id });
   expect(after.status).toBe(400);
   expect(db.query('SELECT COUNT(*) n FROM customer_oauth_refresh').get() as any).toMatchObject({ n: 0 });
+});
+
+// --- Task 6: end-to-end — a minted OAuth access token drives the live MCP endpoint ---
+test('the full connect flow yields a token agentAccess accepts and MCP tools list', async () => {
+  const { account, cookie } = await register();
+  const client = (await registerClient(['http://127.0.0.1:6274/callback'], 'Codex')).body;
+  const { verifier, challenge } = pkce();
+  const code = await mintCode(cookie, client.client_id, uri, challenge, 'library:read library:write files:read');
+  const issued = await token({ grant_type: 'authorization_code', code, redirect_uri: uri, client_id: client.client_id, code_verifier: verifier });
+  const accessToken: string = issued.body.access_token;
+
+  // The reused agent-token validator accepts it for each granted scope.
+  const identity = agentAccess(db, 'Bearer ' + accessToken, 'library:write');
+  expect(identity.accountId).toBe(account.id);
+  expect(identity.scopes.sort()).toEqual(['files:read', 'library:read', 'library:write']);
+  // It shows up in /dashboard/agents with the OAuth-suffixed name.
+  const named = db.query('SELECT name FROM customer_agent_tokens WHERE token_hash IS NOT NULL ORDER BY created_at DESC LIMIT 1').get() as any;
+  expect(named.name).toBe('Codex (OAuth)');
+
+  // And it authenticates a real MCP tools/list over the streamable HTTP transport.
+  const transport = new StreamableHTTPClientTransport(new URL(ORIGIN + '/api/mcp'), {
+    requestInit: { headers: { Authorization: 'Bearer ' + accessToken } },
+    fetch: async (input: any, init: any) => app.fetch(input instanceof Request ? new Request(input, init) : new Request(String(input), init)),
+  });
+  const mcp = new Client({ name: 'oauth-e2e', version: '1.0.0' });
+  try {
+    await mcp.connect(transport);
+    const tools = await mcp.listTools();
+    expect(tools.tools.some(t => t.name === 'list_saves')).toBe(true);
+  } finally {
+    await mcp.close();
+  }
 });
