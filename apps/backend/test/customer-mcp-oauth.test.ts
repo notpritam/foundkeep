@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { openDb } from '../src/db.ts';
 import { createApp } from '../src/app.ts';
 import { config } from '../src/config.ts';
-import { SCOPES, oauthMetadata } from '../src/customer-mcp-oauth.ts';
+import { SCOPES, oauthMetadata, validRedirectUri } from '../src/customer-mcp-oauth.ts';
 
 let db: ReturnType<typeof openDb>, app: ReturnType<typeof createApp>;
 
@@ -88,4 +88,34 @@ test('/api/mcp 401 carries the WWW-Authenticate discovery header', async () => {
   const header = r.headers.get('www-authenticate') || '';
   expect(header).toContain('Bearer');
   expect(header).toContain(`resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource"`);
+});
+
+// --- Task 3: dynamic client registration ---
+test('validRedirectUri accepts https + loopback http, rejects the rest', () => {
+  expect(validRedirectUri('https://example.com/cb')).toBe(true);
+  expect(validRedirectUri('http://127.0.0.1:6274/callback')).toBe(true);
+  expect(validRedirectUri('http://localhost/cb')).toBe(true);
+  expect(validRedirectUri('http://[::1]:8080/cb')).toBe(true);
+  expect(validRedirectUri('http://evil.example/cb')).toBe(false);
+  expect(validRedirectUri('https://user:pass@example.com/cb')).toBe(false);
+  expect(validRedirectUri('https://example.com/cb#frag')).toBe(false);
+  expect(validRedirectUri('javascript:alert(1)')).toBe(false);
+  expect(validRedirectUri('not a url')).toBe(false);
+});
+
+test('DCR stores a loopback client and rejects a non-loopback http redirect', async () => {
+  const ok = await registerClient(['http://127.0.0.1:6274/callback']);
+  expect(ok.status).toBe(201);
+  expect(ok.body.client_id).toMatch(/^fkc_/);
+  expect(ok.body.token_endpoint_auth_method).toBe('none');
+  expect(ok.body.redirect_uris).toEqual(['http://127.0.0.1:6274/callback']);
+  const row = db.query('SELECT client_name FROM customer_oauth_clients WHERE client_id=?').get(ok.body.client_id) as any;
+  expect(row.client_name).toBe('Test MCP Client');
+
+  const bad = await registerClient(['http://evil.example/cb']);
+  expect(bad.status).toBe(400);
+  expect(bad.body.error).toBe('invalid_redirect_uri');
+
+  const noName = await api('/oauth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ redirect_uris: ['https://ok.example/cb'] }) });
+  expect(noName.status).toBe(400);
 });
