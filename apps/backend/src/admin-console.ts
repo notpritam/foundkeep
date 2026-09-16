@@ -61,7 +61,10 @@ export function registerAdmin(app: Hono<CustomerEnv>, db: Database, services: Cu
   // server-side, a __Host- browser-binding cookie, the admin email allow-list,
   // and a single-use short-lived ticket. Google Cloud + Supabase need no change
   // (same secret key + already-allowlisted foundkeep.app redirect origin).
-  const OAUTH_COOKIE = '__Host-fk_admin_oauth';
+  // __Host- prefix requires Secure; only use it over https (matches customer-oauth).
+  const ssoSecure = config.customerOrigin.startsWith('https://');
+  const OAUTH_COOKIE = (ssoSecure ? '__Host-' : '') + 'fk_admin_oauth';
+  const ssoCookieOpts = { httpOnly: true, secure: ssoSecure, sameSite: 'Lax' as const, path: '/' };
   app.get('/admin/auth/login', async c => {
     const id = randomBytes(16).toString('hex');
     const verifier = ssoRand(48);
@@ -69,8 +72,7 @@ export function registerAdmin(app: Hono<CustomerEnv>, db: Database, services: Cu
     ssoSweep(adminSsoFlows);
     if (adminSsoFlows.size >= 500) fail(503, 'sso_busy', 'Sign-in is busy. Try again shortly.');
     adminSsoFlows.set(id, { verifier, browser: ssoDigest(browser), exp: Date.now() + 600_000 });
-    const secure = config.customerOrigin.startsWith('https://');
-    setCookie(c, OAUTH_COOKIE, browser, { httpOnly: true, secure, sameSite: 'Lax', path: '/', maxAge: 600 });
+    setCookie(c, OAUTH_COOKIE, browser, { ...ssoCookieOpts, maxAge: 600 });
     try {
       const url = await gateway.authorize('google', config.customerOrigin + '/api/admin/auth/callback/' + id, verifier);
       return c.redirect(url, 302);
@@ -86,7 +88,7 @@ export function registerAdmin(app: Hono<CustomerEnv>, db: Database, services: Cu
     adminSsoFlows.delete(id);
     const back = (err: string) => c.redirect(adminAppUrl() + '/auth/sso?error=' + err, 302);
     const cookie = getCookie(c, OAUTH_COOKIE);
-    deleteCookie(c, OAUTH_COOKIE, { path: '/' });
+    deleteCookie(c, OAUTH_COOKIE, ssoCookieOpts);
     if (!flow || flow.exp < Date.now() || !cookie || ssoDigest(cookie) !== flow.browser) return back('expired');
     const code = c.req.query('code');
     if (!code || c.req.query('error')) return back('denied');
