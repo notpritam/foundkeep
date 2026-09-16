@@ -211,13 +211,12 @@ export function registerMcpOAuth(
     if (requested.some(scope => !(SCOPES as readonly string[]).includes(scope))) return back('invalid_scope', 'An unsupported scope was requested.');
     const scopes = (requested.length ? [...new Set(requested)] : ['library:read']) as OAuthScope[];
 
-    let account: { id: string }, credentialId: string;
-    try { const session = auth(c, true); account = session.account; credentialId = session.credentialId; }
+    let credentialId: string;
+    try { credentialId = auth(c, true).credentialId; }
     catch (error) {
       if (isUnauthorized(error)) return c.redirect(deps.loginUrl(c.req.url), 302);
       throw error;
     }
-    void account;
     c.header('Cache-Control', 'no-store');
     c.header('Referrer-Policy', 'no-referrer');
     return c.html(consentPage({
