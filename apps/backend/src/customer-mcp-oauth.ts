@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Database } from 'bun:sqlite';
 import type { Hono } from 'hono';
 import type { CustomerEnv } from './customer.ts';
-import { moduleFail as fail, type CustomerServices } from './customer-modules.ts';
+import { moduleFail as fail, type CustomerServices, type CustomerContext } from './customer-modules.ts';
 import { config } from './config.ts';
 
 // OAuth 2.1 authorization server for the FoundKeep MCP endpoint. Public clients
@@ -97,6 +97,43 @@ function pkceMatches(verifier: string, challenge: string): boolean {
   return timingSafeEqual(Buffer.from(computed), Buffer.from(challenge));
 }
 
+const SCOPE_LABELS: Record<OAuthScope, string> = {
+  'library:read': 'See your saved items, folders, and tags',
+  'library:write': 'Create and organize saves, folders, and tags',
+  'files:read': 'Download your saved files and attachments',
+};
+
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!));
+
+/** Add/override query params on an already-validated redirect URI. */
+function withParams(uri: string, params: Record<string, string | undefined>): string {
+  const url = new URL(uri);
+  for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== '') url.searchParams.set(key, value);
+  return url.toString();
+}
+
+/** A minimal, dependency-free consent page. No inline script (a plain POST form). */
+function consentPage(fields: { clientName: string; scopes: OAuthScope[]; csrf: string; params: Record<string, string> }): string {
+  const hidden = Object.entries({ ...fields.params, csrf: fields.csrf })
+    .map(([name, value]) => `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}">`)
+    .join('');
+  const list = fields.scopes.map(scope => `<li>${escapeHtml(SCOPE_LABELS[scope])}</li>`).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Connect to FoundKeep</title>
+<style>:root{color-scheme:light dark}body{font:16px/1.5 system-ui,sans-serif;max-width:30rem;margin:3rem auto;padding:0 1.25rem;background:#0f1011;color:#e8e8e8}@media(prefers-color-scheme:light){body{background:#fff;color:#111}}h1{font-size:1.35rem}.card{border:1px solid #2a2c2e;border-radius:14px;padding:1.25rem}@media(prefers-color-scheme:light){.card{border-color:#e2e2e2}}ul{padding-left:1.1rem}li{margin:.35rem 0}.row{display:flex;gap:.75rem;margin-top:1.5rem}button{flex:1;padding:.7rem 1rem;border-radius:10px;border:0;font:inherit;font-weight:600;cursor:pointer}.allow{background:#4cc38a;color:#04130c}.deny{background:transparent;border:1px solid #3a3c3e;color:inherit}.muted{color:#9aa0a6;font-size:.9rem}</style></head>
+<body><div class="card"><h1>Connect <strong>${escapeHtml(fields.clientName)}</strong> to FoundKeep</h1>
+<p>This app is asking permission to:</p><ul>${list}</ul>
+<p class="muted">You can revoke this connection any time in Settings &rarr; Agent connections.</p>
+<form method="post" action="/api/oauth/authorize">${hidden}
+<div class="row"><button class="deny" type="submit" name="allow" value="0">Deny</button><button class="allow" type="submit" name="allow" value="1">Allow access</button></div></form>
+</div></body></html>`;
+}
+
+const errorPage = (message: string): string =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Connection error</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;max-width:30rem;margin:3rem auto;padding:0 1.25rem}</style></head>
+<body><h1>This connection can&#39;t continue</h1><p>${escapeHtml(message)}</p></body></html>`;
+
 export interface McpOAuthDeps {
   /** Mint an `fk_mcp_` access token (reuses customer_agent_tokens). Returns the raw token. */
   issueAccessToken(accountId: string, name: string, scopes: string[], ttlMs: number): string;
@@ -147,7 +184,85 @@ export function registerMcpOAuth(
     }, 201);
   });
 
-  // Further routes (authorize, token) are added in the tasks that follow.
-  void auth;
+  // --- Authorization endpoint: validate, reuse the web session, show consent ---
+  // The CSRF token binds the consent to this browser session + client + redirect.
+  const csrfToken = (credentialId: string, clientId: string, redirectUri: string) =>
+    digest(credentialId + '|' + clientId + '|' + redirectUri);
+  const errorResponse = (c: CustomerContext, message: string) => {
+    c.header('Cache-Control', 'no-store');
+    c.header('Referrer-Policy', 'no-referrer');
+    return c.html(errorPage(message), 400);
+  };
+
+  app.get('/oauth/authorize', c => {
+    const q = c.req.query();
+    const client = getClient(db, q.client_id);
+    const registered = client ? (JSON.parse(client.redirect_uris_json) as string[]) : [];
+    // An unverified client or redirect must NEVER become an open redirect.
+    if (!client || !q.redirect_uri || !registered.includes(q.redirect_uri)) {
+      return errorResponse(c, 'This app could not be verified. It may be misconfigured. Close this page and connect again.');
+    }
+    const redirectUri = q.redirect_uri;
+    const state = q.state;
+    const back = (error: string, description?: string) => c.redirect(withParams(redirectUri, { error, error_description: description, state }), 302);
+    if (q.response_type !== 'code') return back('unsupported_response_type', 'Only response_type=code is supported.');
+    if (!q.code_challenge || q.code_challenge_method !== 'S256' || !/^[A-Za-z0-9._~-]{43}$/.test(q.code_challenge)) return back('invalid_request', 'PKCE with code_challenge_method=S256 is required.');
+    const requested = (q.scope || '').split(/\s+/).filter(Boolean);
+    if (requested.some(scope => !(SCOPES as readonly string[]).includes(scope))) return back('invalid_scope', 'An unsupported scope was requested.');
+    const scopes = (requested.length ? [...new Set(requested)] : ['library:read']) as OAuthScope[];
+
+    let account: { id: string }, credentialId: string;
+    try { const session = auth(c, true); account = session.account; credentialId = session.credentialId; }
+    catch (error) {
+      if (isUnauthorized(error)) return c.redirect(deps.loginUrl(c.req.url), 302);
+      throw error;
+    }
+    void account;
+    c.header('Cache-Control', 'no-store');
+    c.header('Referrer-Policy', 'no-referrer');
+    return c.html(consentPage({
+      clientName: client.client_name,
+      scopes,
+      csrf: csrfToken(credentialId, client.client_id, redirectUri),
+      params: { client_id: client.client_id, redirect_uri: redirectUri, scope: scopes.join(' '), state: state ?? '', code_challenge: q.code_challenge, code_challenge_method: 'S256' },
+    }));
+  });
+
+  app.post('/oauth/authorize', async c => {
+    const form = await c.req.parseBody();
+    const str = (key: string) => (typeof form[key] === 'string' ? (form[key] as string) : '');
+    const clientId = str('client_id');
+    const redirectUri = str('redirect_uri');
+    const client = getClient(db, clientId);
+    const registered = client ? (JSON.parse(client.redirect_uris_json) as string[]) : [];
+    if (!client || !redirectUri || !registered.includes(redirectUri)) {
+      return errorResponse(c, 'This app could not be verified. Close this page and connect again.');
+    }
+    let session;
+    try { session = auth(c, true); }
+    catch (error) {
+      if (isUnauthorized(error)) return c.redirect(deps.loginUrl(config.customerOrigin + '/api/oauth/authorize'), 302);
+      throw error;
+    }
+    if (str('csrf') !== csrfToken(session.credentialId, clientId, redirectUri)) fail(403, 'invalid_csrf', 'Your consent could not be verified. Connect again.');
+    rate('oauth-consent:' + session.account.id, 30, 60_000);
+    const state = form.state !== undefined ? str('state') : undefined;
+    c.header('Cache-Control', 'no-store');
+    c.header('Referrer-Policy', 'no-referrer');
+    if (str('allow') !== '1') return c.redirect(withParams(redirectUri, { error: 'access_denied', state }), 302);
+
+    const codeChallenge = str('code_challenge');
+    if (str('code_challenge_method') !== 'S256' || !/^[A-Za-z0-9._~-]{43}$/.test(codeChallenge)) return c.redirect(withParams(redirectUri, { error: 'invalid_request', error_description: 'PKCE S256 is required.', state }), 302);
+    const requested = str('scope').split(/\s+/).filter(Boolean);
+    if (requested.some(scope => !(SCOPES as readonly string[]).includes(scope))) return c.redirect(withParams(redirectUri, { error: 'invalid_scope', state }), 302);
+    const scopes = (requested.length ? [...new Set(requested)] : ['library:read']) as OAuthScope[];
+
+    const code = 'fka_' + rand(32);
+    sweepAuthCodes();
+    authCodes.set(digest(code), { clientId, accountId: session.account.id, scopes, codeChallenge, redirectUri, exp: Date.now() + CODE_TTL_MS });
+    db.query('UPDATE customer_oauth_clients SET last_used_at=? WHERE client_id=?').run(Date.now(), clientId);
+    return c.redirect(withParams(redirectUri, { code, state }), 302);
+  });
+
   void deps;
 }

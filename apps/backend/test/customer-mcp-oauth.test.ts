@@ -49,6 +49,30 @@ async function registerClient(redirectUris = ['http://127.0.0.1:6274/callback'],
   return { status: r.status, body: (await r.json()) as any };
 }
 
+// Drive GET /oauth/authorize with a session and return the parsed consent form.
+async function consent(cookie: string, clientId: string, redirectUri: string, challenge: string, scope = 'library:read library:write', state = 'st-123') {
+  const url = ORIGIN + '/api/oauth/authorize?' + new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope, state, code_challenge: challenge, code_challenge_method: 'S256' });
+  const r = await app.request(url, { headers: { Cookie: cookie } });
+  const html = await r.text();
+  const field = (name: string) => (html.match(new RegExp(`name="${name}" value="([^"]*)"`)) || [])[1];
+  return { status: r.status, location: r.headers.get('location'), html, csrf: field('csrf') };
+}
+// Submit the consent form (form-encoded, same-origin) and return the redirect.
+async function submitConsent(cookie: string, fields: Record<string, string>) {
+  const r = await app.request(ORIGIN + '/api/oauth/authorize', {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: ORIGIN, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(fields).toString(),
+  });
+  return { status: r.status, location: r.headers.get('location') || '' };
+}
+// Full authorize → single-use code, returned from the redirect Location.
+async function mintCode(cookie: string, clientId: string, redirectUri: string, challenge: string, scope = 'library:read library:write') {
+  const g = await consent(cookie, clientId, redirectUri, challenge, scope);
+  const posted = await submitConsent(cookie, { csrf: g.csrf!, client_id: clientId, redirect_uri: redirectUri, scope, state: 'st-123', code_challenge: challenge, code_challenge_method: 'S256', allow: '1' });
+  return new URL(posted.location).searchParams.get('code')!;
+}
+
 // --- Task 1: storage + module constant ---
 test('migration creates both OAuth tables and SCOPES matches the supported set', () => {
   const names = (db.query("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map(r => r.name);
@@ -118,4 +142,70 @@ test('DCR stores a loopback client and rejects a non-loopback http redirect', as
 
   const noName = await api('/oauth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ redirect_uris: ['https://ok.example/cb'] }) });
   expect(noName.status).toBe(400);
+});
+
+// --- Task 4: authorize validation, session, consent, code ---
+test('authorize without a session redirects to the site login with next=', async () => {
+  const client = (await registerClient()).body;
+  const { challenge } = pkce();
+  const url = ORIGIN + '/api/oauth/authorize?' + new URLSearchParams({ response_type: 'code', client_id: client.client_id, redirect_uri: 'http://127.0.0.1:6274/callback', scope: 'library:read', state: 's', code_challenge: challenge, code_challenge_method: 'S256' });
+  const r = await app.request(url, { redirect: 'manual' });
+  expect(r.status).toBe(302);
+  const loc = r.headers.get('location') || '';
+  expect(loc.startsWith(ORIGIN + '/login?next=')).toBe(true);
+  expect(decodeURIComponent(loc.split('next=')[1]!)).toContain('/api/oauth/authorize');
+});
+
+test('authorize renders consent with the client name, scope labels and a CSRF field', async () => {
+  const { cookie } = await register();
+  const client = (await registerClient(['http://127.0.0.1:6274/callback'], 'Claude Code')).body;
+  const { challenge } = pkce();
+  const g = await consent(cookie, client.client_id, 'http://127.0.0.1:6274/callback', challenge, 'library:read library:write');
+  expect(g.status).toBe(200);
+  expect(g.html).toContain('Claude Code');
+  expect(g.html).toContain('See your saved items, folders, and tags');
+  expect(g.html).toContain('Create and organize saves, folders, and tags');
+  expect(g.csrf).toBeTruthy();
+});
+
+test('authorize rejects an unknown client with an error page, not a redirect', async () => {
+  const { cookie } = await register();
+  const { challenge } = pkce();
+  const r = await app.request(ORIGIN + '/api/oauth/authorize?' + new URLSearchParams({ response_type: 'code', client_id: 'fkc_nope', redirect_uri: 'http://127.0.0.1:6274/callback', code_challenge: challenge, code_challenge_method: 'S256', scope: 'library:read' }), { headers: { Cookie: cookie } });
+  expect(r.status).toBe(400);
+  expect(r.headers.get('location')).toBeNull();
+  expect(await r.text()).toContain("can");
+});
+
+test('consent Allow returns a code; Deny returns access_denied; both preserve state', async () => {
+  const { cookie } = await register();
+  const client = (await registerClient()).body;
+  const { challenge } = pkce();
+  const uri = 'http://127.0.0.1:6274/callback';
+
+  const g = await consent(cookie, client.client_id, uri, challenge);
+  const allowed = await submitConsent(cookie, { csrf: g.csrf!, client_id: client.client_id, redirect_uri: uri, scope: 'library:read library:write', state: 'st-123', code_challenge: challenge, code_challenge_method: 'S256', allow: '1' });
+  expect(allowed.status).toBe(302);
+  const allowUrl = new URL(allowed.location);
+  expect(allowUrl.searchParams.get('code')).toMatch(/^fka_/);
+  expect(allowUrl.searchParams.get('state')).toBe('st-123');
+
+  const g2 = await consent(cookie, client.client_id, uri, challenge);
+  const denied = await submitConsent(cookie, { csrf: g2.csrf!, client_id: client.client_id, redirect_uri: uri, scope: 'library:read library:write', state: 'st-123', code_challenge: challenge, code_challenge_method: 'S256', allow: '0' });
+  const denyUrl = new URL(denied.location);
+  expect(denyUrl.searchParams.get('error')).toBe('access_denied');
+  expect(denyUrl.searchParams.get('state')).toBe('st-123');
+});
+
+test('consent with a bad CSRF token is rejected', async () => {
+  const { cookie } = await register();
+  const client = (await registerClient()).body;
+  const { challenge } = pkce();
+  const uri = 'http://127.0.0.1:6274/callback';
+  await consent(cookie, client.client_id, uri, challenge);
+  const bad = await app.request(ORIGIN + '/api/oauth/authorize', {
+    method: 'POST', headers: { Cookie: cookie, Origin: ORIGIN, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ csrf: 'wrong', client_id: client.client_id, redirect_uri: uri, scope: 'library:read', code_challenge: challenge, code_challenge_method: 'S256', allow: '1' }).toString(),
+  });
+  expect(bad.status).toBe(403);
 });
