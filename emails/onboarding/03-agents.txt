@@ -1,0 +1,18 @@
+Give your AI a memory
+
+Everything you save in FoundKeep can become a tool your AI assistant reads
+from. Ask Claude or Codex "what did I save about X?" and it actually knows —
+because it's pulling from your library.
+
+- It can search, read, and organize your saves from your instructions.
+- No token, no fuss: approve access with a quick browser sign-in. Works with
+  Claude Code, Claude Desktop, and Codex. Revoke any time in
+  Settings -> Agent connections.
+
+Connect your AI: {{connectUrl}}
+See it in action: {{helpUrl}}usecase-second-brain-for-agents/
+
+That's the tour. Save what catches your eye, let FoundKeep file it, and lean
+on it (and your AI) when you need it. Reply any time — we read everything.
+
+Help: {{helpUrl}}  ·  Connect your AI: {{connectUrl}}  ·  Unsubscribe: {{unsubscribeUrl}}

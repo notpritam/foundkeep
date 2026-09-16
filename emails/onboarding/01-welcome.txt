@@ -1,0 +1,24 @@
+Welcome to FoundKeep, {{name}}
+
+FoundKeep is a private place to keep the things worth keeping — links,
+highlights, photos, files, even whole tweet threads — and actually find
+them again later.
+
+Three things to try:
+
+1. Save from anywhere — add the browser extension or share into FoundKeep
+   from your phone. One tap and it's kept.
+2. Let AI do the filing — every save gets a summary, tags and a category
+   automatically, so it's searchable without you organizing a thing.
+3. Find it again — search across everything, or follow the links between
+   related saves.
+
+Open your library: {{dashboardUrl}}
+2-minute getting started: {{helpUrl}}getting-started/
+
+A few ways people use it:
+- A research library that stays organized on its own: {{helpUrl}}usecase-research-library/
+- A reading list you'll actually finish: {{helpUrl}}usecase-reading-list/
+- Keep tweets & threads forever (full text + media): {{helpUrl}}usecase-keep-tweets-forever/
+
+Help: {{helpUrl}}  ·  Connect your AI: {{connectUrl}}  ·  Unsubscribe: {{unsubscribeUrl}}

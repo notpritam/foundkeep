@@ -1,0 +1,17 @@
+The best filing system is the one you never touch
+
+Most "save it for later" tools become a junk drawer because organizing is
+work. FoundKeep does that part for you — so your only job is to save.
+
+- It reads and tags everything: summaries, tags, categories, and even text
+  lifted out of screenshots. Search finds it all: {{helpUrl}}search-and-filters/
+- Your tags, when you want them: add personal tags or use folders:
+  {{helpUrl}}folders-and-tags/
+- Group and share with Collections: {{helpUrl}}collections/
+
+Save a few things: {{dashboardUrl}}
+
+The habit that makes it click: save the moment something catches your eye.
+Trust that you'll find it later — because you will.
+
+Help: {{helpUrl}}  ·  Connect your AI: {{connectUrl}}  ·  Unsubscribe: {{unsubscribeUrl}}
