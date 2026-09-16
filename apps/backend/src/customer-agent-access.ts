@@ -19,6 +19,16 @@ export function agentAccess(db:Database,header:string|undefined,scope:AgentScope
  db.query('UPDATE customer_agent_tokens SET last_seen_at=? WHERE id=?').run(Date.now(),row.id);
  return {id:row.id,accountId:row.account_id,scopes};
 }
+/** Insert one `fk_mcp_` access token and return the raw secret. Shared by the
+ *  interactive `/dashboard/agents` path and the OAuth `/token` endpoint (DRY).
+ *  This is the minting core ONLY: it does not enforce the per-account cap or
+ *  clean up expired tokens — those belong to the interactive path below. OAuth
+ *  access tokens are short-lived (1h) and therefore skip that cap deliberately. */
+export function mintAgentToken(db:Database,accountId:string,name:string,scopes:string[],ttlMs:number):{id:string;token:string;expiresAt:number}{
+ const token='fk_mcp_'+randomBytes(32).toString('base64url'),id=randomUUID(),now=Date.now(),expiresAt=now+ttlMs;
+ db.query('INSERT INTO customer_agent_tokens(id,account_id,name,token_hash,scopes_json,created_at,expires_at) VALUES(?,?,?,?,?,?,?)').run(id,accountId,name,hash(token),JSON.stringify(scopes),now,expiresAt);
+ return {id,token,expiresAt};
+}
 export function createAgentToken(db:Database,owner:string,body:Record<string,unknown>,customerOrigin=config.customerOrigin){
  const name=organizationName(body.name,60,'An agent name');
  if(!Array.isArray(body.scopes)||!body.scopes.includes('library:read')||body.scopes.some(value=>!AGENT_SCOPES.includes(value as AgentScope)))moduleFail(400,'invalid_scope','Choose library read access and any optional permissions.');
@@ -28,8 +38,7 @@ export function createAgentToken(db:Database,owner:string,body:Record<string,unk
   db.query('DELETE FROM customer_agent_tokens WHERE account_id=? AND expires_at<=?').run(owner,Date.now());
   const count=db.query('SELECT COUNT(*) n FROM customer_agent_tokens WHERE account_id=?').get(owner) as {n:number};
   if(count.n>=10)moduleFail(409,'agent_limit','Revoke an unused agent before connecting another.');
-  const token='fk_mcp_'+randomBytes(32).toString('base64url'),id=randomUUID(),expiresAt=Date.now()+Number(days)*86_400_000;
-  db.query('INSERT INTO customer_agent_tokens(id,account_id,name,token_hash,scopes_json,created_at,expires_at) VALUES(?,?,?,?,?,?,?)').run(id,owner,name,hash(token),JSON.stringify(scopes),Date.now(),expiresAt);
+  const {id,token,expiresAt}=mintAgentToken(db,owner,name,scopes,Number(days)*86_400_000);
   return {id,name,token,expiresAt,endpoint:customerOrigin+'/api/mcp'};
  }).immediate();
 }

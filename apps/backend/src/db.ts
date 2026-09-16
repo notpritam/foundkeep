@@ -579,6 +579,28 @@ const MIGRATIONS: string[] = [
     body TEXT NOT NULL, created_at INTEGER NOT NULL
    );
    CREATE INDEX support_ticket_notes_ticket ON support_ticket_notes(ticket_id,created_at);`,
+  // MCP OAuth 2.1 authorization server: dynamically-registered public clients and
+  // rotating refresh-token families. Access tokens reuse customer_agent_tokens.
+  `CREATE TABLE customer_oauth_clients (
+    client_id TEXT PRIMARY KEY,
+    client_name TEXT NOT NULL,
+    redirect_uris_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_used_at INTEGER NOT NULL
+   );
+   CREATE INDEX customer_oauth_clients_used ON customer_oauth_clients(last_used_at);
+   CREATE TABLE customer_oauth_refresh (
+    token_hash TEXT PRIMARY KEY,
+    family_id TEXT NOT NULL,
+    account_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    client_id TEXT NOT NULL,
+    scopes_json TEXT NOT NULL,
+    consumed_at INTEGER,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+   );
+   CREATE INDEX customer_oauth_refresh_family ON customer_oauth_refresh(family_id);
+   CREATE INDEX customer_oauth_refresh_account ON customer_oauth_refresh(account_id);`,
 ];
 
 export const DATABASE_SCHEMA_VERSION = MIGRATIONS.length;

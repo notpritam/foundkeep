@@ -5,8 +5,9 @@ import {registerPreservation} from './customer-preservation-routes.ts';
 import {registerCustomerCollections} from './customer-collections';
 import {registerAdmin, registerSupport} from './admin-console';
 import {registerCustomerProcessing,createProcessingService} from './customer-processing.ts';
-import {registerAgentAccess} from './customer-agent-access.ts';
+import {registerAgentAccess,mintAgentToken} from './customer-agent-access.ts';
 import {registerCustomerMcp} from './customer-mcp.ts';
+import {registerMcpOAuth} from './customer-mcp-oauth.ts';
 import type {AgentAccess} from './customer-agent-access.ts';
 import type {AgentRequest} from './customer-mcp-catalog.ts';
 import {discardAgentUploads} from './customer-mcp-uploads.ts';
@@ -499,6 +500,10 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
   registerCustomerCollections(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) }, c => { try { return auth(c); } catch(error) { if(error instanceof CustomerError && error.status===401)return null; throw error; } });
   registerAdmin(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) }, oauthGateway);
   registerSupport(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) });
+  registerMcpOAuth(app, db, { auth, jsonBody, usage, savingClient, globalMaxCaptures, globalMaxBytes, rate: (key,limit,window) => rates.take(key,limit,window) }, {
+    issueAccessToken: (id, name, scopes, ttl) => mintAgentToken(db, id, name, scopes, ttl).token,
+    loginUrl: (returnTo) => config.customerOrigin + '/login?next=' + encodeURIComponent(returnTo),
+  });
 
   app.post("/mobile/register", async (c) => {
     publicRate(c, "mobile-register");
