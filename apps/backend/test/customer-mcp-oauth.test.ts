@@ -73,6 +73,11 @@ async function mintCode(cookie: string, clientId: string, redirectUri: string, c
   return new URL(posted.location).searchParams.get('code')!;
 }
 
+async function token(fields: Record<string, string>) {
+  const r = await api('/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields).toString() });
+  return { status: r.status, body: (await r.json()) as any, headers: r.headers };
+}
+
 // --- Task 1: storage + module constant ---
 test('migration creates both OAuth tables and SCOPES matches the supported set', () => {
   const names = (db.query("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map(r => r.name);
@@ -208,4 +213,69 @@ test('consent with a bad CSRF token is rejected', async () => {
     body: new URLSearchParams({ csrf: 'wrong', client_id: client.client_id, redirect_uri: uri, scope: 'library:read', code_challenge: challenge, code_challenge_method: 'S256', allow: '1' }).toString(),
   });
   expect(bad.status).toBe(403);
+});
+
+// --- Task 5: token endpoint (code -> tokens, refresh rotation, reuse) ---
+const uri = 'http://127.0.0.1:6274/callback';
+
+test('authorization_code exchange issues an access + refresh pair', async () => {
+  const { cookie } = await register();
+  const client = (await registerClient()).body;
+  const { verifier, challenge } = pkce();
+  const code = await mintCode(cookie, client.client_id, uri, challenge, 'library:read library:write');
+  const r = await token({ grant_type: 'authorization_code', code, redirect_uri: uri, client_id: client.client_id, code_verifier: verifier });
+  expect(r.status).toBe(200);
+  expect(r.headers.get('cache-control')).toContain('no-store');
+  expect(r.body.access_token).toMatch(/^fk_mcp_/);
+  expect(r.body.token_type).toBe('Bearer');
+  expect(r.body.expires_in).toBe(3600);
+  expect(r.body.refresh_token).toMatch(/^fk_ref_/);
+  expect(r.body.scope).toBe('library:read library:write');
+});
+
+test('a wrong code_verifier is rejected as invalid_grant', async () => {
+  const { cookie } = await register();
+  const client = (await registerClient()).body;
+  const { challenge } = pkce();
+  const code = await mintCode(cookie, client.client_id, uri, challenge);
+  const r = await token({ grant_type: 'authorization_code', code, redirect_uri: uri, client_id: client.client_id, code_verifier: 'x'.repeat(43) });
+  expect(r.status).toBe(400);
+  expect(r.body.error).toBe('invalid_grant');
+});
+
+test('replaying an authorization code is rejected', async () => {
+  const { cookie } = await register();
+  const client = (await registerClient()).body;
+  const { verifier, challenge } = pkce();
+  const code = await mintCode(cookie, client.client_id, uri, challenge);
+  const first = await token({ grant_type: 'authorization_code', code, redirect_uri: uri, client_id: client.client_id, code_verifier: verifier });
+  expect(first.status).toBe(200);
+  const replay = await token({ grant_type: 'authorization_code', code, redirect_uri: uri, client_id: client.client_id, code_verifier: verifier });
+  expect(replay.status).toBe(400);
+  expect(replay.body.error).toBe('invalid_grant');
+});
+
+test('refresh rotates the pair, and reusing a consumed refresh revokes the family', async () => {
+  const { cookie } = await register();
+  const client = (await registerClient()).body;
+  const { verifier, challenge } = pkce();
+  const code = await mintCode(cookie, client.client_id, uri, challenge);
+  const first = await token({ grant_type: 'authorization_code', code, redirect_uri: uri, client_id: client.client_id, code_verifier: verifier });
+  const refresh1 = first.body.refresh_token as string;
+
+  const rotated = await token({ grant_type: 'refresh_token', refresh_token: refresh1, client_id: client.client_id });
+  expect(rotated.status).toBe(200);
+  expect(rotated.body.access_token).toMatch(/^fk_mcp_/);
+  expect(rotated.body.refresh_token).toMatch(/^fk_ref_/);
+  expect(rotated.body.refresh_token).not.toBe(refresh1);
+  const refresh2 = rotated.body.refresh_token as string;
+
+  // Reuse of the now-consumed refresh1 -> reuse detection -> family revoked.
+  const reuse = await token({ grant_type: 'refresh_token', refresh_token: refresh1, client_id: client.client_id });
+  expect(reuse.status).toBe(400);
+  expect(reuse.body.error).toBe('invalid_grant');
+  // ...and the rotated refresh2 (same family) is now dead too.
+  const after = await token({ grant_type: 'refresh_token', refresh_token: refresh2, client_id: client.client_id });
+  expect(after.status).toBe(400);
+  expect(db.query('SELECT COUNT(*) n FROM customer_oauth_refresh').get() as any).toMatchObject({ n: 0 });
 });

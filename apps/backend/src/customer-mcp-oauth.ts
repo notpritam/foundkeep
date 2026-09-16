@@ -264,5 +264,79 @@ export function registerMcpOAuth(
     return c.redirect(withParams(redirectUri, { code, state }), 302);
   });
 
-  void deps;
+  // --- Token endpoint: authorization_code exchange + rotating refresh tokens ---
+  const tokenError = (c: CustomerContext, error: string, description: string, status: 400 | 401 = 400) => {
+    c.header('Cache-Control', 'no-store');
+    return c.json({ error, error_description: description }, status);
+  };
+  const accessName = (client: ClientRow | null) => (client?.client_name || 'MCP client') + ' (OAuth)';
+
+  app.post('/oauth/token', async c => {
+    rate('oauth-token:' + clientIp(c), 60, 60_000);
+    // Standard token requests are form-encoded; accept JSON too for convenience.
+    let params: Record<string, string> = {};
+    if (/^application\/json/i.test(c.req.header('content-type') || '')) {
+      const body = await jsonBody(c);
+      for (const [key, value] of Object.entries(body)) params[key] = value === undefined || value === null ? '' : String(value);
+    } else {
+      const form = await c.req.parseBody();
+      for (const [key, value] of Object.entries(form)) params[key] = typeof value === 'string' ? value : '';
+    }
+    c.header('Cache-Control', 'no-store');
+    const grant = params.grant_type;
+
+    if (grant === 'authorization_code') {
+      const code = params.code || '';
+      const key = digest(code);
+      sweepAuthCodes();
+      const record = authCodes.get(key);
+      authCodes.delete(key); // single-use: consumed whether or not validation passes.
+      if (!record || record.exp <= Date.now()) return tokenError(c, 'invalid_grant', 'This authorization code is invalid or expired.');
+      if (params.client_id && params.client_id !== record.clientId) return tokenError(c, 'invalid_grant', 'This code was issued to a different client.');
+      if (params.redirect_uri !== record.redirectUri) return tokenError(c, 'invalid_grant', 'The redirect_uri does not match the authorization request.');
+      if (!pkceMatches(params.code_verifier || '', record.codeChallenge)) return tokenError(c, 'invalid_grant', 'The PKCE code_verifier is invalid.');
+
+      const client = getClient(db, record.clientId);
+      // OAuth access tokens are short-lived (1h) and skip the interactive 10-token
+      // cap; prune this account's expired agent tokens so they can't accumulate.
+      db.query('DELETE FROM customer_agent_tokens WHERE account_id=? AND expires_at<=?').run(record.accountId, Date.now());
+      const accessToken = deps.issueAccessToken(record.accountId, accessName(client), record.scopes, ACCESS_TTL_MS);
+      const refreshToken = 'fk_ref_' + rand(32);
+      const now = Date.now();
+      db.query('INSERT INTO customer_oauth_refresh(token_hash,family_id,account_id,client_id,scopes_json,consumed_at,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?)')
+        .run(digest(refreshToken), rand(16), record.accountId, record.clientId, JSON.stringify(record.scopes), null, now, now + REFRESH_TTL_MS);
+      return c.json({ access_token: accessToken, token_type: 'Bearer', expires_in: Math.floor(ACCESS_TTL_MS / 1000), refresh_token: refreshToken, scope: record.scopes.join(' ') });
+    }
+
+    if (grant === 'refresh_token') {
+      const presented = params.refresh_token || '';
+      if (!/^fk_ref_[A-Za-z0-9_-]+$/.test(presented)) return tokenError(c, 'invalid_grant', 'This refresh token is invalid.');
+      const key = digest(presented);
+      const row = db.query('SELECT * FROM customer_oauth_refresh WHERE token_hash=?').get(key) as { family_id: string; account_id: string; client_id: string; scopes_json: string; consumed_at: number | null; expires_at: number } | null;
+      if (!row) return tokenError(c, 'invalid_grant', 'This refresh token is invalid.');
+      if (row.consumed_at !== null) {
+        // Reuse of an already-rotated token: revoke the whole family (RFC 6819).
+        db.query('DELETE FROM customer_oauth_refresh WHERE family_id=?').run(row.family_id);
+        return tokenError(c, 'invalid_grant', 'This refresh token was already used. The connection was revoked; reconnect.');
+      }
+      if (row.expires_at <= Date.now()) {
+        db.query('DELETE FROM customer_oauth_refresh WHERE token_hash=?').run(key);
+        return tokenError(c, 'invalid_grant', 'This refresh token expired. Reconnect.');
+      }
+      const scopes = JSON.parse(row.scopes_json) as OAuthScope[];
+      const client = getClient(db, row.client_id);
+      db.query('DELETE FROM customer_agent_tokens WHERE account_id=? AND expires_at<=?').run(row.account_id, Date.now());
+      const accessToken = deps.issueAccessToken(row.account_id, accessName(client), scopes, ACCESS_TTL_MS);
+      const newRefresh = 'fk_ref_' + rand(32);
+      const now = Date.now();
+      db.transaction(() => {
+        db.query('UPDATE customer_oauth_refresh SET consumed_at=? WHERE token_hash=?').run(now, key);
+        db.query('INSERT INTO customer_oauth_refresh(token_hash,family_id,account_id,client_id,scopes_json,consumed_at,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?)')
+          .run(digest(newRefresh), row.family_id, row.account_id, row.client_id, JSON.stringify(scopes), null, now, now + REFRESH_TTL_MS);
+      })();
+      return c.json({ access_token: accessToken, token_type: 'Bearer', expires_in: Math.floor(ACCESS_TTL_MS / 1000), refresh_token: newRefresh, scope: scopes.join(' ') });
+    }
+
+    return tokenError(c, 'unsupported_grant_type', 'Use grant_type=authorization_code or refresh_token.');
+  });
 }
