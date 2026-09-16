@@ -191,6 +191,108 @@ export function parseTwitterPost(value: unknown, id: string): TwitterManifest {
     incomplete: incomplete || links.length > 3 || !!v.article,
   };
 }
+// Full-content source. X's public syndication endpoint returns only a ~278-char
+// preview for long-form "note tweets" and often omits media, so we also query a
+// FixTweet-compatible service that expands the full text + media without a login.
+// Configurable so it can be pointed at a self-hosted FixTweet instance.
+const fxBase = () =>
+  (process.env.FOUNDKEEP_TWITTER_API_BASE || "https://api.fxtwitter.com").replace(
+    /\/+$/,
+    "",
+  );
+
+// Map a FixTweet response to our manifest. Third-party, so every media URL is
+// re-validated through the strict Twitter-CDN checks (imageUrl/videoUrl) — a bad
+// or malicious response can never make us download a non-twimg URL.
+export function parseFxTweet(value: unknown, id: string): TwitterManifest {
+  const v = value as any;
+  const tw = v?.tweet;
+  if (!tw || String(tw.id) !== id) throw Error("The public post is unavailable.");
+  const media: TwitterManifest["media"] = [];
+  const all = Array.isArray(tw.media?.all) ? tw.media.all : [];
+  let incomplete = all.length > 8;
+  for (const item of all.slice(0, 8)) {
+    if (item?.type === "photo") {
+      const url = imageUrl(item?.url);
+      if (url) media.push({ kind: "image", url });
+      else incomplete = true;
+    } else if (item?.type === "video" || item?.type === "gif") {
+      const url = videoUrl(item?.url);
+      if (url) media.push({ kind: "video", url });
+      else incomplete = true;
+    }
+  }
+  const name = typeof tw.author?.name === "string" ? tw.author.name.slice(0, 200) : "";
+  const handle =
+    typeof tw.author?.screen_name === "string"
+      ? ` (@${tw.author.screen_name.slice(0, 50)})`
+      : "";
+  return {
+    text: typeof tw.text === "string" ? tw.text.slice(0, 50_000) : "",
+    author: name ? name + handle : "",
+    publishedAt: typeof tw.created_at === "string" ? tw.created_at.slice(0, 100) : null,
+    media,
+    links: [],
+    metadataAvailable: true,
+    incomplete,
+  };
+}
+
+async function resolveViaFx(
+  id: string,
+  read: PublicReader,
+  signal: AbortSignal,
+): Promise<TwitterManifest> {
+  const response = await read(`${fxBase()}/status/${id}`, {
+    maxBytes: 1024 * 1024,
+    signal,
+    accept: "application/json",
+  });
+  return parseFxTweet(JSON.parse(response.data.toString("utf8")), id);
+}
+
+async function resolveViaSyndication(
+  id: string,
+  read: PublicReader,
+  signal: AbortSignal,
+): Promise<TwitterManifest> {
+  // Same public embed token calculation used by the maintained yt-dlp extractor.
+  const token = ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
+  const response = await read(
+    `https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=${token}`,
+    { maxBytes: 2 * 1024 * 1024, signal, accept: "application/json" },
+  );
+  return parseTwitterPost(JSON.parse(response.data.toString("utf8")), id);
+}
+
+// Keep the fuller text; union media (deduped, capped) so full text from one
+// source and media from another still combine into one complete manifest.
+function mergeManifests(
+  a: TwitterManifest | null,
+  b: TwitterManifest | null,
+): TwitterManifest | null {
+  if (!a) return b;
+  if (!b) return a;
+  const primary = a.text.length >= b.text.length ? a : b;
+  const secondary = primary === a ? b : a;
+  const media: TwitterManifest["media"] = [];
+  const seen = new Set<string>();
+  for (const item of [...primary.media, ...secondary.media])
+    if (!seen.has(item.url) && media.length < 8) {
+      media.push(item);
+      seen.add(item.url);
+    }
+  return {
+    text: primary.text || secondary.text,
+    author: primary.author || secondary.author,
+    publishedAt: primary.publishedAt || secondary.publishedAt,
+    media,
+    links: [...new Set([...primary.links, ...secondary.links])].slice(0, 3),
+    metadataAvailable: a.metadataAvailable || b.metadataAvailable,
+    incomplete: !!primary.incomplete,
+  };
+}
+
 export async function resolveTwitterPost(
   url: string,
   hints: SocialContext,
@@ -199,7 +301,21 @@ export async function resolveTwitterPost(
 ): Promise<TwitterManifest> {
   const post = twitterPost(url);
   if (!post) throw Error("Use an X post permalink.");
-  let result: TwitterManifest = {
+  // Query both sources in parallel and merge; either alone can be degraded
+  // (note-tweet truncation on syndication, or FixTweet unavailability).
+  const attempt = async (fn: () => Promise<TwitterManifest>) => {
+    try {
+      return await fn();
+    } catch {
+      signal.throwIfAborted();
+      return null;
+    }
+  };
+  const [fx, syndication] = await Promise.all([
+    attempt(() => resolveViaFx(post.id, read, signal)),
+    attempt(() => resolveViaSyndication(post.id, read, signal)),
+  ]);
+  const result: TwitterManifest = mergeManifests(fx, syndication) ?? {
     text: "",
     author: "",
     publishedAt: null,
@@ -207,22 +323,6 @@ export async function resolveTwitterPost(
     links: [],
     metadataAvailable: false,
   };
-  try {
-    // Same public embed token calculation used by the maintained yt-dlp extractor.
-    const token = ((Number(post.id) / 1e15) * Math.PI)
-      .toString(36)
-      .replace(/(0+|\.)/g, "");
-    const response = await read(
-      `https://cdn.syndication.twimg.com/tweet-result?id=${post.id}&token=${token}`,
-      { maxBytes: 2 * 1024 * 1024, signal, accept: "application/json" },
-    );
-    result = parseTwitterPost(
-      JSON.parse(response.data.toString("utf8")),
-      post.id,
-    );
-  } catch {
-    signal.throwIfAborted();
-  }
   const seen = new Set(result.media.map((x) => x.url));
   for (const url of hints.images)
     if (!seen.has(url) && result.media.length < 8) {

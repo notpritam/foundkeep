@@ -2,9 +2,14 @@ import { expect, test } from "bun:test";
 import {
   twitterPost,
   parseTwitterPost,
+  parseFxTweet,
+  resolveTwitterPost,
   normalizeSocialContext,
 } from "../src/customer-twitter.ts";
-import { createPublicReader } from "../src/customer-public-resource.ts";
+import {
+  createPublicReader,
+  type PublicReader,
+} from "../src/customer-public-resource.ts";
 test("canonicalizes a single post without accepting lookalike hosts or credentials", () => {
   expect(
     twitterPost("https://twitter.com/nasa/status/12345/photo/1?x=1"),
@@ -121,4 +126,110 @@ test('photo URL variants deduplicate and unsupported video formats stay explicit
  expect(hints.images).toHaveLength(1);
  const value=parseTwitterPost({id_str:'123',mediaDetails:[{type:'video',video_info:{variants:[{content_type:'application/x-mpegURL',url:'https://video.twimg.com/only.m3u8'}]}}]},'123');
  expect(value.media).toHaveLength(0);expect(value.incomplete).toBe(true);
+});
+
+test("parseFxTweet expands full note text, keeps only Twitter-CDN media", () => {
+  const m = parseFxTweet(
+    {
+      tweet: {
+        id: "123",
+        text: "the full long-form note tweet body ".repeat(20),
+        author: { name: "Finn", screen_name: "fin465" },
+        created_at: "Wed Sep 16 02:42:31 +0000 2026",
+        media: {
+          all: [
+            { type: "photo", url: "https://pbs.twimg.com/media/AbC123.jpg?name=small" },
+            { type: "video", url: "https://video.twimg.com/ext_tw_video/1/pu/vid/x.mp4" },
+            { type: "photo", url: "https://evil.example/hack.jpg" },
+          ],
+        },
+      },
+    },
+    "123",
+  );
+  expect(m.text.length).toBeGreaterThan(300);
+  expect(m.author).toBe("Finn (@fin465)");
+  expect(m.metadataAvailable).toBe(true);
+  // The evil (non-twimg) photo is dropped; only pbs/video.twimg survive.
+  expect(m.media).toEqual([
+    { kind: "image", url: "https://pbs.twimg.com/media/AbC123?format=jpg&name=orig" },
+    { kind: "video", url: "https://video.twimg.com/ext_tw_video/1/pu/vid/x.mp4" },
+  ]);
+  expect(m.incomplete).toBe(true);
+  expect(() => parseFxTweet({ tweet: { id: "999" } }, "123")).toThrow();
+});
+
+test("resolveTwitterPost merges full text (FixTweet) with media (syndication)", async () => {
+  const full = "how to get 500k-10m+ views on your launch video ".repeat(10);
+  const read: PublicReader = async (url) => {
+    const body = url.includes("fxtwitter")
+      ? {
+          tweet: {
+            id: "555",
+            text: full,
+            author: { name: "Finn", screen_name: "fin465" },
+            created_at: "Wed Sep 16 02:42:31 +0000 2026",
+            media: { all: [] },
+          },
+        }
+      : url.includes("syndication")
+        ? {
+            id_str: "555",
+            text: "truncated preview…",
+            user: { name: "Finn", screen_name: "fin465" },
+            created_at: "2026-09-16T02:42:31.000Z",
+            mediaDetails: [
+              {
+                type: "video",
+                video_info: {
+                  variants: [
+                    {
+                      content_type: "video/mp4",
+                      bitrate: 832000,
+                      url: "https://video.twimg.com/a/vid/b.mp4",
+                    },
+                  ],
+                },
+              },
+            ],
+          }
+        : null;
+    if (!body) throw new Error("unexpected " + url);
+    return { url, mime: "application/json", data: Buffer.from(JSON.stringify(body)) };
+  };
+  const m = await resolveTwitterPost(
+    "https://x.com/fin465/status/555",
+    { version: 1, images: [], links: [], articleText: "" },
+    AbortSignal.timeout(5000),
+    read,
+  );
+  expect(m.text).toBe(full); // full text from FixTweet beats the syndication preview
+  expect(m.media).toEqual([{ kind: "video", url: "https://video.twimg.com/a/vid/b.mp4" }]);
+  expect(m.metadataAvailable).toBe(true);
+});
+
+test("resolveTwitterPost still works when FixTweet is down (syndication only)", async () => {
+  const read: PublicReader = async (url) => {
+    if (url.includes("fxtwitter")) throw new Error("fx down");
+    return {
+      url,
+      mime: "application/json",
+      data: Buffer.from(
+        JSON.stringify({
+          id_str: "777",
+          text: "preview only",
+          user: { name: "A", screen_name: "a" },
+          created_at: "2026-09-16T02:42:31.000Z",
+        }),
+      ),
+    };
+  };
+  const m = await resolveTwitterPost(
+    "https://x.com/a/status/777",
+    { version: 1, images: [], links: [], articleText: "" },
+    AbortSignal.timeout(5000),
+    read,
+  );
+  expect(m.text).toBe("preview only");
+  expect(m.metadataAvailable).toBe(true);
 });
