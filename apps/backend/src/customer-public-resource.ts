@@ -4,16 +4,31 @@ import {
   isPublicPreviewAddress,
   resolvePublicHost,
   requestPinned,
+  sanitizeExtraHeaders,
   type PreviewAddress,
   type PreviewTarget,
   type PreviewUpstream,
 } from "./customer-preview.ts";
-export type PublicResource = { url: string; mime: string; data: Buffer };
+export type PublicReadOptions = {
+  maxBytes: number;
+  signal: AbortSignal;
+  accept?: string;
+  headers?: Record<string, string>;
+  cookies?: (host: string) => string | null;
+};
+export type PublicResource = { url: string; mime: string; data: Buffer; status: number };
+export class PublicResourceError extends Error {
+  constructor(readonly status: number, readonly url: string) {
+    super("The public source is unavailable.");
+  }
+}
 export type PublicReader = (
   url: string,
-  options: { maxBytes: number; signal: AbortSignal; accept?: string },
+  options: PublicReadOptions,
 ) => Promise<PublicResource>;
-/** Pinned DNS on every redirect, bounded body and wall time, no cookies/auth. */
+/** Pinned DNS on every redirect, bounded body and wall time. Headers and a
+ * per-host cookie may be supplied by the caller; both are re-scoped on every
+ * redirect hop so neither ever reaches a host it was not issued for. */
 export function createPublicReader(
   deps: {
     resolve?: (host: string, signal: AbortSignal) => Promise<PreviewAddress[]>;
@@ -21,6 +36,7 @@ export function createPublicReader(
       target: PreviewTarget,
       signal: AbortSignal,
       accept?: string,
+      headers?: Record<string, string>,
     ) => Promise<PreviewUpstream>;
   } = {},
 ): PublicReader {
@@ -56,11 +72,22 @@ export function createPublicReader(
           addresses.some((x) => !isPublicPreviewAddress(x.address))
         )
           throw Error("This is not a public source.");
+        // Headers and cookie are rebuilt from options on every hop: a header or
+        // cookie issued for the original host must never follow a redirect to
+        // a different one.
+        const cookie = options.cookies?.(host);
+        const hopHeaders: Record<string, string> = sanitizeExtraHeaders(
+          options.headers,
+        );
+        delete hopHeaders.Cookie;
+        delete hopHeaders.cookie;
+        if (cookie) hopHeaders.Cookie = cookie;
         response = await Promise.race([
           (deps.transport || requestPinned)(
             { ...addresses[0]!, url },
             signal,
             options.accept || "*/*",
+            hopHeaders,
           ),
           aborted,
         ]);
@@ -72,8 +99,9 @@ export function createPublicReader(
           if (!url) throw Error("This is not a public source.");
           continue;
         }
+        if (response.status !== 200)
+          throw new PublicResourceError(response.status, url.href);
         if (
-          response.status !== 200 ||
           !["", "identity"].includes(
             response.headers.get("content-encoding") || "",
           )
@@ -102,6 +130,7 @@ export function createPublicReader(
             .trim()
             .toLowerCase(),
           data: Buffer.concat(chunks),
+          status: response.status,
         };
       }
       throw Error("Too many source redirects.");

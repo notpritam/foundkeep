@@ -68,7 +68,7 @@ export function extractSource(html:string,url:string,requestedUrl=url):Omit<Sour
   const notice=extractionStatus==='unavailable'?'This page did not expose readable public content. Save the text from the page with the extension, or add a note.':video&&!transcript?'Video metadata is available, but no transcript was exposed by this page.':extractionStatus==='metadata-only'?'Only the public preview was available. The full post or article was not exposed by this page.':null;
   return {url,text,title,description,imageUrl,author,publishedAt,siteName,platform,contentKind,extractionStatus,transcriptStatus,notice};
 }
-export function createSourceFetcher(options:{resolve?:(host:string,signal:AbortSignal)=>Promise<PreviewAddress[]>;transport?:(target:PreviewTarget,signal:AbortSignal,accept?:string)=>Promise<PreviewUpstream>}={}){
+export function createSourceFetcher(options:{resolve?:(host:string,signal:AbortSignal)=>Promise<PreviewAddress[]>;transport?:(target:PreviewTarget,signal:AbortSignal,accept?:string,headers?:Record<string,string>)=>Promise<PreviewUpstream>}={}){
  return async(raw:string):Promise<SourceSnapshot>=>{
   let url=previewSourceUrl(raw);if(!url)throw new Error('This source is not a public web page.');
   const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;let current:PreviewUpstream|undefined;

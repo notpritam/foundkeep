@@ -19,7 +19,7 @@ export interface PreviewUpstream {
 export interface PreviewImage { bytes: Uint8Array; mime: string }
 interface PreviewOptions {
   resolve?: (hostname: string, signal: AbortSignal) => Promise<PreviewAddress[]>;
-  transport?: (target: PreviewTarget, signal: AbortSignal) => Promise<PreviewUpstream>;
+  transport?: (target: PreviewTarget, signal: AbortSignal, accept?: string, headers?: Record<string, string>) => Promise<PreviewUpstream>;
   deadlineMs?: number; maxBytes?: number; maxRedirects?: number;
   maxConcurrent?: number; maxPerAccount?: number;
 }
@@ -98,10 +98,36 @@ export function previewRequestOptions(target: PreviewTarget): RequestOptions {
   };
 }
 
-export async function requestPinned(target: PreviewTarget, signal: AbortSignal, accept?: string): Promise<PreviewUpstream> {
+// Host and Accept-Encoding are pinned by the reader itself (target address, no
+// compression) and must never be overridable by caller-supplied headers, in
+// any letter case. Every layer that forwards headers to a transport applies
+// this same filter, so the guarantee holds regardless of which transport runs.
+const PROTECTED_HEADERS = new Set(["host", "accept-encoding"]);
+export function sanitizeExtraHeaders(headers?: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    if (PROTECTED_HEADERS.has(key.toLowerCase())) continue;
+    if (!/^[\x20-\x7e]*$/.test(value) || value.length > 8192) continue;
+    result[key] = value;
+  }
+  return result;
+}
+export async function requestPinned(target: PreviewTarget, signal: AbortSignal, accept?: string, headers?: Record<string, string>): Promise<PreviewUpstream> {
+  const base = previewRequestOptions(target);
+  const merged: Record<string, string> = { ...(base.headers as Record<string, string>) };
+  const drop = (name: string) => {
+    const lower = name.toLowerCase();
+    for (const existing of Object.keys(merged)) if (existing.toLowerCase() === lower) delete merged[existing];
+  };
+  for (const [key, value] of Object.entries(sanitizeExtraHeaders(headers))) {
+    // A caller-supplied Accept is allowed, but the explicit accept argument wins below when both are given.
+    drop(key);
+    merged[key] = value;
+  }
+  if (accept) { drop("Accept"); merged.Accept = accept; }
   return new Promise((resolve, reject) => {
     const request = (target.url.protocol === "https:" ? httpsRequest : httpRequest)(
-      { ...previewRequestOptions(target), ...(accept ? { headers: { ...previewRequestOptions(target).headers, Accept: accept } } : {}), signal },
+      { ...base, headers: merged, signal },
       response => {
         const headers = new Headers();
         for (const [key, value] of Object.entries(response.headers)) {
