@@ -13,7 +13,7 @@ export type TwitterManifest = {
   text: string;
   author: string;
   publishedAt: string | null;
-  media: { kind: "image" | "video"; url: string }[];
+  media: { kind: "image" | "video"; url: string; audioUrls?: string[] }[];
   links: string[];
   metadataAvailable: boolean;
   incomplete?: boolean;

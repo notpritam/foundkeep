@@ -16,7 +16,7 @@ function platformOnlyTitle(title:string|null,platform:NonNullable<SourceSnapshot
  const label=title.normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
  return platform==='youtube'?label==='youtube':platform==='instagram'?label==='instagram':/^(?:x|twitter|xx|xtwitter|twitterx)$/.test(label);
 }
-function blockedRoute(url:string){
+export function blockedRoute(url:string){
  // Route evidence is language-independent and does not reject ordinary cross-host redirects.
  const path=new URL(url).pathname;
  return /^\/(?:unsupportedbrowser|checkpoint|challenge|login|log-in|signin|sign-in)(?:\.php)?(?:\/|$)/i.test(path)||/^\/(?:accounts\/(?:login|signin)|i\/flow\/login|auth\/(?:login|signin))(?:\/|$)/i.test(path);
