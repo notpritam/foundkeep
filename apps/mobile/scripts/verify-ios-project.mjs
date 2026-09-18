@@ -27,6 +27,7 @@ for (const file of ['Info.plist', 'FoundkeepShare.entitlements', 'PrivacyInfo.xc
 const info = await readFile(join(shareDirectory, 'Info.plist'), 'utf8');
 assert.match(info, /com\.apple\.share-services/);
 assert.match(info, /NSExtensionActivationSupportsWebURLWithMaxCount/);
+assert.match(info, /<key>NSExtensionActivationDictionaryVersion<\/key>\s*<integer>2<\/integer>/, "Dictionary version 2 keeps the extension visible when a host offers extra asset types (YouTube, Reddit).");
 assert.match(info, /NSExtensionActivationSupportsText/);
 assert.match(info, /NSExtensionActivationSupportsImageWithMaxCount/);
 assert.match(info, /NSExtensionActivationSupportsMovieWithMaxCount/);

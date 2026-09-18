@@ -69,3 +69,16 @@ test('resolved dev config isolates bundle, group, keychain, Android, OTA channel
   assert.equal(eas.build['friends-android'].android.buildType,'apk');assert.equal(eas.build['friends-play'].android.buildType,'app-bundle');assert.equal(eas.submit['friends-ios'].ios.ascAppId,'6809771188');
   assert.throws(()=>config('staging'));
 });
+
+test('iOS Share Extension activation rule appears in every host that offers at least one supported type', async () => {
+  const info = await readFile(new URL('../share-extension/Info.plist', import.meta.url), 'utf8');
+  const rule = info.match(/<key>NSExtensionActivationRule<\/key>\s*<dict>([\s\S]*?)<\/dict>/)?.[1];
+  assert.ok(rule, 'NSExtensionActivationRule must stay in dictionary form so Safari keeps running SafariPreprocessor.js');
+  // Version 1 (the default) hides the extension unless it handles *every* asset type the host offers.
+  // YouTube, Reddit and other apps vend extra representations beside the link, so version 2 is required.
+  assert.match(rule, /<key>NSExtensionActivationDictionaryVersion<\/key>\s*<integer>2<\/integer>/);
+  for (const key of ['NSExtensionActivationSupportsText', 'NSExtensionActivationSupportsWebURLWithMaxCount', 'NSExtensionActivationSupportsWebPageWithMaxCount', 'NSExtensionActivationSupportsImageWithMaxCount', 'NSExtensionActivationSupportsMovieWithMaxCount', 'NSExtensionActivationSupportsFileWithMaxCount']) {
+    assert.match(rule, new RegExp(`<key>${key}</key>`), `${key} must stay declared`);
+  }
+  assert.doesNotMatch(info, /TRUEPREDICATE/);
+});
