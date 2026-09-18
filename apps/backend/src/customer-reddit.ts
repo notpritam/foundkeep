@@ -44,7 +44,9 @@ export const resolveReddit: SocialResolver = async (post, hints, signal, deps) =
     if (!match) return { ...EMPTY_MANIFEST(), links: hints.links };
     canonical = `https://www.reddit.com/r/${match[1]}/comments/${match[2]}/`; id = match[2]!;
   }
-  const endpoint = `${canonical}.json?raw_json=1`;
+  // limit=1 keeps the listing to the post itself; the comment tree is never used
+  // and an unbounded one can be megabytes.
+  const endpoint = `${canonical}.json?raw_json=1&limit=1`;
   const attempt = async (session: ReturnType<typeof deps.session>) => {
     try { const manifest = parseRedditListing(await fetchListing(endpoint, deps.read, signal, session ? h => session.cookieHeader(h) : undefined), id); session?.report('ok'); return manifest; }
     catch (error) {

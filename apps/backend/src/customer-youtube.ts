@@ -3,7 +3,7 @@ export function parseYouTubeOembed(json: unknown, id: string): SocialManifest {
   const v = json as any;
   if (!v || typeof v.title !== 'string') throw Error('The public video is unavailable.');
   const media: SocialManifest['media'] = [{ kind: 'video', url: `https://www.youtube.com/watch?v=${id}` }];
-  if (mediaHost(v.thumbnail_url, ['ytimg.com'])) media.push({ kind: 'image', url: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg` });
+  if (mediaHost(v.thumbnail_url, ['ytimg.com'])) media.push({ kind: 'image', url: `https://i.ytimg.com/vi/${id}/hqdefault.jpg` }); // maxresdefault 404s for anything not uploaded in HD
   return { text: v.title.slice(0, 1000), author: typeof v.author_name === 'string' ? v.author_name.slice(0, 200) : '', publishedAt: null, media, links: [], metadataAvailable: true };
 }
 export const resolveYouTube: SocialResolver = async (post, hints, signal, deps) => {

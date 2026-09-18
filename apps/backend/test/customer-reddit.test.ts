@@ -42,8 +42,8 @@ test('resolver fetches .json with raw_json, resolves share links, and retries wi
   const m = await resolveReddit({ platform: 'reddit', site: 'reddit', id: 's:AbC', url: 'https://www.reddit.com/r/space/s/AbC' }, hints, new AbortController().signal, deps(read, session));
   expect(m.metadataAvailable).toBe(true);
   expect(calls[0]).toMatchObject({ url: 'https://www.reddit.com/r/space/s/AbC', cookie: null });
-  expect(calls[1]).toMatchObject({ url: 'https://www.reddit.com/r/space/comments/1abc2d/.json?raw_json=1', cookie: null, accept: 'application/json' });
-  expect(calls[2]).toMatchObject({ url: 'https://www.reddit.com/r/space/comments/1abc2d/.json?raw_json=1', cookie: 'reddit_session=r1' });
+  expect(calls[1]).toMatchObject({ url: 'https://www.reddit.com/r/space/comments/1abc2d/.json?raw_json=1&limit=1', cookie: null, accept: 'application/json' });
+  expect(calls[2]).toMatchObject({ url: 'https://www.reddit.com/r/space/comments/1abc2d/.json?raw_json=1&limit=1', cookie: 'reddit_session=r1' });
   expect(reports).toEqual(['ok']);
   denied = true;
   const noSession = await resolveReddit({ platform: 'reddit', site: 'reddit', id: '1abc2d', url: 'https://www.reddit.com/r/space/comments/1abc2d/' }, hints, new AbortController().signal, deps(read));

@@ -143,7 +143,9 @@ test('the helper only ever gets a private per-download copy of the jar, then the
   expect(await readFile(cookieFile, 'utf8')).toBe(jar);
   expect((await stat(cookieFile)).mtimeMs).toBe(before.mtimeMs);
   const ffmpeg = commands.find(c => c.includes('/usr/bin/ffmpeg'))!;
-  expect(ffmpeg.slice(0, 2)).toEqual(['/usr/bin/prlimit', `--fsize=${50 * 1024 * 1024}`]);
+  // The mux gets headroom over the caller's budget: video+audio together can
+  // exceed it, and an over-budget mux is dropped below rather than killed here.
+  expect(ffmpeg.slice(0, 2)).toEqual(['/usr/bin/prlimit', `--fsize=${50 * 1024 * 1024 + 16 * 1024 * 1024}`]);
   expect(ffmpeg).toContain('-c');
   expect(ffmpeg).toContain('copy');
   expect(ffmpeg).toContain('-protocol_whitelist');
@@ -209,6 +211,25 @@ test('a failed mux is an error, never a silent fallback to the video track', asy
     expect(result.status).toBe('error');
     expect(await readdir(temporary).catch(() => null)).toBe(null);
   }
+});
+
+test('a mux that overshoots the budget falls back to the silent video track', async () => {
+  const maxBytes = 512 * 1024;
+  const result = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', { maxBytes }, { runExtractor: async (spec, signal) => {
+    if (spec.args.includes(HELPER_PATH)) {
+      await copyFile(fixture, join(spec.cwd, 'video.mp4'));
+      await writeFile(join(spec.cwd, 'audio.m4a'), 'audio track');
+      return JSON.stringify({ status: 'downloaded', subtitles: [], audio: true });
+    }
+    if (spec.args.includes('/usr/bin/ffmpeg')) { await writeFile(join(spec.cwd, 'muxed.mp4'), Buffer.alloc(maxBytes + 1)); return ''; }
+    return runRemoteMediaProcess(spec, signal);
+  } });
+  expect(result.status).toBe('downloaded');
+  if (result.status !== 'downloaded') return;
+  // Silent picture beats no save at all when only the sound pushed it over.
+  expect(result.absolutePath.endsWith('video.mp4')).toBe(true);
+  expect(result.bytes).toBe((await stat(fixture)).size);
+  await result.dispose();
 });
 
 test('an absent or empty audio track is an error rather than a mux of nothing', async () => {

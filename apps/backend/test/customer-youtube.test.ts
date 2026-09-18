@@ -5,7 +5,7 @@ const post = { platform: 'youtube' as const, site: 'youtube', id: 'dQw4w9WgXcQ',
 test('oembed gives title, channel and thumbnail, and the video itself is the media item', () => {
   const m = parseYouTubeOembed({ title: 'A talk', author_name: 'Channel', thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg' }, post.id);
   expect(m).toMatchObject({ text: 'A talk', author: 'Channel', metadataAvailable: true });
-  expect(m.media).toEqual([{ kind: 'video', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, { kind: 'image', url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg' }]);
+  expect(m.media).toEqual([{ kind: 'video', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, { kind: 'image', url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg' }]);
   expect(() => parseYouTubeOembed({ error: 'x' }, post.id)).toThrow();
 });
 test('resolver calls the oembed endpoint and degrades to the video item alone on failure', async () => {

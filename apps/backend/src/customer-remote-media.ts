@@ -156,12 +156,23 @@ export async function downloadCustomerRemoteMedia(
       const audio = await lstat(join(directory, 'audio.m4a'));
       if (!video.isFile() || video.isSymbolicLink() || !video.size) return failure('error');
       if (!audio.isFile() || audio.isSymbolicLink() || !audio.size) return failure('error');
+      // The mux needs headroom: the video already fills the budget and the audio
+      // is added on top. An over-budget result is dropped just below, so the
+      // limit here only exists to stop a runaway ffmpeg.
       await run({
         executable: '/usr/bin/prlimit',
-        args: [`--fsize=${maxBytes}`, '--as=536870912', '--cpu=30', '--nofile=32', '--', '/usr/bin/ffmpeg', '-v', 'error', '-nostdin', '-threads', '1', '-protocol_whitelist', 'file', '-f', 'mov', '-i', 'video.mp4', '-f', 'mov', '-i', 'audio.m4a', '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', 'muxed.mp4'],
+        args: [`--fsize=${maxBytes + 16 * 1024 * 1024}`, '--as=536870912', '--cpu=30', '--nofile=32', '--', '/usr/bin/ffmpeg', '-v', 'error', '-nostdin', '-threads', '1', '-protocol_whitelist', 'file', '-f', 'mov', '-i', 'video.mp4', '-f', 'mov', '-i', 'audio.m4a', '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', 'muxed.mp4'],
         cwd: directory, stdin: '',
       }, controller.signal);
       absolutePath = join(directory, 'muxed.mp4');
+      // Video plus audio can exceed a budget the video alone fits. Losing the
+      // sound is a smaller loss than losing the save, so an over-budget mux is
+      // discarded and the silent track is kept instead.
+      const muxed = await lstat(absolutePath).catch(() => null);
+      if (muxed?.isFile() && !muxed.isSymbolicLink() && muxed.size > maxBytes) {
+        await rm(absolutePath, { force: true });
+        absolutePath = join(directory, 'video.mp4');
+      }
     }
     const file = await lstat(absolutePath);
     if (!file.isFile() || file.isSymbolicLink() || !file.size) return failure('error');

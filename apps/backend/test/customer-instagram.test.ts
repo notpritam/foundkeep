@@ -25,7 +25,7 @@ test('media info API yields the full carousel with videos first per slide', asyn
   expect(() => parseInstagramMediaInfo({ items: [{ code: 'other' }] }, 'C0dE_f-1')).toThrow();
 });
 test('resolver uses the embed page anonymously, then the media API with the session, with the right headers', async () => {
-  const embed = await text('instagram-embed.html'), info = await json('instagram-media-info.json');
+  const info = await json('instagram-media-info.json');
   const calls: any[] = [];
   const read = async (url: string, options: any) => {
     calls.push({ url, headers: options.headers, cookie: options.cookies?.('www.instagram.com') ?? null });
