@@ -9,9 +9,12 @@ export function parseRedditListing(json: unknown, id: string): SocialManifest {
   if (!post) throw Error('The public post is unavailable.');
   const source = Array.isArray(post.crosspost_parent_list) && post.crosspost_parent_list[0] ? post.crosspost_parent_list[0] : post;
   const media: SocialMedia[] = []; let incomplete = false;
-  const image = (raw: unknown) => { const url = mediaHost(raw, IMAGE_HOSTS); if (url) media.push({ kind: 'image', url }); else incomplete = true; };
-  if (source.is_gallery && source.gallery_data?.items && source.media_metadata) {
-    for (const item of source.gallery_data.items.slice(0, 8)) { const meta = source.media_metadata[item?.media_id]; if (meta?.status === 'valid' && (meta.s?.u || meta.s?.gif)) image(meta.s.u || meta.s.gif); else incomplete = true; }
+  const image = (raw: unknown) => { const url = mediaHost(raw, IMAGE_HOSTS); if (url && new URL(url).hostname !== 'v.redd.it') media.push({ kind: 'image', url }); else incomplete = true; };
+  if (source.is_gallery) {
+    const items = Array.isArray(source.gallery_data?.items) ? source.gallery_data.items : [];
+    const metadata = source.media_metadata && typeof source.media_metadata === 'object' ? source.media_metadata : {};
+    if (!items.length) incomplete = true;
+    for (const item of items.slice(0, 8)) { const meta = metadata[item?.media_id]; if (meta?.status === 'valid' && (meta.s?.u || meta.s?.gif)) image(meta.s.u || meta.s.gif); else incomplete = true; }
   }
   const video = source.secure_media?.reddit_video ?? source.media?.reddit_video;
   if (video?.fallback_url) {
@@ -26,7 +29,7 @@ export function parseRedditListing(json: unknown, id: string): SocialManifest {
   const links: string[] = [];
   if (!source.is_self && !media.length) { const link = outbound(source.url_overridden_by_dest ?? source.url); if (link) links.push(link); else incomplete = true; }
   const title = typeof post.title === 'string' ? post.title.trim() : '', body = typeof source.selftext === 'string' ? source.selftext.trim() : '';
-  return { text: [title, body].filter(Boolean).join('\n\n').slice(0, 50_000), author: [post.author ? `u/${String(post.author).slice(0, 50)}` : '', post.subreddit ? `r/${String(post.subreddit).slice(0, 50)}` : ''].filter(Boolean).join(' · '),
+  return { text: [title, body].filter(Boolean).join('\n\n').slice(0, 50_000), author: [typeof post.author === 'string' ? `u/${post.author.slice(0, 50)}` : '', typeof post.subreddit === 'string' ? `r/${post.subreddit.slice(0, 50)}` : ''].filter(Boolean).join(' · '),
     publishedAt: isoDate(post.created_utc), media: media.slice(0, 8), links: links.slice(0, 3), metadataAvailable: true, incomplete: incomplete || (!media.length && !links.length && !body) };
 }
 async function fetchListing(url: string, read: PublicReader, signal: AbortSignal, cookies?: (host: string) => string | null) {

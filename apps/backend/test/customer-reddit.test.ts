@@ -22,6 +22,11 @@ test('wrong id, removed or empty listings are unavailable', () => {
   expect(() => parseRedditListing([{ data: { children: [{ data: { id: 'other' } }] } }], 'l1')).toThrow();
   expect(() => parseRedditListing({}, 'l1')).toThrow();
 });
+test('malformed gallery data degrades instead of throwing', () => {
+  const m = parseRedditListing([{ data: { children: [{ data: { id: 'g1', title: 'Broken gallery', is_gallery: true, gallery_data: { items: 'oops' }, media_metadata: {} } }] } }], 'g1');
+  expect(m.media).toEqual([]);
+  expect(m.incomplete).toBe(true);
+});
 test('resolver fetches .json with raw_json, resolves share links, and retries with the session on IP blocks', async () => {
   const calls: any[] = [];
   const listing = await load('reddit-gallery.json');
