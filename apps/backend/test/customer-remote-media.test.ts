@@ -1,22 +1,31 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { copyFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { downloadCustomerRemoteMedia, runRemoteMediaProcess, type RemoteMediaRunner } from '../src/customer-remote-media.ts';
 
+const HELPER_PATH = fileURLToPath(new URL('../scripts/customer-remote-media.py', import.meta.url));
 let directory: string;
 let fixture: string;
+let audioFixture: string;
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'foundkeep-remote-test-'));
   fixture = join(directory, 'fixture.mp4');
   const process = Bun.spawn(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=96x64:rate=5', '-t', '1', '-c:v', 'libx264', '-threads', '1', '-pix_fmt', 'yuv420p', fixture], { stdout: 'ignore', stderr: 'ignore' });
   expect(await process.exited).toBe(0);
+  audioFixture = join(directory, 'fixture.m4a');
+  const audio = Bun.spawn(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-c:a', 'aac', '-threads', '1', audioFixture], { stdout: 'ignore', stderr: 'ignore' });
+  expect(await audio.exited).toBe(0);
 });
 afterAll(async () => { await rm(directory, { recursive: true, force: true }); });
 
-const downloaded: RemoteMediaRunner = async ({ cwd }) => {
-  await copyFile(fixture, join(cwd, 'video.mp4'));
+// Only the extractor is faked; ffmpeg and ffprobe run for real through the
+// same seam so their arguments and output stay under test.
+const downloaded: RemoteMediaRunner = async (spec, signal) => {
+  if (!spec.args.includes(HELPER_PATH)) return runRemoteMediaProcess(spec, signal);
+  await copyFile(fixture, join(spec.cwd, 'video.mp4'));
   return JSON.stringify({ status: 'downloaded', title: '<b>Public video</b>\u0000', description: 'Caption\r\nline', author: 'Alice', subtitles: [{ language: 'en', automatic: false, text: 'WEBVTT\n\n00:00.000 --> 00:01.000\nHello' }] });
 };
 
@@ -100,4 +109,97 @@ test('process runner isolates configuration and caps stdout', async () => {
     expect(env.PYTHONPATH).toBeUndefined();
     await expect(runRemoteMediaProcess({ ...spec, args: ['-I', '-c', 'print("x" * 300000)'] }, new AbortController().signal)).rejects.toThrow();
   } finally { delete process.env.FOUNDKEEP_REMOTE_TEST_SECRET; }
+});
+
+
+test('cookie file is validated before it reaches the helper, and audio tracks are muxed then probed', async () => {
+  const sessions = await mkdtemp(join(tmpdir(), 'foundkeep-sessions-'));
+  const cookieFile = join(sessions, 'reddit.txt');
+  await writeFile(cookieFile, '# Netscape HTTP Cookie File\n');
+  await chmod(cookieFile, 0o600);
+  const commands: string[][] = [];
+  const runner: RemoteMediaRunner = async (spec, signal) => {
+    commands.push([spec.executable, ...spec.args]);
+    if (spec.args.includes(HELPER_PATH)) {
+      const input = JSON.parse(spec.stdin);
+      expect(input.cookieFile).toBe(cookieFile);
+      // Only the same-host MP4/M4A candidate survives the caller-side filter.
+      expect(input.audioUrls).toEqual(['https://v.redd.it/abc/DASH_AUDIO_128.mp4']);
+      await copyFile(fixture, join(spec.cwd, 'video.mp4'));
+      await writeFile(join(spec.cwd, 'audio.m4a'), 'audio track');
+      return JSON.stringify({ status: 'downloaded', subtitles: [], audio: true });
+    }
+    if (spec.args.includes('/usr/bin/ffmpeg')) { await copyFile(fixture, join(spec.cwd, 'muxed.mp4')); return ''; }
+    return runRemoteMediaProcess(spec, signal);
+  };
+  const audioUrls = ['https://v.redd.it/abc/DASH_AUDIO_128.mp4', 'https://evil.test/DASH_audio.mp4', 'https://v.redd.it/abc/DASH_audio.txt'];
+  const result = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', { cookieFile, audioUrls }, { runExtractor: runner, sessionsDirectory: sessions });
+  expect(result.status).toBe('downloaded');
+  const ffmpeg = commands.find(c => c.includes('/usr/bin/ffmpeg'))!;
+  expect(ffmpeg.slice(0, 2)).toEqual(['/usr/bin/prlimit', `--fsize=${50 * 1024 * 1024}`]);
+  expect(ffmpeg).toContain('-c');
+  expect(ffmpeg).toContain('copy');
+  expect(ffmpeg).toContain('-protocol_whitelist');
+  expect(ffmpeg.at(-1)).toBe('muxed.mp4');
+  const probe = commands.find(c => c.includes('/usr/bin/ffprobe'))!;
+  expect(probe.at(-1)!.endsWith('muxed.mp4')).toBe(true);
+  if (result.status === 'downloaded') {
+    expect(result.absolutePath.endsWith('muxed.mp4')).toBe(true);
+    await result.dispose();
+  }
+
+  await chmod(cookieFile, 0o644);
+  const insecure = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', { cookieFile }, { runExtractor: async (spec) => { expect(JSON.parse(spec.stdin).cookieFile).toBeUndefined(); return JSON.stringify({ status: 'unavailable' }); }, sessionsDirectory: sessions });
+  expect(insecure.status).toBe('unavailable');
+  for (const outsider of ['/etc/passwd', join(sessions, '..', 'escape.txt'), 'reddit.txt']) {
+    const outside = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', { cookieFile: outsider }, { runExtractor: async (spec) => { expect(JSON.parse(spec.stdin).cookieFile).toBeUndefined(); return JSON.stringify({ status: 'unavailable' }); }, sessionsDirectory: sessions });
+    expect(outside.status).toBe('unavailable');
+  }
+  await rm(sessions, { recursive: true, force: true });
+});
+
+test('a failed mux is an error, never a silent fallback to the video track', async () => {
+  for (const broken of ['throw', 'missing', 'empty'] as const) {
+    let temporary = '';
+    const result = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', {}, { runExtractor: async (spec, signal) => {
+      if (spec.args.includes(HELPER_PATH)) {
+        temporary = spec.cwd;
+        await copyFile(fixture, join(spec.cwd, 'video.mp4'));
+        await writeFile(join(spec.cwd, 'audio.m4a'), 'audio track');
+        return JSON.stringify({ status: 'downloaded', subtitles: [], audio: true });
+      }
+      if (spec.args.includes('/usr/bin/ffmpeg')) {
+        if (broken === 'throw') throw new Error('mux failed');
+        if (broken === 'empty') await writeFile(join(spec.cwd, 'muxed.mp4'), '');
+        return '';
+      }
+      return runRemoteMediaProcess(spec, signal);
+    } });
+    expect(result.status).toBe('error');
+    expect(await readdir(temporary).catch(() => null)).toBe(null);
+  }
+});
+
+test('an absent or empty audio track is an error rather than a mux of nothing', async () => {
+  const result = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', {}, { runExtractor: async ({ cwd, args }) => {
+    if (!args.includes(HELPER_PATH)) throw new Error('must not run');
+    await copyFile(fixture, join(cwd, 'video.mp4'));
+    return JSON.stringify({ status: 'downloaded', subtitles: [], audio: true });
+  } });
+  expect(result.status).toBe('error');
+});
+
+test('a real ffmpeg mux carries both tracks into the single probed file', async () => {
+  const result = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', {}, { runExtractor: async (spec, signal) => {
+    if (!spec.args.includes(HELPER_PATH)) return runRemoteMediaProcess(spec, signal);
+    await copyFile(fixture, join(spec.cwd, 'video.mp4'));
+    await copyFile(audioFixture, join(spec.cwd, 'audio.m4a'));
+    return JSON.stringify({ status: 'downloaded', subtitles: [], audio: true });
+  } });
+  expect(result.status).toBe('downloaded');
+  if (result.status !== 'downloaded') return;
+  expect(result.absolutePath.endsWith('muxed.mp4')).toBe(true);
+  const probe = JSON.parse(await runRemoteMediaProcess({ executable: '/usr/bin/ffprobe', args: ['-v', 'error', '-show_entries', 'stream=codec_name', '-of', 'json', result.absolutePath], cwd: directory, stdin: '' }, new AbortController().signal));
+  expect(probe.streams.map((stream: { codec_name: string }) => stream.codec_name).sort()).toEqual(['aac', 'h264']);
+  await result.dispose();
 });

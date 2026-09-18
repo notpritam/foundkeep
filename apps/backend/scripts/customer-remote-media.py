@@ -14,12 +14,15 @@ import os
 from pathlib import Path
 import resource
 import socket
+import stat as statmod
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
 
 MAX_BYTES = 50 * 1024 * 1024
+MAX_AUDIO_BYTES = 16 * 1024 * 1024
 MAX_DURATION = 1800
 MAX_NETWORK_BYTES = 100 * 1024 * 1024
 V4_BLOCKS = tuple(ipaddress.ip_network(value) for value in (
@@ -76,6 +79,24 @@ def public_url(raw):
         return raw
     except ValueError as error:
         raise BoundaryError('Invalid URL') from error
+
+
+def validate_cookie_file(path):
+    """An operator-supplied Netscape jar: absolute, regular, private, small.
+
+    yt-dlp rewrites this file in place when it closes, so a symlink here would
+    be a write primitive as well as a read one; lstat plus S_ISREG refuses both.
+    Group/other permission bits mean the jar is already shared and is not used.
+    """
+    if not isinstance(path, str) or not os.path.isabs(path) or len(path) > 4096 or '\x00' in path:
+        raise BoundaryError('Invalid cookie file')
+    try:
+        info = os.lstat(path)
+    except OSError as error:
+        raise BoundaryError('Missing cookie file') from error
+    if not statmod.S_ISREG(info.st_mode) or (info.st_mode & 0o077) or info.st_size > 256 * 1024:
+        raise BoundaryError('Cookie file must be a private regular file')
+    return path
 
 
 def install_network_guard():
@@ -202,11 +223,12 @@ def select_progressive_format(context, maximum):
         raise TooLarge('All compatible formats exceed the size budget')
 
 
-def extractor_options(maximum, duration):
+def extractor_options(maximum, duration, cookie_file=None):
     return {
         'quiet': True, 'no_warnings': True, 'logger': QuietLogger(),
         'proxy': '', 'geo_verification_proxy': '', 'usenetrc': False,
-        'cookiefile': None, 'cookiesfrombrowser': None, 'cachedir': False,
+        'cookiefile': validate_cookie_file(cookie_file) if cookie_file else None,
+        'cookiesfrombrowser': None, 'cachedir': False,
         'js_runtimes': {}, 'remote_components': [], 'enable_file_urls': False,
         'external_downloader': {}, 'fixup': 'never', 'postprocessors': [],
         'outtmpl': 'video.mp4', 'noplaylist': True, 'playlistend': 1,
@@ -399,7 +421,48 @@ class BoundedResponse:
         self.close()
 
 
-def extract(source, maximum, duration):
+# One process handles one source, so the video and every audio attempt share a
+# single wire budget instead of each renewing the network ceiling.
+DIRECT_BUDGET = Budget()
+
+
+def open_direct(request, timeout):
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), PublicRedirectHandler(), ResponseBudgetHandler(DIRECT_BUDGET))
+    return opener.open(request, timeout=timeout)
+
+
+def direct_download(source, maximum, audio_urls):
+    """A direct MP4 needs no platform extractor, but uses the same actual
+    connection guard, verified TLS, redirect checks and streaming limits.
+
+    Some hosts (Reddit) serve the picture and the sound as two sibling files.
+    Only the caller's own candidates are tried, only on the video's own host,
+    and only until one works; the parent muxes them. A missing or oversized
+    audio track leaves a playable silent video rather than failing the save.
+    """
+    request = urllib.request.Request(source, headers={'Accept': 'video/mp4', 'Accept-Encoding': 'identity', 'User-Agent': 'Foundkeep-Public-Media/1.0'})
+    with open_direct(request, 10) as response:
+        write_response(response, Path('video.mp4'), maximum)
+    audio = False
+    video_host = urllib.parse.urlsplit(source).hostname
+    for candidate in (audio_urls or [])[:3]:
+        try:
+            url = public_url(candidate)
+            parts = urllib.parse.urlsplit(url)
+            if parts.hostname != video_host or not parts.path.lower().endswith(('.mp4', '.m4a')):
+                continue
+            request = urllib.request.Request(url, headers={'Accept': 'audio/mp4,video/mp4', 'Accept-Encoding': 'identity', 'User-Agent': 'Foundkeep-Public-Media/1.0'})
+            with open_direct(request, 10) as response:
+                write_response(response, Path('audio.m4a'), min(maximum, MAX_AUDIO_BYTES))
+            audio = True
+            break
+        except (BoundaryError, urllib.error.URLError, OSError):
+            Path('audio.m4a').unlink(missing_ok=True)
+            continue
+    return {'status': 'downloaded', 'subtitles': [], 'audio': audio}
+
+
+def extract(source, maximum, duration, cookie_file=None):
     import yt_dlp
     from yt_dlp.globals import all_plugins_loaded, plugin_dirs
     from yt_dlp.version import __version__
@@ -423,7 +486,7 @@ def extract(source, maximum, duration):
                 raise BoundaryError('Request budget exceeded')
             return super().urlopen(req)
 
-    with PublicYoutubeDL(extractor_options(maximum, duration)) as downloader:
+    with PublicYoutubeDL(extractor_options(maximum, duration, cookie_file)) as downloader:
         info = downloader.extract_info(source, download=False)
         validate_info(info, duration)
         if info.get('protocol') not in ('http', 'https') or info.get('ext') != 'mp4' or info.get('requested_formats'):
@@ -476,17 +539,17 @@ def main():
         source = public_url(options['url'])
         maximum = min(MAX_BYTES, max(1, int(options['maxBytes'])))
         duration = min(MAX_DURATION, max(1, int(options['maxDurationSeconds'])))
+        cookie_file = options.get('cookieFile')
+        if cookie_file is not None:
+            cookie_file = validate_cookie_file(cookie_file)
+        audio_urls = options.get('audioUrls')
+        if audio_urls is not None and (not isinstance(audio_urls, list) or len(audio_urls) > 3 or not all(isinstance(entry, str) for entry in audio_urls)):
+            raise BoundaryError('Invalid audio URLs')
         resource.setrlimit(resource.RLIMIT_FSIZE, (maximum, maximum))
-        # Direct URLs do not need a platform extractor, but use the same actual
-        # connection guard, verified TLS, redirect checks and streaming limits.
         if urllib.parse.urlsplit(source).path.lower().endswith('.mp4'):
-            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), PublicRedirectHandler(), ResponseBudgetHandler(Budget()))
-            request = urllib.request.Request(source, headers={'Accept': 'video/mp4', 'Accept-Encoding': 'identity', 'User-Agent': 'Foundkeep-Public-Media/1.0'})
-            with opener.open(request, timeout=10) as response:
-                write_response(response, Path('video.mp4'), maximum)
-            result = {'status': 'downloaded', 'subtitles': []}
+            result = direct_download(source, maximum, audio_urls)
         else:
-            result = extract(source, maximum, duration)
+            result = extract(source, maximum, duration, cookie_file)
     except TooLarge:
         result = {'status': 'too_large'}
     except Unsupported:

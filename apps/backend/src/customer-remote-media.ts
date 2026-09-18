@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstat, mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config } from './config.ts';
 import { previewSourceUrl } from './customer-preview.ts';
 
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -72,10 +73,24 @@ function text(value: unknown, maximum: number): string {
 }
 function failure(status: FailureStatus): RemoteMediaResult { return { status, reason: reasons[status] }; }
 
+/** An operator session jar is only forwarded when it is an unshared regular
+ *  file inside a session directory. Anything else is dropped, not refused: a
+ *  stale or ill-kept jar must degrade to an anonymous download, never abort it.
+ *  The helper rechecks all of this, and yt-dlp rewrites the jar on close, so
+ *  symlinks are rejected as a write primitive as much as a read one. */
+async function safeCookieFile(path: string | undefined, roots: string[]): Promise<string | undefined> {
+  if (!path || !isAbsolute(path) || path.length > 4096 || path.includes('\0') || path.split('/').includes('..')) return undefined;
+  if (!roots.some(root => path.startsWith(root.replace(/\/+$/, '') + '/'))) return undefined;
+  try {
+    const file = await lstat(path);
+    return file.isFile() && !file.isSymbolicLink() && (file.mode & 0o077) === 0 && file.size <= 256 * 1024 ? path : undefined;
+  } catch { return undefined; }
+}
+
 /** One public source -> one disposable, probed MP4. Does not persist or replace source evidence. */
 export async function downloadCustomerRemoteMedia(
   rawUrl: string, options: RemoteMediaOptions = {},
-  dependencies: { runExtractor?: RemoteMediaRunner } = {},
+  dependencies: { runExtractor?: RemoteMediaRunner; sessionsDirectory?: string } = {},
 ): Promise<RemoteMediaResult> {
   const source = previewSourceUrl(rawUrl);
   if (!source) return failure('unsupported');
@@ -89,13 +104,21 @@ export async function downloadCustomerRemoteMedia(
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, bounded(options.deadlineMs, MAX_DEADLINE));
   const maxBytes = bounded(options.maxBytes, MAX_BYTES);
   const maxDuration = bounded(options.maxDurationSeconds, MAX_DURATION);
+  const run = dependencies.runExtractor || runRemoteMediaProcess;
+  const sessionsDirectory = dependencies.sessionsDirectory ?? process.env.FOUNDKEEP_SOCIAL_SESSIONS_DIR ?? join(homedir(), '.config', 'foundkeep', 'social-sessions');
+  const cookieFile = await safeCookieFile(options.cookieFile, [sessionsDirectory, join(config.dataDir, 'social-sessions')]);
+  // Separate audio (Reddit) is only ever fetched from the video's own host, so
+  // a hostile resolver cannot turn one public video into a second destination.
+  const audioUrls = (options.audioUrls ?? []).slice(0, 3).map(value => previewSourceUrl(value))
+    .filter((url): url is URL => !!url && url.hostname === source.hostname && /\.(mp4|m4a)$/i.test(url.pathname))
+    .map(url => url.href);
   let directory: string | undefined;
   let keep = false;
   try {
     directory = await mkdtemp(join(tmpdir(), 'foundkeep-remote-media-'));
-    const output = await (dependencies.runExtractor || runRemoteMediaProcess)({
+    const output = await run({
       executable: python || '/usr/bin/python3', args: ['-I', HELPER], cwd: directory,
-      stdin: JSON.stringify({ url: source.href, maxBytes, maxDurationSeconds: maxDuration }),
+      stdin: JSON.stringify({ url: source.href, maxBytes, maxDurationSeconds: maxDuration, ...(cookieFile ? { cookieFile } : {}), ...(audioUrls.length ? { audioUrls } : {}) }),
     }, controller.signal);
     controller.signal.throwIfAborted();
     if (Buffer.byteLength(output) > 256 * 1024) return failure('error');
@@ -104,7 +127,22 @@ export async function downloadCustomerRemoteMedia(
     if (metadata.status !== 'downloaded') {
       return failure(['unavailable', 'unsupported', 'too_large'].includes(metadata.status) ? metadata.status : 'error');
     }
-    const absolutePath = join(directory, 'video.mp4');
+    let absolutePath = join(directory, 'video.mp4');
+    if (metadata.audio === true) {
+      // A separately downloaded audio track is remuxed, never re-encoded, and
+      // only the two known local files are readable. A failed mux is an error:
+      // silently keeping the picture would lose evidence the save claims.
+      const video = await lstat(absolutePath);
+      const audio = await lstat(join(directory, 'audio.m4a'));
+      if (!video.isFile() || video.isSymbolicLink() || !video.size) return failure('error');
+      if (!audio.isFile() || audio.isSymbolicLink() || !audio.size) return failure('error');
+      await run({
+        executable: '/usr/bin/prlimit',
+        args: [`--fsize=${maxBytes}`, '--as=536870912', '--cpu=30', '--nofile=32', '--', '/usr/bin/ffmpeg', '-v', 'error', '-nostdin', '-threads', '1', '-protocol_whitelist', 'file', '-i', 'video.mp4', '-i', 'audio.m4a', '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', 'muxed.mp4'],
+        cwd: directory, stdin: '',
+      }, controller.signal);
+      absolutePath = join(directory, 'muxed.mp4');
+    }
     const file = await lstat(absolutePath);
     if (!file.isFile() || file.isSymbolicLink() || !file.size) return failure('error');
     if (file.size > maxBytes) return failure('too_large');
@@ -112,7 +150,7 @@ export async function downloadCustomerRemoteMedia(
     if (bytes.length !== file.size || bytes.length < 12 || bytes.toString('ascii', 4, 8) !== 'ftyp') return failure('error');
     // Only the MOV demuxer and local file protocol are enabled; external data
     // references are disabled. No network-capable protocols reach ffprobe.
-    const probe = JSON.parse(await runRemoteMediaProcess({
+    const probe = JSON.parse(await run({
       executable: '/usr/bin/prlimit', args: ['--as=536870912', '--cpu=15', '--fsize=1048576', '--nofile=32', '--', '/usr/bin/ffprobe', '-v', 'error', '-threads', '1', '-protocol_whitelist', 'file', '-f', 'mov', '-enable_drefs', '0', '-show_entries', 'format=duration:stream=codec_type,codec_name,width,height', '-of', 'json', absolutePath],
       cwd: directory, stdin: '',
     }, controller.signal));

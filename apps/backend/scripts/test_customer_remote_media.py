@@ -322,6 +322,50 @@ else: raise AssertionError('extractor subprocess accepted')
         self.assertEqual(options['external_downloader'], {})
         self.assertEqual(options['fixup'], 'never')
 
+    def test_cookiefile_is_only_used_when_a_private_regular_file_is_supplied(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'youtube.txt'
+            path.write_text('# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t2000000000\tSID\tabc\n')
+            os.chmod(path, 0o600)
+            options = media.extractor_options(1024, 60, cookie_file=str(path))
+            self.assertEqual(options['cookiefile'], str(path))
+            self.assertIsNone(options['cookiesfrombrowser'])
+            os.chmod(path, 0o644)
+            with self.assertRaises(media.BoundaryError):
+                media.validate_cookie_file(str(path))
+            with self.assertRaises(media.BoundaryError):
+                media.validate_cookie_file('relative.txt')
+            with self.assertRaises(media.BoundaryError):
+                media.validate_cookie_file(str(Path(tmp) / 'absent.txt'))
+            link = Path(tmp) / 'link.txt'
+            link.symlink_to(path)
+            with self.assertRaises(media.BoundaryError):
+                media.validate_cookie_file(str(link))
+
+    def test_direct_download_fetches_first_working_audio_track_on_the_same_host(self):
+        calls = []
+        class Response:
+            def __init__(self, body, status=200):
+                self.body, self.status, self.headers = io.BytesIO(body), status, {'Content-Length': str(len(body))}
+            def read(self, n=-1): return self.body.read(n)
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+        def fake_open(request, timeout):
+            calls.append(request.full_url)
+            if request.full_url.endswith('DASH_AUDIO_128.mp4'):
+                raise media.urllib.error.HTTPError(request.full_url, 403, 'denied', {}, None)
+            return Response(b'\x00\x00\x00\x18ftypisom' + b'a' * 100)
+        previous = os.getcwd()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(media, 'open_direct', side_effect=fake_open):
+            try:
+                os.chdir(tmp)
+                result = media.direct_download('https://v.redd.it/abc/DASH_720.mp4', 10_000, ['https://v.redd.it/abc/DASH_AUDIO_128.mp4', 'https://v.redd.it/abc/DASH_audio.mp4', 'https://evil.test/DASH_audio.mp4'])
+                self.assertEqual(result, {'status': 'downloaded', 'subtitles': [], 'audio': True})
+                self.assertTrue((Path(tmp) / 'audio.m4a').exists())
+                self.assertEqual(calls, ['https://v.redd.it/abc/DASH_720.mp4', 'https://v.redd.it/abc/DASH_AUDIO_128.mp4', 'https://v.redd.it/abc/DASH_audio.mp4'])
+            finally:
+                os.chdir(previous)
+
     def test_playlist_live_and_duration_rejected_before_download(self):
         for info in [{'_type': 'playlist'}, {'entries': []}, {'is_live': True}, {'live_status': 'is_upcoming'}, {'duration': 1801}]:
             with self.assertRaises(media.Unsupported):
