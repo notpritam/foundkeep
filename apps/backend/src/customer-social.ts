@@ -21,10 +21,14 @@ function parse(raw: unknown): URL | null {
 }
 const host = (u: URL, domain: string) => u.hostname === domain || u.hostname.endsWith('.' + domain);
 const GENERIC_SITES: [string, string, RegExp][] = [
-  ['tiktok', 'tiktok.com', /^\/(?:@[^/]+\/(?:video|photo)\/\d+|t\/[\w-]+|[\w-]{6,})\/?$/], ['threads', 'threads.net', /^\/@[^/]+\/post\/[\w-]+\/?$/], ['threads', 'threads.com', /^\/@[^/]+\/post\/[\w-]+\/?$/],
-  ['facebook', 'facebook.com', /^\/(?:reel\/\d+|share\/[rv]\/[\w-]+|[^/]+\/(?:videos|posts)\/[\w.-]+|watch\/?|photo\/?)/], ['facebook', 'fb.watch', /^\/[\w-]+\/?$/],
-  ['pinterest', 'pinterest.com', /^\/pin\/\d+\/?$/], ['pinterest', 'pin.it', /^\/[\w-]+\/?$/], ['tumblr', 'tumblr.com', /^\/(?:[^/]+\/)?(?:post\/)?\d+/], ['vimeo', 'vimeo.com', /^\/(?:\d+|[^/]+\/\d+)\/?$/],
-  ['twitch', 'twitch.tv', /\/clip\/[\w-]+/], ['twitch', 'clips.twitch.tv', /^\/[\w-]+\/?$/], ['dailymotion', 'dailymotion.com', /^\/video\/[\w-]+\/?$/],
+  // vm./vt. short-link hosts must be listed before the generic tiktok.com entry so they win: host() treats
+  // 'tiktok.com' as a match for any subdomain, including vm./vt., but only these two accept a bare short code.
+  ['tiktok', 'vm.tiktok.com', /^\/[\w-]{6,}\/?$/], ['tiktok', 'vt.tiktok.com', /^\/[\w-]{6,}\/?$/],
+  ['tiktok', 'tiktok.com', /^\/(?:@[^/]+\/(?:video|photo)\/\d+|t\/[\w-]+)\/?$/],
+  ['threads', 'threads.net', /^\/@[^/]+\/post\/[\w-]+\/?$/], ['threads', 'threads.com', /^\/@[^/]+\/post\/[\w-]+\/?$/],
+  ['facebook', 'facebook.com', /^\/(?:reel\/\d+|share\/[rv]\/[\w-]+|[^/]+\/(?:videos|posts)\/[\w.-]+|watch|photo)\/?$/], ['facebook', 'fb.watch', /^\/[\w-]+\/?$/],
+  ['pinterest', 'pinterest.com', /^\/pin\/\d+\/?$/], ['pinterest', 'pin.it', /^\/[\w-]+\/?$/], ['tumblr', 'tumblr.com', /^\/(?:[^/]+\/)?(?:post\/)?\d+\/?$/], ['vimeo', 'vimeo.com', /^\/(?:\d+|[^/]+\/\d+)\/?$/],
+  ['twitch', 'twitch.tv', /^\/[^/]+\/clip\/[\w-]+\/?$/], ['twitch', 'clips.twitch.tv', /^\/[\w-]+\/?$/], ['dailymotion', 'dailymotion.com', /^\/video\/[\w-]+\/?$/],
 ];
 const TRACKING = /^(utm_|igsh$|igshid$|si$|is_from_webapp$|sender_device$|share_id$|ref$|s$|t$|fbclid$|rdt$)/;
 export function socialPost(raw: string | null | undefined): SocialPost | null {
@@ -45,13 +49,21 @@ export function socialPost(raw: string | null | undefined): SocialPost | null {
   }
   if (host(u, 'instagram.com')) { const id = u.pathname.match(/^\/(?:[^/]+\/)?(?:p|reel|reels|tv)\/([\w-]{5,40})\/?$/)?.[1]; return id ? { platform: 'instagram', site: 'instagram', id, url: `https://www.instagram.com/p/${id}/` } : null; }
   if (host(u, 'linkedin.com')) {
-    const id = u.pathname.match(/^\/posts\/[^/]*?-(\d{15,25})-[\w-]{4}\/?$/)?.[1] || u.pathname.match(/^\/feed\/update\/urn:li:(?:activity|ugcPost|share):(\d{15,25})\/?$/)?.[1];
-    return id ? { platform: 'linkedin', site: 'linkedin', id, url: `https://www.linkedin.com/feed/update/urn:li:activity:${id}/` } : null;
+    const postsId = u.pathname.match(/^\/posts\/[^/]*?-(\d{15,25})-[\w-]{4}\/?$/)?.[1];
+    if (postsId) return { platform: 'linkedin', site: 'linkedin', id: postsId, url: `https://www.linkedin.com/feed/update/urn:li:activity:${postsId}/` };
+    // ugcPost/share are distinct URN id spaces from activity and must not be rewritten to activity.
+    const feed = u.pathname.match(/^\/feed\/update\/urn:li:(activity|ugcPost|share):(\d{15,25})\/?$/);
+    if (!feed) return null;
+    const [, type, digits] = feed;
+    const id = type === 'activity' ? digits : `${type}:${digits}`;
+    return { platform: 'linkedin', site: 'linkedin', id, url: `https://www.linkedin.com/feed/update/urn:li:${type}:${digits}/` };
   }
   if (host(u, 'bsky.app')) { const m = u.pathname.match(/^\/profile\/([\w.:-]+)\/post\/([\w]+)\/?$/); return m ? { platform: 'bluesky', site: 'bluesky', id: `${m[1]}/${m[2]}`, url: `https://bsky.app/profile/${m[1]}/post/${m[2]}` } : null; }
   for (const [site, domain, pattern] of GENERIC_SITES) if (host(u, domain) && pattern.test(u.pathname)) {
     const clean = new URL(u.href); clean.hash = '';
-    for (const key of [...clean.searchParams.keys()]) if (TRACKING.test(key)) clean.searchParams.delete(key);
+    // Facebook's `watch`/`photo` forms carry their id in the query (v=/fbid=), so the query is kept as-is
+    // rather than tracking-stripped; every other generic site strips known tracking params as before.
+    if (site !== 'facebook') for (const key of [...clean.searchParams.keys()]) if (TRACKING.test(key)) clean.searchParams.delete(key);
     return { platform: 'generic', site, id: clean.href, url: clean.href };
   }
   return null;

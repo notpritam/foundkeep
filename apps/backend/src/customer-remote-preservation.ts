@@ -20,8 +20,11 @@ export function remoteVideoCandidate(url:string,snapshot:SourceSnapshot|null):bo
   return snapshot?.contentKind==='video'||/\.mp4$/i.test(u.pathname)||is('youtu.be')&&u.pathname.length>1||is('youtube.com')&&(/^\/(?:shorts|embed|live)\//.test(u.pathname)||u.pathname==='/watch'&&u.searchParams.has('v'))||is('instagram.com')&&/^\/(?:p|reel|reels|tv)\//.test(u.pathname)||(is('x.com')||is('twitter.com'))&&/^\/(?:[^/]+\/status\/\d+|i\/web\/status\/\d+)/.test(u.pathname)
    || is('reddit.com') && /\/comments\//.test(u.pathname) || is('redd.it') || is('v.redd.it')
    || is('linkedin.com') && /^\/(?:posts\/|feed\/update\/)/.test(u.pathname)
-   || is('tiktok.com') || is('threads.net') || is('threads.com') || is('facebook.com') && /\/(?:reel|videos|watch|share)\b/.test(u.pathname + u.search) || is('fb.watch')
-   || is('pinterest.com') && /^\/pin\//.test(u.pathname) || is('vimeo.com') || is('twitch.tv') && /\/clip\//.test(u.pathname) || is('dailymotion.com') && /^\/video\//.test(u.pathname)
+   || is('tiktok.com') && /^\/(?:@[^/]+\/video\/\d+|t\/[\w-]+)\/?$/.test(u.pathname)
+   || (host==='vm.tiktok.com'||host==='vt.tiktok.com') && /^\/[\w-]{6,}\/?$/.test(u.pathname)
+   || (is('threads.net')||is('threads.com')) && /^\/@[^/]+\/post\/[\w-]+\/?$/.test(u.pathname)
+   || is('facebook.com') && /\/(?:reel|videos|watch|share)\b/.test(u.pathname + u.search) || is('fb.watch') && /^\/[\w-]+\/?$/.test(u.pathname)
+   || is('pinterest.com') && /^\/pin\//.test(u.pathname) || is('vimeo.com') && /^\/(?:\d+|[^/]+\/\d+)\/?$/.test(u.pathname) || is('twitch.tv') && /\/clip\//.test(u.pathname) || is('dailymotion.com') && /^\/video\//.test(u.pathname)
    || is('dms.licdn.com') || is('cdninstagram.com') || is('fbcdn.net');
  }catch{return false;}
 }
