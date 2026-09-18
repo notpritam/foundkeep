@@ -1,0 +1,41 @@
+{
+  "thread": {
+    "$type": "app.bsky.feed.defs#threadViewPost",
+    "post": {
+      "uri": "at://did:plc:abc/app.bsky.feed.post/3kabc",
+      "author": {
+        "did": "did:plc:abc",
+        "handle": "alice.bsky.social",
+        "displayName": "Alice"
+      },
+      "record": {
+        "$type": "app.bsky.feed.post",
+        "text": "Two photos from the ridge",
+        "createdAt": "2026-09-01T10:00:00.000Z",
+        "facets": [
+          {
+            "features": [
+              {
+                "$type": "app.bsky.richtext.facet#link",
+                "uri": "https://example.org/ridge"
+              }
+            ]
+          }
+        ]
+      },
+      "embed": {
+        "$type": "app.bsky.embed.images#view",
+        "images": [
+          {
+            "fullsize": "https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:abc/bafy1@jpeg",
+            "alt": ""
+          },
+          {
+            "fullsize": "https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:abc/bafy2@jpeg",
+            "alt": ""
+          }
+        ]
+      }
+    }
+  }
+}
