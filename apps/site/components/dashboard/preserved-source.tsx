@@ -15,6 +15,26 @@ type Asset = {
   text: string | null;
 };
 type Preservation = { status: string; error: string | null; updatedAt:number; assets: Asset[] };
+// The platforms the backend's socialPost() accepts. A host test, not a
+// permalink test: the backend decides whether a given path is preservable, and
+// a stale client regex would hide the panel on links it can already keep.
+const PRESERVED_HOSTS = [
+  "x.com", "twitter.com", "reddit.com", "redd.it", "instagram.com", "linkedin.com",
+  "bsky.app", "youtube.com", "youtu.be", "tiktok.com", "threads.net", "threads.com",
+  "facebook.com", "fb.watch", "pinterest.com", "pin.it", "tumblr.com", "vimeo.com",
+  "twitch.tv", "dailymotion.com",
+];
+export function preservablePlatform(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  try {
+    const url = new URL(raw);
+    if (!["http:", "https:"].includes(url.protocol)) return false;
+    const host = url.hostname.toLowerCase();
+    return PRESERVED_HOSTS.some((d) => host === d || host.endsWith("." + d));
+  } catch {
+    return false;
+  }
+}
 export function PreservedSource({
   id,
   sourceUrl,
@@ -24,11 +44,7 @@ export function PreservedSource({
 }) {
   const { me, request } = useDashboard(),
     cache = useQueryClient();
-  const supported =
-    !!sourceUrl &&
-    /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/(?:[\w]+|i\/web)\/status\/\d+/.test(
-      sourceUrl,
-    );
+  const supported = preservablePlatform(sourceUrl);
   const key = ["preservation", me.account.id, id];
   const query = useQuery({
     queryKey: key,
@@ -124,7 +140,9 @@ export function PreservedSource({
                 <summary>
                   {asset.kind === "article"
                     ? "Read saved article"
-                    : "Read archived post"}
+                    : asset.kind === "transcript"
+                      ? "Read video subtitles and description"
+                      : "Read archived post"}
                 </summary>
                 <p className="preserved-text">{asset.text}</p>
               </details>

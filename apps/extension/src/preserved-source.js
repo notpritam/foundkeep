@@ -1,5 +1,23 @@
 // Private files use the fixed, account-bound background API. Object URLs exist
 // only for the open item and are revoked on navigation or account changes.
+// The platforms the backend's socialPost() accepts. A host test, not a
+// permalink test: the backend decides whether a given path is preservable, and
+// a stale client regex would hide the panel on links it can already keep.
+const PRESERVED_HOSTS = [
+  'x.com', 'twitter.com', 'reddit.com', 'redd.it', 'instagram.com', 'linkedin.com',
+  'bsky.app', 'youtube.com', 'youtu.be', 'tiktok.com', 'threads.net', 'threads.com',
+  'facebook.com', 'fb.watch', 'pinterest.com', 'pin.it', 'tumblr.com', 'vimeo.com',
+  'twitch.tv', 'dailymotion.com',
+];
+export function preservablePlatform(raw) {
+  if (!raw) return false;
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol)) return false;
+    const host = url.hostname.toLowerCase();
+    return PRESERVED_HOSTS.some(domain => host === domain || host.endsWith('.' + domain));
+  } catch { return false; }
+}
 export function bindPreservedSource(root, api) {
   let generation = 0, timer, captureId, busy = false;
   const objectUrls = new Set(), cards = new Map();
@@ -16,7 +34,7 @@ export function bindPreservedSource(root, api) {
   }
   async function show(save) {
     reset();
-    if (!save?.sourceUrl || !/^https?:\/\/(?:www\.|mobile\.|m\.)?(?:x|twitter)\.com\/(?:\w+|i\/web)\/status\/\d+/.test(save.sourceUrl)) return;
+    if (!preservablePlatform(save?.sourceUrl)) return;
     root.hidden = false; captureId = save.id;
     const version = generation;
     const heading = element('h3', 'Loading source files…');

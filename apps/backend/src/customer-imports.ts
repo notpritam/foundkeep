@@ -100,7 +100,10 @@ export function registerCustomerImports(app: Hono<CustomerEnv>, db: Database, se
           const bytes = Buffer.byteLength(entry.url+entry.title+(entry.description||'')+provenance,'utf8') + organizationBytes(parentId,tags);
           db.query(`INSERT INTO customer_captures(id,account_id,client_id,type,source_url,source_title,note_text,storage_bytes,captured_at,created_at,updated_at,provenance_json,manual_tags,folder_id,saved_via)
             VALUES(?,?,?,'bookmark',?,?,?,?,?,?,?,?,?,?,?)`).run(id,current.account.id,`import:${importId}:${chunk}:${counts.imported}`,entry.url,entry.title,entry.description,bytes,capturedAt,now,now,provenance,tags,parentId,services.savingClient(current));
-          enqueuePreservation(db,current.account.id,id,entry.url);
+          // Only X is auto-preserved on import: a bookmark file can carry
+          // thousands of social links, and every other platform would turn one
+          // import into that many preservation jobs. They preserve on demand.
+          if (twitterPost(entry.url)) enqueuePreservation(db,current.account.id,id,entry.url);
           deltaBytes+=bytes; counts.imported++; urls.set(entry.url,id);
         }
         const known = db.query('SELECT 1 FROM customer_import_origins WHERE capture_id=? AND fingerprint=?').get(id,fingerprint);
@@ -123,3 +126,4 @@ export function registerCustomerImports(app: Hono<CustomerEnv>, db: Database, se
   });
 }
 import {enqueuePreservation} from './customer-preservation.ts';
+import {twitterPost} from './customer-twitter.ts';

@@ -47,6 +47,19 @@ test('retries are idempotent; duplicate imports retain source history without ov
   const detail = await (await request('/captures/' + saved.id, owner.cookie)).json() as any;
   expect(detail.capture.importOrigins.map((item: any) => item.source).sort()).toEqual(['brave', 'chrome']);
 });
+test('an import only auto-preserves X permalinks; other platforms stay on demand', async () => {
+  const owner = await account();
+  const imported = [
+    { url: 'https://x.com/someone/status/1800000000000000000', title: 'An X post', folderPath: [] },
+    { url: 'https://www.reddit.com/r/space/comments/1abc2d/a_title/', title: 'A Reddit post', folderPath: [] },
+    { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'A video', folderPath: [] },
+  ];
+  expect((await request('/imports', owner.cookie, { importId: crypto.randomUUID(), chunk: 0, source: 'chrome', entries: imported })).status).toBe(200);
+  const queued = db.query('SELECT source_url FROM customer_preservation_jobs WHERE account_id=?').all(owner.id) as { source_url: string }[];
+  // A bookmark file can hold thousands of social links; only the X path is cheap
+  // enough to fan out automatically. The rest preserve on demand.
+  expect(queued.map(row => row.source_url)).toEqual(['https://x.com/someone/status/1800000000000000000']);
+});
 test('account scoping, unsafe URLs, bounded chunks and atomic storage limits are enforced', async () => {
   const a = await account(); const b = await account(); const importId = crypto.randomUUID();
   expect((await request('/imports', a.cookie, { importId, chunk: 0, source: 'chrome', entries })).status).toBe(200);

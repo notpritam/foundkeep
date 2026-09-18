@@ -94,7 +94,6 @@ const resolvers: Partial<Record<SocialPlatform, SocialResolver>> = {
   youtube: resolveYouTube,
   generic: resolveGeneric,
 };
-export function registerSocialResolver(platform: SocialPlatform, resolver: SocialResolver) { resolvers[platform] = resolver; }
 export async function resolveSocialPost(url: string, hints: SocialContext, signal: AbortSignal, deps: Partial<SocialResolverDeps> = {}): Promise<SocialManifest> {
   const post = socialPost(url);
   if (!post) throw Error('Use a public social post link.');
