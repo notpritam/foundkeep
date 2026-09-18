@@ -51,3 +51,9 @@ test('generic resolver turns page metadata into a manifest and flags login walls
   });
   expect(walled).toMatchObject({ metadataAvailable: false, restricted: true });
 });
+test('resolveSocialPost dispatches by platform', async () => {
+  const read = async (url: string) => ({ url, mime: 'application/json', data: Buffer.from(JSON.stringify({ title: 'T', author_name: 'C', thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg' })), status: 200 });
+  const m = await resolveSocialPost('https://youtu.be/dQw4w9WgXcQ', { version: 1, images: [], links: [], articleText: '' }, new AbortController().signal, { read, session: () => null });
+  expect(m.text).toBe('T');
+  await expect(resolveSocialPost('https://example.com/x', { version: 1, images: [], links: [], articleText: '' }, new AbortController().signal, { read, session: () => null })).rejects.toThrow('Use a public social post link.');
+});

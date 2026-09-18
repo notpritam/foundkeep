@@ -1,25 +1,28 @@
-import { twitterPost, resolveTwitterPost, type SocialContext, type TwitterManifest } from './customer-twitter.ts';
-import { readPublicResource, type PublicReader } from './customer-public-resource.ts';
+import { twitterPost, resolveTwitterPost, type SocialContext } from './customer-twitter.ts';
+import { readPublicResource } from './customer-public-resource.ts';
 import { fetchCustomerSource, blockedRoute, type SourceSnapshot } from './customer-source.ts';
 import { remoteVideoCandidate } from './customer-remote-preservation.ts';
-import { socialSessions, type PlatformSession } from './customer-social-sessions.ts';
+import { socialSessions } from './customer-social-sessions.ts';
+import { resolveReddit } from './customer-reddit.ts';
+import { resolveInstagram } from './customer-instagram.ts';
+import { resolveLinkedIn } from './customer-linkedin.ts';
+import { resolveBluesky } from './customer-bluesky.ts';
+import { resolveYouTube } from './customer-youtube.ts';
+import {
+  parse, host, mediaHost, isoDate, isRestrictedStatus, EMPTY_MANIFEST,
+  type SocialPlatform, type SocialPost, type SocialMedia, type SocialManifest, type SocialResolverDeps, type SocialResolver,
+} from './customer-social-types.ts';
 
-export type SocialPlatform = 'x' | 'reddit' | 'instagram' | 'linkedin' | 'bluesky' | 'youtube' | 'generic';
-export type SocialPost = { platform: SocialPlatform; site: string; id: string; url: string };
-export type SocialMedia = { kind: 'image' | 'video'; url: string; audioUrls?: string[] };
-export type SocialManifest = TwitterManifest & { restricted?: boolean };
-export type SocialResolverDeps = { read: PublicReader; session: (site: string) => PlatformSession | null; source: (url: string) => Promise<SourceSnapshot> };
-export type SocialResolver = (post: SocialPost, hints: SocialContext, signal: AbortSignal, deps: SocialResolverDeps) => Promise<SocialManifest>;
+// Re-exported so existing importers of these symbols from customer-social.ts keep working; the
+// definitions themselves now live in customer-social-types.ts (see the comment there for why).
+export {
+  mediaHost, isoDate, isRestrictedStatus, EMPTY_MANIFEST,
+  type SocialPlatform, type SocialPost, type SocialMedia, type SocialManifest, type SocialResolverDeps, type SocialResolver,
+};
 
 const LABELS: Record<SocialPlatform, string> = { x: 'X', reddit: 'Reddit', instagram: 'Instagram', linkedin: 'LinkedIn', bluesky: 'Bluesky', youtube: 'YouTube', generic: 'This site' };
 export const platformLabel = (platform: SocialPlatform) => LABELS[platform];
-export const EMPTY_MANIFEST = (): SocialManifest => ({ text: '', author: '', publishedAt: null, media: [], links: [], metadataAvailable: false });
 
-function parse(raw: unknown): URL | null {
-  if (typeof raw !== 'string' || raw.length > 4096) return null;
-  try { const u = new URL(raw); return ['http:', 'https:'].includes(u.protocol) && !u.username && !u.password && !u.port ? u : null; } catch { return null; }
-}
-const host = (u: URL, domain: string) => u.hostname === domain || u.hostname.endsWith('.' + domain);
 const GENERIC_SITES: [string, string, RegExp][] = [
   // vm./vt. short-link hosts must be listed before the generic tiktok.com entry so they win: host() treats
   // 'tiktok.com' as a match for any subdomain, including vm./vt., but only these two accept a bare short code.
@@ -69,12 +72,6 @@ export function socialPost(raw: string | null | undefined): SocialPost | null {
   }
   return null;
 }
-export function mediaHost(url: unknown, allowed: string[]): string | null {
-  const u = parse(url);
-  return u && u.protocol === 'https:' && allowed.some(domain => host(u, domain)) ? u.href : null;
-}
-export const isoDate = (seconds: unknown) => typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000).toISOString() : null;
-export const isRestrictedStatus = (status: number) => status === 401 || status === 403 || status === 429;
 
 export const resolveGeneric: SocialResolver = async (post, hints, signal, deps) => {
   let snapshot: SourceSnapshot | null = null;
@@ -90,6 +87,11 @@ export const resolveGeneric: SocialResolver = async (post, hints, signal, deps) 
 };
 const resolvers: Partial<Record<SocialPlatform, SocialResolver>> = {
   x: async (post, hints, signal, deps) => resolveTwitterPost(post.url, hints, signal, deps.read),
+  reddit: resolveReddit,
+  instagram: resolveInstagram,
+  linkedin: resolveLinkedIn,
+  bluesky: resolveBluesky,
+  youtube: resolveYouTube,
   generic: resolveGeneric,
 };
 export function registerSocialResolver(platform: SocialPlatform, resolver: SocialResolver) { resolvers[platform] = resolver; }

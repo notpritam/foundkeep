@@ -1,7 +1,7 @@
 import { parseHTML } from 'linkedom';
 import { PublicResourceError } from './customer-public-resource.ts';
 import { blockedRoute } from './customer-source.ts';
-import { EMPTY_MANIFEST, isoDate, isRestrictedStatus, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social.ts';
+import { EMPTY_MANIFEST, isoDate, isRestrictedStatus, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social-types.ts';
 const CDN = ['cdninstagram.com', 'fbcdn.net'];
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';

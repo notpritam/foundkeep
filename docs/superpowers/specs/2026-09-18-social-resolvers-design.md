@@ -80,7 +80,7 @@ The existing anonymous callers are unchanged.
 | `customer-reddit.ts` | `/r/<sub>/s/<id>` share links → follow one redirect; `<permalink>.json?raw_json=1` with UA `FoundKeep/1.0`; `over18=1` cookie for NSFW-gated posts. Text = `title` + `selftext`; author `u/<name>`; `created_utc`. | Same endpoint with `reddit.txt`/`.cookie` (lifts "IP unable to access the Reddit API"). | Images: `url_overridden_by_dest` (i.redd.it), `preview.images[].source`, galleries via `gallery_data.items` × `media_metadata` (`s.u`, unescaped). Video: `secure_media.reddit_video` → handled by the video path (below). Crossposts: `crosspost_parent_list[0]`. |
 | `customer-instagram.ts` | `https://www.instagram.com/p/<code>/embed/captioned/` → `contextJSON`/`og:*` → caption, author, first image. | Media id from shortcode (offline base-64 with IG alphabet). `GET https://www.instagram.com/api/v1/media/<id>/info/` with `x-ig-app-id: 936619743392459`, `x-csrftoken` from the `csrftoken` cookie, `x-requested-with: XMLHttpRequest`, browser UA → `items[0]`: `caption.text`, `user.username`/`full_name`, `taken_at`, `carousel_media[]`/`image_versions2.candidates[0].url`, `video_versions[0].url`. | Images: `*.cdninstagram.com`, `*.fbcdn.net` (allow-list). Video: direct mp4 via the video path with the session cookie file when present. |
 | `customer-linkedin.ts` | Guest page `https://www.linkedin.com/posts/<slug>` or `/feed/update/urn:li:activity:<id>` with a desktop browser UA. Text from `<p class="attributed-text-segment-list__content">` (fallback `og:description`), author from `og:title` prefix / `data-tracking-control-name="public_post_feed-actor-name"`, date from `<time>`, images from `data-delayed-url` / `og:image`, video from `<video data-sources>`. `/authwall` or `/login` redirect → `denied`. | Voyager: `GET https://www.linkedin.com/voyager/api/feed/updates/urn:li:activity:<id>` with cookies `li_at` + `JSESSIONID`, headers `csrf-token: <JSESSIONID value without quotes>`, `x-restli-protocol-version: 2.0.0`, `accept: application/vnd.linkedin.normalized+json+2.1`. | Images `media.licdn.com`, `dms.licdn.com`; video `dms.licdn.com` mp4 via the video path. |
-| `customer-bluesky.ts` | `https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=` then `app.bsky.feed.getPostThread?uri=at://<did>/app.bsky.feed.post/<rkey>&depth=0&parentHeight=0`. Text `record.text`, author `author.displayName (@handle)`, `record.createdAt`. | none needed | Images `embed.images[].fullsize` (`cdn.bsky.app`); video: `embed.playlist` HLS → yt-dlp (Bluesky extractor). |
+| `customer-bluesky.ts` | `https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=` then `app.bsky.feed.getPostThread?uri=at://<did>/app.bsky.feed.post/<rkey>&depth=0&parentHeight=0`. Text `record.text`, author `author.displayName (@handle)`, `record.createdAt`. | none needed | Images `embed.images[].fullsize` (`cdn.bsky.app`); video is thumbnail-only in this pass — `embed.thumbnail` is stored as an image and the manifest is marked `incomplete`; the HLS `embed.playlist` download is deferred. |
 | `customer-youtube.ts` | `https://www.youtube.com/oembed?url=<watch>&format=json` → title, author. Description/subtitles come back from the video path. | yt-dlp receives `youtube.txt` as cookie file. | Video via the video path. |
 | `customer-generic-social.ts` | Existing `fetchCustomerSource` (og/JSON-LD) → title, description as text, `og:image`, author. | If a `<platform>.txt` exists for the host's platform, pass it to yt-dlp. | Video via the video path when `remoteVideoCandidate`. |
 
@@ -89,16 +89,25 @@ session chains both fail; the pipeline still stores the captured text and notes 
 
 **5. Video path with sessions and muxing**
 
-* `downloadCustomerRemoteMedia(url, { cookieFile })`: TS validates the path is a regular file
-  inside the sessions dir, then passes `cookiefile` to the helper. The helper keeps
-  `cookiesfrombrowser: None`, no proxy, no plugins, pinned version; it only sets
-  `cookiefile` when given. yt-dlp's jar is domain-scoped, so the file is never sent off-platform.
-* Reddit (and any DASH-only source): the helper gains a second mode, `merge`, used only when
-  the selector finds no progressive MP4 but finds an `avc1` video-only MP4 and an `mp4a` audio
-  MP4 on the same host: both are downloaded through the same bounded transport into
-  `video.m4v` / `audio.m4a`, then TS runs
-  `prlimit … /usr/bin/ffmpeg -v error -protocol_whitelist file -i video.m4v -i audio.m4a -c copy -movflags +faststart video.mp4`
-  with the same limits as the ffprobe call. ffprobe validation stays after the mux.
+* `downloadCustomerRemoteMedia(url, { cookieFile, audioUrls })`: TS validates the path is a
+  regular file inside the sessions dir, then copies the operator jar into the per-download temp
+  directory as `cookies.txt` (mode `0600`) before yt-dlp ever sees it — yt-dlp rewrites whatever
+  jar it is given when it closes, so the helper must hand it a private copy, never the operator's
+  original file. The helper keeps `cookiesfrombrowser: None`, no proxy, no plugins, pinned
+  version; it only sets `cookiefile` when given. yt-dlp's jar is domain-scoped, so the file is
+  never sent off-platform.
+* Reddit (and any other source whose manifest carries sibling audio): the resolver emits
+  `audioUrls` on the video item instead of a merge mode inside yt-dlp. The Python helper's
+  direct-`.mp4` branch downloads the video into `video.mp4`, then tries the caller's `audioUrls`
+  in order — same host as the video only, `.mp4`/`.m4a` path only — through the same bounded
+  transport, into `audio.m4a` capped at 16 MiB; a missing or broken candidate costs only the
+  sound; the picture is still kept. When an `audio.m4a` came back, TS runs
+  `prlimit --fsize=<maxBytes> --as=536870912 --cpu=30 --nofile=32 -- /usr/bin/ffmpeg -v error
+  -nostdin -threads 1 -protocol_whitelist file -f mov -i video.mp4 -f mov -i audio.m4a -map 0:v:0
+  -map 1:a:0 -c copy -movflags +faststart -f mp4 muxed.mp4` and treats `muxed.mp4` as the
+  result. The same size/ftyp checks and the same `prlimit … ffprobe` validation that runs
+  against `video.mp4` in the no-audio case run against `muxed.mp4` here — there is no separate
+  validation path for the muxed file.
 
 **6. Pipeline changes** (`customer-preservation.ts`, `customer-preservation-routes.ts`,
 `customer.ts`)

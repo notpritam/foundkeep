@@ -1,4 +1,4 @@
-import { mediaHost, type SocialManifest, type SocialResolver } from './customer-social.ts';
+import { mediaHost, type SocialManifest, type SocialResolver } from './customer-social-types.ts';
 export function parseYouTubeOembed(json: unknown, id: string): SocialManifest {
   const v = json as any;
   if (!v || typeof v.title !== 'string') throw Error('The public video is unavailable.');

@@ -1,7 +1,7 @@
 import { parseHTML } from 'linkedom';
 import { PublicResourceError } from './customer-public-resource.ts';
 import { blockedRoute } from './customer-source.ts';
-import { EMPTY_MANIFEST, isRestrictedStatus, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social.ts';
+import { EMPTY_MANIFEST, isRestrictedStatus, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social-types.ts';
 const CDN = ['licdn.com'];
 const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 const clean = (v: unknown, max: number) => typeof v === 'string' ? v.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').trim().slice(0, max) : '';

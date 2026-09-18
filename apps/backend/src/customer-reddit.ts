@@ -1,5 +1,5 @@
 import { PublicResourceError, type PublicReader } from './customer-public-resource.ts';
-import { EMPTY_MANIFEST, isoDate, isRestrictedStatus, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social.ts';
+import { EMPTY_MANIFEST, isoDate, isRestrictedStatus, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social-types.ts';
 import { previewSourceUrl } from './customer-preview.ts';
 const IMAGE_HOSTS = ['redd.it', 'i.imgur.com'], VIDEO_HOSTS = ['v.redd.it'];
 const UA = { 'User-Agent': 'FoundKeep/1.0 (+https://foundkeep.app)' };

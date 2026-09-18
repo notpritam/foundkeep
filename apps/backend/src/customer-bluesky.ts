@@ -1,5 +1,5 @@
 import { previewSourceUrl } from './customer-preview.ts';
-import { EMPTY_MANIFEST, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social.ts';
+import { EMPTY_MANIFEST, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social-types.ts';
 const CDN = ['cdn.bsky.app', 'video.bsky.app', 'video.cdn.bsky.app'];
 const API = 'https://public.api.bsky.app/xrpc';
 export function parseBlueskyThread(json: unknown, rkey: string): SocialManifest {
