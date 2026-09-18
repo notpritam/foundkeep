@@ -9,8 +9,10 @@ import { RelayHub, type ConnData, type Sock } from "./relay.ts";
 import { startCustomerWorker } from "./customer-enrichment.ts";
 import { processAuthCleanup } from "./customer-oauth.ts";
 import { createSupabaseGateway } from "./supabase-auth.ts";
+import { socialSessions } from "./customer-social-sessions.ts";
 
 const db = openDb();
+console.log(socialSessions.describe());
 const app = createApp(db);
 const hub = new RelayHub(db);
 const stopCustomerWorker = startCustomerWorker(db);

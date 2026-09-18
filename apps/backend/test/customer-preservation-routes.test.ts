@@ -305,3 +305,31 @@ test("ordinary saves do not queue downloads; changing an archived post source ca
     ).status,
   ).toBe(409);
 });
+test("preservation can be requested for any supported social post and rejects other pages", async () => {
+  const owner = await register();
+  const instagram = await save(owner.cookie, {
+    type: "bookmark",
+    sourceUrl: "https://www.instagram.com/p/C0dE_f-1/",
+  });
+  const accepted = await request(
+    `/captures/${instagram.id}/preservation`,
+    "POST",
+    {},
+    owner.cookie,
+  );
+  expect(accepted.status).toBe(202);
+  const article = await save(owner.cookie, {
+    type: "bookmark",
+    sourceUrl: "https://example.com/article",
+  });
+  const rejected = await request(
+    `/captures/${article.id}/preservation`,
+    "POST",
+    {},
+    owner.cookie,
+  );
+  expect(rejected.status).toBe(400);
+  const body = (await rejected.json()) as any;
+  expect(body.error).toBe("unsupported_source");
+  expect(body.message).toBe("Use a public social post link.");
+});

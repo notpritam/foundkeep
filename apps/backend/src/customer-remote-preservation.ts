@@ -29,8 +29,8 @@ export function remoteVideoCandidate(url:string,snapshot:SourceSnapshot|null):bo
  }catch{return false;}
 }
 /** Owns extractor temp files until disposal and transfers only validated bytes to staging. */
-export async function preserveRemoteVideo(url:string,root:string,signal:AbortSignal,download:RemoteDownloader=downloadCustomerRemoteMedia):Promise<Preservation>{
- const remote=await download(url,{signal,deadlineMs:120_000});
+export async function preserveRemoteVideo(url:string,root:string,signal:AbortSignal,download:RemoteDownloader=downloadCustomerRemoteMedia,options:{cookieFile?:string;audioUrls?:string[]}={}):Promise<Preservation>{
+ const remote=await download(url,{signal,deadlineMs:120_000,...options});
  const evidence:DownloadEvidence={status:remote.status,sourceUrl:url,notice:notices[remote.status],transcriptStatus:'unavailable'};
  if(remote.status!=='downloaded')return {evidence};
  let file:StoredCustomerFile|undefined;

@@ -7,7 +7,7 @@ import {
   enqueuePreservation,
 } from "./customer-preservation.ts";
 import { resolveCustomerFile, customerFileResponse } from "./customer-files.ts";
-import { twitterPost } from "./customer-twitter.ts";
+import { socialPost } from "./customer-social.ts";
 import { config } from "./config.ts";
 export function registerPreservation(
   app: Hono<CustomerEnv>,
@@ -47,8 +47,8 @@ export function registerPreservation(
           )
           .get(id, owner) as { source_url: string | null } | null;
         if (!row) moduleFail(404, "not_found", "Saved item not found.");
-        if (!twitterPost(row.source_url))
-          moduleFail(400, "unsupported_source", "Use an X post permalink.");
+        if (!socialPost(row.source_url))
+          moduleFail(400, "unsupported_source", "Use a public social post link.");
         const previous = db
           .query(
             "SELECT source_url FROM customer_preservation_jobs WHERE capture_id=? AND account_id=?",
@@ -56,7 +56,7 @@ export function registerPreservation(
           .get(id, owner) as { source_url: string } | null;
         if (
           previous &&
-          previous.source_url !== twitterPost(row.source_url)!.url
+          previous.source_url !== socialPost(row.source_url)!.url
         )
           moduleFail(
             409,

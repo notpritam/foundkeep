@@ -27,7 +27,7 @@ export type RemoteMediaResult = { status: FailureStatus; reason: string } | {
   /** Caller must dispose in a finally block after copying into owner-scoped storage. */
   dispose(): Promise<void>;
 };
-export type RemoteMediaOptions = { signal?: AbortSignal; maxBytes?: number; maxDurationSeconds?: number; deadlineMs?: number };
+export type RemoteMediaOptions = { signal?: AbortSignal; maxBytes?: number; maxDurationSeconds?: number; deadlineMs?: number; cookieFile?: string; audioUrls?: string[] };
 export type RemoteMediaProcess = { executable: string; args: string[]; cwd: string; stdin: string };
 export type RemoteMediaRunner = (spec: RemoteMediaProcess, signal: AbortSignal) => Promise<string>;
 

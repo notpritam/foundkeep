@@ -1,6 +1,7 @@
 import {enqueuePreservation,preservationDetails,preparePreservedCleanup} from './customer-preservation.ts';
 import {preservedMediaColumns,type PreservedMediaPreview} from './customer-media-preview.ts';
-import {normalizeSocialContext,twitterPost} from './customer-twitter.ts';
+import {normalizeSocialContext} from './customer-twitter.ts';
+import {socialPost} from './customer-social.ts';
 import {registerPreservation} from './customer-preservation-routes.ts';
 import {registerCustomerCollections} from './customer-collections';
 import {registerAdmin, registerSupport} from './admin-console';
@@ -954,7 +955,7 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
     let socialContext;try { socialContext=normalizeSocialContext(body.socialContext); } catch { fail(400,'invalid_social_context','Invalid social attachment hints.'); }
     const provenanceJson = provenance ? JSON.stringify(provenance) : null;
     const processingOptionsJson = JSON.stringify(processingOptions);
-    const socialContextJson = twitterPost(sourceUrl) ? JSON.stringify(socialContext) : null;
+    const socialContextJson = socialPost(sourceUrl) ? JSON.stringify(socialContext) : null;
     const baseStorageBytes = image.bytes + [sourceUrl, sourceTitle, selectionText, noteText, articleText, clientId, batchId, provenanceJson, processingOptionsJson, socialContextJson].reduce((sum, text) => sum + Buffer.byteLength(text || "", "utf8"), 0);
     const result = db.transaction(() => {
       // Authentication must still hold after the streamed body was received.

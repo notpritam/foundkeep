@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { openDb } from "../src/db.ts";
 import {
   createPreservationService,
@@ -158,4 +160,40 @@ test('expired leases resume missing work, and unavailable metadata never downloa
  await worker.tick();worker.close();
  expect(preservationDetails(db,owner,capture)?.status).toBe('partial');expect(preservationDetails(db,owner,capture)?.attempts).toBe(2);expect(downloads).toBe(0);
  expect(preservationDetails(db,owner,capture)?.assets.map(asset=>asset.kind)).toEqual(['post']);
+});
+test('any recognised social post is preserved with platform-aware notes and a transcript asset', async () => {
+  const reddit = 'https://www.reddit.com/r/space/comments/1abc2d/';
+  db.query("INSERT INTO customer_captures(id,account_id,client_id,type,status,source_url,selection_text,storage_bytes,captured_at,created_at,updated_at) VALUES('r',?,'r','page','done',?,'',100,1,1,1)").run(owner, reddit);
+  enqueuePreservation(db, owner, 'r', 'https://old.reddit.com/r/space/comments/1abc2d/some_title/?utm_source=share');
+  expect((db.query("SELECT source_url FROM customer_preservation_jobs WHERE capture_id='r'").get() as any).source_url).toBe(reddit);
+  const seen: any[] = [];
+  const s = createPreservationService(db, {
+    root,
+    resolve: async () => ({ text: 'Title\n\nBody', author: 'u/mina', publishedAt: '2026-09-01T00:00:00.000Z', metadataAvailable: false, restricted: true, media: [{ kind: 'video' as const, url: 'https://v.redd.it/abc/DASH_720.mp4', audioUrls: ['https://v.redd.it/abc/DASH_AUDIO_128.mp4'] }], links: [] }),
+    read: async (url) => ({ url, mime: 'image/png', data: png, status: 200 }),
+    remote: async (url, options) => { seen.push({ url, cookieFile: options.cookieFile, audioUrls: options.audioUrls }); return { status: 'unavailable' as const, reason: 'x' }; },
+    sessions: { session: () => ({ site: 'reddit', cookieFile: '/tmp/reddit.txt', cookieHeader: () => null, cookie: () => null, report() {} }), describe: () => '' },
+  });
+  await s.tick();
+  const result = preservationDetails(db, owner, 'r')!;
+  expect(result.status).toBe('partial');
+  expect(result.error).toContain('Reddit did not expose the full public post.');
+  expect(result.error).toContain('Reddit restricted server access');
+  expect(result.error).not.toContain('X did not');
+  expect(seen).toEqual([{ url: 'https://v.redd.it/abc/DASH_720.mp4', cookieFile: '/tmp/reddit.txt', audioUrls: ['https://v.redd.it/abc/DASH_AUDIO_128.mp4'] }]);
+});
+test('video subtitles and description become a transcript asset', async () => {
+  const clip = join(root, 'clip.bin');
+  // A minimal ISO-BMFF "ftyp" box header so customer-files.ts's magic-byte sniffer
+  // detects video/mp4 — a plain placeholder string does not satisfy the sniffer.
+  const clipBytes = Buffer.from([0, 0, 0, 12, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+  await writeFile(clip, clipBytes);
+  const s = service({
+    resolve: async () => ({ ...manifest, media: [{ kind: 'video' as const, url: 'https://video.twimg.com/a.mp4' }] }),
+    remote: async () => ({ status: 'downloaded' as const, absolutePath: clip, sourceUrl: 'https://video.twimg.com/a.mp4', mime: 'video/mp4' as const, bytes: clipBytes.length, sha256: createHash('sha256').update(clipBytes).digest('base64url'), durationSeconds: 1, title: 'Clip', description: 'About the clip', author: 'Mina', subtitles: [{ language: 'en', automatic: true, text: 'WEBVTT\n\nhello' }], dispose: async () => {} }),
+  });
+  enqueuePreservation(db, owner, capture, url);
+  await s.tick();
+  const kinds = preservationDetails(db, owner, capture)!.assets.map(a => a.kind);
+  expect(kinds).toContain('transcript');
 });

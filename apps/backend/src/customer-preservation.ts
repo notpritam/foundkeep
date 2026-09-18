@@ -2,13 +2,17 @@ import { createHash } from "node:crypto";
 import type { Database } from "bun:sqlite";
 import { config } from "./config.ts";
 import { accountPlan } from "./customer-plans.ts";
+import { normalizeSocialContext, type SocialContext } from "./customer-twitter.ts";
 import {
-  normalizeSocialContext,
-  resolveTwitterPost,
-  twitterPost,
-  type SocialContext,
-  type TwitterManifest,
-} from "./customer-twitter.ts";
+  socialPost,
+  platformLabel,
+  resolveSocialPost,
+  type SocialManifest,
+} from "./customer-social.ts";
+import {
+  socialSessions,
+  type SessionStore,
+} from "./customer-social-sessions.ts";
 import {
   readPublicResource,
   type PublicReader,
@@ -52,7 +56,7 @@ export function enqueuePreservation(
   source: string | null,
   context: SocialContext = normalizeSocialContext(null),
 ) {
-  const post = twitterPost(source);
+  const post = socialPost(source);
   if (!post) return;
   db.query(
     "INSERT OR IGNORE INTO customer_preservation_jobs(capture_id,account_id,source_url,context_json,created_at,updated_at) VALUES(?,?,?,?,?,?)",
@@ -119,10 +123,11 @@ export function createPreservationService(
       url: string,
       hints: SocialContext,
       signal: AbortSignal,
-    ) => Promise<TwitterManifest>;
+    ) => Promise<SocialManifest>;
     remote?: RemoteDownloader;
     source?: (url: string) => Promise<SourceSnapshot>;
     globalMaxBytes?: number;
+    sessions?: SessionStore;
   } = {},
 ) {
   const root = options.root || config.dataDir,
@@ -141,7 +146,7 @@ export function createPreservationService(
         "SELECT c.source_url,c.source_title,c.selection_text,c.note_text,c.article_text,c.storage_bytes FROM customer_captures c JOIN customer_preservation_jobs j ON j.capture_id=c.id AND j.account_id=c.account_id WHERE c.id=? AND c.account_id=? AND j.lease_token=? AND j.status='running'",
       )
       .get(job.capture_id, job.account_id, job.lease_token) as Save | null;
-    return row && twitterPost(row.source_url)?.url === job.source_url
+    return row && socialPost(row.source_url)?.url === job.source_url
       ? row
       : null;
   }
@@ -274,7 +279,10 @@ export function createPreservationService(
         save = current(job);
       if (!save) throw Error("The saved source changed or was removed.");
       const context = normalizeSocialContext(JSON.parse(job.context_json));
-      const manifest = await (options.resolve || resolveTwitterPost)(
+      const post = socialPost(job.source_url),
+        label = platformLabel(post?.platform ?? "x"),
+        sessions = options.sessions ?? socialSessions;
+      const manifest = await (options.resolve || resolveSocialPost)(
         job.source_url,
         context,
         signal,
@@ -308,7 +316,7 @@ export function createPreservationService(
           source: job.source_url,
           kind: "article",
           position: 1,
-          title: "Article captured from X",
+          title: `Article captured from ${label}`,
           mime: "text/plain",
           text: context.articleText,
         });
@@ -328,6 +336,7 @@ export function createPreservationService(
               "Storage limit reached. Saved files are kept; free space and retry.",
             );
           if (item.kind === "video") {
+            const session = sessions.session(post?.site ?? "x");
             const result = await preserveRemoteVideo(
               item.url,
               root,
@@ -337,6 +346,10 @@ export function createPreservationService(
                   ...opts,
                   maxBytes: Math.min(budget, 50 * 1024 * 1024),
                 }),
+              {
+                cookieFile: session?.cookieFile ?? undefined,
+                audioUrls: item.audioUrls,
+              },
             );
             if (!result.file) {
               issues.push("A video copy was unavailable.");
@@ -351,6 +364,16 @@ export function createPreservationService(
               mime: result.file.mime,
               file: result.file,
             });
+            if (result.text)
+              commit(job, {
+                key: "transcript:" + item.url,
+                source: item.url,
+                kind: "transcript",
+                position: 20 + index,
+                title: "Video subtitles and description",
+                mime: "text/plain",
+                text: result.text,
+              });
           } else {
             const data = await read(item.url, {
               maxBytes: Math.min(budget, 8 * 1024 * 1024),
@@ -423,7 +446,11 @@ export function createPreservationService(
       }
       if (!manifest.metadataAvailable)
         issues.push(
-          "X did not expose the full public post. The captured text and available files are kept.",
+          `${label} did not expose the full public post. The captured text and available files are kept.`,
+        );
+      if (manifest.restricted)
+        issues.push(
+          `${label} restricted server access; the captured text and available files are kept.`,
         );
       if (manifest.incomplete)
         issues.push(
