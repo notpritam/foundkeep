@@ -24,7 +24,7 @@ ssh pritam@157.180.102.248 'chmod 700 ~/.config/foundkeep/social-sessions && chm
 Or use the bb `secrets` skill to write a `.cookie` file without the value passing through an agent.
 
 ## Guard rails
-Cookies are only sent to hosts matching their domain (re-checked on every redirect). On 401/403/429 or a login redirect the site's session cools down for 30 minutes (10 for rate limits) and anonymous access is used meanwhile. Authenticated calls are spaced at least 2 s apart per site. Nothing from a session is ever logged.
+Cookies for other domains in a file are ignored: only the site's own domains are loaded (plus `google.com` for YouTube and `twitter.com` for X), so exporting a whole browser jar by mistake leaks nothing to another platform. Cookies are only sent to hosts matching their domain (re-checked on every redirect). On 401/403/429 or a login redirect the site's session cools down for 30 minutes (10 for rate limits) and anonymous access is used meanwhile. Authenticated calls are spaced at least 2 s apart per site. Nothing from a session is ever logged.
 
 The backend prints `social sessions: …` once at startup (see "Where files live" above); if a site you just dropped a file for is missing from that line, check permissions and filename before assuming the fetch itself failed. `FOUNDKEEP_SOCIAL_SESSIONS_DIR` can point the whole lookup at a different directory — set it in a systemd drop-in (`systemctl edit <service>`) rather than the shared `.env` if only one deployment should use the override.
 

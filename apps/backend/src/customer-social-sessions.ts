@@ -11,9 +11,16 @@ export type PlatformSession = {
   cookie(name: string): string | null;
   report(outcome: SessionOutcome): void;
 };
-export type SessionStore = { session(site: string): PlatformSession | null; describe(): string };
+export type SessionStore = {
+  session(site: string): PlatformSession | null;
+  /** The site's synthesized jar path, or null when the site is not loaded or is
+   * cooling down. Reading a path is not an authenticated call, so this never
+   * spends the spacing slot `session()` guards. */
+  cookieFileFor(site: string): string | null;
+  describe(): string;
+};
 
-type Cookie = { domain: string; hostOnly: boolean; name: string; value: string };
+type Cookie = { domain: string; hostOnly: boolean; secure: boolean; name: string; value: string };
 type Loaded = { site: string; cookies: Cookie[]; cookieFile: string | null; mtimeMs: number; kind: 'txt' | 'cookie' };
 
 /** Registrable domain per site. Raw `.cookie` files are scoped to `.<domain>`. */
@@ -22,6 +29,12 @@ export const SITE_DOMAINS: Record<string, string> = {
   youtube: 'youtube.com', tiktok: 'tiktok.com', threads: 'threads.net', facebook: 'facebook.com',
   pinterest: 'pinterest.com', tumblr: 'tumblr.com', vimeo: 'vimeo.com', twitch: 'twitch.tv', dailymotion: 'dailymotion.com',
 };
+/** Extra registrable domains that are part of the same operator sign-in as the
+ * site itself. Everything else in a dropped file — an ad network, another
+ * network's jar pasted in by accident — is discarded at load. */
+export const SITE_EXTRA_DOMAINS: Record<string, string[]> = { youtube: ['google.com'], x: ['twitter.com'] };
+const siteDomains = (site: string) => [SITE_DOMAINS[site] ?? `${site}.com`, ...(SITE_EXTRA_DOMAINS[site] ?? [])];
+const ownedBySite = (domain: string, domains: string[]) => domains.some(d => domain === d || domain.endsWith('.' + d));
 const MAX_FILE = 256 * 1024, RELOAD_MS = 30_000, SPACING_MS = 2_000;
 const COOLDOWN: Record<Exclude<SessionOutcome, 'ok'>, number> = { denied: 30 * 60_000, login: 30 * 60_000, ratelimited: 10 * 60_000 };
 
@@ -41,7 +54,7 @@ function parseNetscape(body: string): Cookie[] {
     if (parts.length < 7) continue;
     const domain = parts[0]!.toLowerCase(), name = parts[5]!, value = parts.slice(6).join('\t');
     if (!domain || !name) continue;
-    cookies.push({ domain: domain.replace(/^\./, ''), hostOnly: !domain.startsWith('.') && parts[1]!.toUpperCase() !== 'TRUE', name, value });
+    cookies.push({ domain: domain.replace(/^\./, ''), hostOnly: !domain.startsWith('.') && parts[1]!.toUpperCase() !== 'TRUE', secure: parts[3]!.toUpperCase() === 'TRUE', name, value });
   }
   return cookies;
 }
@@ -49,7 +62,7 @@ function parseRaw(body: string, domain: string): Cookie[] {
   return body.split('\n')[0]!.split(';').map(part => part.trim()).filter(Boolean).flatMap(part => {
     const at = part.indexOf('=');
     if (at <= 0) return [];
-    return [{ domain, hostOnly: false, name: part.slice(0, at).trim(), value: part.slice(at + 1).trim() }];
+    return [{ domain, hostOnly: false, secure: true, name: part.slice(0, at).trim(), value: part.slice(at + 1).trim() }];
   });
 }
 function matches(cookie: Cookie, host: string) {
@@ -74,7 +87,7 @@ export function createSessionStore(options: { directory?: string; runtimeDirecto
       mkdirSync(runtime, { recursive: true, mode: 0o700 });
       const path = join(runtime, `${site}.txt`);
       const expiry = Math.floor(now() / 1000) + 365 * 86_400;
-      const lines = cookies.map(c => `.${c.domain}\tTRUE\t/\tTRUE\t${expiry}\t${c.name}\t${c.value}`);
+      const lines = cookies.map(c => `.${c.domain}\tTRUE\t/\t${c.secure ? 'TRUE' : 'FALSE'}\t${expiry}\t${c.name}\t${c.value}`);
       writeFileSync(path, `# Netscape HTTP Cookie File\n${lines.join('\n')}\n`, { mode: 0o600 });
       chmodSync(path, 0o600);
       return path;
@@ -103,9 +116,17 @@ export function createSessionStore(options: { directory?: string; runtimeDirecto
       let cookies: Cookie[];
       try { cookies = kind === 'txt' ? parseNetscape(readFileSync(path, 'utf8')) : parseRaw(readFileSync(path, 'utf8'), SITE_DOMAINS[site] ?? `${site}.com`); }
       catch { continue; }
+      // A file may hold a whole browser jar. Only the site's own domains are
+      // kept, so nothing here — nor the jar handed to yt-dlp — can carry a
+      // cookie to a platform the operator never meant to authenticate to.
+      const domains = siteDomains(site);
+      cookies = cookies.filter(c => ownedBySite(c.domain, domains));
       if (!cookies.length) continue;
       seen.add(site);
-      loaded.set(site, { site, cookies, cookieFile: kind === 'txt' ? path : synthesize(site, cookies), mtimeMs: stat.mtimeMs, kind });
+      // Always synthesized, never the operator's own path: the filtered jar is
+      // the only cookie set that may leave this process, and yt-dlp rewrites
+      // whatever file it is given.
+      loaded.set(site, { site, cookies, cookieFile: synthesize(site, cookies), mtimeMs: stat.mtimeMs, kind });
     }
     for (const site of [...loaded.keys()]) if (!seen.has(site)) loaded.delete(site);
   }
@@ -125,6 +146,12 @@ export function createSessionStore(options: { directory?: string; runtimeDirecto
         cookie: name => entry.cookies.find(c => c.name === name)?.value ?? null,
         report: outcome => { if (outcome !== 'ok') cooldownUntil.set(site, now() + COOLDOWN[outcome]); },
       };
+    },
+    cookieFileFor(site) {
+      scan();
+      const entry = loaded.get(site);
+      if (!entry) return null;
+      return (cooldownUntil.get(site) ?? 0) > now() ? null : entry.cookieFile;
     },
     describe() {
       scan();

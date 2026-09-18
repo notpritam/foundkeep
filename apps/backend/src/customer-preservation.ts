@@ -340,7 +340,9 @@ export function createPreservationService(
               "Storage limit reached. Saved files are kept; free space and retry.",
             );
           if (item.kind === "video") {
-            const session = sessions.session(post?.site ?? "x");
+            // Only the jar path is needed here, and asking for it must not spend
+            // the site's one authenticated call — the resolvers need that slot.
+            const cookieFile = sessions.cookieFileFor(post?.site ?? "x");
             const result = await preserveRemoteVideo(
               item.url,
               root,
@@ -351,7 +353,7 @@ export function createPreservationService(
                   maxBytes: Math.min(budget, 50 * 1024 * 1024),
                 }),
               {
-                cookieFile: session?.cookieFile ?? undefined,
+                cookieFile: cookieFile ?? undefined,
                 audioUrls: item.audioUrls,
               },
             );
@@ -448,13 +450,15 @@ export function createPreservationService(
           );
         }
       }
-      if (!manifest.metadataAvailable)
-        issues.push(
-          `${label} did not expose the full public post. The captured text and available files are kept.`,
-        );
+      // A restricted server is the reason the post was not exposed; naming both
+      // would read as two independent faults for one cause.
       if (manifest.restricted)
         issues.push(
           `${label} restricted server access; the captured text and available files are kept.`,
+        );
+      else if (!manifest.metadataAvailable)
+        issues.push(
+          `${label} did not expose the full public post. The captured text and available files are kept.`,
         );
       if (manifest.incomplete)
         issues.push(

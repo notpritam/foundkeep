@@ -22,13 +22,28 @@ export class PublicResourceError extends Error {
     super("The public source is unavailable.");
   }
 }
+/** True when `host` stays inside `origin`'s own site: the same hostname, or one
+ * sharing its last two DNS labels (`www.instagram.com` and `i.instagram.com`,
+ * never `consent.facebook.com`). IP literals only ever match themselves, since
+ * their trailing octets are not DNS labels. */
+function sameSite(host: string, origin: string): boolean {
+  const a = host.toLowerCase(), b = origin.toLowerCase();
+  if (a === b) return true;
+  if (isIP(a) || isIP(b)) return false;
+  const site = (value: string) => value.split('.').slice(-2).join('.');
+  return a.includes('.') && b.includes('.') && site(a) === site(b);
+}
 export type PublicReader = (
   url: string,
   options: PublicReadOptions,
 ) => Promise<PublicResource>;
-/** Pinned DNS on every redirect, bounded body and wall time. Headers and a
- * per-host cookie may be supplied by the caller; both are re-scoped on every
- * redirect hop so neither ever reaches a host it was not issued for. */
+/** Pinned DNS on every redirect, bounded body and wall time. Caller headers and
+ * a per-host cookie are re-scoped on every redirect hop. Caller headers may
+ * carry session-derived secrets (an Instagram `x-csrftoken`, a LinkedIn
+ * `csrf-token`), so they are sent only to hops that stay inside the original
+ * request's own site — the same hostname, or one sharing its last two DNS
+ * labels. Every other hop gets the default headers only. The cookie is asked
+ * for per hop hostname and is sent only over `https:`. */
 export function createPublicReader(
   deps: {
     resolve?: (host: string, signal: AbortSignal) => Promise<PreviewAddress[]>;
@@ -57,6 +72,7 @@ export function createPublicReader(
     try {
       let url = previewSourceUrl(raw);
       if (!url) throw Error("This is not a public source.");
+      const origin = url.hostname.replace(/^\[|\]$/g, "");
       for (let hop = 0; hop < 4; hop++) {
         signal.throwIfAborted();
         const host = url.hostname.replace(/^\[|\]$/g, ""),
@@ -74,11 +90,13 @@ export function createPublicReader(
           throw Error("This is not a public source.");
         // Headers and cookie are rebuilt from options on every hop: a header or
         // cookie issued for the original host must never follow a redirect to
-        // a different one.
-        const cookie = options.cookies?.(host);
-        const hopHeaders: Record<string, string> = sanitizeExtraHeaders(
-          options.headers,
-        );
+        // a different one. Caller headers survive only inside the original
+        // site; the cookie is per-hop and plaintext hops get none.
+        const cookie =
+          url.protocol === "https:" ? options.cookies?.(host) : null;
+        const hopHeaders: Record<string, string> = sameSite(host, origin)
+          ? sanitizeExtraHeaders(options.headers)
+          : {};
         // Any casing of a caller-supplied Cookie is removed, not just the two
         // literal spellings, so it can never bypass the per-host cookie below.
         for (const key of Object.keys(hopHeaders))

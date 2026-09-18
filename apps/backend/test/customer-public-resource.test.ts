@@ -21,7 +21,46 @@ test('headers and per-hop cookies reach the transport, and cookies re-scope on r
   expect(result.status).toBe(200);
   expect(result.url).toBe('https://cdn.example.net/file.json');
   expect(seen[0]!.headers).toEqual({ 'User-Agent': 'FoundKeep/1.0 test', Cookie: 'reddit_session=r1' });
-  expect(seen[1]!.headers).toEqual({ 'User-Agent': 'FoundKeep/1.0 test' });
+  // A hop to an unrelated registrable domain gets the default headers only: the
+  // caller's headers were issued for reddit.com and may carry session secrets.
+  expect(seen[1]!.headers).toEqual({});
+});
+test('a hop inside the original registrable domain keeps the caller headers and its own cookie', async () => {
+  const seen: { host: string; headers: Record<string, string> }[] = [];
+  const read = createPublicReader({
+    resolve: async () => [{ address: '1.1.1.1', family: 4 }],
+    transport: async (target, _signal, _accept, headers) => {
+      seen.push({ host: target.url.host, headers: headers ?? {} });
+      if (target.url.host === 'www.reddit.com') return { status: 302, headers: new Headers({ location: 'https://old.reddit.com/r/a/comments/xyz/.json' }), body: body(''), cancel() {} };
+      return { status: 200, headers: new Headers({ 'content-type': 'application/json' }), body: body('{"ok":true}'), cancel() {} };
+    },
+  });
+  const result = await read('https://www.reddit.com/r/a/s/xyz', {
+    maxBytes: 1024, signal: new AbortController().signal, accept: 'application/json',
+    headers: { 'User-Agent': 'FoundKeep/1.0 test' },
+    cookies: host => (host.endsWith('reddit.com') ? `session-for=${host}` : null),
+  });
+  expect(result.url).toBe('https://old.reddit.com/r/a/comments/xyz/.json');
+  expect(seen[1]!.host).toBe('old.reddit.com');
+  expect(seen[1]!.headers).toEqual({ 'User-Agent': 'FoundKeep/1.0 test', Cookie: 'session-for=old.reddit.com' });
+});
+test('a plaintext hop never carries the cookie', async () => {
+  const seen: Record<string, string>[] = [];
+  const read = createPublicReader({
+    resolve: async () => [{ address: '1.1.1.1', family: 4 }],
+    transport: async (target, _signal, _accept, headers) => {
+      seen.push(headers ?? {});
+      if (target.url.protocol === 'https:') return { status: 302, headers: new Headers({ location: 'http://www.reddit.com/r/a/comments/xyz/.json' }), body: body(''), cancel() {} };
+      return { status: 200, headers: new Headers({ 'content-type': 'application/json' }), body: body('{"ok":true}'), cancel() {} };
+    },
+  });
+  await read('https://www.reddit.com/r/a/s/xyz', {
+    maxBytes: 1024, signal: new AbortController().signal, accept: 'application/json',
+    headers: { 'User-Agent': 'FoundKeep/1.0 test' },
+    cookies: () => 'reddit_session=r1',
+  });
+  expect(seen[0]).toEqual({ 'User-Agent': 'FoundKeep/1.0 test', Cookie: 'reddit_session=r1' });
+  expect(seen[1]).toEqual({ 'User-Agent': 'FoundKeep/1.0 test' });
 });
 test('pinnedRequestHeaders — the merge that actually runs in production — protects Host/Accept-Encoding in any case, drops invalid values, lets ordinary headers through, and the explicit accept wins over a caller Accept', () => {
   const headers = pinnedRequestHeaders(

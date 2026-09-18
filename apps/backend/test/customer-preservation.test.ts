@@ -167,22 +167,27 @@ test('any recognised social post is preserved with platform-aware notes', async 
   enqueuePreservation(db, owner, 'r', 'https://old.reddit.com/r/space/comments/1abc2d/some_title/?utm_source=share');
   expect((db.query("SELECT source_url FROM customer_preservation_jobs WHERE capture_id='r'").get() as any).source_url).toBe(reddit);
   const seen: any[] = [];
-  const sessionSites: string[] = [];
+  const sessionSites: string[] = [], consumed: string[] = [];
   const s = createPreservationService(db, {
     root,
     resolve: async () => ({ text: 'Title\n\nBody', author: 'u/mina', publishedAt: '2026-09-01T00:00:00.000Z', metadataAvailable: false, restricted: true, media: [{ kind: 'video' as const, url: 'https://v.redd.it/abc/DASH_720.mp4', audioUrls: ['https://v.redd.it/abc/DASH_AUDIO_128.mp4'] }], links: [] }),
     read: async (url) => ({ url, mime: 'image/png', data: png, status: 200 }),
     remote: async (url, options) => { seen.push({ url, cookieFile: options.cookieFile, audioUrls: options.audioUrls }); return { status: 'unavailable' as const, reason: 'x' }; },
-    sessions: { session: (site: string) => { sessionSites.push(site); return { site: 'reddit', cookieFile: '/tmp/reddit.txt', cookieHeader: () => null, cookie: () => null, report() {} }; }, describe: () => '' },
+    // The pipeline reads the jar path without spending the 2 s authenticated-call
+    // slot the resolvers need, so session() must never be reached from here.
+    sessions: { session: () => { consumed.push('session'); return null; }, cookieFileFor: (site: string) => { sessionSites.push(site); return '/tmp/reddit.txt'; }, describe: () => '' },
   });
   await s.tick();
   const result = preservationDetails(db, owner, 'r')!;
   expect(result.status).toBe('partial');
-  expect(result.error).toContain('Reddit did not expose the full public post.');
+  // A restricted server is why the post was not exposed; saying both would read
+  // as two separate faults.
+  expect(result.error).not.toContain('did not expose');
   expect(result.error).toContain('Reddit restricted server access');
   expect(result.error).not.toContain('X did not');
   expect(seen).toEqual([{ url: 'https://v.redd.it/abc/DASH_720.mp4', cookieFile: '/tmp/reddit.txt', audioUrls: ['https://v.redd.it/abc/DASH_AUDIO_128.mp4'] }]);
   expect(sessionSites).toEqual(['reddit']);
+  expect(consumed).toEqual([]);
 });
 test('the visible-article asset title names the platform, or "the page" for a generic source', async () => {
   const context = normalizeSocialContext({ version: 1, images: [], links: [], articleText: 'Visible on-page article text' });
