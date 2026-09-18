@@ -674,7 +674,7 @@ export default function Home(){return <LandingProvider><div className="landing-b
       <footer className="site-footer wrap compact-footer">
         <Link className="brand" href="/"><img src="/assets/studio-mark.svg?v=bookmark-evolved-1" width="28" height="28" alt=""/><span>FoundKeep</span></Link>
         <span>© 2026 NotPritam</span>
-        <nav aria-label="Footer"><a href="#pricing">Pricing</a><Link href="/support">Support</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><ExternalLink href="https://github.com/notpritam/foundkeep">Source</ExternalLink></nav>
+        <nav aria-label="Footer"><a href="#pricing">Pricing</a><ExternalLink href="https://help.foundkeep.app">Help</ExternalLink><ExternalLink href="https://blog.foundkeep.app">Blog</ExternalLink><Link href="/support">Support</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><ExternalLink href="https://github.com/notpritam/foundkeep">Source</ExternalLink></nav>
       </footer>
     </div>
   </div></LandingProvider>;}

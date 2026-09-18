@@ -27,6 +27,7 @@ const icons = {
   folder: <path d="M3 8V5a2 2 0 0 1 2-2h4l3 4h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />,
   globe: <><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18" /></>,
   switch: <path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />,
+  book: <><path d="M12 6c-2-1.4-5-1.4-8 0v12c3-1.4 6-1.4 8 0 2-1.4 5-1.4 8 0V6c-3-1.4-6-1.4-8 0Z" /><path d="M12 6v12" /></>,
 };
 function Icon({ children }: { children: ReactNode }) { return <svg aria-hidden="true" viewBox="0 0 24 24">{children}</svg>; }
 
@@ -137,9 +138,12 @@ export function Sidebar({ me, section, collectionId, libraryHref = '/dashboard',
     { href: '/dashboard/apps', id: 'open-setup', label: 'Apps & devices', active: section === 'apps', icon: icons.devices },
     { href: '/dashboard/plans', id: 'open-plans', label: 'Plans & usage', active: section === 'plans', icon: icons.plans },
     { href: '/dashboard/settings', id: 'open-settings', label: 'Settings', active: settings, icon: icons.settings },
+    { href: 'https://help.foundkeep.app', id: 'sidebar-help', label: 'Help & guides', active: false, icon: icons.book },
     { href: '/support', id: 'sidebar-support', label: 'Support', active: false, icon: icons.help },
   ];
-  const navLink = (link: typeof primary[number]) => <Link key={link.id} id={link.id} href={link.href} aria-label={link.label} title={rail ? link.label : undefined} className={`sidebar-nav-link${link.active ? ' nav-active' : ''}`} aria-current={link.active ? 'page' : undefined} onNavigate={event => { if (link.id === 'all-captures' && onLibrary) { event.preventDefault(); openLibrary(); } else close(); }}><Icon>{link.icon}</Icon><span className="sidebar-nav-label">{link.label}</span>{link.id === 'all-captures' ? <span id="nav-count">{me.usage.captures.toLocaleString('en-US')}</span> : null}</Link>;
+  const navLink = (link: typeof primary[number]) => /^https?:\/\//.test(link.href)
+    ? <a key={link.id} id={link.id} href={link.href} target="_blank" rel="noreferrer" aria-label={link.label} title={rail ? link.label : undefined} className="sidebar-nav-link" onClick={close}><Icon>{link.icon}</Icon><span className="sidebar-nav-label">{link.label}</span></a>
+    : <Link key={link.id} id={link.id} href={link.href} aria-label={link.label} title={rail ? link.label : undefined} className={`sidebar-nav-link${link.active ? ' nav-active' : ''}`} aria-current={link.active ? 'page' : undefined} onNavigate={event => { if (link.id === 'all-captures' && onLibrary) { event.preventDefault(); openLibrary(); } else close(); }}><Icon>{link.icon}</Icon><span className="sidebar-nav-label">{link.label}</span>{link.id === 'all-captures' ? <span id="nav-count">{me.usage.captures.toLocaleString('en-US')}</span> : null}</Link>;
   const allCollections = collections.data?.collections || [];
   const visibleCollections = allCollections.slice(0, 8);
   const selected = allCollections.find(collection => collection.id === collectionId);
