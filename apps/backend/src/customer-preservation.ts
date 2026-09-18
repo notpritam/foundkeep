@@ -281,6 +281,10 @@ export function createPreservationService(
       const context = normalizeSocialContext(JSON.parse(job.context_json));
       const post = socialPost(job.source_url),
         label = platformLabel(post?.platform ?? "x"),
+        articleTitle =
+          post?.platform === "generic"
+            ? "Article captured from the page"
+            : `Article captured from ${label}`,
         sessions = options.sessions ?? socialSessions;
       const manifest = await (options.resolve || resolveSocialPost)(
         job.source_url,
@@ -316,7 +320,7 @@ export function createPreservationService(
           source: job.source_url,
           kind: "article",
           position: 1,
-          title: `Article captured from ${label}`,
+          title: articleTitle,
           mime: "text/plain",
           text: context.articleText,
         });

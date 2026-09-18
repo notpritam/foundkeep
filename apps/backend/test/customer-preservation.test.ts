@@ -161,18 +161,19 @@ test('expired leases resume missing work, and unavailable metadata never downloa
  expect(preservationDetails(db,owner,capture)?.status).toBe('partial');expect(preservationDetails(db,owner,capture)?.attempts).toBe(2);expect(downloads).toBe(0);
  expect(preservationDetails(db,owner,capture)?.assets.map(asset=>asset.kind)).toEqual(['post']);
 });
-test('any recognised social post is preserved with platform-aware notes and a transcript asset', async () => {
+test('any recognised social post is preserved with platform-aware notes', async () => {
   const reddit = 'https://www.reddit.com/r/space/comments/1abc2d/';
   db.query("INSERT INTO customer_captures(id,account_id,client_id,type,status,source_url,selection_text,storage_bytes,captured_at,created_at,updated_at) VALUES('r',?,'r','page','done',?,'',100,1,1,1)").run(owner, reddit);
   enqueuePreservation(db, owner, 'r', 'https://old.reddit.com/r/space/comments/1abc2d/some_title/?utm_source=share');
   expect((db.query("SELECT source_url FROM customer_preservation_jobs WHERE capture_id='r'").get() as any).source_url).toBe(reddit);
   const seen: any[] = [];
+  const sessionSites: string[] = [];
   const s = createPreservationService(db, {
     root,
     resolve: async () => ({ text: 'Title\n\nBody', author: 'u/mina', publishedAt: '2026-09-01T00:00:00.000Z', metadataAvailable: false, restricted: true, media: [{ kind: 'video' as const, url: 'https://v.redd.it/abc/DASH_720.mp4', audioUrls: ['https://v.redd.it/abc/DASH_AUDIO_128.mp4'] }], links: [] }),
     read: async (url) => ({ url, mime: 'image/png', data: png, status: 200 }),
     remote: async (url, options) => { seen.push({ url, cookieFile: options.cookieFile, audioUrls: options.audioUrls }); return { status: 'unavailable' as const, reason: 'x' }; },
-    sessions: { session: () => ({ site: 'reddit', cookieFile: '/tmp/reddit.txt', cookieHeader: () => null, cookie: () => null, report() {} }), describe: () => '' },
+    sessions: { session: (site: string) => { sessionSites.push(site); return { site: 'reddit', cookieFile: '/tmp/reddit.txt', cookieHeader: () => null, cookie: () => null, report() {} }; }, describe: () => '' },
   });
   await s.tick();
   const result = preservationDetails(db, owner, 'r')!;
@@ -181,6 +182,24 @@ test('any recognised social post is preserved with platform-aware notes and a tr
   expect(result.error).toContain('Reddit restricted server access');
   expect(result.error).not.toContain('X did not');
   expect(seen).toEqual([{ url: 'https://v.redd.it/abc/DASH_720.mp4', cookieFile: '/tmp/reddit.txt', audioUrls: ['https://v.redd.it/abc/DASH_AUDIO_128.mp4'] }]);
+  expect(sessionSites).toEqual(['reddit']);
+});
+test('the visible-article asset title names the platform, or "the page" for a generic source', async () => {
+  const context = normalizeSocialContext({ version: 1, images: [], links: [], articleText: 'Visible on-page article text' });
+  const tiktokUrl = 'https://www.tiktok.com/@u/video/7300000000000000000';
+  db.query("INSERT INTO customer_captures(id,account_id,client_id,type,status,source_url,selection_text,storage_bytes,captured_at,created_at,updated_at) VALUES('t',?,'t','page','done',?,'',100,1,1,1)").run(owner, tiktokUrl);
+  enqueuePreservation(db, owner, 't', tiktokUrl, context);
+  await createPreservationService(db, {
+    root,
+    resolve: async () => ({ text: 'Body', author: '', publishedAt: null, metadataAvailable: true, media: [], links: [] }),
+  }).tick();
+  const tiktokArticle = preservationDetails(db, owner, 't')!.assets.find((a) => a.kind === 'article');
+  expect(tiktokArticle?.title).toBe('Article captured from the page');
+
+  enqueuePreservation(db, owner, capture, url, context);
+  await service({ resolve: async () => ({ ...manifest, links: [] }) }).tick();
+  const xArticle = preservationDetails(db, owner, capture)!.assets.find((a) => a.kind === 'article');
+  expect(xArticle?.title).toBe('Article captured from X');
 });
 test('video subtitles and description become a transcript asset', async () => {
   const clip = join(root, 'clip.bin');
