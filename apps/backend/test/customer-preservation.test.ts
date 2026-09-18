@@ -42,7 +42,7 @@ const service = (extra = {}) =>
   createPreservationService(db, {
     root,
     resolve: async () => manifest,
-    read: async (url) => ({ url, mime: "image/png", data: png }),
+    read: async (url) => ({ url, mime: "image/png", data: png, status: 200 }),
     source: async (url) => ({
       url,
       requestedUrl: url,

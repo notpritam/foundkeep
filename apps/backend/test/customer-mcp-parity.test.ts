@@ -144,7 +144,7 @@ test('social account deletion through MCP needs a completed provider check bound
 test('MCP reads preserved files in bounded chunks and rechecks ownership before returning bytes',async()=>{
  const api=ops(),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aEwoAAAAASUVORK5CYII=','base64');
  const {capture}=await api.call('create_save',{clientId:'preserved-mcp',type:'tweet',sourceUrl:'https://x.com/author/status/12345',selectionText:'Original tweet'}) as any;
- const worker=createPreservationService(db,{resolve:async()=>({text:'Original tweet',author:'Author',publishedAt:null,metadataAvailable:true,media:[{kind:'image',url:'https://pbs.twimg.com/media/example.png'}],links:[]}),read:async url=>({url,mime:'image/png',data:png})});
+ const worker=createPreservationService(db,{resolve:async()=>({text:'Original tweet',author:'Author',publishedAt:null,metadataAvailable:true,media:[{kind:'image',url:'https://pbs.twimg.com/media/example.png'}],links:[]}),read:async url=>({url,mime:'image/png',data:png,status:200})});
  let cleanup=()=>{};
  try{
   await worker.tick();cleanup=preparePreservedCleanup(db,config.dataDir,owner,capture.id);

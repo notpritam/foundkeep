@@ -112,7 +112,11 @@ export function sanitizeExtraHeaders(headers?: Record<string, string>): Record<s
   }
   return result;
 }
-export async function requestPinned(target: PreviewTarget, signal: AbortSignal, accept?: string, headers?: Record<string, string>): Promise<PreviewUpstream> {
+// Pure so the merge/dedup/Accept-precedence contract can be unit tested
+// directly, independent of an actual socket connection (previewRequestOptions
+// hard-codes port 80/443, so there is no way to point requestPinned itself at
+// a local test server).
+export function pinnedRequestHeaders(target: PreviewTarget, accept?: string, headers?: Record<string, string>): Record<string, string> {
   const base = previewRequestOptions(target);
   const merged: Record<string, string> = { ...(base.headers as Record<string, string>) };
   const drop = (name: string) => {
@@ -125,6 +129,11 @@ export async function requestPinned(target: PreviewTarget, signal: AbortSignal, 
     merged[key] = value;
   }
   if (accept) { drop("Accept"); merged.Accept = accept; }
+  return merged;
+}
+export async function requestPinned(target: PreviewTarget, signal: AbortSignal, accept?: string, headers?: Record<string, string>): Promise<PreviewUpstream> {
+  const base = previewRequestOptions(target);
+  const merged = pinnedRequestHeaders(target, accept, headers);
   return new Promise((resolve, reject) => {
     const request = (target.url.protocol === "https:" ? httpsRequest : httpRequest)(
       { ...base, headers: merged, signal },

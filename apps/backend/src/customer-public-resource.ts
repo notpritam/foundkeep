@@ -79,8 +79,10 @@ export function createPublicReader(
         const hopHeaders: Record<string, string> = sanitizeExtraHeaders(
           options.headers,
         );
-        delete hopHeaders.Cookie;
-        delete hopHeaders.cookie;
+        // Any casing of a caller-supplied Cookie is removed, not just the two
+        // literal spellings, so it can never bypass the per-host cookie below.
+        for (const key of Object.keys(hopHeaders))
+          if (key.toLowerCase() === "cookie") delete hopHeaders[key];
         if (cookie) hopHeaders.Cookie = cookie;
         response = await Promise.race([
           (deps.transport || requestPinned)(

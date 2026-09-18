@@ -195,7 +195,7 @@ test("resolveTwitterPost merges full text (FixTweet) with media (syndication)", 
           }
         : null;
     if (!body) throw new Error("unexpected " + url);
-    return { url, mime: "application/json", data: Buffer.from(JSON.stringify(body)) };
+    return { url, mime: "application/json", data: Buffer.from(JSON.stringify(body)), status: 200 };
   };
   const m = await resolveTwitterPost(
     "https://x.com/fin465/status/555",
@@ -222,6 +222,7 @@ test("resolveTwitterPost still works when FixTweet is down (syndication only)", 
           created_at: "2026-09-16T02:42:31.000Z",
         }),
       ),
+      status: 200,
     };
   };
   const m = await resolveTwitterPost(

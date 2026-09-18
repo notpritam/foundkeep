@@ -86,7 +86,7 @@ const worker = () =>
       media: [{ kind: "image", url: "https://pbs.twimg.com/media/a.png" }],
       links: [],
     }),
-    read: async (url) => ({ url, mime: "image/png", data: png }),
+    read: async (url) => ({ url, mime: "image/png", data: png, status: 200 }),
   });
 test('library cards discover saved tweet media and serve its private preview after preservation finishes',async()=>{
  const owner=await register(),other=await register(),capture=await save(owner.cookie,{userTags:['Design reference']});
