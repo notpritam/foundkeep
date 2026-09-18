@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 sys.dont_write_bytecode = True
@@ -187,7 +188,6 @@ else: raise AssertionError('extractor subprocess accepted')
         from email.message import Message
         from yt_dlp.networking import Request
         from yt_dlp.networking.exceptions import HTTPError
-        import urllib.error
         import urllib.request
         for platform in (False, True):
             with self.subTest(platform=platform):
@@ -353,7 +353,10 @@ else: raise AssertionError('extractor subprocess accepted')
         def fake_open(request, timeout):
             calls.append(request.full_url)
             if request.full_url.endswith('DASH_AUDIO_128.mp4'):
-                raise media.urllib.error.HTTPError(request.full_url, 403, 'denied', {}, None)
+                # Closed before raising: an unread urllib body warns at collection.
+                denied = urllib.error.HTTPError(request.full_url, 403, 'denied', {}, io.BytesIO())
+                denied.close()
+                raise denied
             return Response(b'\x00\x00\x00\x18ftypisom' + b'a' * 100)
         previous = os.getcwd()
         with tempfile.TemporaryDirectory() as tmp, patch.object(media, 'open_direct', side_effect=fake_open):
@@ -365,6 +368,50 @@ else: raise AssertionError('extractor subprocess accepted')
                 self.assertEqual(calls, ['https://v.redd.it/abc/DASH_720.mp4', 'https://v.redd.it/abc/DASH_AUDIO_128.mp4', 'https://v.redd.it/abc/DASH_audio.mp4'])
             finally:
                 os.chdir(previous)
+
+    def test_direct_download_degrades_to_a_silent_video_when_audio_responses_break(self):
+        """A broken sibling audio file must cost the sound, never the save."""
+        import http.client
+        import zlib
+        payload = b'\x00\x00\x00\x18ftypisom' + b'a' * 100
+        class Response:
+            def __init__(self, body, declared=None):
+                self.body = io.BytesIO(body)
+                self.headers = {'Content-Length': str(len(body)) if declared is None else declared}
+            def read(self, n=-1): return self.body.read(n)
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+
+        def download(candidates, outcomes):
+            calls = []
+            def fake_open(request, timeout):
+                calls.append(request.full_url)
+                outcome = outcomes.get(request.full_url)
+                if isinstance(outcome, Exception):
+                    raise outcome
+                return outcome or Response(payload)
+            previous = os.getcwd()
+            with tempfile.TemporaryDirectory() as tmp, patch.object(media, 'open_direct', side_effect=fake_open):
+                try:
+                    os.chdir(tmp)
+                    result = media.direct_download('https://v.redd.it/abc/DASH_720.mp4', 10_000, candidates)
+                    return result, calls, Path(tmp, 'video.mp4').read_bytes(), Path(tmp, 'audio.m4a').exists()
+                finally:
+                    os.chdir(previous)
+
+        first, second, third = ('https://v.redd.it/abc/a%d.m4a' % index for index in (1, 2, 3))
+        # http.client.IncompleteRead is not an OSError; the next track still runs.
+        result, calls, video, audio = download([first, second], {first: http.client.IncompleteRead(b'')})
+        self.assertEqual(result, {'status': 'downloaded', 'subtitles': [], 'audio': True})
+        self.assertTrue(audio)
+        self.assertEqual(calls, ['https://v.redd.it/abc/DASH_720.mp4', first, second])
+        # A malformed Content-Length (ValueError) and a zlib error are not OSError either.
+        result, calls, video, audio = download([first, second, third], {
+            first: http.client.IncompleteRead(b''), second: Response(payload, declared='not-a-number'), third: zlib.error('corrupt')})
+        self.assertEqual(result, {'status': 'downloaded', 'subtitles': [], 'audio': False})
+        self.assertFalse(audio)
+        self.assertEqual(video, payload)
+        self.assertEqual(calls, ['https://v.redd.it/abc/DASH_720.mp4', first, second, third])
 
     def test_playlist_live_and_duration_rejected_before_download(self):
         for info in [{'_type': 'playlist'}, {'entries': []}, {'is_live': True}, {'live_status': 'is_upcoming'}, {'duration': 1801}]:

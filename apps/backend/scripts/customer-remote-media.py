@@ -16,7 +16,6 @@ import resource
 import socket
 import stat as statmod
 import sys
-import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
@@ -456,7 +455,9 @@ def direct_download(source, maximum, audio_urls):
                 write_response(response, Path('audio.m4a'), min(maximum, MAX_AUDIO_BYTES))
             audio = True
             break
-        except (BoundaryError, urllib.error.URLError, OSError):
+        except Exception:
+            # Any failed candidate (refused, truncated, malformed length, bad
+            # compression) costs only the sound, never the whole save.
             Path('audio.m4a').unlink(missing_ok=True)
             continue
     return {'status': 'downloaded', 'subtitles': [], 'audio': audio}

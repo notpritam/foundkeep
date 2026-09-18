@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstat, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { chmod, copyFile, lstat, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,16 +74,35 @@ function text(value: unknown, maximum: number): string {
 function failure(status: FailureStatus): RemoteMediaResult { return { status, reason: reasons[status] }; }
 
 /** An operator session jar is only forwarded when it is an unshared regular
- *  file inside a session directory. Anything else is dropped, not refused: a
- *  stale or ill-kept jar must degrade to an anonymous download, never abort it.
- *  The helper rechecks all of this, and yt-dlp rewrites the jar on close, so
- *  symlinks are rejected as a write primitive as much as a read one. */
+ *  file genuinely inside a session directory. Anything else is dropped, not
+ *  refused: a stale or ill-kept jar must degrade to an anonymous download,
+ *  never abort it. Both the path and each root are resolved, so a symlinked
+ *  directory under a root cannot present a jar from outside it, and an empty,
+ *  relative or `/` root is discarded rather than matching every path. */
 async function safeCookieFile(path: string | undefined, roots: string[]): Promise<string | undefined> {
-  if (!path || !isAbsolute(path) || path.length > 4096 || path.includes('\0') || path.split('/').includes('..')) return undefined;
-  if (!roots.some(root => path.startsWith(root.replace(/\/+$/, '') + '/'))) return undefined;
+  if (!path || !isAbsolute(path) || path.length > 4096 || path.includes('\0')) return undefined;
   try {
     const file = await lstat(path);
-    return file.isFile() && !file.isSymbolicLink() && (file.mode & 0o077) === 0 && file.size <= 256 * 1024 ? path : undefined;
+    if (!file.isFile() || file.isSymbolicLink() || (file.mode & 0o077) !== 0 || file.size > 256 * 1024) return undefined;
+    const resolved = await realpath(path);
+    for (const candidate of roots) {
+      if (!candidate || !isAbsolute(candidate) || candidate === '/') continue;
+      const root = await realpath(candidate).catch(() => '');
+      if (root && root !== '/' && resolved.startsWith(root + '/')) return resolved;
+    }
+  } catch { /* an unreadable or vanished jar is simply not used */ }
+  return undefined;
+}
+
+/** yt-dlp rewrites whatever jar it is given when it closes, so the helper only
+ *  ever sees a copy: the operator's session file cannot be truncated by the
+ *  kill that ends a cancelled download, and the copy dies with the temp
+ *  directory. A copy that cannot be made downgrades to an anonymous download. */
+async function privateJarCopy(from: string, to: string): Promise<string | undefined> {
+  try {
+    await copyFile(from, to);
+    await chmod(to, 0o600);
+    return to;
   } catch { return undefined; }
 }
 
@@ -106,7 +125,7 @@ export async function downloadCustomerRemoteMedia(
   const maxDuration = bounded(options.maxDurationSeconds, MAX_DURATION);
   const run = dependencies.runExtractor || runRemoteMediaProcess;
   const sessionsDirectory = dependencies.sessionsDirectory ?? process.env.FOUNDKEEP_SOCIAL_SESSIONS_DIR ?? join(homedir(), '.config', 'foundkeep', 'social-sessions');
-  const cookieFile = await safeCookieFile(options.cookieFile, [sessionsDirectory, join(config.dataDir, 'social-sessions')]);
+  const operatorJar = await safeCookieFile(options.cookieFile, [sessionsDirectory, join(config.dataDir, 'social-sessions')]);
   // Separate audio (Reddit) is only ever fetched from the video's own host, so
   // a hostile resolver cannot turn one public video into a second destination.
   const audioUrls = (options.audioUrls ?? []).slice(0, 3).map(value => previewSourceUrl(value))
@@ -116,6 +135,7 @@ export async function downloadCustomerRemoteMedia(
   let keep = false;
   try {
     directory = await mkdtemp(join(tmpdir(), 'foundkeep-remote-media-'));
+    const cookieFile = operatorJar ? await privateJarCopy(operatorJar, join(directory, 'cookies.txt')) : undefined;
     const output = await run({
       executable: python || '/usr/bin/python3', args: ['-I', HELPER], cwd: directory,
       stdin: JSON.stringify({ url: source.href, maxBytes, maxDurationSeconds: maxDuration, ...(cookieFile ? { cookieFile } : {}), ...(audioUrls.length ? { audioUrls } : {}) }),
@@ -138,7 +158,7 @@ export async function downloadCustomerRemoteMedia(
       if (!audio.isFile() || audio.isSymbolicLink() || !audio.size) return failure('error');
       await run({
         executable: '/usr/bin/prlimit',
-        args: [`--fsize=${maxBytes}`, '--as=536870912', '--cpu=30', '--nofile=32', '--', '/usr/bin/ffmpeg', '-v', 'error', '-nostdin', '-threads', '1', '-protocol_whitelist', 'file', '-i', 'video.mp4', '-i', 'audio.m4a', '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', 'muxed.mp4'],
+        args: [`--fsize=${maxBytes}`, '--as=536870912', '--cpu=30', '--nofile=32', '--', '/usr/bin/ffmpeg', '-v', 'error', '-nostdin', '-threads', '1', '-protocol_whitelist', 'file', '-f', 'mov', '-i', 'video.mp4', '-f', 'mov', '-i', 'audio.m4a', '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', 'muxed.mp4'],
         cwd: directory, stdin: '',
       }, controller.signal);
       absolutePath = join(directory, 'muxed.mp4');

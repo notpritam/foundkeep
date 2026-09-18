@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { chmod, copyFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,7 +64,6 @@ test('rejects oversized files even when the extractor claims success', async () 
 });
 
 test('rejects symlink output and invalid extractor JSON', async () => {
-  const { symlink } = await import('node:fs/promises');
   expect((await downloadCustomerRemoteMedia('https://example.com/video.mp4', {}, { runExtractor: async ({ cwd }) => {
     await symlink(fixture, join(cwd, 'video.mp4'));
     return '{"status":"downloaded"}';
@@ -112,17 +111,23 @@ test('process runner isolates configuration and caps stdout', async () => {
 });
 
 
-test('cookie file is validated before it reaches the helper, and audio tracks are muxed then probed', async () => {
+test('the helper only ever gets a private per-download copy of the jar, then the tracks are muxed and probed', async () => {
   const sessions = await mkdtemp(join(tmpdir(), 'foundkeep-sessions-'));
   const cookieFile = join(sessions, 'reddit.txt');
-  await writeFile(cookieFile, '# Netscape HTTP Cookie File\n');
+  const jar = '# Netscape HTTP Cookie File\n.reddit.com\tTRUE\t/\tTRUE\t2000000000\tsession\tsecret\n';
+  await writeFile(cookieFile, jar);
   await chmod(cookieFile, 0o600);
+  const before = await stat(cookieFile);
   const commands: string[][] = [];
   const runner: RemoteMediaRunner = async (spec, signal) => {
     commands.push([spec.executable, ...spec.args]);
     if (spec.args.includes(HELPER_PATH)) {
       const input = JSON.parse(spec.stdin);
-      expect(input.cookieFile).toBe(cookieFile);
+      // yt-dlp rewrites whatever jar it is handed, so the operator's own file
+      // never travels; the copy dies with the temp directory.
+      expect(input.cookieFile).toBe(join(spec.cwd, 'cookies.txt'));
+      expect(await readFile(input.cookieFile, 'utf8')).toBe(jar);
+      expect((await stat(input.cookieFile)).mode & 0o777).toBe(0o600);
       // Only the same-host MP4/M4A candidate survives the caller-side filter.
       expect(input.audioUrls).toEqual(['https://v.redd.it/abc/DASH_AUDIO_128.mp4']);
       await copyFile(fixture, join(spec.cwd, 'video.mp4'));
@@ -135,11 +140,15 @@ test('cookie file is validated before it reaches the helper, and audio tracks ar
   const audioUrls = ['https://v.redd.it/abc/DASH_AUDIO_128.mp4', 'https://evil.test/DASH_audio.mp4', 'https://v.redd.it/abc/DASH_audio.txt'];
   const result = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', { cookieFile, audioUrls }, { runExtractor: runner, sessionsDirectory: sessions });
   expect(result.status).toBe('downloaded');
+  expect(await readFile(cookieFile, 'utf8')).toBe(jar);
+  expect((await stat(cookieFile)).mtimeMs).toBe(before.mtimeMs);
   const ffmpeg = commands.find(c => c.includes('/usr/bin/ffmpeg'))!;
   expect(ffmpeg.slice(0, 2)).toEqual(['/usr/bin/prlimit', `--fsize=${50 * 1024 * 1024}`]);
   expect(ffmpeg).toContain('-c');
   expect(ffmpeg).toContain('copy');
   expect(ffmpeg).toContain('-protocol_whitelist');
+  // Both inputs are demuxer-pinned, exactly as the ffprobe line is.
+  expect(ffmpeg.join(' ')).toContain('-f mov -i video.mp4 -f mov -i audio.m4a');
   expect(ffmpeg.at(-1)).toBe('muxed.mp4');
   const probe = commands.find(c => c.includes('/usr/bin/ffprobe'))!;
   expect(probe.at(-1)!.endsWith('muxed.mp4')).toBe(true);
@@ -147,15 +156,37 @@ test('cookie file is validated before it reaches the helper, and audio tracks ar
     expect(result.absolutePath.endsWith('muxed.mp4')).toBe(true);
     await result.dispose();
   }
-
-  await chmod(cookieFile, 0o644);
-  const insecure = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', { cookieFile }, { runExtractor: async (spec) => { expect(JSON.parse(spec.stdin).cookieFile).toBeUndefined(); return JSON.stringify({ status: 'unavailable' }); }, sessionsDirectory: sessions });
-  expect(insecure.status).toBe('unavailable');
-  for (const outsider of ['/etc/passwd', join(sessions, '..', 'escape.txt'), 'reddit.txt']) {
-    const outside = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', { cookieFile: outsider }, { runExtractor: async (spec) => { expect(JSON.parse(spec.stdin).cookieFile).toBeUndefined(); return JSON.stringify({ status: 'unavailable' }); }, sessionsDirectory: sessions });
-    expect(outside.status).toBe('unavailable');
-  }
   await rm(sessions, { recursive: true, force: true });
+});
+
+test('a jar is forwarded only from a real directory inside a usable session root', async () => {
+  const sessions = await mkdtemp(join(tmpdir(), 'foundkeep-sessions-'));
+  const outside = await mkdtemp(join(tmpdir(), 'foundkeep-outside-'));
+  const cookieFile = join(sessions, 'reddit.txt');
+  for (const path of [cookieFile, join(outside, 'reddit.txt')]) {
+    await writeFile(path, '# Netscape HTTP Cookie File\n');
+    await chmod(path, 0o600);
+  }
+  await symlink(outside, join(sessions, 'linked'));
+  const attempt = async (cookie: string, sessionsDirectory: string, expected: 'copy' | 'none') => {
+    const result = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', { cookieFile: cookie }, { sessionsDirectory, runExtractor: async (spec) => {
+      expect(JSON.parse(spec.stdin).cookieFile).toBe(expected === 'copy' ? join(spec.cwd, 'cookies.txt') : undefined);
+      return JSON.stringify({ status: 'unavailable' });
+    } });
+    expect(result.status).toBe('unavailable');
+  };
+  // An unset-but-empty session directory is not a root that contains everything.
+  await attempt(cookieFile, '', 'none');
+  await attempt(cookieFile, '/', 'none');
+  // A symlinked directory inside the root does not put its target inside it.
+  await attempt(join(sessions, 'linked', 'reddit.txt'), sessions, 'none');
+  for (const outsider of ['/etc/passwd', join(sessions, '..', 'escape.txt'), 'reddit.txt']) await attempt(outsider, sessions, 'none');
+  await chmod(cookieFile, 0o644);
+  await attempt(cookieFile, sessions, 'none');
+  await chmod(cookieFile, 0o600);
+  await attempt(cookieFile, sessions, 'copy');
+  await rm(sessions, { recursive: true, force: true });
+  await rm(outside, { recursive: true, force: true });
 });
 
 test('a failed mux is an error, never a silent fallback to the video track', async () => {
