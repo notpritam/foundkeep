@@ -27,7 +27,7 @@ const GENERIC_SITES: [string, string, RegExp][] = [
   ['tiktok', 'tiktok.com', /^\/(?:@[^/]+\/(?:video|photo)\/\d+|t\/[\w-]+)\/?$/],
   ['threads', 'threads.net', /^\/@[^/]+\/post\/[\w-]+\/?$/], ['threads', 'threads.com', /^\/@[^/]+\/post\/[\w-]+\/?$/],
   ['facebook', 'facebook.com', /^\/(?:reel\/\d+|share\/[rv]\/[\w-]+|[^/]+\/(?:videos|posts)\/[\w.-]+|watch|photo)\/?$/], ['facebook', 'fb.watch', /^\/[\w-]+\/?$/],
-  ['pinterest', 'pinterest.com', /^\/pin\/\d+\/?$/], ['pinterest', 'pin.it', /^\/[\w-]+\/?$/], ['tumblr', 'tumblr.com', /^\/(?:[^/]+\/)?(?:post\/)?\d+\/?$/], ['vimeo', 'vimeo.com', /^\/(?:\d+|[^/]+\/\d+)\/?$/],
+  ['pinterest', 'pinterest.com', /^\/pin\/\d+\/?$/], ['pinterest', 'pin.it', /^\/[\w-]+\/?$/], ['tumblr', 'tumblr.com', /^\/(?:[^/]+\/)?(?:post\/)?(\d+)(?:\/[\w%-]*)?\/?$/], ['vimeo', 'vimeo.com', /^\/(?:\d+|[^/]+\/\d+)\/?$/],
   ['twitch', 'twitch.tv', /^\/[^/]+\/clip\/[\w-]+\/?$/], ['twitch', 'clips.twitch.tv', /^\/[\w-]+\/?$/], ['dailymotion', 'dailymotion.com', /^\/video\/[\w-]+\/?$/],
 ];
 const TRACKING = /^(utm_|igsh$|igshid$|si$|is_from_webapp$|sender_device$|share_id$|ref$|s$|t$|fbclid$|rdt$)/;
@@ -61,9 +61,10 @@ export function socialPost(raw: string | null | undefined): SocialPost | null {
   if (host(u, 'bsky.app')) { const m = u.pathname.match(/^\/profile\/([\w.:-]+)\/post\/([\w]+)\/?$/); return m ? { platform: 'bluesky', site: 'bluesky', id: `${m[1]}/${m[2]}`, url: `https://bsky.app/profile/${m[1]}/post/${m[2]}` } : null; }
   for (const [site, domain, pattern] of GENERIC_SITES) if (host(u, domain) && pattern.test(u.pathname)) {
     const clean = new URL(u.href); clean.hash = '';
-    // Facebook's `watch`/`photo` forms carry their id in the query (v=/fbid=), so the query is kept as-is
-    // rather than tracking-stripped; every other generic site strips known tracking params as before.
-    if (site !== 'facebook') for (const key of [...clean.searchParams.keys()]) if (TRACKING.test(key)) clean.searchParams.delete(key);
+    for (const key of [...clean.searchParams.keys()]) if (TRACKING.test(key)) clean.searchParams.delete(key);
+    // Facebook's `watch`/`photo` forms carry their id in v=/fbid=; once tracking params are stripped, every
+    // other remaining query key is noise, so keep only those two.
+    if (site === 'facebook') for (const key of [...clean.searchParams.keys()]) if (key !== 'v' && key !== 'fbid') clean.searchParams.delete(key);
     return { platform: 'generic', site, id: clean.href, url: clean.href };
   }
   return null;

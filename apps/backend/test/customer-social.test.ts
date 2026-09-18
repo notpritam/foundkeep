@@ -18,6 +18,11 @@ test('canonicalises supported post links and rejects lookalikes and non-posts', 
   expect(socialPost('https://vm.tiktok.com/ZMabcdef/')).toMatchObject({ platform: 'generic', site: 'tiktok' });
   expect(socialPost('https://www.twitch.tv/somechannel/clip/SomeClip-abc')).toMatchObject({ platform: 'generic', site: 'twitch' });
   expect(socialPost('https://www.facebook.com/watch?v=123456')).toEqual({ platform: 'generic', site: 'facebook', id: 'https://www.facebook.com/watch?v=123456', url: 'https://www.facebook.com/watch?v=123456' });
+  expect(socialPost('https://www.facebook.com/watch?v=123456&fbclid=IwAR2xyz')).toEqual({ platform: 'generic', site: 'facebook', id: 'https://www.facebook.com/watch?v=123456', url: 'https://www.facebook.com/watch?v=123456' });
+  expect(socialPost('https://www.facebook.com/photo?fbid=987&set=a.1')).toEqual({ platform: 'generic', site: 'facebook', id: 'https://www.facebook.com/photo?fbid=987', url: 'https://www.facebook.com/photo?fbid=987' });
+  expect(socialPost('https://www.facebook.com/reel/123456?fbclid=IwAR2xyz')).toEqual({ platform: 'generic', site: 'facebook', id: 'https://www.facebook.com/reel/123456', url: 'https://www.facebook.com/reel/123456' });
+  expect(socialPost('https://someblog.tumblr.com/post/184364133432/some-post-title')).toMatchObject({ platform: 'generic', site: 'tumblr' });
+  expect(socialPost('https://www.tumblr.com/someblog/184364133432/some-post-title')).toMatchObject({ platform: 'generic', site: 'tumblr' });
   for (const url of ['https://x.com.evil.test/a/status/1', 'https://www.reddit.com/r/space/', 'https://www.instagram.com/someuser/', 'https://www.linkedin.com/in/jane/', 'https://example.com/post/1', 'https://user@bsky.app/profile/a/post/b', 'file:///tmp/a', 'https://www.tiktok.com/business', 'https://www.tiktok.com/discover', 'https://www.facebook.com/watchXYZ', 'https://www.facebook.com/user/videos/123/anything/else', 'https://www.twitch.tv/foo/bar/clip/x/y', 'https://www.tumblr.com/', 'https://vimeo.com/channels'])
     expect(socialPost(url)).toBeNull();
 });
