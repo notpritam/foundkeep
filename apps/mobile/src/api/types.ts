@@ -69,6 +69,8 @@ export type NativeSession = {
   recoveryCode?: string;
 };
 
+export type PreservationAsset = { id: string; kind: 'post' | 'image' | 'video' | 'article' | 'transcript' | string; title: string; mime: string; bytes: number; text: string | null };
+export type Preservation = { status: 'pending' | 'running' | 'ready' | 'partial' | 'failed' | string; error: string | null; updatedAt: number; assets: PreservationAsset[] };
 export type CaptureList = { captures: Capture[]; nextCursor: string | null; total: number };
 export type RelatedSave = { capture: Capture; reasons: { kind: 'batch' | 'source' | 'tag' | 'folder' | 'agent'; label: string }[] };
 

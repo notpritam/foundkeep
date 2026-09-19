@@ -10,10 +10,11 @@ import type { Capture } from '../../../api/types.ts';
 import { CapturePreview, captureLabels } from '../../../components/CapturePreview.tsx';
 import { EditCaptureSheet } from '../../../components/EditCaptureSheet.tsx';
 import { RelatedSaves } from '../../../components/RelatedSaves.tsx';
+import { PreservedPost } from '../../../components/PreservedPost.tsx';
 import { FrostedPanel } from '../../../components/ScenicSurface.tsx';
 import { Shimmer } from '../../../components/Shimmer.tsx';
 import { Button, Message, Screen } from '../../../components/ui.tsx';
-import { capturePreviewSource } from '../../../collection/preview.ts';
+import { capturePreviewSource, preservablePlatform } from '../../../collection/preview.ts';
 import { captureTitle } from '../../../collection/model.ts';
 import { useSession } from '../../../session/SessionProvider.tsx';
 import { useAppearance, useThemedStyles } from '../../../appearance/AppearanceProvider.tsx';
@@ -116,6 +117,7 @@ export default function CaptureDetail() {
       <Row label="Summary" value={capture.summary} />
       <Row label="Saved text" value={capture.articleText} />
       </FrostedPanel> : null}
+      {preservablePlatform(source) ? <PreservedPost key={`${account?.id}:${capture.id}`} id={capture.id} revision={capture.updatedAt} /> : null}
       <FrostedPanel style={styles.origin}>
         <Pressable accessibilityRole="button" accessibilityLabel="Show source details" accessibilityState={{ expanded: originExpanded }} onPress={() => setOriginExpanded(value => !value)} style={styles.originToggle}>
           <View style={{ flex: 1, gap: 4 }}><Text style={typography.heading}>Original source</Text><Text numberOfLines={1} style={typography.small}>{source || publisher || capture.provenance?.originalFileName || 'Saved in FoundKeep'}</Text></View>

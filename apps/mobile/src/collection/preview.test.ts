@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { capturePreviewSource, galleryColumns } from './preview.ts';
+import { capturePreviewSource, galleryColumns, preservablePlatform, preservedAssetSource } from './preview.ts';
 
 test('private previews construct only the owned API route and scope cache identity to the account', () => {
   const capture = { id: 'image-id', blobUrl: 'https://evil.example/steal', updatedAt: 12 };
@@ -30,4 +30,17 @@ test('generated previews use the owned backend route, never a returned origin wi
  const result=capturePreviewSource({id:'video-id',previewUrl:'https://evil.example/preview',updatedAt:18},'secret','account-a');
  assert.match(result!.uri,/^https:\/\/foundkeep\.app\/api\/mobile\/captures\/video-id\/preview\?/);
  assert.equal(result!.headers?.Authorization,'Bearer secret');
+});
+
+test('preservablePlatform accepts supported hosts and their subdomains, rejects lookalikes and non-social', () => {
+  for (const url of ['https://x.com/nasa/status/20', 'https://www.reddit.com/r/space/comments/1abc2d/', 'https://vm.tiktok.com/ZMabc/', 'https://bsky.app/profile/a/post/b', 'https://www.linkedin.com/feed/update/urn:li:activity:7/']) assert.equal(preservablePlatform(url), true, url);
+  for (const url of ['https://x.com.evil.test/a/status/1', 'https://notreddit.com/x', 'https://overreacted.io/a-guide/', 'ftp://x.com/a', null, undefined]) assert.equal(preservablePlatform(url as string), false, String(url));
+});
+
+test('preservedAssetSource builds only the owned mobile asset route with a bearer header', () => {
+  const s = preservedAssetSource('cap-1', 'asset-9', 'tok', 'acc-a', 42);
+  assert.equal(s?.uri, 'https://foundkeep.app/api/mobile/captures/cap-1/assets/asset-9?account=acc-a&v=42');
+  assert.deepEqual(s?.headers, { Authorization: 'Bearer tok' });
+  assert.equal(preservedAssetSource('cap-1', 'asset-9', null, 'acc-a', 42), null);
+  assert.equal(preservedAssetSource('cap-1', '', 'tok', 'acc-a', 42), null);
 });

@@ -1,6 +1,6 @@
 import { normalizeAutomation } from '../billing/automation.ts';
 import { getEnvironment, getMobilePlatform } from '../environment.ts';
-import type { Account, Capture, CaptureList, Folder, Organization, NativeSession, Usage, RelatedSave } from './types.ts';
+import type { Account, Capture, CaptureList, Folder, Organization, NativeSession, Usage, RelatedSave, Preservation } from './types.ts';
 import type { Plan, AutomationState, ProcessingState } from '../billing/types.ts';
 import type { OAuthIntent, OAuthProvider } from '../auth-oauth.ts';
 
@@ -174,6 +174,8 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     createFolder: (name: string) => json<{ folder: Folder }>('/api/mobile/folders', { method: 'POST', body: { name } }),
     renameFolder: (id: string, name: string) => json<{ folder: Folder }>(`/api/mobile/folders/${encodeURIComponent(id)}`, { method: 'PUT', body: { name } }),
     deleteFolder: (id: string) => json<{ ok: true }>(`/api/mobile/folders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    getPreservation: (id: string, options: ReadOptions = {}) => json<{ preservation: Preservation | null }>(`/api/mobile/captures/${encodeURIComponent(id)}/preservation`, { cacheMs: 2_000, ...options }),
+    retryPreservation: (id: string) => json<{ preservation: Preservation | null }>(`/api/mobile/captures/${encodeURIComponent(id)}/preservation`, { method: 'POST', body: {} }),
     fileUrl: (id: string) => `${getEnvironment().origin}/api/mobile/captures/${encodeURIComponent(id)}/file`,
   };
 }

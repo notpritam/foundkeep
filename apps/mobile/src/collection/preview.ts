@@ -24,6 +24,30 @@ export function capturePreviewSource(capture: Partial<Capture>, token: string | 
   } catch { return null; }
 }
 
+const PRESERVED_HOSTS = ['x.com', 'twitter.com', 'reddit.com', 'redd.it', 'instagram.com', 'linkedin.com', 'bsky.app', 'youtube.com', 'youtu.be', 'tiktok.com', 'threads.net', 'threads.com', 'facebook.com', 'fb.watch', 'pinterest.com', 'pin.it', 'tumblr.com', 'vimeo.com', 'twitch.tv', 'dailymotion.com'];
+
+// A host test, not a permalink test: the backend's socialPost() decides whether
+// a given path is preservable. The panel just needs to know the source could
+// carry a server-kept copy.
+export function preservablePlatform(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol)) return false;
+    const host = url.hostname.toLowerCase();
+    return PRESERVED_HOSTS.some(domain => host === domain || host.endsWith('.' + domain));
+  } catch { return false; }
+}
+
+// Owned, authed source for a preserved media asset (image or video). Built the
+// same way as capturePreviewSource: the exact mobile endpoint plus a bearer
+// header, never a URL returned by the server.
+export function preservedAssetSource(captureId: string, assetId: string, token: string | null, accountId: string | undefined, revision: number): PreviewSource | null {
+  if (!token || !accountId || !captureId || !assetId) return null;
+  const query = new URLSearchParams({ account: accountId, v: String(revision || 0) });
+  return { uri: `${getEnvironment().origin}/api/mobile/captures/${encodeURIComponent(captureId)}/assets/${encodeURIComponent(assetId)}?${query}`, headers: { Authorization: `Bearer ${token}` } };
+}
+
 export function galleryColumns(width: number, fontScale: number): 1 | 2 {
   return width < 340 || fontScale >= 1.3 ? 1 : 2;
 }
