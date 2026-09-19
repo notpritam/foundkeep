@@ -189,6 +189,22 @@ test('any recognised social post is preserved with platform-aware notes', async 
   expect(sessionSites).toEqual(['reddit']);
   expect(consumed).toEqual([]);
 });
+test('a post the platform simply did not expose says so, without the restricted note', async () => {
+  const url = 'https://www.reddit.com/r/space/comments/1nope2/';
+  db.query("INSERT INTO customer_captures(id,account_id,client_id,type,status,source_url,selection_text,storage_bytes,captured_at,created_at,updated_at) VALUES('n',?,'n','page','done',?,'',100,1,1,1)").run(owner, url);
+  enqueuePreservation(db, owner, 'n', url);
+  const s = createPreservationService(db, {
+    root,
+    // Not restricted: the resolver reached the platform and it returned nothing.
+    resolve: async () => ({ text: '', author: '', publishedAt: null, metadataAvailable: false, media: [], links: [] }),
+    read: async (u: string) => ({ url: u, mime: 'image/png', data: png, status: 200 }),
+  });
+  await s.tick();
+  const result = preservationDetails(db, owner, 'n')!;
+  expect(result.status).toBe('partial');
+  expect(result.error).toContain('Reddit did not expose the full public post.');
+  expect(result.error).not.toContain('restricted server access');
+});
 test('the visible-article asset title names the platform, or "the page" for a generic source', async () => {
   const context = normalizeSocialContext({ version: 1, images: [], links: [], articleText: 'Visible on-page article text' });
   const tiktokUrl = 'https://www.tiktok.com/@u/video/7300000000000000000';

@@ -12,7 +12,7 @@ FoundKeep's backend resolves social posts anonymously first. When a platform blo
   * `instagram.cookie`: `sessionid`, `csrftoken`, `ds_user_id`
   * `linkedin.cookie`: `li_at`, `JSESSIONID` (keep the quotes: `JSESSIONID="ajax:…"`)
   * `reddit.cookie`: `reddit_session`
-  * `x.cookie`: `auth_token`, `ct0`
+  * `x.cookie`: `auth_token`, `ct0` — only used by the video download path (for age-restricted posts); public X posts need no session
 Sites: x, reddit, instagram, linkedin, bluesky, youtube, tiktok, threads, facebook, pinterest, tumblr, vimeo, twitch, dailymotion.
 
 ## Moving the values safely
