@@ -1,0 +1,25 @@
+appId: app.foundkeep.android
+tags:
+  - core
+---
+# Create a note from the dock.
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    id: "dock-new-note"
+- assertVisible:
+    text: "A thought worth keeping|Get it down before it gets away"
+    timeout: 15000
+- tapOn:
+    text: "Get it down before it gets away…"
+    optional: true
+- inputText: "Maestro test note — a thought worth keeping."
+- hideKeyboard
+# Save/keep the note (label may be "Save", "Keep", or a checkmark — confirm on first run).
+- tapOn:
+    text: "Save|Keep|Done"
+    optional: true
+- back
+- assertVisible:
+    id: "collection-header"

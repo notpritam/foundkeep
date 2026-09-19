@@ -1,0 +1,19 @@
+appId: app.foundkeep.android
+tags:
+  - core
+---
+# Search + filters.
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    id: "collection-search"
+- assertVisible:
+    text: "Search your collection"
+    timeout: 10000
+- inputText: "note"
+- hideKeyboard
+- tapOn:
+    accessibilityLabel: "Show search and filters"
+    optional: true
+- back

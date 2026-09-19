@@ -1,0 +1,16 @@
+appId: app.foundkeep.android
+tags:
+  - core
+---
+# Settings tab.
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    text: "Settings"
+- assertVisible: "Settings."
+- assertVisible: "Appearance"
+- assertVisible: "Save from other apps"
+- assertVisible:
+    text: "Capture-ready alerts"
+    optional: true

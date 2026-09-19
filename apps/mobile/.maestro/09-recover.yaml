@@ -1,0 +1,14 @@
+appId: app.foundkeep.android
+tags:
+  - auth
+---
+# Recovery-code entry screen is reachable from sign-in.
+- launchApp:
+    clearState: true
+- tapOn:
+    text: "Continue with email"
+    optional: true
+- tapOn: "Use a recovery code"
+- assertVisible:
+    text: "recovery|Recovery|code"
+    timeout: 15000

@@ -1,0 +1,13 @@
+appId: app.foundkeep.android
+tags:
+  - share
+  - manual-trigger
+---
+# The core capture path: content shared into FoundKeep from another app.
+# Maestro can't invoke the OS share sheet, so trigger the SEND intent first (see
+# README): adb shell am start -a android.intent.action.SEND -t text/plain \
+#   --es android.intent.extra.TEXT "https://example.com" app.foundkeep.android
+# Then this flow asserts the app handled the shared content.
+- assertVisible:
+    text: "Keep|Save|Adding|Saved|A thought worth keeping"
+    timeout: 20000

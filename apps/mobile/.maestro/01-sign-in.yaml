@@ -1,0 +1,10 @@
+appId: app.foundkeep.android
+tags:
+  - auth
+  - smoke
+---
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- assertVisible:
+    id: "collection-header"

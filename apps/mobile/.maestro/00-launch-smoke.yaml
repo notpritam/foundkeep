@@ -1,0 +1,10 @@
+appId: app.foundkeep.android
+tags:
+  - smoke
+---
+# App launches to the auth entry when signed out.
+- launchApp:
+    clearState: true
+- assertVisible:
+    text: "Continue with email|Your collection awaits."
+    timeout: 25000

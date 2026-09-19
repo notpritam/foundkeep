@@ -1,0 +1,14 @@
+appId: app.foundkeep.android
+tags:
+  - auth
+  - writes-data
+---
+# WARNING: creates a real account on whatever backend the build points at.
+# Run only against a dev/test backend. Supply --env NEW_EMAIL / NEW_PASSWORD / NEW_NAME.
+- launchApp:
+    clearState: true
+- tapOn:
+    text: "New here? Create an account|Create an account"
+- assertVisible:
+    text: "Create|Register|account"
+    timeout: 15000

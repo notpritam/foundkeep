@@ -1,0 +1,8 @@
+# Maestro workspace config for the FoundKeep Android app.
+# Run:  maestro test .maestro --env EMAIL=you@example.com --env PASSWORD=secret
+# The appId in each flow is app.foundkeep.android (prod/friends build). For a dev
+# build with a different package, override per flow or search-replace the appId.
+flows:
+  - "*.yaml"
+executionOrder:
+  continueOnFailure: true

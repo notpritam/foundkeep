@@ -1,0 +1,17 @@
+appId: app.foundkeep.android
+tags:
+  - billing
+---
+# The subscription / Pro screen (reached from Settings or a Pro entry point).
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- tapOn:
+    text: "Settings"
+- tapOn:
+    text: "Pro|Subscription|Plan|Upgrade"
+    optional: true
+- assertVisible:
+    text: "Pro|Subscription|month|plan"
+    timeout: 15000
+    optional: true

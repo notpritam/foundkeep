@@ -1,0 +1,23 @@
+appId: app.foundkeep.android
+tags:
+  - core
+---
+# Open the first saved item and see its detail/reader view.
+# Requires the signed-in account to already have at least one save.
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- assertVisible:
+    id: "gallery-list"
+- tapOn:
+    id: "gallery-list"
+    childOf:
+      id: "gallery-list"
+    index: 0
+    optional: true
+- assertVisible:
+    text: "Show source details|Try keeping this post again|Related"
+    timeout: 20000
+- back
+- assertVisible:
+    id: "collection-header"

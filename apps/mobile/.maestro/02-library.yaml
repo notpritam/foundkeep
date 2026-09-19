@@ -1,0 +1,19 @@
+appId: app.foundkeep.android
+tags:
+  - core
+---
+# The library/collection tab: header, search entry, gallery, and the dock.
+- launchApp:
+    clearState: true
+- runFlow: subflows/login.yaml
+- assertVisible:
+    id: "collection-header"
+- assertVisible:
+    id: "collection-search"
+- assertVisible:
+    id: "floating-dock"
+- assertVisible:
+    id: "dock-new-note"
+- assertVisible:
+    text: "The collection."
+    optional: true

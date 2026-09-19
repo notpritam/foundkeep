@@ -1,0 +1,19 @@
+appId: app.foundkeep.android
+---
+# Reusable sign-in with email + password. Supply --env EMAIL=... --env PASSWORD=...
+# Selectors come from apps/mobile/src/app/(auth)/sign-in.tsx (Field label="Email"/
+# "Password", Button label="Sign in", AuthOptions "Continue with email").
+- tapOn:
+    text: "Continue with email"
+    optional: true
+- tapOn:
+    text: "Email"
+    optional: true
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn: "Sign in"
+- assertVisible:
+    id: "collection-header"
+    timeout: 25000
