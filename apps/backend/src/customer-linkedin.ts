@@ -2,7 +2,8 @@ import { parseHTML } from 'linkedom';
 import { PublicResourceError } from './customer-public-resource.ts';
 import { blockedRoute } from './customer-source.ts';
 import { EMPTY_MANIFEST, isRestrictedStatus, mediaHost, type SocialManifest, type SocialMedia, type SocialResolver } from './customer-social-types.ts';
-const CDN = ['licdn.com'];
+// Post media only. static.licdn.com serves LinkedIn's own UI sprites (reaction icons, logos).
+const CDN = ['media.licdn.com', 'dms.licdn.com'];
 const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 const clean = (v: unknown, max: number) => typeof v === 'string' ? v.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').trim().slice(0, max) : '';
 function ld(document: any): Record<string, any> { for (const script of document.querySelectorAll('script[type="application/ld+json"]')) { try { const value = JSON.parse(script.textContent || ''); const list = Array.isArray(value) ? value : value?.['@graph'] ?? [value]; const posting = list.find((x: any) => x?.['@type'] === 'SocialMediaPosting'); if (posting) return posting; } catch {} } return {}; }

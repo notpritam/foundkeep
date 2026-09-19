@@ -9,6 +9,11 @@ test('guest page yields commentary, author, date, largest images and the best mp
   expect(m).toMatchObject({ text: 'Shipping the new agent runtime today.\nThree lessons: keep it small, measure, ship.', author: 'Jane Doe', publishedAt: '2026-09-01T10:00:00.000Z', metadataAvailable: true });
   expect(m.media).toEqual([{ kind: 'video', url: 'https://dms.licdn.com/playlist/vid/v2/D4D05AQ/mp4-720p-30fp-crf28/0/1?e=1&v=beta&t=vsig' }, { kind: 'image', url: 'https://media.licdn.com/dms/image/v2/D4D22AQ/feedshare-shrink_2048_1536/0/1?e=1&v=beta&t=sig2' }]);
 });
+test('guest page ignores LinkedIn UI sprites on static.licdn.com', async () => {
+  const m = parseLinkedInGuest(await text('linkedin-guest.html'), post.id);
+  expect(m.media.some(item => item.url.includes('static.licdn.com'))).toBe(false);
+  expect(m.media.filter(item => item.kind === 'image')).toHaveLength(1);
+});
 test('guest page with only og tags is metadata-only but usable', () => {
   const m = parseLinkedInGuest('<meta property="og:title" content="A B on LinkedIn: hi"><meta property="og:description" content="hi there">', post.id);
   expect(m).toMatchObject({ text: 'hi there', author: 'A B', metadataAvailable: true, incomplete: true });
