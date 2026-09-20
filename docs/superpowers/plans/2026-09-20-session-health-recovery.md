@@ -14,7 +14,9 @@
 - [x] Add operator-only push delivery using the same admin allowlist as console access. Test recipient isolation, disabled devices, receipt errors and token pruning. Retry failed delivery without claiming an alert was sent.
 - [x] Add the admin-gated `/admin/social-sessions` endpoint, startup/interval/shutdown wiring and `/console/sessions` using the existing console components. Verify authorization and rendering with fresh data.
 - [x] Review and run Python/Bun media tests, correct split-stream format/transport issues, and run a real YouTube download with ffprobe evidence.
-- [ ] Run backend suite/typechecks and production site build. Package immutable dev backend/site releases, verify locally, switch atomically and verify the public dev origin.
-- [ ] Promote the verified changes under the existing production authorization, retain prior releases, verify health/admin access and actual media results, record release and rollback notes.
+- [x] Run backend suite/typechecks and production site build. Package immutable dev backend/site releases, verify locally, switch atomically and verify the public dev origin.
+- [x] Promote the verified changes under the existing production authorization, retain prior releases, verify health/admin access and actual media results, record release and rollback notes.
 
 Verification so far: 438 backend tests pass; 22 Python boundary tests pass; backend and site TypeScript checks pass; dev Next build passes. The live YouTube sample `dQw4w9WgXcQ` downloaded 29,969,206 bytes in 1.698 seconds; ffprobe verified H.264 video and AAC audio, duration 213.09 seconds. The separate `jNQXAC9IVRw` sample still received a platform bot/sign-in wall; that external restriction is unchanged.
+
+Dev and production API save tests both returned ready with post/video/image/transcript assets and an authenticated H.264/AAC video. Anonymous media reads returned 401. Test accounts and their saves were deleted. The dev startup probes reported Instagram, LinkedIn and Reddit healthy. Production operator push delivery has no opted-in active device yet; the owner must enable Capture-ready alerts on the phone.
