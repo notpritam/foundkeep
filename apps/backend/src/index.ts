@@ -10,6 +10,7 @@ import { startCustomerWorker } from "./customer-enrichment.ts";
 import { processAuthCleanup } from "./customer-oauth.ts";
 import { createSupabaseGateway } from "./supabase-auth.ts";
 import { socialSessions } from "./customer-social-sessions.ts";
+import { createSessionHealthService } from './customer-session-health.ts';
 
 const db = openDb();
 console.log(socialSessions.describe());
@@ -18,6 +19,12 @@ const hub = new RelayHub(db);
 const stopCustomerWorker = startCustomerWorker(db);
 const managedProcessing = createProcessingService(db);
 const preservation = createPreservationService(db);
+const sessionHealth = createSessionHealthService(db);
+const probeSessions = () => { void sessionHealth.tick().catch(() => {}); };
+const sessionStartupTimer = setTimeout(probeSessions, 120_000);
+sessionStartupTimer.unref();
+const sessionHealthTimer = setInterval(probeSessions, 10 * 60_000);
+sessionHealthTimer.unref();
 const preservationTimer = setInterval(() => { void preservation.tick().catch(() => {}); }, 3000);
 preservationTimer.unref();
 const processingTimer = setInterval(() => { void managedProcessing.tick().catch(() => {}); }, 10_000);
@@ -71,6 +78,8 @@ console.log(`  relay:    wss://<host>/agent`);
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     stopCustomerWorker();
+    clearTimeout(sessionStartupTimer);
+    clearInterval(sessionHealthTimer);
     clearInterval(preservationTimer);
     preservation.close();
     clearInterval(processingTimer);

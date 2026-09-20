@@ -7,6 +7,9 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { randomBytes, createHash } from 'node:crypto';
 import { config } from './config';
 import { type OAuthGateway } from './supabase-auth';
+import { isAdminEmail } from './customer-admin-identity';
+import { socialSessionStatuses } from './customer-session-health';
+export { isAdminEmail } from './customer-admin-identity';
 
 const DAY = 86_400_000;
 const KINDS = ['support', 'feedback', 'bug', 'idea'] as const;
@@ -16,11 +19,6 @@ type Status = (typeof STATUSES)[number];
 
 /** Admins are an env allowlist (read live so it can change without a rebuild),
  *  layered on top of the normal customer session — admins sign in as themselves. */
-function adminEmails(): Set<string> {
-  return new Set((process.env.FOUNDKEEP_ADMIN_EMAILS ?? 'notpritamsharma@gmail.com')
-    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
-}
-export const isAdminEmail = (email: string): boolean => adminEmails().has(email.trim().toLowerCase());
 
 const n = (row: unknown): number => (row as { n: number }).n;
 
@@ -119,6 +117,12 @@ export function registerAdmin(app: Hono<CustomerEnv>, db: Database, services: Cu
   app.get('/admin/me', c => {
     const current = admin(c);
     return c.json({ admin: true, email: current.email });
+  });
+
+  app.get('/admin/social-sessions', c => {
+    admin(c);
+    c.header('Cache-Control', 'private, no-store');
+    return c.json({ sites: socialSessionStatuses(db) });
   });
 
   app.get('/admin/overview', c => {

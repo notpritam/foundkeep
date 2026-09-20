@@ -92,3 +92,7 @@ measured test video is ~28 MiB).
 HLS/m3u8 assembly (would mean writing a fragment client inside the sandbox), VP9/AV1 (the mux is
 a stream copy into MP4 and the validator requires h264), and YouTube's bot wall (unchanged: a
 `youtube.txt` cookie file is still used when present).
+
+## Recovery verification refinement
+
+The first live whole-track request selected the expected 26.5 MB video but took 107 seconds before audio began, exceeding the 120-second combined deadline. The pinned YouTube extractor supplies `downloader_options.http_chunk_size`; the helper now honors that hint through the same guarded opener, with strict HTTP Content-Range and body-length checks, at most 10 MiB per request, one shared request/byte budget, and cleanup on inconsistency. Offline cases cover ignored ranges, shifted offsets, changing totals, truncation and oversize. This remains ordinary HTTP transfer, without enabling fragment manifests or an external downloader.

@@ -108,10 +108,10 @@ test('metadata endpoints serve the documents at the root with no-store', async (
   const as = await root('/.well-known/oauth-authorization-server');
   expect(as.status).toBe(200);
   expect(as.headers.get('cache-control')).toContain('no-store');
-  expect((await as.json()).authorization_endpoint).toBe(ORIGIN + '/api/oauth/authorize');
+  expect(await as.json()).toMatchObject({ authorization_endpoint: ORIGIN + '/api/oauth/authorize' });
   const pr = await root('/.well-known/oauth-protected-resource');
   expect(pr.status).toBe(200);
-  expect((await pr.json()).resource).toBe(ORIGIN + '/api/mcp');
+  expect(await pr.json()).toMatchObject({ resource: ORIGIN + '/api/mcp' });
 });
 
 test('/api/mcp 401 carries the WWW-Authenticate discovery header', async () => {

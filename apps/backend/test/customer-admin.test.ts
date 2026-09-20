@@ -134,3 +134,16 @@ test("server-to-server admin token grants access without a session", async () =>
   expect(bad.status).toBe(401);
   delete process.env.FOUNDKEEP_ADMIN_API_TOKEN;
 });
+
+test('session health is admin-only and returns only safe operational fields', async () => {
+  expect((await request('/admin/social-sessions')).status).toBe(401);
+  const user = await register();
+  expect((await request('/admin/social-sessions','GET',undefined,user.cookie)).status).toBe(403);
+  process.env.FOUNDKEEP_ADMIN_EMAILS = user.account.email;
+  const response = await request('/admin/social-sessions','GET',undefined,user.cookie);
+  expect(response.status).toBe(200);
+  expect(response.headers.get('cache-control')).toContain('no-store');
+  const { sites } = await response.json() as any;
+  expect(sites.some((row: any) => row.site === 'reddit')).toBe(true);
+  for (const row of sites) expect(Object.keys(row).sort()).toEqual(['checkedAt','failures','okAt','reason','site','status']);
+});

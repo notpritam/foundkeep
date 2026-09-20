@@ -175,7 +175,7 @@ test('any recognised social post is preserved with platform-aware notes', async 
     remote: async (url, options) => { seen.push({ url, cookieFile: options.cookieFile, audioUrls: options.audioUrls }); return { status: 'unavailable' as const, reason: 'x' }; },
     // The pipeline reads the jar path without spending the 2 s authenticated-call
     // slot the resolvers need, so session() must never be reached from here.
-    sessions: { session: () => { consumed.push('session'); return null; }, cookieFileFor: (site: string) => { sessionSites.push(site); return '/tmp/reddit.txt'; }, describe: () => '' },
+    sessions: { sites: () => ['reddit'], session: () => { consumed.push('session'); return null; }, cookieFileFor: (site: string) => { sessionSites.push(site); return '/tmp/reddit.txt'; }, describe: () => '' },
   });
   await s.tick();
   const result = preservationDetails(db, owner, 'r')!;

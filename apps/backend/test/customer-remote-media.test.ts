@@ -232,6 +232,25 @@ test('a mux that overshoots the budget falls back to the silent video track', as
   await result.dispose();
 });
 
+test('the extractor path may pair its own tracks, which are muxed like sibling URLs', async () => {
+  // YouTube offers no progressive file: the helper picks a video-only and an
+  // audio-only stream itself, so `audio` arrives without any caller audioUrls.
+  const result = await downloadCustomerRemoteMedia('https://www.youtube.com/watch?v=split', {}, { runExtractor: async (spec, signal) => {
+    if (!spec.args.includes(HELPER_PATH)) return runRemoteMediaProcess(spec, signal);
+    expect(JSON.parse(spec.stdin).audioUrls).toBeUndefined();
+    await copyFile(fixture, join(spec.cwd, 'video.mp4'));
+    await copyFile(audioFixture, join(spec.cwd, 'audio.m4a'));
+    return JSON.stringify({ status: 'downloaded', title: 'Split source', description: '', author: 'Alice', subtitles: [], audio: true });
+  } });
+  expect(result.status).toBe('downloaded');
+  if (result.status !== 'downloaded') return;
+  expect(result.absolutePath.endsWith('muxed.mp4')).toBe(true);
+  expect(result.title).toBe('Split source');
+  const probe = JSON.parse(await runRemoteMediaProcess({ executable: '/usr/bin/ffprobe', args: ['-v', 'error', '-show_entries', 'stream=codec_name', '-of', 'json', result.absolutePath], cwd: directory, stdin: '' }, new AbortController().signal));
+  expect(probe.streams.map((stream: { codec_name: string }) => stream.codec_name).sort()).toEqual(['aac', 'h264']);
+  await result.dispose();
+});
+
 test('an absent or empty audio track is an error rather than a mux of nothing', async () => {
   const result = await downloadCustomerRemoteMedia('https://v.redd.it/abc/DASH_720.mp4', {}, { runExtractor: async ({ cwd, args }) => {
     if (!args.includes(HELPER_PATH)) throw new Error('must not run');

@@ -413,10 +413,186 @@ else: raise AssertionError('extractor subprocess accepted')
         self.assertEqual(video, payload)
         self.assertEqual(calls, ['https://v.redd.it/abc/DASH_720.mp4', first, second, third])
 
+    def test_split_selection_pairs_video_and_audio_only_when_no_progressive_mp4_exists(self):
+        """YouTube publishes no progressive MP4, only adaptive halves over https."""
+        import copy
+        from yt_dlp import YoutubeDL
+        from yt_dlp.globals import all_plugins_loaded, plugin_dirs
+        from yt_dlp.utils import ExtractorError
+        plugin_dirs.value = []
+        all_plugins_loaded.value = True
+        mib = 1024 * 1024
+        video_only = [
+            {'format_id': '160', 'height': 144, 'width': 256, 'filesize': 1 * mib, 'tbr': 110, 'vcodec': 'avc1.4d400c'},
+            {'format_id': '134', 'height': 360, 'width': 640, 'filesize': 6 * mib, 'tbr': 620, 'vcodec': 'avc1.4d401e'},
+            {'format_id': '136', 'height': 720, 'width': 1280, 'filesize': 22 * mib, 'tbr': 2400, 'vcodec': 'avc1.4d401f'},
+            {'format_id': '137', 'height': 1080, 'width': 1920, 'filesize': 45 * mib, 'tbr': 4500, 'vcodec': 'avc1.640028'},
+        ]
+        audio_only = [
+            {'format_id': '139', 'abr': 49, 'filesize': 1 * mib, 'acodec': 'mp4a.40.5', 'ext': 'm4a'},
+            {'format_id': '140', 'abr': 130, 'filesize': 3 * mib, 'acodec': 'mp4a.40.2', 'ext': 'm4a'},
+        ]
+        for entry in video_only:
+            entry.update({'url': 'https://cdn.example.com/' + entry['format_id'], 'ext': 'mp4', 'protocol': 'https', 'acodec': 'none'})
+        for entry in audio_only:
+            entry.update({'url': 'https://cdn.example.com/' + entry['format_id'], 'protocol': 'https', 'vcodec': 'none'})
+        adaptive = video_only + audio_only
+        # Neither half of a VP9/Opus pair survives a stream copy into MP4.
+        free = [{**video_only[3], 'format_id': '248', 'ext': 'webm', 'vcodec': 'vp09.00.40.08'},
+                {**audio_only[1], 'format_id': '251', 'ext': 'webm', 'acodec': 'opus'}]
+        streamed = [{**video_only[2], 'format_id': '96', 'protocol': 'm3u8_native'},
+                    {**audio_only[1], 'format_id': '95', 'protocol': 'm3u8_native', 'ext': 'mp4'}]
+        progressive = {'format_id': '22', 'url': 'https://cdn.example.com/22', 'ext': 'mp4', 'protocol': 'https',
+                       'height': 720, 'width': 1280, 'filesize': 25 * mib, 'tbr': 1800,
+                       'vcodec': 'avc1.64001F', 'acodec': 'mp4a.40.2'}
+
+        def select(candidates, maximum=50 * mib):
+            with YoutubeDL(media.extractor_options(maximum, 1800)) as downloader:
+                try:
+                    info = downloader.process_ie_result({'id': 'fixture', 'title': 'Fixture', 'extractor': 'generic', 'extractor_key': 'Generic', 'duration': 120, 'formats': copy.deepcopy(candidates)}, download=False)
+                except ExtractorError:
+                    return None
+                pair = info.get('requested_formats')
+                return [entry['format_id'] for entry in pair] if pair else info['format_id']
+
+        # 720p beats 1080p, 130k audio beats 49k, and the budget still bites.
+        self.assertEqual(select(adaptive), ['136', '140'])
+        self.assertEqual(select(adaptive, 20 * mib), ['134', '140'])
+        # One playable file needs no mux, so the pair selector never even runs.
+        with patch.object(media, 'select_split_formats', side_effect=AssertionError('split selection ran')):
+            self.assertEqual(select([progressive] + adaptive), '22')
+        # No compatible audio, or nothing but m3u8, degrades instead of guessing.
+        self.assertIsNone(select(video_only + [free[1]]))
+        self.assertIsNone(select(free))
+        self.assertIsNone(select(streamed))
+        self.assertIsNone(select(audio_only))
+        # Only oversized video: a size failure, not a silently wrong smaller pick.
+        with self.assertRaises(media.TooLarge):
+            select(adaptive, 512 * 1024)
+        # An oversized progressive rendition must not hide a pair that does fit,
+        # but it is still the reported reason when no pair can be made.
+        self.assertEqual(select([progressive] + adaptive, 10 * mib), ['134', '140'])
+        with self.assertRaises(media.TooLarge):
+            select([progressive], 10 * mib)
+
+    def test_split_pair_is_rechecked_before_either_track_is_fetched(self):
+        video = {'format_id': '136', 'url': 'https://cdn.example.com/video', 'ext': 'mp4',
+                 'protocol': 'https', 'vcodec': 'avc1.4d401f', 'acodec': 'none'}
+        audio = {'format_id': '140', 'url': 'https://cdn.example.com/audio', 'ext': 'm4a',
+                 'protocol': 'https', 'vcodec': 'none', 'acodec': 'mp4a.40.2'}
+        self.assertEqual(media.split_stream_pair([video, audio]), (video, audio))
+        self.assertEqual(media.split_stream_pair([audio, video]), (video, audio))
+        for invalid in [{**video, 'fragments': [{'url': 'https://cdn.example.com/part'}]}, {**video, 'has_drm': True}]:
+            self.assertIsNone(media.select_split_formats({'formats': [invalid, audio]}, 50 * 1024 * 1024))
+            with self.assertRaises(media.Unsupported):
+                media.split_stream_pair([invalid, audio])
+        for pair in ['not a list', [video], [video, audio, audio], [video, 'not a format'],
+                     [video, video], [audio, audio], [video, {**audio, 'vcodec': 'avc1.4d401f'}],
+                     [{**video, 'protocol': 'm3u8_native'}, audio],
+                     [video, {**audio, 'protocol': 'm3u8_native'}],
+                     [{**video, 'ext': 'webm', 'vcodec': 'vp09.00.40.08'}, audio],
+                     [video, {**audio, 'ext': 'webm', 'acodec': 'opus'}],
+                     [video, {**audio, 'acodec': 'opus'}],
+                     [{**video, 'vcodec': 'vp09.00.40.08'}, audio]]:
+            with self.assertRaises(media.Unsupported):
+                media.split_stream_pair(pair)
+
+    def test_split_tracks_are_fetched_over_the_guarded_transport_with_per_track_headers(self):
+        import yt_dlp
+        from yt_dlp.networking import Response
+        from yt_dlp.networking.exceptions import TransportError
+        from yt_dlp.networking._urllib import UrllibRH
+        picture = bytes([0, 0, 0, 24]) + b'ftypmp42' + b'v' * 24
+        sound = bytes([0, 0, 0, 24]) + b'ftypM4A ' + b'a' * 24
+
+        def selected():
+            return {'id': 'split', 'title': 'Split source', 'duration': 120, 'ext': 'mp4', 'protocol': 'https+https',
+                    'requested_formats': [
+                        {'format_id': '136', 'url': 'https://cdn.example.com/video?itag=136', 'ext': 'mp4',
+                         'protocol': 'https', 'vcodec': 'avc1.4d401f', 'acodec': 'none', 'width': 1280, 'height': 720,
+                         'http_headers': {'Referer': 'https://www.example.com/watch', 'Cookie': 'SID=secret'}},
+                        {'format_id': '140', 'url': 'https://cdn.example.com/audio?itag=140', 'ext': 'm4a',
+                         'protocol': 'https', 'vcodec': 'none', 'acodec': 'mp4a.40.2', 'abr': 130,
+                         'http_headers': {'Referer': 'https://www.example.com/watch'}}]}
+
+        def run(audio_body):
+            seen = []
+            def transport(handler, request):
+                seen.append((request.url, {key.lower(): value for key, value in request.headers.items()}))
+                if 'itag=140' in request.url:
+                    if isinstance(audio_body, Exception):
+                        raise audio_body
+                    body = audio_body
+                else:
+                    body = picture
+                return Response(io.BytesIO(body), request.url, {'Content-Type': 'video/mp4', 'Content-Length': str(len(body))})
+            with tempfile.TemporaryDirectory() as directory:
+                previous = os.getcwd()
+                try:
+                    os.chdir(directory)
+                    with patch.object(yt_dlp.YoutubeDL, 'extract_info', lambda self, url, **kwargs: selected()), \
+                            patch.object(UrllibRH, '_send', transport):
+                        result = media.extract('https://www.example.com/watch?v=split', 50 * 1024 * 1024, 1800)
+                    return result, seen, Path('video.mp4').read_bytes(), Path('audio.m4a').exists() and Path('audio.m4a').read_bytes()
+                finally:
+                    os.chdir(previous)
+
+        result, seen, video, audio = run(sound)
+        self.assertEqual(result, {'status': 'downloaded', 'title': 'Split source', 'description': '',
+                                  'author': '', 'subtitles': [], 'audio': True})
+        self.assertEqual((video, audio), (picture, sound))
+        self.assertEqual([url for url, _ in seen], ['https://cdn.example.com/video?itag=136', 'https://cdn.example.com/audio?itag=140'])
+        # Each hop carries only its own track's headers: the video's session
+        # cookie must never follow the audio request.
+        self.assertEqual(seen[0][1].get('cookie'), 'SID=secret')
+        self.assertNotIn('cookie', seen[1][1])
+        # A refused audio track costs the sound, never the picture.
+        result, seen, video, audio = run(TransportError('refused'))
+        self.assertEqual(result['audio'], False)
+        self.assertEqual((video, audio), (picture, False))
+        self.assertEqual(len(seen), 2)
+        # So does one that will not fit the audio budget.
+        with patch.object(media, 'MAX_AUDIO_BYTES', 16):
+            result, seen, video, audio = run(sound)
+        self.assertEqual(result['audio'], False)
+        self.assertEqual((video, audio), (picture, False))
+
     def test_playlist_live_and_duration_rejected_before_download(self):
         for info in [{'_type': 'playlist'}, {'entries': []}, {'is_live': True}, {'live_status': 'is_upcoming'}, {'duration': 1801}]:
             with self.assertRaises(media.Unsupported):
                 media.validate_info(info, 1800)
+
+    def test_http_chunks_preserve_exact_bytes_and_reject_bad_ranges(self):
+        from yt_dlp.networking import Response
+        data = b'0123456789'
+        track = {'url': 'https://cdn.example.com/video', 'downloader_options': {'http_chunk_size': 4}}
+        for mode in ['ok', 'ignored', 'wrong_offset', 'changed_total', 'oversize', 'truncated']:
+            calls = []
+            class Downloader:
+                def urlopen(self, request):
+                    span = request.headers['Range']
+                    calls.append(span)
+                    start, end = map(int, span.removeprefix('bytes=').split('-'))
+                    end = min(end,len(data)-1)
+                    total = len(data)
+                    if mode == 'ignored':
+                        return Response(io.BytesIO(data),request.url,{'Content-Length':str(total)},status=200)
+                    if mode == 'wrong_offset': start += 1
+                    if mode == 'changed_total' and start: total += 1
+                    if mode == 'oversize': total = 100
+                    body = data[start:end+1]
+                    if mode == 'truncated': body = body[:-1]
+                    return Response(io.BytesIO(body),request.url,{'Content-Range':f'bytes {start}-{end}/{total}'},status=206)
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory,'video.mp4')
+                if mode in ['ok','ignored']:
+                    media.fetch_track(Downloader(),track,path,20)
+                    self.assertEqual(path.read_bytes(),data)
+                    self.assertEqual(calls,['bytes=0-3','bytes=4-7','bytes=8-9'] if mode=='ok' else ['bytes=0-3'])
+                else:
+                    with self.assertRaises(media.BoundaryError):
+                        media.fetch_track(Downloader(),track,path,20)
+                    self.assertFalse(path.exists())
 
 
 if __name__ == '__main__':

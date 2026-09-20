@@ -1,5 +1,7 @@
 import {customerNativeUrl} from './customer-native.ts';
 import type { Database } from 'bun:sqlite';
+import { adminEmails } from './customer-admin-identity.ts';
+import { config } from './config.ts';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const TOKEN = /^(?:Exponent|Expo)PushToken\[[A-Za-z0-9_-]{10,200}\]$/;
@@ -39,6 +41,26 @@ export async function deliverCaptureNotification(
     sound: 'default',
     data: { url: customerNativeUrl('capture/'+capture.captureId) },
   }));
+  return deliverMessages(db, devices, messages, fetcher);
+}
+
+/** Operator health never goes to customer devices outside the admin allowlist. */
+export async function deliverOperatorAlert(db: Database, alert: { title: string; body: string }, fetcher: NotificationFetcher = fetch): Promise<number> {
+  const emails = [...adminEmails()];
+  if (!emails.length) return 0;
+  const devices = db.query(`SELECT p.connection_id,p.expo_push_token FROM customer_push_devices p
+    JOIN customer_accounts a ON a.id=p.account_id
+    JOIN customer_connections c ON c.id=p.connection_id AND c.account_id=p.account_id
+    WHERE p.enabled=1 AND c.expires_at>? AND lower(a.email) IN (${emails.map(() => '?').join(',')})
+    ORDER BY p.created_at LIMIT 100`).all(Date.now(), ...emails) as PushRow[];
+  if (!devices.length) return 0;
+  return deliverMessages(db, devices, devices.map(device => ({
+    to: device.expo_push_token, title: alert.title, body: alert.body,
+    sound: 'default', data: { url: config.customerOrigin + '/console/sessions' },
+  })), fetcher);
+}
+
+async function deliverMessages(db: Database, devices: PushRow[], messages: unknown[], fetcher: NotificationFetcher): Promise<number> {
   try {
     const response = await fetcher(EXPO_PUSH_URL, {
       method: 'POST',
@@ -51,14 +73,16 @@ export async function deliverCaptureNotification(
     let receipts: unknown;
     try { receipts = JSON.parse(raw)?.data; } catch { return 0; }
     if (!Array.isArray(receipts)) return 0;
+    let delivered = 0;
     for (let index = 0; index < receipts.length && index < devices.length; index++) {
       const receipt = receipts[index] as { status?: unknown; details?: { error?: unknown } } | null;
+      if (receipt?.status === 'ok') delivered++;
       if (receipt?.status === 'error' && receipt.details?.error === 'DeviceNotRegistered') {
         db.query('DELETE FROM customer_push_devices WHERE connection_id=? AND expo_push_token=?')
           .run(devices[index]!.connection_id, devices[index]!.expo_push_token);
       }
     }
-    return messages.length;
+    return delivered;
   } catch {
     return 0;
   }

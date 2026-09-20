@@ -137,3 +137,34 @@ test('missing directory yields an empty store without throwing', () => {
   expect(store.session('instagram')).toBeNull();
   expect(store.describe()).toBe('social sessions: none');
 });
+
+test('an observer sees every reported outcome and never changes the breaker', () => {
+  write('reddit.cookie', 'reddit_session=r1');
+  let clock = 9_000_000;
+  const seen: [string, string][] = [];
+  const store = createSessionStore({ directory: dir, runtimeDirectory: runtime, now: () => clock, onOutcome: (site, outcome) => seen.push([site, outcome]) });
+  store.session('reddit')!.report('ok');
+  clock += 2_000;
+  store.session('reddit')!.report('denied');
+  expect(seen).toEqual([['reddit', 'ok'], ['reddit', 'denied']]);
+  // The breaker still cools the site down for 30 minutes after `denied`.
+  clock += 2_000;
+  expect(store.session('reddit')).toBeNull();
+  clock += 30 * 60_000;
+  expect(store.session('reddit')).not.toBeNull();
+  // A throwing observer cannot stop the breaker from recording the failure.
+  const loud = createSessionStore({ directory: dir, runtimeDirectory: runtime, now: () => clock, onOutcome: () => { throw Error('observer exploded'); } });
+  loud.session('reddit')!.report('login');
+  clock += 2_000;
+  expect(loud.session('reddit')).toBeNull();
+});
+
+test('sites() lists the loaded site names and nothing else', () => {
+  write('reddit.cookie', 'reddit_session=r1');
+  write('instagram.txt', netscape);
+  write('notes.md', 'not a jar');
+  const store = createSessionStore({ directory: dir, runtimeDirectory: runtime });
+  expect(store.sites()).toEqual(['instagram', 'reddit']);
+  expect(store.sites().join(' ')).not.toContain('r1');
+  expect(store.sites().join(' ')).not.toContain(dir);
+});

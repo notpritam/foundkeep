@@ -23,6 +23,7 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
         <Link href="/console">Overview</Link>
         <Link href="/console/users">Users</Link>
         <Link href="/console/usage">Usage</Link>
+        <Link href="/console/sessions">Sessions</Link>
         <Link href="/console/support">Support</Link>
         <a href="/dashboard" style={{ marginLeft: 'auto' }}>← Library</a>
       </nav>

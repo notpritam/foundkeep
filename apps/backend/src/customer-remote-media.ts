@@ -149,9 +149,12 @@ export async function downloadCustomerRemoteMedia(
     }
     let absolutePath = join(directory, 'video.mp4');
     if (metadata.audio === true) {
-      // A separately downloaded audio track is remuxed, never re-encoded, and
-      // only the two known local files are readable. A failed mux is an error:
-      // silently keeping the picture would lose evidence the save claims.
+      // The helper reports a separate audio track either because the caller
+      // supplied sibling URLs (Reddit) or because the source offers no
+      // progressive file at all and it paired two adaptive tracks (YouTube).
+      // Either way the two are remuxed, never re-encoded, and only the two
+      // known local files are readable. A failed mux is an error: silently
+      // keeping the picture would lose evidence the save claims.
       const video = await lstat(absolutePath);
       const audio = await lstat(join(directory, 'audio.m4a'));
       if (!video.isFile() || video.isSymbolicLink() || !video.size) return failure('error');

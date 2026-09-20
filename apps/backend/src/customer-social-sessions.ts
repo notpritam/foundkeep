@@ -12,6 +12,7 @@ export type PlatformSession = {
   report(outcome: SessionOutcome): void;
 };
 export type SessionStore = {
+  sites(): string[];
   session(site: string): PlatformSession | null;
   /** The site's synthesized jar path, or null when the site is not loaded or is
    * cooling down. Reading a path is not an authenticated call, so this never
@@ -74,7 +75,7 @@ function matches(cookie: Cookie, host: string) {
  * cookie files (`<site>.txt` Netscape jars or `<site>.cookie` raw
  * `name=value; ...` lines) and exposes per-site, host-scoped cookie access
  * with a failure breaker. Nothing here logs cookie values. */
-export function createSessionStore(options: { directory?: string; runtimeDirectory?: string; now?: () => number } = {}): SessionStore {
+export function createSessionStore(options: { directory?: string; runtimeDirectory?: string; now?: () => number; onOutcome?: (site: string, outcome: SessionOutcome) => void } = {}): SessionStore {
   const directory = options.directory ?? process.env.FOUNDKEEP_SOCIAL_SESSIONS_DIR ?? join(homedir(), '.config', 'foundkeep', 'social-sessions');
   const runtime = options.runtimeDirectory ?? join(config.dataDir, 'social-sessions');
   const now = options.now ?? Date.now;
@@ -127,10 +128,13 @@ export function createSessionStore(options: { directory?: string; runtimeDirecto
       // the only cookie set that may leave this process, and yt-dlp rewrites
       // whatever file it is given.
       loaded.set(site, { site, cookies, cookieFile: synthesize(site, cookies), mtimeMs: stat.mtimeMs, kind });
+      cooldownUntil.delete(site);
+      lastIssued.delete(site);
     }
     for (const site of [...loaded.keys()]) if (!seen.has(site)) loaded.delete(site);
   }
   return {
+    sites() { scan(); return [...loaded.keys()].sort(); },
     session(site) {
       scan();
       const entry = loaded.get(site);
@@ -144,7 +148,10 @@ export function createSessionStore(options: { directory?: string; runtimeDirecto
         cookieFile: entry.cookieFile,
         cookieHeader: host => { const list = entry.cookies.filter(c => matches(c, host)); return list.length ? list.map(c => `${c.name}=${c.value}`).join('; ') : null; },
         cookie: name => entry.cookies.find(c => c.name === name)?.value ?? null,
-        report: outcome => { if (outcome !== 'ok') cooldownUntil.set(site, now() + COOLDOWN[outcome]); },
+        report: outcome => {
+          if (outcome !== 'ok') cooldownUntil.set(site, now() + COOLDOWN[outcome]);
+          try { options.onOutcome?.(site, outcome); } catch { /* Observers cannot change the breaker. */ }
+        },
       };
     },
     cookieFileFor(site) {

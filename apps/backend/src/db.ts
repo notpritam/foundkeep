@@ -601,6 +601,12 @@ const MIGRATIONS: string[] = [
    );
    CREATE INDEX customer_oauth_refresh_family ON customer_oauth_refresh(family_id);
    CREATE INDEX customer_oauth_refresh_account ON customer_oauth_refresh(account_id);`,
+  // Operator session health; no cookie values or response bodies are persisted.
+  `CREATE TABLE social_session_probes (
+    site TEXT PRIMARY KEY, status TEXT NOT NULL, reason TEXT,
+    checked_at INTEGER NOT NULL, ok_at INTEGER,
+    failures INTEGER NOT NULL DEFAULT 0, notified_at INTEGER
+   );`,
 ];
 
 export const DATABASE_SCHEMA_VERSION = MIGRATIONS.length;

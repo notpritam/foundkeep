@@ -13,6 +13,7 @@ import math
 import os
 from pathlib import Path
 import resource
+import re
 import socket
 import stat as statmod
 import sys
@@ -173,6 +174,29 @@ class QuietLogger:
     info = warning = error = debug
 
 
+VIDEO_CODECS = ('avc1', 'avc3', 'h264')
+AUDIO_CODECS = ('mp4a', 'aac')
+
+
+def positive(value):
+    return value if isinstance(value, (int, float)) and math.isfinite(value) and value > 0 else None
+
+
+def codec_is(value, prefixes):
+    """Strict codec match: an unknown codec is not one of these."""
+    return isinstance(value, str) and value.startswith(prefixes)
+
+
+def resolution_rank(candidate):
+    """Highest resolution up to a 720 short edge; when only larger renditions
+    exist, the closest above it. Unknown dimensions rank last, and ties go to
+    the higher bitrate and then the higher frame rate."""
+    width, height = positive(candidate.get('width')), positive(candidate.get('height'))
+    resolution = min(width, height) if width and height else height or width or 0
+    rank = (2, resolution) if 0 < resolution <= 720 else (1, -resolution) if resolution > 720 else (0, 0)
+    return (*rank, positive(candidate.get('tbr')) or 0, positive(candidate.get('fps')) or 0)
+
+
 def select_progressive_format(context, maximum):
     """Prefer the best picture up to a 720p short edge within the byte budget.
 
@@ -180,9 +204,6 @@ def select_progressive_format(context, maximum):
     before calling this selector. Unknown sizes remain candidates; only the
     subsequent bounded streaming write can establish that they fit.
     """
-    def positive(value):
-        return value if isinstance(value, (int, float)) and math.isfinite(value) and value > 0 else None
-
     def codec_matches(value, prefixes):
         return value in (None, 'unknown') or any(str(value).startswith(prefix) for prefix in prefixes)
 
@@ -210,16 +231,103 @@ def select_progressive_format(context, maximum):
         if size is not None and size > maximum:
             oversized = True
             continue
-        width, height = positive(candidate.get('width')), positive(candidate.get('height'))
-        resolution = min(width, height) if width and height else height or width or 0
-        # Use the highest resolution up to the target. If only larger formats
-        # exist, choose the closest above it; unknown dimensions rank last.
-        rank = (2, resolution) if 0 < resolution <= 720 else (1, -resolution) if resolution > 720 else (0, 0)
-        candidates.append(((*rank, positive(candidate.get('tbr')) or 0, positive(candidate.get('fps')) or 0), candidate))
+        candidates.append((resolution_rank(candidate), candidate))
     if candidates:
         yield max(candidates, key=lambda item: item[0])[1]
     elif oversized:
         raise TooLarge('All compatible formats exceed the size budget')
+
+
+def select_split_formats(context, maximum):
+    """Pair one video-only MP4 track with one audio-only MP4 track.
+
+    YouTube publishes no progressive rendition over plain HTTPS, only adaptive
+    halves, so the picture and the sound are chosen together and the parent
+    muxes them with a stream copy. Both halves must therefore already be MP4
+    codecs. No new protocol is involved: a fragmented or m3u8 half is simply
+    never a candidate. The pair is returned in yt-dlp's own requested_formats
+    shape, which is how the format-selector contract says "these two".
+    """
+    audio_maximum = min(maximum, MAX_AUDIO_BYTES)
+    videos, audios = [], []
+    oversized = False
+    for candidate in context['formats']:
+        if candidate.get('protocol') not in ('http', 'https'):
+            continue
+        if candidate.get('fragments') or candidate.get('has_drm'):
+            continue
+        size = positive(candidate.get('filesize')) or positive(candidate.get('filesize_approx'))
+        if candidate.get('acodec') == 'none' and candidate.get('ext') == 'mp4' and codec_is(candidate.get('vcodec'), VIDEO_CODECS):
+            if size is not None and size > maximum:
+                oversized = True
+            else:
+                videos.append((resolution_rank(candidate), candidate))
+        elif candidate.get('vcodec') == 'none' and candidate.get('ext') in ('m4a', 'mp4') and codec_is(candidate.get('acodec'), AUDIO_CODECS):
+            if size is None or size <= audio_maximum:
+                audios.append(((positive(candidate.get('abr')) or 0, positive(candidate.get('tbr')) or 0), candidate))
+    if not videos:
+        if oversized:
+            raise TooLarge('All compatible formats exceed the size budget')
+        return None
+    if not audios:
+        # A picture with no usable sound is not worth two downloads and a mux.
+        return None
+    video = max(videos, key=lambda item: item[0])[1]
+    audio = max(audios, key=lambda item: item[0])[1]
+    sizes = [positive(entry.get('filesize')) or positive(entry.get('filesize_approx')) or 0 for entry in (video, audio)]
+    return {
+        'requested_formats': [video, audio], 'ext': 'mp4',
+        'format_id': '+'.join(str(entry.get('format_id') or '') for entry in (video, audio)),
+        'protocol': '+'.join(str(entry.get('protocol')) for entry in (video, audio)),
+        'vcodec': video.get('vcodec'), 'acodec': audio.get('acodec'),
+        'width': video.get('width'), 'height': video.get('height'), 'fps': video.get('fps'),
+        'filesize_approx': sum(sizes) or None,
+    }
+
+
+def select_format(context, maximum):
+    """A progressive MP4 keeps first claim; a pair is only considered when no
+    single playable file fits, so a source that still offers one is never muxed.
+    An oversized progressive rendition must not hide a smaller adaptive one,
+    but it is still the reported reason when nothing else can be paired."""
+    oversized = None
+    try:
+        progressive = list(select_progressive_format(context, maximum))
+    except TooLarge as error:
+        progressive, oversized = [], error
+    if progressive:
+        yield progressive[0]
+        return
+    pair = select_split_formats(context, maximum)
+    if pair:
+        yield pair
+    elif oversized is not None:
+        raise oversized
+
+
+def split_stream_pair(requested):
+    """Re-check the selector's pair at the point of use.
+
+    Exactly one video-only and one audio-only track, both plain HTTP(S) MP4 in
+    codecs the stream-copy mux accepts. A third track, a fragmented half or a
+    swapped role is refused rather than fetched, so what reaches the network is
+    what was chosen.
+    """
+    if not isinstance(requested, list) or len(requested) != 2 or not all(isinstance(entry, dict) for entry in requested):
+        raise Unsupported('Only one video and one audio track may be combined')
+    video = next((entry for entry in requested if entry.get('acodec') == 'none'), None)
+    audio = next((entry for entry in requested if entry.get('vcodec') == 'none'), None)
+    if video is None or audio is None or video is audio:
+        raise Unsupported('Only one video and one audio track may be combined')
+    if any(entry.get('protocol') not in ('http', 'https') for entry in requested):
+        raise Unsupported('Only progressive HTTP streams are supported')
+    if any(entry.get('fragments') or entry.get('has_drm') for entry in requested):
+        raise Unsupported('Only complete unencrypted HTTP tracks may be combined')
+    if video.get('ext') != 'mp4' or not codec_is(video.get('vcodec'), VIDEO_CODECS):
+        raise Unsupported('Only an MP4 H.264 video track may be combined')
+    if audio.get('ext') not in ('m4a', 'mp4') or not codec_is(audio.get('acodec'), AUDIO_CODECS):
+        raise Unsupported('Only an MP4 AAC audio track may be combined')
+    return video, audio
 
 
 def extractor_options(maximum, duration, cookie_file=None):
@@ -239,9 +347,11 @@ def extractor_options(maximum, duration, cookie_file=None):
         'continuedl': False, 'nopart': True, 'overwrites': False,
         'writethumbnail': False, 'writeinfojson': False, 'writesubtitles': False,
         'writeautomaticsub': False, 'getcomments': False,
-        # Progressive MP4 requires no external downloader/muxer/runtime. A direct
-        # MP4 may have unknown codec metadata; ffprobe independently checks it.
-        'format': lambda context: select_progressive_format(context, maximum),
+        # Progressive MP4 requires no external downloader/muxer/runtime, and an
+        # adaptive pair needs only the parent's existing ffmpeg stream copy. A
+        # direct MP4 may have unknown codec metadata; ffprobe independently
+        # checks the file that is actually kept.
+        'format': lambda context: select_format(context, maximum),
         'check_formats': False,
         'match_filter': lambda info, **kwargs: 'unsupported stream' if info.get('is_live') or (info.get('duration') or 0) > duration else None,
     }
@@ -463,6 +573,68 @@ def direct_download(source, maximum, audio_urls):
     return {'status': 'downloaded', 'subtitles': [], 'audio': audio}
 
 
+def fetch_track(downloader, track, output, maximum):
+    """Honor extractor HTTP chunk hints without enabling a downloader plugin.
+
+    YouTube throttles a whole-track request. Its extractor specifies bounded
+    HTTP ranges; every range still uses the same guarded opener and budget.
+    Reject gaps, changed lengths and truncation instead of assembling a corrupt
+    file. Servers ignoring the first Range may still stream a complete file.
+    """
+    from yt_dlp.networking import Request
+    output = Path(output)
+    url = public_url(track.get('url'))
+    if positive(track.get('filesize')) and track['filesize'] > maximum:
+        raise TooLarge('Stream exceeds limit')
+    headers = {key: value for key, value in (track.get('http_headers') or {}).items() if key.lower() not in ('range', 'accept-encoding')}
+    headers['Accept-Encoding'] = 'identity'
+    hint = positive((track.get('downloader_options') or {}).get('http_chunk_size'))
+    if not hint:
+        with downloader.urlopen(Request(url, headers=headers)) as response:
+            write_response(response, output, maximum)
+        return
+    chunk_size = max(1, min(int(hint), 10 * 1024 * 1024))
+    offset, total, handle = 0, None, None
+    try:
+        while total is None or offset < total:
+            end = min(offset + chunk_size, total if total is not None else maximum) - 1
+            with downloader.urlopen(Request(url, headers={**headers, 'Range': f'bytes={offset}-{end}'})) as response:
+                if response.status == 200 and offset == 0 and not response.headers.get('Content-Range'):
+                    write_response(response, output, maximum)
+                    return
+                match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', response.headers.get('Content-Range') or '')
+                if response.status != 206 or not match:
+                    raise BoundaryError('Invalid HTTP range response')
+                first, last, length = map(int, match.groups())
+                if length > maximum:
+                    raise TooLarge('Stream exceeds limit')
+                if length <= 0 or first != offset or last != min(end, length - 1) or (total is not None and total != length):
+                    raise BoundaryError('Inconsistent HTTP range response')
+                total = length
+                expected, written = last - first + 1, 0
+                if handle is None:
+                    handle = open(output, 'xb')
+                while True:
+                    data = response.read(min(64 * 1024, expected - written + 1))
+                    if not data:
+                        break
+                    written += len(data)
+                    if written > expected:
+                        raise BoundaryError('HTTP range exceeds its declared length')
+                    handle.write(data)
+                if written != expected:
+                    raise BoundaryError('Truncated HTTP range')
+                offset += written
+    except BaseException:
+        if handle is not None:
+            handle.close()
+        output.unlink(missing_ok=True)
+        raise
+    finally:
+        if handle is not None:
+            handle.close()
+
+
 def extract(source, maximum, duration, cookie_file=None):
     import yt_dlp
     from yt_dlp.globals import all_plugins_loaded, plugin_dirs
@@ -490,16 +662,26 @@ def extract(source, maximum, duration, cookie_file=None):
     with PublicYoutubeDL(extractor_options(maximum, duration, cookie_file)) as downloader:
         info = downloader.extract_info(source, download=False)
         validate_info(info, duration)
-        if info.get('protocol') not in ('http', 'https') or info.get('ext') != 'mp4' or info.get('requested_formats'):
-            raise Unsupported('No progressive MP4 available')
-        public_url(info['url'])
-        if info.get('filesize') and info['filesize'] > maximum:
-            raise TooLarge('Video exceeds limit')
-        # Fixed path; use the selected HTTP format without re-extracting the
-        # source, writing sidecars, or permitting any postprocessor to execute.
-        from yt_dlp.networking import Request
-        with downloader.urlopen(Request(info['url'], headers=info.get('http_headers', {}))) as response:
-            write_response(response, Path('video.mp4'), maximum)
+
+        audio = False
+        if info.get('requested_formats'):
+            # No progressive MP4 exists (YouTube): the picture and the sound are
+            # two plain HTTPS tracks fetched over this same guarded transport,
+            # each bounded on its own, and the parent muxes them into one file.
+            video_track, audio_track = split_stream_pair(info['requested_formats'])
+            fetch_track(downloader, video_track, 'video.mp4', maximum)
+            try:
+                fetch_track(downloader, audio_track, 'audio.m4a', min(maximum, MAX_AUDIO_BYTES))
+                audio = True
+            except Exception:
+                # A refused, oversized or malformed audio track costs only the
+                # sound; the parent keeps the silent picture rather than the
+                # save failing outright.
+                Path('audio.m4a').unlink(missing_ok=True)
+        else:
+            if info.get('protocol') not in ('http', 'https') or info.get('ext') != 'mp4':
+                raise Unsupported('No progressive MP4 available')
+            fetch_track(downloader, info, 'video.mp4', maximum)
         subtitles = []
         for automatic, collection in ((False, info.get('subtitles')), (True, info.get('automatic_captions'))):
             if subtitles or not isinstance(collection, dict):
@@ -518,7 +700,7 @@ def extract(source, maximum, duration, cookie_file=None):
                 except Exception:
                     # Optional evidence must never become a fabricated transcript.
                     continue
-        return {'status': 'downloaded', 'title': str(info.get('title') or '')[:1000],
+        return {'status': 'downloaded', 'audio': audio, 'title': str(info.get('title') or '')[:1000],
                 'description': str(info.get('description') or '')[:16000],
                 'author': str(info.get('uploader') or info.get('creator') or '')[:500], 'subtitles': subtitles}
 
