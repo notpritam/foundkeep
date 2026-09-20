@@ -13,7 +13,9 @@ import type { PlatformSession } from './customer-social-sessions.ts';
 
 export type SocialPlatform = 'x' | 'reddit' | 'instagram' | 'linkedin' | 'bluesky' | 'youtube' | 'generic';
 export type SocialPost = { platform: SocialPlatform; site: string; id: string; url: string };
-export type SocialMedia = { kind: 'image' | 'video'; url: string; audioUrls?: string[] };
+// previewOf links a redundant cover image to the video it represents. A carousel
+// photo has no previewOf and must still be preserved independently.
+export type SocialMedia = TwitterManifest['media'][number];
 export type SocialManifest = TwitterManifest & { restricted?: boolean };
 export type SocialResolverDeps = { read: PublicReader; session: (site: string) => PlatformSession | null; source: (url: string) => Promise<SourceSnapshot> };
 export type SocialResolver = (post: SocialPost, hints: SocialContext, signal: AbortSignal, deps: SocialResolverDeps) => Promise<SocialManifest>;

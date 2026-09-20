@@ -14,7 +14,7 @@ const author = (name: unknown, handle: unknown) => { const n = typeof name === '
 function pushNode(media: SocialMedia[], node: any, flags: { incomplete: boolean }) {
   const video = node?.is_video ? mediaHost(node.video_url, CDN) : null, image = mediaHost(node?.display_url, CDN);
   if (node?.is_video) { if (video) media.push({ kind: 'video', url: video }); else flags.incomplete = true; }
-  if (image) media.push({ kind: 'image', url: image }); else if (!node?.is_video) flags.incomplete = true;
+  if (image) media.push({ kind: 'image', url: image, ...(video ? { previewOf: video } : {}) }); else if (!node?.is_video) flags.incomplete = true;
 }
 export function parseInstagramEmbed(html: string, code: string): SocialManifest {
   const flags = { incomplete: false }; const media: SocialMedia[] = [];
@@ -46,7 +46,7 @@ export function parseInstagramMediaInfo(json: unknown, code: string): SocialMani
   for (const slide of (Array.isArray(item.carousel_media) && item.carousel_media.length ? item.carousel_media : [item]).slice(0, 8)) {
     const video = mediaHost(slide?.video_versions?.[0]?.url, CDN), image = mediaHost(slide?.image_versions2?.candidates?.[0]?.url, CDN);
     if (slide?.video_versions?.length) { if (video) media.push({ kind: 'video', url: video }); else flags.incomplete = true; }
-    if (image) media.push({ kind: 'image', url: image }); else if (!slide?.video_versions?.length) flags.incomplete = true;
+    if (image) media.push({ kind: 'image', url: image, ...(video ? { previewOf: video } : {}) }); else if (!slide?.video_versions?.length) flags.incomplete = true;
   }
   return { text: String(item.caption?.text ?? '').slice(0, 50_000), author: author(item.user?.full_name, item.user?.username), publishedAt: isoDate(item.taken_at), media: media.slice(0, 8), links: [], metadataAvailable: true, incomplete: flags.incomplete };
 }

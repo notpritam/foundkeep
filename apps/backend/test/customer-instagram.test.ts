@@ -12,7 +12,7 @@ test('shortcodes decode to media ids the way Instagram does', () => {
 test('embed page yields caption, author, carousel images and video', async () => {
   const m = parseInstagramEmbed(await text('instagram-embed.html'), 'C0dE_f-1');
   expect(m).toMatchObject({ text: 'Rooftop eclipse', author: 'Mina K (@mina)', publishedAt: '2025-09-01T00:00:00.000Z', metadataAvailable: true });
-  expect(m.media).toEqual([{ kind: 'image', url: 'https://scontent.cdninstagram.com/v/t51/1.jpg' }, { kind: 'video', url: 'https://scontent.cdninstagram.com/v/t66/2.mp4' }, { kind: 'image', url: 'https://scontent.cdninstagram.com/v/t51/2.jpg' }]);
+  expect(m.media).toEqual([{ kind: 'image', url: 'https://scontent.cdninstagram.com/v/t51/1.jpg' }, { kind: 'video', url: 'https://scontent.cdninstagram.com/v/t66/2.mp4' }, { kind: 'image', url: 'https://scontent.cdninstagram.com/v/t51/2.jpg', previewOf: 'https://scontent.cdninstagram.com/v/t66/2.mp4' }]);
 });
 test('embed page without the JSON blob falls back to the caption markup', () => {
   const m = parseInstagramEmbed('<div class="Caption"><a class="CaptionUsername">mina</a> Plain caption</div><img class="EmbeddedMediaImage" src="https://scontent.cdninstagram.com/v/t51/x.jpg">', 'C0dE_f-1');
@@ -20,7 +20,7 @@ test('embed page without the JSON blob falls back to the caption markup', () => 
 });
 test('media info API yields the full carousel with videos first per slide', async () => {
   const m = parseInstagramMediaInfo(await json('instagram-media-info.json'), 'C0dE_f-1');
-  expect(m.media).toEqual([{ kind: 'image', url: 'https://scontent.cdninstagram.com/v/t51/1.jpg' }, { kind: 'video', url: 'https://scontent.cdninstagram.com/v/t66/2.mp4' }, { kind: 'image', url: 'https://scontent.cdninstagram.com/v/t51/2.jpg' }]);
+  expect(m.media).toEqual([{ kind: 'image', url: 'https://scontent.cdninstagram.com/v/t51/1.jpg' }, { kind: 'video', url: 'https://scontent.cdninstagram.com/v/t66/2.mp4' }, { kind: 'image', url: 'https://scontent.cdninstagram.com/v/t51/2.jpg', previewOf: 'https://scontent.cdninstagram.com/v/t66/2.mp4' }]);
   expect(m.author).toBe('Mina K (@mina)');
   expect(() => parseInstagramMediaInfo({ items: [{ code: 'other' }] }, 'C0dE_f-1')).toThrow();
 });

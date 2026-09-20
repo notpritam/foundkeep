@@ -205,6 +205,11 @@ export function createPreservationService(
           if (!current(job))
             throw Error("The saved source changed or was removed.");
           if (existing(job, asset.key)) return false;
+          // CDN signatures rotate between retries. Keep the existing file and
+          // its asset id when the downloaded bytes are already in this save.
+          if (asset.file && db.query(
+            "SELECT 1 FROM customer_media_assets WHERE capture_id=? AND account_id=? AND kind=? AND sha256=?",
+          ).get(job.capture_id, job.account_id, asset.kind, sha)) return false;
           const used = db
             .query(
               "SELECT COALESCE(SUM(storage_bytes),0) total,COALESCE(SUM(CASE WHEN account_id=? THEN storage_bytes ELSE 0 END),0) own FROM customer_captures",
@@ -325,6 +330,8 @@ export function createPreservationService(
           text: context.articleText,
         });
       const media = [...manifest.media];
+      const savedVideos = new Set<string>();
+      const missingImages: { previewOf?: string }[] = [];
       // Download only variants belonging to this post. A generic post extractor may
       // include quoted-post media and cannot establish that ownership when X is unavailable.
       for (const [index, item] of media.slice(0, 8).entries()) {
@@ -332,7 +339,10 @@ export function createPreservationService(
         if (!current(job))
           throw Error("The saved source changed or was removed.");
         const key = "media:" + item.url;
-        if (existing(job, key)) continue;
+        if (existing(job, key)) {
+          if (item.kind === "video") savedVideos.add(item.url);
+          continue;
+        }
         try {
           const budget = remaining(job);
           if (!budget)
@@ -370,6 +380,7 @@ export function createPreservationService(
               mime: result.file.mime,
               file: result.file,
             });
+            savedVideos.add(item.url);
             if (result.text)
               commit(job, {
                 key: "transcript:" + item.url,
@@ -414,13 +425,16 @@ export function createPreservationService(
           }
         } catch (error) {
           if (!current(job)) throw error;
-          issues.push(
-            error instanceof Error && error.message.startsWith("Storage limit")
-              ? error.message
-              : "A media file could not be downloaded.",
-          );
+          if (error instanceof Error && error.message.startsWith("Storage limit"))
+            issues.push(error.message);
+          else if (item.kind === "image") missingImages.push(item);
+          else issues.push("A video could not be downloaded. Your saved files are still available.");
         }
       }
+      // A failed cover is optional only after its own video was preserved.
+      // Other photos, and covers for missing videos, remain visible failures.
+      if (missingImages.some(item => !item.previewOf || !savedVideos.has(item.previewOf)))
+        issues.push("An image could not be downloaded. Your saved files are still available.");
       for (const [index, url] of manifest.links.slice(0, 3).entries()) {
         signal.throwIfAborted();
         if (!current(job))

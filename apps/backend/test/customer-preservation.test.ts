@@ -237,3 +237,76 @@ test('video subtitles and description become a transcript asset', async () => {
   const kinds = preservationDetails(db, owner, capture)!.assets.map(a => a.kind);
   expect(kinds).toContain('transcript');
 });
+
+const videoUrl = 'https://scontent.cdninstagram.com/video.mp4';
+const coverUrl = 'https://scontent.cdninstagram.com/cover.jpg';
+async function savedVideo(extra = {}) {
+  const clip = join(root, 'clip.bin');
+  const data = Buffer.from([0, 0, 0, 12, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+  await writeFile(clip, data);
+  return service({
+    resolve: async () => ({ ...manifest, links: [], media: [
+      { kind: 'video', url: videoUrl },
+      { kind: 'image', url: coverUrl, previewOf: videoUrl },
+    ] }),
+    remote: async () => ({ status: 'downloaded' as const, absolutePath: clip, sourceUrl: videoUrl, mime: 'video/mp4' as const, bytes: data.length, sha256: createHash('sha256').update(data).digest('base64url'), durationSeconds: 1, title: 'Clip', description: '', author: '', subtitles: [], dispose: async () => {} }),
+    read: async () => { throw Error('Cover unavailable'); },
+    ...extra,
+  });
+}
+test('a missing video cover does not mark the saved video as incomplete, including on retry', async () => {
+  enqueuePreservation(db, owner, capture, url);
+  const worker = await savedVideo();
+  try {
+    await worker.tick();
+    const first = preservationDetails(db, owner, capture)!;
+    expect(first.status).toBe('ready');
+    expect(first.error).toBeNull();
+    expect(first.assets.map(a => a.kind)).toEqual(['post', 'video']);
+    db.query("UPDATE customer_preservation_jobs SET status='pending'").run();
+    await worker.tick();
+    expect(preservationDetails(db, owner, capture)).toMatchObject({ status: 'ready', error: null, assets: first.assets });
+  } finally { worker.close(); }
+});
+test('missing carousel photos still report an image failure alongside a saved video', async () => {
+  enqueuePreservation(db, owner, capture, url);
+  const worker = await savedVideo({ resolve: async () => ({ ...manifest, links: [], media: [
+    { kind: 'video', url: videoUrl }, { kind: 'image', url: coverUrl },
+  ] }) });
+  try {
+    await worker.tick();
+    const result = preservationDetails(db, owner, capture)!;
+    expect(result.status).toBe('partial');
+    expect(result.error).toBe('An image could not be downloaded. Your saved files are still available.');
+    expect(result.assets.map(a => a.kind)).toEqual(['post', 'video']);
+  } finally { worker.close(); }
+});
+test('a missing video is never treated as saved just because its cover exists', async () => {
+  enqueuePreservation(db, owner, capture, url);
+  const worker = await savedVideo({ remote: async () => ({ status: 'unavailable', reason: 'Unavailable' }), read: async (url: string) => ({ url, mime: 'image/png', data: png, status: 200 }) });
+  try {
+    await worker.tick();
+    const result = preservationDetails(db, owner, capture)!;
+    expect(result.status).toBe('partial');
+    expect(result.error).toContain('A video copy was unavailable.');
+    expect(result.assets.map(a => a.kind)).toEqual(['post', 'image']);
+  } finally { worker.close(); }
+});
+test('retrying after signed video URLs rotate keeps one file and unchanged storage usage', async () => {
+  enqueuePreservation(db, owner, capture, url);
+  const firstWorker = await savedVideo();
+  await firstWorker.tick(); firstWorker.close();
+  const original = preservationDetails(db, owner, capture)!.assets;
+  const used = (db.query('SELECT storage_bytes FROM customer_captures').get() as any).storage_bytes;
+  db.query("UPDATE customer_preservation_jobs SET status='pending'").run();
+  const rotatedUrl = videoUrl + '?signature=refreshed';
+  const secondWorker = await savedVideo({ resolve: async () => ({ ...manifest, links: [], media: [
+    { kind: 'video', url: rotatedUrl }, { kind: 'image', url: coverUrl, previewOf: rotatedUrl },
+  ] }) });
+  try {
+    await secondWorker.tick();
+    expect(preservationDetails(db, owner, capture)!.assets).toEqual(original);
+    expect(preservationDetails(db, owner, capture)!.status).toBe('ready');
+    expect((db.query('SELECT storage_bytes FROM customer_captures').get() as any).storage_bytes).toBe(used);
+  } finally { secondWorker.close(); }
+});
