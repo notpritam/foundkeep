@@ -153,8 +153,9 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     unregisterNotifications: () => json<{ ok: true }>('/api/mobile/notifications', { method: 'DELETE' }),
     logout: () => json<{ ok: true }>('/api/mobile/logout', { method: 'POST' }),
     deleteAccount: (proof: string | { reauthToken: string }) => json<{ ok: true }>('/api/mobile/account', { method: 'DELETE', body: typeof proof === 'string' ? { password: proof } : proof }),
-    listCaptures(filters: { q?: string; type?: string; cursor?: string; batchId?: string; folderId?: string; tag?: string }, options: ReadOptions = {}) {
+    listCaptures(filters: { archived?: boolean; q?: string; type?: string; cursor?: string; batchId?: string; folderId?: string; tag?: string }, options: ReadOptions = {}) {
       const query = new URLSearchParams({ view: 'cards', sort: 'recent' });
+      if (filters.archived) query.set('archived', 'true');
       if (filters.q) query.set('q', filters.q);
       if (filters.type) query.set('type', filters.type);
       if (filters.cursor) query.set('cursor', filters.cursor);
@@ -169,6 +170,7 @@ export function createFoundkeepClient({ getToken, fetcher = fetch }: ClientOptio
     getCapture: (id: string, options: ReadOptions = {}) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { cacheMs: 20_000, ...options }),
     relatedCaptures: (id: string, options: ReadOptions = {}) => json<{ items: RelatedSave[] }>(`/api/mobile/captures/${encodeURIComponent(id)}/related`, { cacheMs: 10_000, ...options }),
     updateCapture: (id: string, value: { sourceTitle: string | null; noteText: string | null; expectedUpdatedAt: number; folderId?: string | null; userTags?: string[] }) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { method: 'PUT', body: value }),
+    archiveCapture: (id: string, value: { archived: boolean; expectedUpdatedAt: number }) => json<{ capture: Capture }>(`/api/mobile/captures/${encodeURIComponent(id)}/archive`, { method: 'PUT', body: value }),
     deleteCapture: (id: string) => json<{ ok: true }>(`/api/mobile/captures/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     organization: (options: ReadOptions = {}) => json<Organization>('/api/mobile/organization', { cacheMs: 30_000, ...options }),
     createFolder: (name: string) => json<{ folder: Folder }>('/api/mobile/folders', { method: 'POST', body: { name } }),

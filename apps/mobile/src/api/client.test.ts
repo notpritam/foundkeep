@@ -265,3 +265,26 @@ test('social auth uses only FoundKeep endpoints and separates login from authent
   for (const call of calls.slice(3)) assert.equal(new Headers(call.init?.headers).get('authorization'), 'Bearer device-token');
   assert.deepEqual(JSON.parse(String(calls.at(-1)?.init?.body)), { reauthToken: 'one-use-proof' });
 });
+
+test('archive filters stay separate in cache and archive writes invalidate both views', async () => {
+  let reads = 0;
+  const writes: unknown[] = [];
+  const client = createFoundkeepClient({ getToken: async () => 'archive-token', fetcher: async (input, init) => {
+    const url = new URL(String(input));
+    if (init?.method === 'PUT') {
+      assert.equal(url.pathname, '/api/mobile/captures/one/archive');
+      writes.push(JSON.parse(String(init.body)));
+      return Response.json({ capture: { id: 'one', archivedAt: 2 } });
+    }
+    reads++;
+    return Response.json({ captures: [{ id: url.searchParams.get('archived') === 'true' ? 'archived' : 'active' }], total: 1, nextCursor: null });
+  } });
+  assert.equal((await client.listCaptures({})).captures[0]?.id, 'active');
+  assert.equal((await client.listCaptures({ archived: true })).captures[0]?.id, 'archived');
+  await client.listCaptures({ archived: true });
+  assert.equal(reads, 2);
+  await client.archiveCapture('one', { archived: true, expectedUpdatedAt: 1 });
+  assert.deepEqual(writes, [{ archived: true, expectedUpdatedAt: 1 }]);
+  await client.listCaptures({}); await client.listCaptures({ archived: true });
+  assert.equal(reads, 4);
+});

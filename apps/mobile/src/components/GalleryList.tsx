@@ -14,7 +14,7 @@ import { colors, palettes, typography } from '../theme.ts';
 import type { Capture } from '../api/types.ts';
 import { useAppearance, useThemedStyles } from '../appearance/AppearanceProvider.tsx';
 
-export function GalleryList({ collection, filtered = false, headerSpace = 0, bottomSpace = 24, resetKey = 0, onScroll }: { collection: ReturnType<typeof useCollection>; filtered?: boolean; headerSpace?: number; bottomSpace?: number; resetKey?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
+export function GalleryList({ collection, archived = false, filtered = false, headerSpace = 0, bottomSpace = 24, resetKey = 0, onScroll }: { collection: ReturnType<typeof useCollection>; archived?: boolean; filtered?: boolean; headerSpace?: number; bottomSpace?: number; resetKey?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
   const styles = useThemedStyles(baseStyles);
   const palette = palettes[useAppearance().scheme];
   const { width, height, fontScale } = useWindowDimensions();
@@ -93,9 +93,9 @@ export function GalleryList({ collection, filtered = false, headerSpace = 0, bot
         }}><MotionBoundary enabled={visible}><GalleryCard capture={capture} onOpen={open} /></MotionBoundary></View>;
       })}
     </View> : loading ? <GallerySkeleton columns={columns} viewportHeight={viewport.height} /> : error ? <View style={styles.empty}><Text style={typography.heading}>Couldn’t open your collection.</Text><Message error>{error}</Message><Button label="Try again" onPress={() => void refresh()} /></View> : <View style={styles.empty}>
-      <Text style={[typography.title, { textAlign: 'center' }]}>{filtered ? 'No finds this time.' : 'A home for your good finds.'}</Text>
-      <Text style={[typography.body, styles.emptyCopy]}>{filtered ? 'Try another word or choose All.' : 'Share a link, a photo, or a passing thought. Find it all here.'}</Text>
-      {!filtered ? <Button secondary label="See how to save" onPress={() => router.push('/(app)/onboarding')} /> : null}
+      <Text style={[typography.title, { textAlign: 'center' }]}>{filtered ? 'No finds this time.' : archived ? 'Nothing archived yet.' : 'A home for your good finds.'}</Text>
+      <Text style={[typography.body, styles.emptyCopy]}>{filtered ? 'Try another word or choose All.' : archived ? 'Archive a save to move it out of your collection. You can restore it here anytime.' : 'Share a link, a photo, or a passing thought. Find it all here.'}</Text>
+      {!filtered && !archived ? <Button secondary label="See how to save" onPress={() => router.push('/(app)/onboarding')} /> : null}
     </View>}
     {loadingMore ? <View style={{ paddingTop: 12 }}><MotionBoundary enabled={footerVisible}><GallerySkeleton columns={columns} viewportHeight={200} /></MotionBoundary></View> : captures.length ? <Text style={styles.count}>{captures.length < total ? `${captures.length} of ${total} finds` : `${total} ${total === 1 ? 'find' : 'finds'} · yours to keep`}</Text> : null}
   </ScrollView>;

@@ -1,24 +1,26 @@
 export const captureKinds = { screenshot: 'Screenshot', selection: 'Highlight', bookmark: 'Bookmark', image: 'Image', video: 'Video', audio: 'Audio', document: 'Document', file: 'File', note: 'Note', tweet: 'Tweet' } as const;
 export type CaptureKind = keyof typeof captureKinds;
-export interface DashboardState { q: string; type: CaptureKind | ''; item: string; panel: 'settings' | 'devices' | 'note' | '' }
+export interface DashboardState { archived: 'true' | ''; q: string; type: CaptureKind | ''; item: string; panel: 'settings' | 'devices' | 'note' | '' }
 type SearchValue = string | string[] | undefined;
 export function parseDashboardState(input: URLSearchParams | Record<string, SearchValue>): DashboardState {
   const value = (key: string) => { const result = input instanceof URLSearchParams ? input.get(key) : input[key]; return typeof result === 'string' ? result : ''; };
   const type = value('type');
   const item = value('item');
   const panel = value('panel');
-  return { q: value('q').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 200), type: Object.hasOwn(captureKinds, type) ? type as CaptureKind : '', item: /^[A-Za-z0-9_-]{1,128}$/.test(item) ? item : '', panel: ['settings', 'devices', 'note'].includes(panel) ? panel as DashboardState['panel'] : '' };
+  return { archived: value('archived') === 'true' ? 'true' : '', q: value('q').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 200), type: Object.hasOwn(captureKinds, type) ? type as CaptureKind : '', item: /^[A-Za-z0-9_-]{1,128}$/.test(item) ? item : '', panel: ['settings', 'devices', 'note'].includes(panel) ? panel as DashboardState['panel'] : '' };
 }
 export function dashboardHref(state: DashboardState) {
   const params = new URLSearchParams();
+  if (state.archived) params.set('archived', 'true');
   if (state.q) params.set('q', state.q);
   if (state.type) params.set('type', state.type);
   if (state.item) params.set('item', state.item);
   if (state.panel) params.set('panel', state.panel);
   return `/dashboard${params.size ? `?${params}` : ''}`;
 }
-export function capturesPath(state: Pick<DashboardState, 'q' | 'type'>, cursor?: string) {
+export function capturesPath(state: Pick<DashboardState, 'q' | 'type' | 'archived'>, cursor?: string) {
   const params = new URLSearchParams({ limit: '60', sort: 'recent', view: 'cards' });
+  if (state.archived) params.set('archived', 'true');
   if (state.q) params.set('q', state.q);
   if (state.type) params.set('type', state.type);
   if (cursor) params.set('cursor', cursor);
@@ -35,6 +37,7 @@ export interface Capture {
   id: string; type: string; sourceTitle?: string; sourceUrl?: string; blobUrl?: string; fileUrl?: string;
   previewUrl?: string; width?: number; height?: number; fileName?: string; fileMime?: string; fileBytes?: number; selectionText?: string; noteText?: string; summary?: string; articleText?: string; ocrText?: string;
   createdAt?: number | string; savedVia?: 'iphone' | 'android' | 'browser' | 'dashboard' | null;
+  updatedAt: number; archivedAt?: number | null;
   capturedAt: number | string; status: string; category?: string; tags?: string[]; provenance?: Provenance; enrichError?: string;
   userTags?: string[];
   preservedMedia?: {status:string;imageCount:number;videoCount:number;excerpt?:string|null;items:{id:string;kind:'image'|'video';url:string}[]}|null;
@@ -87,8 +90,9 @@ export function noteBody(note: string, clientId: string, preferences: Preference
 
 export function safePreviewUrl(value: string | undefined, id: string) { const expected = `/api/captures/${encodeURIComponent(id)}/preview`; return value === expected ? expected : null; }
 export function capturePreview(capture: Capture) { return safeBlob(capture.blobUrl, capture.id) || (capture.fileMime?.startsWith('image/') ? safeFileUrl(capture.fileUrl, capture.id) : null) || safePreviewUrl(capture.previewUrl, capture.id); }
-export function savedCaptureHref(id: string, state: Pick<DashboardState, 'q' | 'type'>) {
-  const params = new URLSearchParams(); if (state.q) params.set('q', state.q); if (state.type) params.set('type', state.type);
+export function savedCaptureHref(id: string, state: Pick<DashboardState, 'q' | 'type' | 'archived'>) {
+  const params = new URLSearchParams(); if (state.archived) params.set('archived', 'true');
+  if (state.q) params.set('q', state.q); if (state.type) params.set('type', state.type);
   return `/dashboard/saved/${encodeURIComponent(id)}${params.size ? `?${params}` : ''}`;
 }
 

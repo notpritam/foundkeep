@@ -5,7 +5,7 @@ import { AppState } from 'react-native';
 import type { Capture } from '../api/types.ts';
 import { useSession } from '../session/SessionProvider.tsx';
 
-export function useCollection(filters: { q?: string; type?: string; batchId?: string; folderId?: string; tag?: string }) {
+export function useCollection(filters: { archived?: boolean; q?: string; type?: string; batchId?: string; folderId?: string; tag?: string }) {
   const { client, refresh: refreshAccount } = useSession();
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,10 +20,10 @@ export function useCollection(filters: { q?: string; type?: string; batchId?: st
   const expanded = useRef(false);
   const failures = useRef(0);
   const nextPoll = useRef(0);
-  const requestKey = JSON.stringify([filters.q || '', filters.type || '', filters.batchId || '', filters.folderId || '', filters.tag || '']);
+  const requestKey = JSON.stringify([!!filters.archived, filters.q || '', filters.type || '', filters.batchId || '', filters.folderId || '', filters.tag || '']);
   const latestKey = useRef(requestKey); latestKey.current = requestKey;
   const displayedKey = useRef<string | null>(null);
-  const query = useMemo(() => ({ q: filters.q, type: filters.type, batchId: filters.batchId, folderId: filters.folderId, tag: filters.tag }), [filters.q, filters.type, filters.batchId, filters.folderId, filters.tag]);
+  const query = useMemo(() => ({ archived: filters.archived, q: filters.q, type: filters.type, batchId: filters.batchId, folderId: filters.folderId, tag: filters.tag }), [filters.archived, filters.q, filters.type, filters.batchId, filters.folderId, filters.tag]);
 
   const load = useCallback(async (mode: 'initial' | 'refresh' | 'more' | 'background' = 'initial') => {
     if ((mode === 'more' || mode === 'background') && busy.current) return;

@@ -57,6 +57,7 @@ export type Capture = {
   capturedAt: number;
   createdAt: number;
   savedVia?: 'iphone' | 'android' | 'browser' | 'dashboard' | null;
+  archivedAt?: number | null;
   updatedAt: number;
   enrichError: string | null;
   provenance: CaptureProvenance | null;

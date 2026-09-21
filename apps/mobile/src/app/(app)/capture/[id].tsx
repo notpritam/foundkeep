@@ -31,6 +31,7 @@ export default function CaptureDetail() {
   const palette = palettes[useAppearance().scheme];
   const { id } = useLocalSearchParams<{ id: string }>(); const { client, token, account } = useSession(); const [capture, setCapture] = useState<Capture | null>(null); const [error, setError] = useState(''); const [opening, setOpening] = useState(false);
   const [originExpanded, setOriginExpanded] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [editing, setEditing] = useState<Capture | null>(null);
   const [retry, setRetry] = useState(0);
   const pending = useRef(false);
@@ -56,6 +57,13 @@ export default function CaptureDetail() {
     const poll = setInterval(() => { if (AppState.currentState === 'active' && pending.current) void load(true); }, 5_000);
     return () => { live = false; request++; clearInterval(poll); unsubscribe(); appState.remove(); };
   }, [client, account?.id, token, id, retry]));
+  const toggleArchive = async () => {
+    if (!capture || archiving) return;
+    setArchiving(true); setError('');
+    try { const result = await client.archiveCapture(id, { archived: !capture.archivedAt, expectedUpdatedAt: capture.updatedAt }); setCapture(result.capture); }
+    catch (value) { setError((value as Error).message); }
+    finally { setArchiving(false); }
+  };
   const remove = () => Alert.alert('Delete this save?', 'This permanently removes it from your FoundKeep account.', [{ text: 'Keep it', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await client.deleteCapture(id); router.replace('/(app)/(tabs)/collection'); } catch (value) { setError((value as Error).message); } } }]);
   const openFile = async () => {
     if (!capture?.fileName) return;
@@ -90,6 +98,7 @@ export default function CaptureDetail() {
   const publisher = capture.provenance?.siteName || capture.provenance?.sourceApplication;
   return <Screen top={false}>
     <Stack.Screen options={{ title: 'Saved item', headerRight: () => <View style={styles.actions}>
+      <QuickAction label={capture.archivedAt ? 'Restore save' : 'Archive save'} icon={capture.archivedAt ? 'arrow-undo-outline' : 'archive-outline'} disabled={archiving} onPress={() => void toggleArchive()} />
       <QuickAction label="Edit and organize" icon="create-outline" onPress={() => setEditing(capture)} />
       {source ? <QuickAction label="Open original source" icon="open-outline" onPress={openSource} /> : null}
       <QuickAction label="More saved item actions" icon="ellipsis-horizontal" onPress={more} />
@@ -98,6 +107,7 @@ export default function CaptureDetail() {
       {hasPreview ? <CapturePreview capture={capture} contain={capture.type === 'image' || capture.type === 'screenshot'} style={[styles.cover, { aspectRatio: imageAspect }]} /> : null}
       <FrostedPanel style={[styles.hero, hasPreview && styles.overlap]}>
         <Text selectable style={typography.title}>{captureTitle(capture)}</Text>
+        {capture.archivedAt ? <Text style={typography.small}>Archived · your files and notes are kept</Text> : null}
         <Text style={typography.small}>{publisher || captureLabels[capture.type]} · Saved {date(capture.capturedAt)}</Text>
         {capture.folder || tags.length ? <View style={styles.tags}>
           {capture.folder ? <Pressable accessibilityRole="button" accessibilityLabel={`Change folder: ${capture.folder.name}`} onPress={() => setEditing(capture)} style={styles.tag}><Ionicons name="folder-outline" size={14} color={colors.accent} /><Text style={styles.tagText}>{capture.folder.name}</Text></Pressable> : null}
@@ -138,9 +148,9 @@ export default function CaptureDetail() {
     {editing ? <EditCaptureSheet capture={editing} onClose={() => setEditing(null)} /> : null}
   </Screen>;
 }
-function QuickAction({ label, icon, onPress }: { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; onPress: () => void }) {
+function QuickAction({ label, icon, onPress, disabled = false }: { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; onPress: () => void; disabled?: boolean }) {
   const styles = useThemedStyles(baseStyles);
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}><Ionicons name={icon} size={22} color={colors.accent} /></Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}><Ionicons name={icon} size={22} color={colors.accent} /></Pressable>;
 }
 const baseStyles = StyleSheet.create({
   page: { padding: 20, paddingTop: 8, paddingBottom: 48, gap: 20 }, loading: { flex: 1, justifyContent: 'center', padding: 24, gap: 16 },

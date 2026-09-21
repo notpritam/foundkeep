@@ -607,6 +607,8 @@ const MIGRATIONS: string[] = [
     checked_at INTEGER NOT NULL, ok_at INTEGER,
     failures INTEGER NOT NULL DEFAULT 0, notified_at INTEGER
    );`,
+  `ALTER TABLE customer_captures ADD COLUMN archived_at INTEGER;
+   CREATE INDEX idx_customer_captures_archive ON customer_captures(account_id,archived_at,created_at DESC,id DESC);`,
 ];
 
 export const DATABASE_SCHEMA_VERSION = MIGRATIONS.length;

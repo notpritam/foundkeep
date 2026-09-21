@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useDashboard } from './context';
@@ -35,6 +35,7 @@ export function Sidebar({ me, section, collectionId, libraryHref = '/dashboard',
   const { request } = useDashboard();
   const router = useRouter();
   const pathname = usePathname();
+  const archived = useSearchParams().get('archived') === 'true';
   // Share page queries, but let their hydrated page start the first request.
   // Starting it here can change a still-hydrating page's server snapshot.
   const collections = useQuery({ enabled: section !== 'collections', queryKey: ['social-collections'], queryFn: ({ signal }) => request<CollectionList>('/collections', { signal }) });
@@ -129,7 +130,8 @@ export function Sidebar({ me, section, collectionId, libraryHref = '/dashboard',
   const openLibrary = () => { close(); if (onLibrary) onLibrary(); else router.push(libraryHref); };
   const settings = section === 'settings' || section === 'capture' || section === 'processing';
   const primary = [
-    { href: libraryHref, id: 'all-captures', label: 'My library', active: !section, icon: icons.library },
+    { href: libraryHref, id: 'all-captures', label: 'My library', active: !section && !archived, icon: icons.library },
+    { href: '/dashboard?archived=true', id: 'open-archive', label: 'Archive', active: !section && archived, icon: <><rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v12h14V8m-10 4h6"/></> },
     { href: '/dashboard/collections', id: 'open-collections', label: 'Collections', active: section === 'collections' && !collectionId, icon: icons.collections },
     { href: '/dashboard/mind-map', id: 'open-mind-map', label: 'Mind map', active: section === 'mind-map', icon: icons.graph },
     { href: '/dashboard/agents', id: 'open-agents', label: 'Agents', active: section === 'agents', icon: icons.agents },

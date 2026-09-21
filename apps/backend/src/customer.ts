@@ -76,7 +76,7 @@ function pushTypeFilter(where: string[], args: (string | number)[], type: string
     args.push(type);
   }
 }
-const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,saved_via,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json,manual_tags,folder_id,(SELECT name FROM customer_folders WHERE id=customer_captures.folder_id AND account_id=customer_captures.account_id) AS folder_name,(SELECT 1 FROM customer_derivatives WHERE capture_id=customer_captures.id AND account_id=customer_captures.account_id AND kind='preview') AS has_derived_preview,(SELECT json_extract(source_json,'$.imageUrl') FROM customer_processing_results WHERE capture_id=customer_captures.id AND account_id=customer_captures.account_id) AS generated_image_url,"+preservedMediaColumns();
+const CAPTURE_COLUMNS = "id,account_id,client_id,batch_id,type,status,archived_at,saved_via,source_url,source_title,selection_text,note_text,article_text,blob_mime,blob_bytes,file_name,file_path,file_mime,file_bytes,storage_bytes,width,height,captured_at,created_at,updated_at,summary,ocr_text,category,tags,enrich_error,enrich_attempts,processing_at,provenance_json,processing_options_json,manual_tags,folder_id,(SELECT name FROM customer_folders WHERE id=customer_captures.folder_id AND account_id=customer_captures.account_id) AS folder_name,(SELECT 1 FROM customer_derivatives WHERE capture_id=customer_captures.id AND account_id=customer_captures.account_id AND kind='preview') AS has_derived_preview,(SELECT json_extract(source_json,'$.imageUrl') FROM customer_processing_results WHERE capture_id=customer_captures.id AND account_id=customer_captures.account_id) AS generated_image_url,"+preservedMediaColumns();
 // List views need excerpts, not every article and OCR result in the account.
 // Keep the full representation as the default for installed older clients.
 const CARD_TEXT_COLUMNS = new Set(["selection_text", "note_text", "article_text", "summary", "ocr_text"]);
@@ -91,7 +91,7 @@ export interface CustomerCaptureRow {
   preserved_media_json?: string|null;
   has_derived_preview?: number; generated_image_url?: string | null;
   id: string; account_id: string; client_id: string; type: string; status: string;
-  batch_id: string | null; saved_via: SavedVia | null;
+  batch_id: string | null; saved_via: SavedVia | null; archived_at?: number | null;
   source_url: string | null; source_title: string | null; selection_text: string | null;
   note_text: string | null; article_text: string | null; blob_data?: Uint8Array | null;
   blob_mime: string | null; blob_bytes: number; storage_bytes: number;
@@ -137,7 +137,7 @@ export function customerCaptureDto(row: CustomerCaptureRow) {
   const hasPreview = preservedMedia?.imageCount || row.has_derived_preview || previewSourceUrl(row.generated_image_url) || (row.blob_mime && PREVIEW_MIMES.has(row.blob_mime) && row.blob_bytes > 0)
     || (row.file_path && row.file_mime && PREVIEW_MIMES.has(row.file_mime)) || previewSourceUrl(provenance?.leadImageUrl);
   return {
-    id: row.id, clientId: row.client_id, batchId: row.batch_id, type: row.type, status: row.status,
+    id: row.id, clientId: row.client_id, batchId: row.batch_id, type: row.type, status: row.status, archivedAt: row.archived_at ?? null,
     sourceUrl: row.source_url, sourceTitle: row.source_title, selectionText: row.selection_text,
     noteText: row.note_text, articleText: row.article_text, summary: row.summary, ocrText: row.ocr_text,
     category: row.category, tags: JSON.parse(row.tags || "[]") as string[],
@@ -875,6 +875,36 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
     return sort === "recent";
   }
 
+  function archiveFilter(c: C) {
+    const value = c.req.query("archived") ?? "false";
+    if (!["true", "false"].includes(value)) fail(400, "invalid_filter", "Choose the library or archive.");
+    return value === "true" ? "archived_at IS NOT NULL" : "archived_at IS NULL";
+  }
+
+  app.on("PUT", ["/captures/:id/archive", "/mobile/captures/:id/archive"], async (c) => {
+    const current = auth(c);
+    rates.take(`edit:${current.account.id}`, 120, 60_000);
+    const body = await jsonBody(c);
+    if (Object.keys(body).some(key => !["archived", "expectedUpdatedAt"].includes(key)) ||
+        typeof body.archived !== "boolean" || !Number.isSafeInteger(body.expectedUpdatedAt) || Number(body.expectedUpdatedAt) < 0)
+      fail(400, "invalid_input", "Send an archive state and the save revision.");
+    const result = db.transaction(() => {
+      const verified = auth(c, false, false);
+      if (verified.account.id !== current.account.id || verified.credentialId !== current.credentialId)
+        fail(401, "unauthorized", "Your session expired. Sign in again.");
+      const row = findCapture(c.req.param("id"), current.account.id);
+      if (row.updated_at !== body.expectedUpdatedAt)
+        fail(409, "capture_changed", "This save changed. Refresh it before trying again.");
+      if ((row.archived_at != null) !== body.archived) {
+        const now = Math.max(Date.now(), row.updated_at + 1);
+        db.query("UPDATE customer_captures SET archived_at=?,updated_at=? WHERE id=? AND account_id=?")
+          .run(body.archived ? now : null, now, row.id, current.account.id);
+      }
+      return { capture: customerCaptureDto(findCapture(row.id, current.account.id)) };
+    }).immediate();
+    return c.json(result);
+  });
+
   app.get("/captures", (c) => {
     const current = auth(c, true);
     const recent = recentOrder(c);
@@ -887,7 +917,7 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
     const rawLimit = c.req.query("limit") || "60";
     if (!/^\d+$/.test(rawLimit) || Number(rawLimit) < 1) fail(400, "invalid_limit", "Use a positive result limit.");
     const limit = Math.min(100, Number(rawLimit));
-    const where = ["account_id = ?"];
+    const where = ["account_id = ?", archiveFilter(c)];
     const args: (string | number)[] = [current.account.id];
     if (type) pushTypeFilter(where, args, type);
     if (search) {
@@ -1110,7 +1140,7 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
     const cursor = mobileCursor(c.req.query("cursor") || "", recent);
     if (search.length > 200 || (type && !TYPES.has(type)) || !["full", "cards"].includes(view)) fail(400, "invalid_filter", "Choose a valid capture type or a shorter search.");
     if (batchId !== undefined && !/^[A-Za-z0-9_-]{1,80}$/.test(batchId)) fail(400, "invalid_batch", "The shared collection identifier is invalid.");
-    const where = ["account_id = ?"];
+    const where = ["account_id = ?", archiveFilter(c)];
     const args: (string | number)[] = [current.account.id];
     if (batchId !== undefined) { where.push("batch_id = ?"); args.push(batchId); }
     const folderFilter = c.req.query("folderId");
@@ -1166,12 +1196,13 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
     // Accounts are capped at MAX_CAPTURES. Read only matching metadata, then
     // retrieve at most six card excerpts; never load the library's full articles.
     const metadata = db.query(`SELECT ${columns}
-      FROM customer_captures WHERE account_id=? ORDER BY captured_at DESC,id DESC LIMIT ?`)
+      FROM customer_captures WHERE account_id=? AND archived_at IS NULL ORDER BY captured_at DESC,id DESC LIMIT ?`)
       .all(current.account.id, MAX_CAPTURES) as RelatedMetadata[];
     const explicit = db.query(`SELECT DISTINCT CASE WHEN source_id=? THEN target_id ELSE source_id END id
       FROM customer_capture_links WHERE account_id=? AND (source_id=? OR target_id=?) LIMIT 6`).all(capture.id,current.account.id,capture.id,capture.id) as {id:string}[];
-    const matches = [...explicit.map(item=>({id:item.id,reasons:[{kind:'agent' as const,label:'Linked in your collection'}]})),
-      ...relatedCaptures(capture, metadata).filter(item=>!explicit.some(link=>link.id===item.id))].slice(0,6);
+    const activeExplicit = explicit.filter(item => db.query("SELECT 1 FROM customer_captures WHERE id=? AND account_id=? AND archived_at IS NULL").get(item.id, current.account.id));
+    const matches = [...activeExplicit.map(item=>({id:item.id,reasons:[{kind:'agent' as const,label:'Linked in your collection'}]})),
+      ...relatedCaptures(capture, metadata).filter(item=>!activeExplicit.some(link=>link.id===item.id))].slice(0,6);
     const read = db.query(`SELECT ${CARD_COLUMNS} FROM customer_captures WHERE id=? AND account_id=?`);
     return c.json({ items: matches.map(match => ({ capture: { ...customerCaptureDto(read.get(match.id, current.account.id) as CustomerCaptureRow), contentView: "card" }, reasons: match.reasons })) });
   });

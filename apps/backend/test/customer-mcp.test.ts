@@ -87,3 +87,14 @@ test('MCP exposes bounded derivative chunks under the same file scope',async()=>
  const reader=createAgentToken(db,owner,{name:'Metadata',scopes:['library:read']});
  await expect(createMcpOperations(db,'Bearer '+reader.token).call('read_file',{id:capture,derivative:'compact'})).rejects.toThrow('permission');
 });
+
+test('agents can archive and restore with revisions, and search defaults to active saves', async () => {
+ const ops=createMcpOperations(db,'Bearer '+token);
+ const result=await ops.call('set_save_archived',{id:capture,archived:true,expectedUpdatedAt:1}) as any;
+ expect(result.capture.archivedAt).toBeGreaterThan(0);
+ expect((await ops.call('list_saves',{}) as any).items).toHaveLength(0);
+ expect((await ops.call('list_saves',{archived:true}) as any).items.map((item:any)=>item.id)).toEqual([capture]);
+ expect((await ops.call('export_account',{}) as any).saves).toHaveLength(1);
+ await ops.call('set_save_archived',{id:capture,archived:false,expectedUpdatedAt:result.capture.updatedAt});
+ expect((await ops.call('list_saves',{}) as any).items).toHaveLength(1);
+});

@@ -27,6 +27,7 @@ export default function CollectionScreen() {
   const [query, setQuery] = useState('');
   const [listReset, setListReset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [archived, setArchived] = useState(false);
   const [type, setType] = useState<CaptureType>();
   const [organization, setOrganization] = useState<OrganizationChoice>({ folderId: undefined, userTags: [] });
   const { height, fontScale } = useWindowDimensions();
@@ -58,27 +59,28 @@ export default function CollectionScreen() {
     syncCompact(hidden >= measuredHeight.current - 1);
   }, [chrome, travel, syncCompact]);
   useEffect(() => { const timer = setTimeout(() => setSearchQuery(query.trim()), 250); return () => clearTimeout(timer); }, [query]);
-  const collection = useCollection({ q: searchQuery || undefined, type, folderId: organization.folderId === null ? 'unfiled' : organization.folderId, tag: organization.userTags[0] });
+  const collection = useCollection({ archived, q: searchQuery || undefined, type, folderId: organization.folderId === null ? 'unfiled' : organization.folderId, tag: organization.userTags[0] });
   const canWrite = policy.capture.note && !updateRequired;
   return <Screen>
     <View testID="collection-header" style={[styles.top, compact && styles.topCompact]}>
       <Brand compact />
       <View style={styles.actions}>
+        <Pressable accessibilityRole="button" accessibilityLabel={archived ? 'Back to collection' : 'Open archive'} accessibilityState={{ selected: archived }} onPress={() => { setArchived(value => !value); setQuery(''); setSearchQuery(''); setType(undefined); setOrganization({ folderId: undefined, userTags: [] }); setListReset(value => value + 1); chrome.reveal(); syncCompact(false); travel.setValue(0); }} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Ionicons name={archived ? 'albums-outline' : 'archive-outline'} size={22} color={archived ? colors.accent : colors.ink} /></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Show search and filters" onPress={revealSearch} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Ionicons name="search-outline" size={22} color={colors.ink} /></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Write a new note" accessibilityState={{ disabled: !canWrite }} disabled={!canWrite} onPress={() => router.push('/(app)/new-note')} style={({ pressed }) => [styles.add, pressed && styles.pressed, !canWrite && { opacity: .4 }]}><Ionicons name="add" size={25} color={colors.ink} /></Pressable>
       </View>
     </View>
     <View style={styles.galleryRegion}>
-      <GalleryList resetKey={listReset} collection={collection} headerSpace={headerHeight} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
+      <GalleryList archived={archived} resetKey={listReset} collection={collection} headerSpace={headerHeight} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
       <Animated.View testID="collection-expanded-controls" pointerEvents={compact ? 'none' : 'auto'} accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[styles.header, { transform: [{ translateY: Animated.multiply(travel, -1) }] }]} onLayout={event => {
         const next = Math.ceil(event.nativeEvent.layout.height);
         if (next === measuredHeight.current) return;
         measuredHeight.current = next; setHeaderHeight(next); travel.setValue(chrome.resize(next));
       }}>
         <View style={styles.controls}>
-        {height > 550 && fontScale < 1.8 ? <View style={styles.heading}><Text style={styles.title}>The collection.</Text><Text style={styles.subtitle}>Recently saved · newest first</Text></View> : null}
+        {height > 550 && fontScale < 1.8 ? <View style={styles.heading}><Text style={styles.title}>{archived ? 'Archive.' : 'The collection.'}</Text><Text style={styles.subtitle}>{archived ? 'Kept safely · restore whenever you like' : 'Recently saved · newest first'}</Text></View> : null}
         {updateRequired ? <Message error>Update FoundKeep in the App Store to keep saving.</Message> : <Message>{policy.notice}</Message>}
-        <View style={styles.search}><Ionicons name="search-outline" size={19} color={colors.muted} /><AdaptiveTextInput ref={searchRef} testID="collection-search" value={query} onChangeText={setQuery} onFocus={() => { searchingRef.current = true; chrome.reveal(); travel.setValue(0); syncCompact(false); }} onBlur={() => { searchingRef.current = false; }} maxLength={200} accessibilityLabel="Search saved items" placeholder="Search your collection" style={styles.searchInput} returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" /></View>
+        <View style={styles.search}><Ionicons name="search-outline" size={19} color={colors.muted} /><AdaptiveTextInput ref={searchRef} testID="collection-search" value={query} onChangeText={setQuery} onFocus={() => { searchingRef.current = true; chrome.reveal(); travel.setValue(0); syncCompact(false); }} onBlur={() => { searchingRef.current = false; }} maxLength={200} accessibilityLabel={archived ? 'Search archived items' : 'Search saved items'} placeholder={archived ? 'Search your archive' : 'Search your collection'} style={styles.searchInput} returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" /></View>
         <View style={styles.filterRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
           {filters.map(filter => <Pressable key={filter.label} accessibilityRole="button" accessibilityState={{ selected: type === filter.type }} onPress={() => { setType(filter.type); setListReset(value => value + 1); if (!filter.type) { setQuery(''); setSearchQuery(''); setOrganization({ folderId: undefined, userTags: [] }); void collection.refresh(); } chrome.reveal(); syncCompact(false); travel.setValue(0); }} style={({ pressed }) => [styles.filter, type === filter.type && styles.filterActive, pressed && styles.pressed]}><Text style={[styles.filterText, type === filter.type && styles.filterTextActive]}>{filter.label}</Text></Pressable>)}

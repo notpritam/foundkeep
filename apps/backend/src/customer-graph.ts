@@ -17,12 +17,12 @@ export function buildCustomerGraph(db:Database,owner:string,options:GraphOptions
  const q=(options.q||'').trim(),focus=options.focus||null,limit=options.limit??200;
  if(q.length>100||!Number.isInteger(limit)||limit<1||limit>200)moduleFail(400,'invalid_graph_query','Use a search up to 100 characters and a limit from 1 to 200.');
  if(focus&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(focus))moduleFail(400,'invalid_graph_focus','Choose a saved item to focus.');
- if(focus&&!db.query('SELECT 1 FROM customer_captures WHERE account_id=? AND id=?').get(owner,focus))moduleFail(404,'not_found','Saved item not found.');
- const where=['c.account_id=?'],bindings:(string|number)[]=[owner];
+ if(focus&&!db.query('SELECT 1 FROM customer_captures WHERE account_id=? AND id=? AND archived_at IS NULL').get(owner,focus))moduleFail(404,'not_found','Saved item not found.');
+ const where=['c.account_id=?','c.archived_at IS NULL'],bindings:(string|number)[]=[owner];
  if(q){const pattern='%'+q.replace(/[\\%_]/g,value=>'\\'+value)+'%';where.push("(c.source_title LIKE ? ESCAPE '\\' OR c.note_text LIKE ? ESCAPE '\\' OR c.summary LIKE ? ESCAPE '\\' OR c.source_url LIKE ? ESCAPE '\\' OR c.tags LIKE ? ESCAPE '\\' OR c.manual_tags LIKE ? ESCAPE '\\')");bindings.push(...Array(6).fill(pattern));}
  if(focus){where.push(`(c.id=? OR EXISTS(SELECT 1 FROM customer_capture_links l WHERE l.account_id=? AND ((l.source_id=? AND l.target_id=c.id) OR (l.target_id=? AND l.source_id=c.id))))`);bindings.push(focus,owner,focus,focus);}
  const predicate=where.join(' AND ');
- const totalSaves=(db.query('SELECT COUNT(*) n FROM customer_captures WHERE account_id=?').get(owner) as {n:number}).n;
+ const totalSaves=(db.query('SELECT COUNT(*) n FROM customer_captures WHERE account_id=? AND archived_at IS NULL').get(owner) as {n:number}).n;
  const matchingSaves=(db.query(`SELECT COUNT(*) n FROM customer_captures c WHERE ${predicate}`).get(...bindings) as {n:number}).n;
  const rows=db.query(`SELECT c.id,c.type,c.source_title,c.source_url,substr(c.note_text,1,120) note_text,substr(c.summary,1,400) summary,c.tags,c.manual_tags,c.created_at,c.updated_at FROM customer_captures c WHERE ${predicate} ORDER BY CASE WHEN c.id=? THEN 0 ELSE 1 END,c.created_at DESC,c.id DESC LIMIT ?`).all(...bindings,focus||'',limit) as Save[];
  const nodes:CustomerGraphNode[]=[],edges:CustomerGraphEdge[]=[],tagNodes=new Map<string,CustomerGraphNode>();
