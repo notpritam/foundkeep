@@ -13,6 +13,9 @@ Pritam's standing preference (2026-09-12): Foundkeep already has a permanent dev
 - Package with `scripts/package-site.mjs` into a new dev release directory, verify it, switch `current` atomically, restart only `foundkeep-site-dev.service` for web-only changes, and verify the public dev URL. Retain the previous release for rollback.
 - Production at `https://foundkeep.app` is separate. Promote to production only when requested.
 
+
+2026-09-21 archive dev rollout: dev is now schema 33; production remains schema 32. Dev rollback must use the schema-compatible backend `~/.local/share/foundkeep-backend/releases/20260921-115951-archive-cf24ebd-fallback/apps/backend`, preserving the current database. Archive is deployed on the permanent dev website; the mobile dev update is awaiting a responsive authenticated release Mac. See `docs/beta/2026-09-21-save-archive.md`.
+
 See [customer web deployment](deploy/NEXT_WEB.md) for packaging and verification details.
 
 Pritam's preference (2026-09-13): keep dev populated and ready for independent testing. `bun run dev:seed` adds dedicated demo accounts, three public collections, a private scratchpad, starter notes, and a pending submission. Reruns preserve existing data and recorded tester changes. Keep credentials/bookkeeping outside the checkout at `~/.local/share/foundkeep-dev-demo`; never seed production or reset dev. See [demo setup](docs/DEV_DEMO.md).
