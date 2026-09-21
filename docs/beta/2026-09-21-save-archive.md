@@ -14,7 +14,7 @@ The API adds a nullable `archived_at` timestamp in migration 33. `PUT /api/captu
 
 - 446 backend tests pass, including authorization, invalid input, revision conflicts, list pagination, storage preservation, export, graph/related visibility, and MCP archive/restore.
 - 105 mobile tests pass, including cache separation and invalidation for active/archived lists.
-- Backend, mobile and web TypeScript checks pass. Next production-mode dev build and Expo dev web export pass.
+- Backend, mobile and web TypeScript checks pass. Next production-mode dev build and Expo dev web, iOS and Android exports pass.
 - Compiled mobile browser journey passes archive, archive view, restore, retained notes and 390/320px layouts.
 - Web browser journey passes on an isolated API and on the public permanent dev site, including failed-write recovery, search, full-reader navigation, restore and 1280/390/320px layouts. Disposable live test account and saves were deleted.
 - Dev database migration was checked on a private snapshot: integrity passes, account/capture/media/session/connection counts are unchanged, and existing saves default to active.
