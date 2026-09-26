@@ -29,3 +29,7 @@ apps/mobile/dist-gallery-preview/
 apps/site/.next/
 apps/site/next-env.d.ts
 apps/site/tsconfig.tsbuildinfo
+
+# Python bytecode
+__pycache__/
+*.pyc

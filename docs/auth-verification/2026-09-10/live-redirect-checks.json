@@ -1,0 +1,51 @@
+{
+  "checkedAt": "2026-09-10T04:28:14.015Z",
+  "providers": [
+    "apple",
+    "google"
+  ],
+  "results": [
+    {
+      "client": "web",
+      "provider": "apple",
+      "start": true,
+      "providerRedirect": true,
+      "backendCallback": true,
+      "cancellation": true,
+      "localProofCleared": true,
+      "realAccountLoginTested": false
+    },
+    {
+      "client": "web",
+      "provider": "google",
+      "start": true,
+      "providerRedirect": true,
+      "backendCallback": true,
+      "cancellation": true,
+      "localProofCleared": true,
+      "realAccountLoginTested": false
+    },
+    {
+      "client": "ios",
+      "provider": "apple",
+      "start": true,
+      "providerRedirect": true,
+      "backendCallback": true,
+      "cancellation": true,
+      "deepLinkDestination": "foundkeep://oauth/complete",
+      "realAccountLoginTested": false
+    },
+    {
+      "client": "ios",
+      "provider": "google",
+      "start": true,
+      "providerRedirect": true,
+      "backendCallback": true,
+      "cancellation": true,
+      "deepLinkDestination": "foundkeep://oauth/complete",
+      "realAccountLoginTested": false
+    }
+  ],
+  "physicalIPhoneLoginTested": false,
+  "providerTokenExchangeTested": false
+}
