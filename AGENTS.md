@@ -1,5 +1,9 @@
 # Foundkeep project memory
 
+## Launch tracker
+
+The public-launch plan lives in `docs/launch/roadmap.json` (phases P0–P7, then L for post-launch). It is the single source of truth; `docs/launch/dashboard.html` and `docs/launch/STATUS.md` are generated from it by `/usr/bin/node scripts/launch-dashboard.mjs` (`--refresh` also re-reads production usage read-only and the running release dirs). When you finish, start or block a roadmap item, update its `status` in the JSON and regenerate in the same commit. Items marked `asked` came from Pritam's own requests. The repo is public: keep security findings generic in the roadmap and put specifics in the private audit at `~/.local/share/foundkeep-launch/`.
+
 ## Development and user testing
 
 Pritam's standing preference (2026-09-12): Foundkeep already has a permanent dev environment. Deploy changes there for user testing and share its URL instead of creating a separate preview environment.

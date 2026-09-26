@@ -1,0 +1,929 @@
+{
+  "title": "FoundKeep — launch tracker",
+  "goal": "Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.",
+  "updated": "2026-09-26",
+  "snapshot": {
+    "asOf": "2026-09-26 16:57 UTC",
+    "metrics": {
+      "accounts": 21,
+      "newAccounts7d": 0,
+      "active7d": 2,
+      "saves": 146,
+      "saves7d": 63,
+      "collections": 1,
+      "paying": 0,
+      "openTickets": 0
+    },
+    "releases": {
+      "prodBackend": "20260920-063314-instagram-cover-8d02824",
+      "devBackend": "20260921-115951-archive-cf24ebd",
+      "extension": "ext-v1.7.12 (friends) · CWS 1.0.2",
+      "ios": "1.0.0 (23) TestFlight",
+      "android": "1.0.0 (6) APK · (7) Play testing"
+    }
+  },
+  "asks": {
+    "total": 194,
+    "live": 135,
+    "partial": 37,
+    "devOnly": 3,
+    "notBuilt": 5,
+    "parked": 6,
+    "superseded": 8,
+    "verified": "2026-09-26",
+    "inventory": "~/.local/share/foundkeep-launch/ASKS.md"
+  },
+  "phases": [
+    {
+      "id": "P0",
+      "name": "Clean house",
+      "goal": "One branch, one plan, one place to track it.",
+      "exit": "main is the only branch; every ask and backlog item is triaged into this tracker."
+    },
+    {
+      "id": "P1",
+      "name": "Safety net",
+      "goal": "We can recover any data and hear about failures before users do.",
+      "exit": "Nightly verified off-site backup with a tested restore, server errors logged and alerted, uptime alerts, CI on every push."
+    },
+    {
+      "id": "P2",
+      "name": "Open signups safely",
+      "goal": "Strangers can sign up without breaking the service or each other.",
+      "exit": "Limits sized for 1,000 users and the hardening items in the private audit closed."
+    },
+    {
+      "id": "P3",
+      "name": "Accounts, email & legal",
+      "goal": "Accounts are verifiable and recoverable, and the legal pages match the product.",
+      "exit": "Verified email, reset by email, privacy/terms/refund pages that satisfy Paddle, Apple and Google."
+    },
+    {
+      "id": "P4",
+      "name": "Monetization",
+      "goal": "A stranger can pay $5 on web or iOS and get Pro; friends keep what they have.",
+      "exit": "A live purchase verified on web and iOS, and the global beta-Pro flag turned off."
+    },
+    {
+      "id": "P5",
+      "name": "Product gaps",
+      "goal": "Close the asks that make the first week feel finished.",
+      "exit": "Every ★ item marked for launch is live in prod and in the shipped apps."
+    },
+    {
+      "id": "P6",
+      "name": "Store launch",
+      "goal": "FoundKeep is installable from all three stores.",
+      "exit": "Chrome Web Store on the current build, App Store approved, Google Play in production."
+    },
+    {
+      "id": "P7",
+      "name": "Launch",
+      "goal": "People hear about it and we learn from them.",
+      "exit": "Launch posts out and the first 100 non-friend signups."
+    },
+    {
+      "id": "L",
+      "name": "Later (asked)",
+      "goal": "Asked for, deliberately after launch.",
+      "later": true
+    }
+  ],
+  "items": [
+    {
+      "id": "P0.1",
+      "phase": "P0",
+      "title": "Merge feat/session-health-and-youtube into main and work from main",
+      "area": "repo",
+      "status": "done",
+      "owner": "agent",
+      "note": "main @ d8e4f44, pushed."
+    },
+    {
+      "id": "P0.2",
+      "phase": "P0",
+      "title": "Prune merged branches and idle worktrees",
+      "area": "repo",
+      "status": "done",
+      "owner": "agent",
+      "note": "22 local + 6 remote merged branches and 3 idle design worktrees removed; SHAs kept privately."
+    },
+    {
+      "id": "P0.3",
+      "phase": "P0",
+      "title": "Recover uncommitted Sep 10 auth docs from the old atlas checkout",
+      "area": "repo",
+      "status": "done",
+      "owner": "agent",
+      "note": "Committed to main as d8e4f44."
+    },
+    {
+      "id": "P0.4",
+      "phase": "P0",
+      "title": "Extract every FoundKeep ask from the bb threads and verify each against code",
+      "area": "planning",
+      "status": "done",
+      "owner": "agent",
+      "note": "538 messages → 194 FoundKeep asks: 135 live, 37 partial, 3 dev-only, 5 not built, 6 parked, 8 superseded. Full list: ~/.local/share/foundkeep-launch/ASKS.md."
+    },
+    {
+      "id": "P0.5",
+      "phase": "P0",
+      "title": "Production-readiness audit",
+      "area": "planning",
+      "status": "done",
+      "owner": "agent",
+      "note": "49 checks, 18 launch blockers. Details (private): ~/.local/share/foundkeep-launch/readiness.json."
+    },
+    {
+      "id": "P0.6",
+      "phase": "P0",
+      "title": "Launch tracker: roadmap.json + dashboard",
+      "area": "planning",
+      "status": "done",
+      "owner": "agent",
+      "note": "Edit roadmap.json, then run `/usr/bin/node scripts/launch-dashboard.mjs`."
+    },
+    {
+      "id": "P0.7",
+      "phase": "P0",
+      "title": "Triage the Tracker backlog into this plan",
+      "area": "planning",
+      "status": "done",
+      "owner": "agent",
+      "note": "Shipped tasks closed, superseded ones archived; one Tracker initiative now points here."
+    },
+    {
+      "id": "P0.8",
+      "phase": "P0",
+      "title": "Retire atlas-enrich and atlas-bridge, then move ~/personal/apps/atlas to main",
+      "area": "ops",
+      "status": "todo",
+      "owner": "agent",
+      "note": "Both units run from the stale feat/foundkeep-gallery checkout; atlas-enrich still holds a write connection to the prod database."
+    },
+    {
+      "id": "P0.9",
+      "phase": "P0",
+      "title": "Remove legacy Atlas code and the unused /agent relay",
+      "area": "backend",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "apps/agent, apps/browser-mcp, apps/desktop, apps/web, relay.ts. Your 'full pre-launch audit and cleanup' ask."
+    },
+    {
+      "id": "P1.1",
+      "phase": "P1",
+      "title": "Automated nightly prod backups with off-site copy and a restore drill",
+      "area": "ops",
+      "status": "todo",
+      "owner": "agent",
+      "note": "No timer exists; the last snapshot was a manual pre-deploy one on the same disk. Needs an off-site bucket from Pritam."
+    },
+    {
+      "id": "P1.2",
+      "phase": "P1",
+      "title": "Log unexpected server errors and add error monitoring",
+      "area": "ops",
+      "status": "todo",
+      "owner": "agent",
+      "note": "500s are currently returned without being logged."
+    },
+    {
+      "id": "P1.3",
+      "phase": "P1",
+      "title": "External uptime checks and alerting (site, API, processing queue)",
+      "area": "ops",
+      "status": "todo",
+      "owner": "pritam",
+      "note": "Pick the alert channel (push, email, Slack); an agent wires the checks."
+    },
+    {
+      "id": "P1.4",
+      "phase": "P1",
+      "title": "CI for backend, site and mobile on every push",
+      "area": "ops",
+      "status": "todo",
+      "owner": "agent",
+      "note": "Today CI only covers extension paths and iOS. Backend 481/481 and mobile 105/105 pass locally."
+    },
+    {
+      "id": "P1.5",
+      "phase": "P1",
+      "title": "Scripted release and rollback with a health gate and automatic backup",
+      "area": "ops",
+      "status": "todo",
+      "owner": "agent",
+      "note": "Deploys are manual drop-in swaps; prune old release dirs."
+    },
+    {
+      "id": "P1.6",
+      "phase": "P1",
+      "title": "Fix the timing-out extension destination test",
+      "area": "extension",
+      "status": "todo",
+      "owner": "agent",
+      "note": "tests/extension-destination.mjs times out at 30s."
+    },
+    {
+      "id": "P1.7",
+      "phase": "P1",
+      "title": "Explicit log retention and structured request logs",
+      "area": "ops",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P1.8",
+      "phase": "P1",
+      "title": "Run the Android Maestro flows on an emulator or CI",
+      "area": "mobile",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "11 flows committed (ac9ddda), never executed."
+    },
+    {
+      "id": "P2.1",
+      "phase": "P2",
+      "title": "Raise the service-wide save and storage caps for launch",
+      "area": "backend",
+      "status": "todo",
+      "owner": "agent",
+      "note": "Size service-wide limits and disk for launch traffic."
+    },
+    {
+      "id": "P2.2",
+      "phase": "P2",
+      "title": "Signup and sign-in rate limiting review, plus captcha on signup",
+      "area": "security",
+      "status": "todo",
+      "owner": "agent",
+      "note": "Details in the private audit."
+    },
+    {
+      "id": "P2.3",
+      "phase": "P2",
+      "title": "Origin hardening behind the CDN",
+      "area": "security",
+      "status": "todo",
+      "owner": "pritam",
+      "note": "Details in the private audit."
+    },
+    {
+      "id": "P2.4",
+      "phase": "P2",
+      "title": "Complete agent-access revocation",
+      "area": "security",
+      "status": "todo",
+      "owner": "agent",
+      "note": "Details in the private audit."
+    },
+    {
+      "id": "P2.5",
+      "phase": "P2",
+      "title": "Admin console hardening",
+      "area": "security",
+      "status": "todo",
+      "owner": "agent",
+      "note": "Details in the private audit."
+    },
+    {
+      "id": "P2.6",
+      "phase": "P2",
+      "title": "MCP OAuth consent and registration hardening",
+      "area": "security",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P2.7",
+      "phase": "P2",
+      "title": "Sign-in abuse hardening",
+      "area": "security",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P2.8",
+      "phase": "P2",
+      "title": "Hard spend cap on the AI provider, and a 'daily budget reached' message",
+      "area": "ops",
+      "status": "todo",
+      "owner": "pritam"
+    },
+    {
+      "id": "P2.9",
+      "phase": "P2",
+      "title": "Separate dev and prod mobile app identities",
+      "area": "mobile",
+      "status": "todo",
+      "owner": "agent",
+      "note": "A dev build currently replaces the production app on the same phone."
+    },
+    {
+      "id": "P3.1",
+      "phase": "P3",
+      "title": "Transactional email provider and sender domain (SPF/DKIM)",
+      "area": "accounts",
+      "status": "todo",
+      "owner": "pritam",
+      "note": "Nothing sends email today. Pick a provider and add its DNS records."
+    },
+    {
+      "id": "P3.2",
+      "phase": "P3",
+      "title": "Email verification and email password reset",
+      "area": "accounts",
+      "status": "todo",
+      "owner": "agent",
+      "note": "Needs P3.1. Reset is recovery-code only today."
+    },
+    {
+      "id": "P3.3",
+      "phase": "P3",
+      "title": "Complete the privacy policy (controller, GDPR rights, all processors)",
+      "area": "legal",
+      "status": "todo",
+      "owner": "pritam",
+      "note": "An agent drafts; you decide the legal entity and address."
+    },
+    {
+      "id": "P3.4",
+      "phase": "P3",
+      "title": "Fix the Terms and add a refund policy that names Paddle",
+      "area": "legal",
+      "status": "todo",
+      "owner": "pritam",
+      "note": "Terms still say captures are never published, but public collections are live."
+    },
+    {
+      "id": "P3.5",
+      "phase": "P3",
+      "title": "Report/takedown flow and DMCA contact for public collections",
+      "area": "collections",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P3.6",
+      "phase": "P3",
+      "title": "Public account-deletion instructions page",
+      "area": "legal",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "Required by the Play listing."
+    },
+    {
+      "id": "P3.7",
+      "phase": "P3",
+      "title": "Support tickets notify you and can be replied to",
+      "area": "support",
+      "status": "todo",
+      "owner": "agent",
+      "note": "The form promises an email follow-up; tickets only land in the database."
+    },
+    {
+      "id": "P3.8",
+      "phase": "P3",
+      "title": "Verify Sign in with Apple end to end on a physical iPhone",
+      "area": "accounts",
+      "status": "todo",
+      "owner": "pritam"
+    },
+    {
+      "id": "P3.9",
+      "phase": "P3",
+      "title": "Complete the data export (files, collections)",
+      "area": "accounts",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P4.1",
+      "phase": "P4",
+      "title": "Define Free vs Pro and enforce it; make the pricing copy match",
+      "area": "billing",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "Today Free and Pro differ only in storage, and Free gets AI processing."
+    },
+    {
+      "id": "P4.2",
+      "phase": "P4",
+      "title": "Beta-Pro switch-off: per-account grants for friends and reviewers, grace period, notice",
+      "area": "billing",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "Purchases are blocked while the global flag is on."
+    },
+    {
+      "id": "P4.3",
+      "phase": "P4",
+      "title": "Paddle live: seller verification, domain approval, live catalog and webhook",
+      "area": "billing",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true
+    },
+    {
+      "id": "P4.4",
+      "phase": "P4",
+      "title": "Paddle production fixes, then rebuild the site with the live client token",
+      "area": "billing",
+      "status": "todo",
+      "owner": "agent",
+      "note": "API base defaults to sandbox; past_due handling."
+    },
+    {
+      "id": "P4.5",
+      "phase": "P4",
+      "title": "RevenueCat for iOS: Paid Apps agreement, project, entitlement, offering, webhook",
+      "area": "billing",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true,
+      "note": "The app shows 'Subscription unavailable' in prod."
+    },
+    {
+      "id": "P4.6",
+      "phase": "P4",
+      "title": "Hide the web upgrade path inside the iOS app",
+      "area": "mobile",
+      "status": "todo",
+      "owner": "agent",
+      "note": "App Store guideline 3.1.1."
+    },
+    {
+      "id": "P4.7",
+      "phase": "P4",
+      "title": "Decide Android monetization: Play Billing or free-only",
+      "area": "billing",
+      "status": "todo",
+      "owner": "pritam"
+    },
+    {
+      "id": "P4.8",
+      "phase": "P4",
+      "title": "A real /pricing page",
+      "area": "site",
+      "status": "todo",
+      "owner": "agent",
+      "note": "/pricing is a 404 today."
+    },
+    {
+      "id": "P5.1",
+      "phase": "P5",
+      "title": "Promote archive to prod and publish the mobile update",
+      "area": "backend",
+      "status": "doing",
+      "owner": "agent",
+      "asked": true,
+      "note": "Live on dev.foundkeep.app (schema 33); prod is schema 32."
+    },
+    {
+      "id": "P5.2",
+      "phase": "P5",
+      "title": "Guided first run after signup: install the extension or app, make a first save",
+      "area": "onboarding",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "New users land on an empty library that says 'Write a first note'."
+    },
+    {
+      "id": "P5.3",
+      "phase": "P5",
+      "title": "Send the onboarding email sequence",
+      "area": "onboarding",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "Templates exist in emails/onboarding; needs P3.1."
+    },
+    {
+      "id": "P5.4",
+      "phase": "P5",
+      "title": "Web: browse and filter by folder, edit tags",
+      "area": "web",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "The extension and app can do this; the landing page advertises folders."
+    },
+    {
+      "id": "P5.5",
+      "phase": "P5",
+      "title": "Web: open a save in a side drawer, not a blocking modal",
+      "area": "web",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "P5.6",
+      "phase": "P5",
+      "title": "Remove leftover blue and audit contrast on every screen",
+      "area": "design",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "P5.7",
+      "phase": "P5",
+      "title": "Mobile palette: near-black and emerald, matching web",
+      "area": "mobile",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "The app still uses the azure palette."
+    },
+    {
+      "id": "P5.8",
+      "phase": "P5",
+      "title": "Extension save sheet: tag a person and highlight",
+      "area": "extension",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "P5.9",
+      "phase": "P5",
+      "title": "Landing navigation at tablet widths (541–800px)",
+      "area": "site",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "P5.10",
+      "phase": "P5",
+      "title": "Social capture gaps: TikTok, Threads and Facebook video, HLS/DASH, files over 50 MiB, YouTube session",
+      "area": "capture",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "P5.11",
+      "phase": "P5",
+      "title": "Verify push notifications end to end (APNs key; FCM for Android)",
+      "area": "mobile",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true
+    },
+    {
+      "id": "P5.12",
+      "phase": "P5",
+      "title": "Product analytics: signup → pairing → first save → retention",
+      "area": "ops",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P5.13",
+      "phase": "P5",
+      "title": "Admin console: real uptime, actual spend, social-session status",
+      "area": "admin",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "P5.14",
+      "phase": "P5",
+      "title": "Publish launch public collections so Explore isn't empty",
+      "area": "collections",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true,
+      "note": "Prod has 0 public collections."
+    },
+    {
+      "id": "P5.15",
+      "phase": "P5",
+      "title": "Update public copy: versions, 'private beta' wording, beta page build number",
+      "area": "site",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "P6.1",
+      "phase": "P6",
+      "title": "Start the Google Play closed test: 12+ testers for 14 days",
+      "area": "stores",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true,
+      "note": "Start first: the 14-day clock gates Play production access."
+    },
+    {
+      "id": "P6.2",
+      "phase": "P6",
+      "title": "Android build with the preserved-post view for friends (APK and Play testing)",
+      "area": "mobile",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "Android build 6 predates it. Needs the Mac."
+    },
+    {
+      "id": "P6.3",
+      "phase": "P6",
+      "title": "Build the Chrome Web Store 1.0.3 kit from 1.7.12",
+      "area": "stores",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "Store is on 1.0.2 (built from 1.7.11)."
+    },
+    {
+      "id": "P6.4",
+      "phase": "P6",
+      "title": "Submit CWS 1.0.3, and fix the listing text, support URL and developer email",
+      "area": "stores",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true,
+      "note": "The listing still points to GitHub issues and shows an unrelated developer email."
+    },
+    {
+      "id": "P6.5",
+      "phase": "P6",
+      "title": "Keep the direct extension ZIP in sync with the latest release",
+      "area": "extension",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "Site serves 1.7.11."
+    },
+    {
+      "id": "P6.6",
+      "phase": "P6",
+      "title": "Refresh store assets: CWS, App Store screenshots, Play graphics",
+      "area": "stores",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P6.7",
+      "phase": "P6",
+      "title": "Play listing, Data safety, first AAB upload, Play signing fingerprint for App Links",
+      "area": "stores",
+      "status": "todo",
+      "owner": "pritam"
+    },
+    {
+      "id": "P6.8",
+      "phase": "P6",
+      "title": "Submit to the App Store: current build with IAP, App Privacy, contact phone, review notes",
+      "area": "stores",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true,
+      "note": "Needs P4.5 and P4.6."
+    },
+    {
+      "id": "P6.9",
+      "phase": "P6",
+      "title": "Give the Play service account release permissions",
+      "area": "stores",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true,
+      "note": "Its last API call got a 403."
+    },
+    {
+      "id": "P7.1",
+      "phase": "P7",
+      "title": "Landing polish pass, with pricing copy that matches reality",
+      "area": "site",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P7.2",
+      "phase": "P7",
+      "title": "More help articles from your usage ideas, with screenshots on every page",
+      "area": "site",
+      "status": "doing",
+      "owner": "agent",
+      "asked": true,
+      "note": "help.foundkeep.app is live with 4 posts and 5 use cases; 3 pages lack screenshots."
+    },
+    {
+      "id": "P7.3",
+      "phase": "P7",
+      "title": "Launch video and demo",
+      "area": "marketing",
+      "status": "todo",
+      "owner": "agent"
+    },
+    {
+      "id": "P7.4",
+      "phase": "P7",
+      "title": "VC demo: saved-company watchlist with a daily agent report",
+      "area": "marketing",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "P7.5",
+      "phase": "P7",
+      "title": "Launch posts: Product Hunt, X, Hacker News, blog",
+      "area": "marketing",
+      "status": "todo",
+      "owner": "pritam"
+    },
+    {
+      "id": "P7.6",
+      "phase": "P7",
+      "title": "Customer discovery calls (goal 100–200)",
+      "area": "marketing",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true
+    },
+    {
+      "id": "L.1",
+      "phase": "L",
+      "title": "Sell collections with a 15% commission",
+      "area": "collections",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true,
+      "note": "Spec exists (2026-09-15)."
+    },
+    {
+      "id": "L.2",
+      "phase": "L",
+      "title": "Save and autofill form data from the extension",
+      "area": "extension",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.3",
+      "phase": "L",
+      "title": "Firefox, Safari and Edge Add-ons builds",
+      "area": "extension",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.4",
+      "phase": "L",
+      "title": "GitHub and X sign-in",
+      "area": "accounts",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.5",
+      "phase": "L",
+      "title": "Merge saves with the same source URL, plus manual and agent linking",
+      "area": "backend",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.6",
+      "phase": "L",
+      "title": "Merge overlapping articles and blogs",
+      "area": "backend",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.7",
+      "phase": "L",
+      "title": "Agent-scheduled daily library cleanup",
+      "area": "agents",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.8",
+      "phase": "L",
+      "title": "To-dos and reminders with notifications, usable by agents",
+      "area": "agents",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.9",
+      "phase": "L",
+      "title": "Privacy stance on operator access, then end-to-end encryption",
+      "area": "security",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true
+    },
+    {
+      "id": "L.10",
+      "phase": "L",
+      "title": "Desktop capture dock (Electron) on FoundKeep accounts",
+      "area": "desktop",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.11",
+      "phase": "L",
+      "title": "Upload images from the web dashboard",
+      "area": "web",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.12",
+      "phase": "L",
+      "title": "No hard reloads anywhere in the web app",
+      "area": "web",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.13",
+      "phase": "L",
+      "title": "Linear-style list layout for the library",
+      "area": "web",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.14",
+      "phase": "L",
+      "title": "Extension force-update",
+      "area": "extension",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.15",
+      "phase": "L",
+      "title": "Speech-to-text for uncaptioned videos, and video compression",
+      "area": "capture",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.16",
+      "phase": "L",
+      "title": "Continuous bookmark sync (import is one-shot today)",
+      "area": "extension",
+      "status": "todo",
+      "owner": "agent",
+      "asked": true
+    },
+    {
+      "id": "L.17",
+      "phase": "L",
+      "title": "Open-source license decision",
+      "area": "repo",
+      "status": "todo",
+      "owner": "pritam",
+      "asked": true
+    },
+    {
+      "id": "L.18",
+      "phase": "L",
+      "title": "Rotate the Apple sign-in secret before 2027-03-09",
+      "area": "accounts",
+      "status": "todo",
+      "owner": "pritam"
+    },
+    {
+      "id": "L.19",
+      "phase": "L",
+      "title": "Browser agent control through the extension (parked 2026-09-06)",
+      "area": "agents",
+      "status": "blocked",
+      "owner": "pritam",
+      "asked": true,
+      "note": "You said 'lets not focus on agent part'; code was stripped from the store build."
+    }
+  ]
+}
