@@ -13,6 +13,7 @@
   "src/review.html",
   "src/review.js",
   "src/review.css",
+  "src/dock/dock.js",
   "src/sidebar-capture.js",
   "src/save-review.js",
   "src/save-details.js",
