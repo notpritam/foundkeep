@@ -1,4 +1,4 @@
-import { stageSaveReview, readSaveReview, confirmSaveReview, cancelSaveReview, updateSaveReview } from "./save-review.js";
+import { stageSaveReview, readSaveReview, confirmSaveReview, cancelSaveReview, updateSaveReview, clearSaveReview } from "./save-review.js";
 import { PRODUCT_NAME } from "./product.js";
 import { trustedLibrarySender } from "./library-api.js";
 import { startBookmarkImport, resumeBookmarkImport, cancelBookmarkImport, importProgress } from "./import-queue.js";
@@ -302,6 +302,10 @@ chrome.commands.onCommand.addListener((command, tab) => {
   else void chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => begin(tab));
 });
 
+// A save review is scoped to the tab that started it; once that tab is gone
+// there is no page left to review against, so drop its draft.
+chrome.tabs.onRemoved.addListener(tabId => { void clearSaveReview(tabId); });
+
 // ---------------------------------------------------------------------------
 // Messages from popup / content scripts
 // ---------------------------------------------------------------------------
@@ -325,11 +329,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (['prepare-save', 'save-review-get', 'save-review-confirm', 'save-review-cancel', 'save-review-update'].includes(msg?.kind)) {
-    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.windowId)) { sendResponse({ ok: false, error: 'Open the FoundKeep sidebar to choose a destination.' }); return; }
+    const reviewKind = msg.kind !== 'prepare-save';
+    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(reviewKind ? msg.tabId : msg.windowId)) { sendResponse({ ok: false, error: 'Open the FoundKeep sidebar to choose a destination.' }); return; }
     void (async () => {
-      if (msg.kind === 'save-review-get') return { draft: await readSaveReview(msg.windowId) };
-      if (msg.kind === 'save-review-update') { await updateSaveReview(msg.windowId, msg.id, msg.form); return {}; }
-      if (msg.kind === 'save-review-cancel') { await cancelSaveReview(msg.windowId, msg.id); return {}; }
+      if (msg.kind === 'save-review-get') return { draft: await readSaveReview(msg.tabId) };
+      if (msg.kind === 'save-review-update') { await updateSaveReview(msg.tabId, msg.id, msg.form); return {}; }
+      if (msg.kind === 'save-review-cancel') { await cancelSaveReview(msg.tabId, msg.id); return {}; }
       if (msg.kind === 'save-review-confirm') {
         const record = await confirmSaveReview(msg, (draft, commit) => performCapture(draft.action, { ...draft, commit }));
         return { capture: record ? { id: record.id, cloudStatus: record.cloudStatus, type: record.type } : null };

@@ -45,10 +45,10 @@ test('an X save opens a destination review without saving until confirmation, an
  // The draft survives a fresh module instance, and a different account cannot
  // take over an outstanding save, even if it chooses local storage.
  await button.click();await panel.waitFor('document.querySelector("#destinationDialog").open');
- const pending=await panel.evaluate("chrome.windows.getCurrent().then(async window=>(await import('./save-review.js?fresh')).readSaveReview(window.id))");
+ const pending=await panel.evaluate("chrome.tabs.query({active:true,currentWindow:true}).then(async ([tab])=>(await import('./save-review.js?fresh')).readSaveReview(tab.id))");
  assert.equal(pending.tweet.text,'A tweet worth keeping.');
  await panel.evaluate("chrome.storage.local.set({atlasCustomer:{account:{id:'different-account'},connection:{id:'different-connection'},token:null,status:'reconnect'}})");
- const denied=await panel.evaluate(`chrome.runtime.sendMessage({kind:'save-review-confirm',windowId:${pending.tab.windowId},id:${JSON.stringify(pending.id)},choice:{kind:'local'}})`);
+ const denied=await panel.evaluate(`chrome.runtime.sendMessage({kind:'save-review-confirm',tabId:${pending.tab.id},id:${JSON.stringify(pending.id)},choice:{kind:'local'}})`);
  assert.equal(denied.ok,false);assert.match(denied.error,/account changed/);assert.equal(await count(),1);
  await panel.evaluate('chrome.storage.local.remove("atlasCustomer")');
  await panel.evaluate('document.querySelector("#destinationCancel").click()');

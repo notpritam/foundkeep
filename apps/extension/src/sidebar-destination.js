@@ -6,7 +6,8 @@ export function bindSidebarDestination() {
   const dialog = $('destinationDialog');
   const request = async (kind, values = {}) => {
     windowId ??= (await chrome.windows.getCurrent()).id;
-    const result = await chrome.runtime.sendMessage({ kind, windowId, ...values });
+    const [active] = await chrome.tabs.query({ active: true, windowId });
+    const result = await chrome.runtime.sendMessage({ kind, windowId, tabId: active?.id, ...values });
     if (!result?.ok) throw new Error(result?.error || 'Could not prepare the save. Try again.');
     return result;
   };

@@ -3,43 +3,46 @@ import { saveCapture } from './capture.js';
 import { getCapture } from './db.js';
 import { normalizeSaveDetails, normalizeSaveTags } from './save-details.js';
 
-const key = windowId => 'foundkeep-save-review-' + windowId;
+const key = tabId => 'foundkeep-save-review-tab-' + tabId;
 const locks = new Map();
-const changed = () => chrome.runtime.sendMessage({ kind: 'foundkeep-save-review-changed' }).catch(() => {});
-async function exclusive(windowId, run) {
-  const previous = locks.get(windowId) || Promise.resolve();
-  const next = previous.catch(() => {}).then(run); locks.set(windowId, next);
-  try { return await next; } finally { if (locks.get(windowId) === next) locks.delete(windowId); }
+const changed = tabId => chrome.runtime.sendMessage({ kind: 'foundkeep-save-review-changed', tabId }).catch(() => {});
+async function exclusive(tabId, run) {
+  const previous = locks.get(tabId) || Promise.resolve();
+  const next = previous.catch(() => {}).then(run); locks.set(tabId, next);
+  try { return await next; } finally { if (locks.get(tabId) === next) locks.delete(tabId); }
 }
-export async function readSaveReview(windowId) {
-  const draft = (await chrome.storage.session.get(key(windowId)))[key(windowId)];
+export async function readSaveReview(tabId) {
+  const draft = (await chrome.storage.session.get(key(tabId)))[key(tabId)];
   return draft && Date.now() - draft.createdAt < 30 * 60_000 ? draft : null;
 }
+export async function clearSaveReview(tabId) {
+  await chrome.storage.session.remove(key(tabId)); changed(tabId);
+}
 export async function stageSaveReview(request) {
-  return exclusive(request.tab.windowId, async () => {
-    const current = await readSaveReview(request.tab.windowId);
+  return exclusive(request.tab.id, async () => {
+    const current = await readSaveReview(request.tab.id);
     if (current) {
-      changed();
+      changed(request.tab.id);
       if (current.action === 'tweet' && request.action === 'tweet' && current.tweet.url === request.tweet.url) return current;
-      throw new Error('Finish or cancel the current save in the sidebar first.');
+      throw new Error('Finish or cancel the current save first.');
     }
     const binding = await captureBinding();
     const draft = { ...request, id: 'cap_' + crypto.randomUUID(), accountId: binding.cloudAccountId, createdAt: Date.now() };
-    await chrome.storage.session.set({ [key(request.tab.windowId)]: draft }); changed();
+    await chrome.storage.session.set({ [key(request.tab.id)]: draft }); changed(request.tab.id);
     return draft;
   });
 }
-export async function cancelSaveReview(windowId, id) {
-  return exclusive(windowId, async () => {
-    const draft = await readSaveReview(windowId);
+export async function cancelSaveReview(tabId, id) {
+  return exclusive(tabId, async () => {
+    const draft = await readSaveReview(tabId);
     if (!draft || draft.id !== id) return;
-    await chrome.storage.session.remove(key(windowId)); changed();
+    await chrome.storage.session.remove(key(tabId)); changed(tabId);
     if (draft.action === 'tweet') chrome.tabs.sendMessage(draft.tab.id, { kind: 'foundkeep-tweet-result', url: draft.tweet.url, cancelled: true }).catch(() => {});
   });
 }
-export async function updateSaveReview(windowId, id, form) {
-  return exclusive(windowId, async () => {
-    const draft = await readSaveReview(windowId);
+export async function updateSaveReview(tabId, id, form) {
+  return exclusive(tabId, async () => {
+    const draft = await readSaveReview(tabId);
     if (!draft || draft.id !== id) return;
     const binding = await captureBinding();
     if (binding.cloudAccountId !== draft.accountId) throw new Error('Your connected account changed. Cancel this review and start again.');
@@ -48,12 +51,12 @@ export async function updateSaveReview(windowId, id, form) {
     for (const [key, max] of Object.entries(limits)) if (key in form && (typeof form[key] !== 'string' || form[key].length > max)) throw new Error('The review draft is too large.');
     if ('shareImage' in form && typeof form.shareImage !== 'boolean') throw new Error('Invalid image sharing choice.');
     const normalized = { ...form, tags: normalizeSaveTags(form.tags || []), sharedTags: normalizeSaveTags(form.sharedTags || []) };
-    await chrome.storage.session.set({ [key(windowId)]: { ...draft, form: normalized } });
+    await chrome.storage.session.set({ [key(tabId)]: { ...draft, form: normalized } });
   });
 }
-export async function confirmSaveReview({ windowId, id, choice }, capture) {
-  return exclusive(windowId, async () => {
-    const draft = await readSaveReview(windowId);
+export async function confirmSaveReview({ tabId, id, choice }, capture) {
+  return exclusive(tabId, async () => {
+    const draft = await readSaveReview(tabId);
     if (!draft || draft.id !== id) throw new Error('This save has expired. Start it again.');
     const binding = await captureBinding();
     if (binding.cloudAccountId !== draft.accountId) throw new Error('Your connected account changed. Cancel this review and start again.');
@@ -92,7 +95,7 @@ export async function confirmSaveReview({ windowId, id, choice }, capture) {
       throw new Error('This save was already confirmed with different details. Check Local saves before editing it.');
     // A worker restart after commit can safely acknowledge the original save.
     const record = existing || await capture(draft, input => saveCapture(input, { destination, id: draft.id }));
-    await chrome.storage.session.remove(key(windowId)); changed();
+    await chrome.storage.session.remove(key(tabId)); changed(tabId);
     if (draft.action === 'tweet') chrome.tabs.sendMessage(draft.tab.id, { kind: 'foundkeep-tweet-result', url: draft.tweet.url, cancelled: !record }).catch(() => {});
     return record;
   });

@@ -12,6 +12,11 @@ test('only packaged library and popup pages can proxy customer content',()=>{
  const runtime={id:'own-extension',getURL:path=>'chrome-extension://own-extension/'+path};
  assert.equal(trustedLibrarySender({id:runtime.id,url:runtime.getURL('src/library.html')},runtime),true);
  for(const sender of [{id:'other',url:runtime.getURL('src/library.html')},{id:runtime.id,url:'https://foundkeep.app/dashboard'},{id:runtime.id,url:runtime.getURL('src/twitter.js')},{id:runtime.id,url:runtime.getURL('src/library.html/evil')}])assert.equal(trustedLibrarySender(sender,runtime),false);
+ for (const page of ['review.html', 'import.html', 'dock-settings.html'])
+   assert.equal(trustedLibrarySender({ id: runtime.id, url: runtime.getURL('src/' + page) + '?tab=4' }, runtime), true, page);
+ assert.equal(trustedLibrarySender({ id: runtime.id, url: runtime.getURL('src/dock/dock.js') }, runtime), false);
+ assert.equal(trustedLibrarySender({ id: 'other', url: runtime.getURL('src/review.html') }, runtime), false);
+ assert.equal(trustedLibrarySender({ id: runtime.id, url: 'https://evil.example/src/review.html' }, runtime), false);
 });
 
 test('private asset chunks use fixed owned routes and bounded ranges',()=>{
