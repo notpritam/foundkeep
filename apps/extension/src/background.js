@@ -1,6 +1,7 @@
 import { stageSaveReview, readSaveReview, confirmSaveReview, cancelSaveReview, updateSaveReview, clearSaveReview } from "./save-review.js";
 import { PRODUCT_NAME } from "./product.js";
 import { trustedLibrarySender } from "./library-api.js";
+import { summonDock, startCapture, handleDockMessage, withDockHidden, reviewTabFor, dashboardUrl } from "./dock-control.js";
 import { startBookmarkImport, resumeBookmarkImport, cancelBookmarkImport, importProgress } from "./import-queue.js";
 import { drainQueue, saveCapture } from "./capture.js";
 import { extractPageDocument } from "./page-extractor.js";
@@ -21,16 +22,17 @@ import {
 } from "./preferences.js";
 import { cloudImageMime } from "./image-formats.js";
 
-// The dock content script cannot read chrome.storage itself (protectCloudStorage
-// below locks it to TRUSTED_CONTEXTS so account credentials never reach a
-// content script); this key holds only where the dock sits on screen, and is
-// read/written on the dock's behalf through the dock-position message below.
-const DOCK_POSITION_KEY = "foundkeep-dock-position";
-
 protectCloudStorage().catch(() => {});
-// Use Chrome's native toolbar behavior so opening the panel keeps activeTab's
-// user-gesture grant. The same panel remains available as the user changes tabs.
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+// R1: the toolbar icon toggles the floating dock rather than opening the
+// native side panel — a second click on an already-expanded dock collapses
+// it (summonDock passes toggle through to the dock's own dock-show handler,
+// which never collapses a dock mid-review). Falls back to the dashboard tab
+// when the dock cannot be injected (e.g. a chrome:// or Web Store page).
+chrome.action.onClicked.addListener(tab => {
+  void summonDock(tab.id, { expand: true, toggle: true }).then(async shown => {
+    if (!shown) await chrome.tabs.create({ url: dashboardUrl('/dashboard'), index: tab.index + 1 });
+  });
+});
 chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
   if (msg?.kind === "atlas-refresh-preferences") {
     if (!trustedPairingSender(sender)) {
@@ -289,11 +291,10 @@ function openReviewPanel(tab) {
   return chrome.sidePanel.open({ windowId: tab.windowId });
 }
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  const opened = openReviewPanel(tab);
-  void opened.then(async () => {
+  void (async () => {
     if (info.menuItemId === "save-image" && !publicHttpUrl(info.srcUrl)) throw new Error('FoundKeep can only save images from public web addresses.');
-    await stageSaveReview({ action: info.menuItemId, tab, info, trigger: "context" });
-  }).catch(error => configuredFlash(false, error.message));
+    await startCapture(tab, info.menuItemId, { info, trigger: "context" });
+  })().catch(error => configuredFlash(false, error.message));
 });
 
 chrome.commands.onCommand.addListener((command, tab) => {
@@ -301,8 +302,7 @@ chrome.commands.onCommand.addListener((command, tab) => {
   if (!action) return;
   const begin = tab => {
     if (!tab) return;
-    const opened = openReviewPanel(tab);
-    void opened.then(() => stageSaveReview({ action, tab, trigger: "keyboard" })).catch(error => configuredFlash(false, error.message));
+    void startCapture(tab, action, { trigger: "keyboard" }).catch(error => configuredFlash(false, error.message));
   };
   if (tab) begin(tab);
   else void chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => begin(tab));
@@ -316,6 +316,10 @@ chrome.tabs.onRemoved.addListener(tabId => { void clearSaveReview(tabId); });
 // Messages from popup / content scripts
 // ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (typeof msg?.kind === 'string' && msg.kind.startsWith('dock-')) {
+    handleDockMessage(msg, sender).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
   if (msg?.kind === 'prepare-legacy-save') {
     if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.windowId)) {
       sendResponse({ ok: false, error: 'Open FoundKeep to choose a destination.' }); return;
@@ -338,6 +342,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const isReviewKind = msg.kind !== 'prepare-save';
     if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(isReviewKind ? msg.tabId : msg.windowId)) { sendResponse({ ok: false, error: 'Open the FoundKeep sidebar to choose a destination.' }); return; }
     void (async () => {
+      // review.html is a web-accessible resource any page could otherwise
+      // iframe (or window.open) with someone else's tab id; require it to
+      // only ever act on the tab it is actually embedded in (or the popup
+      // fallback tab it was opened for). library.html (the native side
+      // panel) has no such per-tab identity to check, so it keeps trusting
+      // its own tabId.
+      if (isReviewKind && new URL(sender.url).pathname === '/src/review.html') {
+        const owner = await reviewTabFor(sender);
+        if (owner === null || owner !== msg.tabId) throw new Error('This review no longer matches its page. Reopen it and try again.');
+      }
       if (msg.kind === 'save-review-get') return { draft: await readSaveReview(msg.tabId) };
       if (msg.kind === 'save-review-update') { await updateSaveReview(msg.tabId, msg.id, msg.form); return {}; }
       if (msg.kind === 'save-review-cancel') { await cancelSaveReview(msg.tabId, msg.id); return {}; }
@@ -470,14 +484,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'Open the tweet on X to save it.' }); return;
     }
     if (p.socialContext !== undefined && (JSON.stringify(p.socialContext).length > 120000 || p.socialContext?.version !== 1)) { sendResponse({ ok: false, error: 'This post is too large to capture.' }); return; }
-    const opened = openReviewPanel(sender.tab);
-    void opened.then(async () => {
-      const state = await getEffectivePreferences();
-      if (!state.preferences.capture.tweet) throw new Error('Tweet capture is disabled in your FoundKeep preferences.');
-      const draft = await stageSaveReview({ action: 'tweet', tab: sender.tab, tweet: { url: p.url, text: p.text, title: p.title, socialContext: p.socialContext || null }, trigger: 'twitter' });
-      sendResponse({ ok: true, pending: true, draftId: draft.id });
-    }).catch(error => sendResponse({ ok: false, error: error.message }));
-    return true;
+    // dock.js is always present on x.com (it is a static content script
+    // entry there), so feedback — including a disabled-preference or
+    // sign-in error surfaced later by performCapture — goes through the
+    // dock's own status line rather than back through this response.
+    void startCapture(sender.tab, 'tweet', { tweet: { url: p.url, text: p.text, title: p.title, socialContext: p.socialContext || null }, trigger: 'twitter' });
+    sendResponse({ ok: true, pending: true });
+    return;
   }
   if (msg?.kind === "saveNote") {
     if (!trustedLibrarySender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Open FoundKeep to save a note.' }); return; }
@@ -510,34 +523,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } catch (e) {
         sendResponse({ ok: false, error: String(e) });
       }
-    })();
-    return true;
-  }
-  if (msg?.kind === "dock-position") {
-    (async () => {
-      // Only a genuine top-frame content script may read or write where the
-      // dock sits — never an extension page, and never a subframe. This
-      // never touches atlasCustomer or any other cloud/account storage key.
-      const fromDockContentScript =
-        sender.id === chrome.runtime.id &&
-        !!sender.tab &&
-        sender.frameId === 0 &&
-        !sender.url?.startsWith(chrome.runtime.getURL(""));
-      if (!fromDockContentScript) return sendResponse({ ok: false });
-      if (msg.reset === true) {
-        await chrome.storage.local.remove(DOCK_POSITION_KEY);
-        return sendResponse({ ok: true });
-      }
-      if (msg.pos !== undefined) {
-        const { fx, fy } = msg.pos || {};
-        if (!Number.isFinite(fx) || !Number.isFinite(fy) || fx < 0 || fx > 1 || fy < 0 || fy > 1) {
-          return sendResponse({ ok: false });
-        }
-        await chrome.storage.local.set({ [DOCK_POSITION_KEY]: { fx, fy } });
-        return sendResponse({ ok: true });
-      }
-      const stored = await chrome.storage.local.get(DOCK_POSITION_KEY);
-      sendResponse(stored[DOCK_POSITION_KEY] || null);
     })();
     return true;
   }
@@ -575,9 +560,10 @@ async function performCapture(action, { tab, info, tweet, text, attachPage, trig
         capturedAt: context.provenance.capturedAt, provenance: context.provenance });
     }
     case "region":
-      return regionScreenshot(tab, captureMethod, limits, commit);
+      // The dock sits above the page and must not appear in the screenshot.
+      return withDockHidden(tab.id, () => regionScreenshot(tab, captureMethod, limits, commit));
     case "fullpage":
-      return fullPageScreenshot(tab, captureMethod, limits, commit);
+      return withDockHidden(tab.id, () => fullPageScreenshot(tab, captureMethod, limits, commit));
     case "highlight":
       return saveHighlight(tab, captureMethod, limits, commit);
     case "savepage": {
@@ -676,6 +662,18 @@ async function saveImage(srcUrl, tab, captureMethod, limits, commit) {
   });
 }
 
+// A rejection from chrome.scripting.executeScript / chrome.tabs.captureVisibleTab
+// on a page the extension cannot script (no host permission, and no fresh
+// activeTab grant because the dock triggered this without a toolbar click)
+// carries a Chrome-authored message mentioning permission/access/activeTab.
+// Surface FoundKeep's own remedy instead of that raw message.
+function friendlyCaptureError(error) {
+  const message = String(error?.message || error || "");
+  return /permission|cannot access|activetab/i.test(message)
+    ? new Error("Click the FoundKeep icon on this page to allow capture.")
+    : error;
+}
+
 async function saveHighlight(tab, captureMethod, limits, commit) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
@@ -692,7 +690,7 @@ async function saveHighlight(tab, captureMethod, limits, commit) {
       }
       return { text, paragraph };
     },
-  });
+  }).catch(error => { throw friendlyCaptureError(error); });
   if (!result?.text) throw new Error("no text selected");
   boundedText(result.text, limits.selectionCharacters, "Selected text");
   const context = await capturePageContext(tab, { captureMethod });
@@ -717,13 +715,13 @@ async function regionScreenshot(tab, captureMethod, limits, commit) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: regionSelectInPage,
-  });
+  }).catch(error => { throw friendlyCaptureError(error); });
   if (!result) return;
   const { rect, dpr } = result;
   await assertCaptureTab(tab);
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
     format: "png",
-  });
+  }).catch(error => { throw friendlyCaptureError(error); });
   await assertCaptureTab(tab);
   const encoded = await cropDataUrl(dataUrl, rect, dpr, limits.imageBytes);
   const context = await capturePageContext(tab, { captureMethod });
@@ -837,7 +835,7 @@ async function fullPageScreenshot(tab, captureMethod, limits, commit) {
   const [{ result: dims }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: prepFullPage,
-  });
+  }).catch(error => { throw friendlyCaptureError(error); });
   const dpr = Math.max(1, Number(dims.dpr) || 1);
   const pixelWidth = Math.round(dims.viewW * dpr);
   if (!pixelWidth || pixelWidth > MAX_IMAGE_DIMENSION) {
@@ -864,7 +862,7 @@ async function fullPageScreenshot(tab, captureMethod, limits, commit) {
       await assertCaptureTab(tab);
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
         format: "png",
-      });
+      }).catch(error => { throw friendlyCaptureError(error); });
       await assertCaptureTab(tab);
       shots.push({ y: actualY, dataUrl });
       if (actualY + dims.viewH >= totalH) break;

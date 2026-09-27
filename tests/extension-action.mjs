@@ -22,7 +22,10 @@ test('toolbar opens the native sidebar with no popup, and notes, local saves and
     await context.route('**/api/collections', route => route.fulfill({ json: { collections: [] } }));
     await context.route('**/api/captures', route => route.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }));
     assert.equal(await worker.evaluate(() => chrome.action.getPopup({})), '');
-    assert.equal(await worker.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick), true);
+    // Task 4: the toolbar icon now toggles the floating dock via
+    // chrome.action.onClicked (R1) rather than opening the native side
+    // panel on click; that native behavior must stay off so onClicked fires.
+    assert.equal(await worker.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick), false);
     const origin = await worker.evaluate(() => new URL(chrome.runtime.getManifest().host_permissions[0]).origin);
     await context.route(origin + '/__panel-fixture', route => route.fulfill({ contentType: 'text/html', body: '<title>A page worth keeping</title><p>A thoughtful little corner of the internet.</p>' }));
     const tab = await context.newPage(); await tab.goto(origin + '/__panel-fixture');

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { dockWorld } from './helpers/dock-world.mjs';
+import { pollUntil } from './helpers/poll.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 
 const CONNECTED_STATE = {
@@ -28,9 +29,12 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   await context.route(origin + '/__dock*', route => route.fulfill({ contentType: 'text/html', body: '<title>Dock fixture</title><p style="height:3000px">Long page</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__dock');
   const tabId = await worker.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__dock' }))[0].id);
-  // Task 4 wires the real background summon path; here the test injects the
-  // dock directly and feeds it a dock-state (no background handler yet for
-  // dock-hello, so dockState would otherwise stay null and connected false).
+  // Task 4 wires the real background summon path, including a dock-hello
+  // handler that computes and returns a real dockState — dock.js's own init
+  // fires dock-hello as soon as it loads, racing the explicit dock-state
+  // this test sends below. Signing in here makes that real state agree with
+  // CONNECTED_STATE regardless of which response dock.js applies last.
+  await worker.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' } }));
   await worker.evaluate(async ({ id, state }) => {
     await chrome.scripting.executeScript({ target: { tabId: id }, files: ['src/dock/dock.js'] });
     await chrome.tabs.sendMessage(id, { kind: 'dock-show' });
@@ -103,13 +107,43 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   await again.click('.pill'); await again.click('.grip'); await web.keyboard.press('Home');
   const reset = await again.evaluate(`__foundkeepDock.rect('.dock')`);
   assert.equal(Math.round(1200 - (reset.x + reset.width)), 16);
+  // A drag ending outside the viewport must persist where the dock actually
+  // landed (the clamped edge, flush with 0 margin) rather than an
+  // out-of-range fraction the background's dock-position handler rejects —
+  // which would otherwise silently fall back to the default position (with
+  // its 16px margin) on the next reload. Collapse first: the expanded dock
+  // is much wider, so "flush with the edge" is only comparable across the
+  // drag and the reload check below when both read the same (collapsed) width.
+  await again.click('.pill'); await again.waitFor(`__foundkeepDock.state() === 'collapsed'`);
+  const edgeGrip = await again.evaluate(`__foundkeepDock.rect('.grip')`);
+  await web.mouse.move(edgeGrip.x + 5, edgeGrip.y + 5); await web.mouse.down();
+  await web.mouse.move(5000, 400, { steps: 8 }); await web.mouse.up();
+  const draggedToEdge = await again.evaluate(`__foundkeepDock.rect('.dock')`);
+  assert.equal(Math.round(1200 - (draggedToEdge.x + draggedToEdge.width)), 0, 'dragging past the right edge clamps flush to it: ' + JSON.stringify(draggedToEdge));
+  // setPosition's persist message is fire-and-forget from the dock's side;
+  // wait for it to actually land in storage before reloading, or the reload
+  // can race ahead of it and observe the previous (or default) position.
+  await pollUntil(worker, async () => {
+    const stored = (await chrome.storage.local.get('foundkeep-dock-position'))['foundkeep-dock-position'];
+    return !!stored && stored.fx > 0.9;
+  }, null);
+  await web.reload();
+  await worker.evaluate(async ({ id, state }) => {
+    await chrome.scripting.executeScript({ target: { tabId: id }, files: ['src/dock/dock.js'] });
+    await chrome.tabs.sendMessage(id, { kind: 'dock-show' });
+    await chrome.tabs.sendMessage(id, { kind: 'dock-state', state });
+  }, { id: tabId, state: CONNECTED_STATE });
+  const afterEdgeDrag = await dockWorld(web, extensionId);
+  await afterEdgeDrag.waitFor(`__foundkeepDock.state() === 'collapsed'`);
+  const persistedEdge = await afterEdgeDrag.evaluate(`__foundkeepDock.rect('.dock')`);
+  assert.equal(Math.round(1200 - (persistedEdge.x + persistedEdge.width)), 0, 'the clamped edge position, not the default, survives a reload: ' + JSON.stringify(persistedEdge));
   // Resizing the window keeps the dock inside the viewport. The resize
   // handler runs on the next event-loop turn after Playwright applies the
   // new viewport, so wait for the clamp rather than reading the rect
   // immediately (R9: poll through the dock world instead of a raw
   // page.waitForFunction, which never awaits an async predicate anyway).
   await web.setViewportSize({ width: 500, height: 400 });
-  await again.waitFor(`(() => { const r = __foundkeepDock.rect('.dock'); return r.x >= 0 && r.x + r.width <= 500 && r.y + r.height <= 400; })()`);
-  const clamped = await again.evaluate(`__foundkeepDock.rect('.dock')`);
+  await afterEdgeDrag.waitFor(`(() => { const r = __foundkeepDock.rect('.dock'); return r.x >= 0 && r.x + r.width <= 500 && r.y + r.height <= 400; })()`);
+  const clamped = await afterEdgeDrag.evaluate(`__foundkeepDock.rect('.dock')`);
   assert.ok(clamped.x >= 0 && clamped.x + clamped.width <= 500 && clamped.y + clamped.height <= 400, JSON.stringify(clamped));
 });

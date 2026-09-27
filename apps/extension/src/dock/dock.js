@@ -98,7 +98,15 @@
     if (frame) placeCard();
   }
   function setPosition(left, top, persist = true) {
-    pos = { fx: left / innerWidth, fy: top / innerHeight }; place();
+    // Clamp before storing the fraction, not just before rendering: a drag
+    // or arrow-key move that ends outside the viewport must persist where
+    // the dock actually landed (the edge), not a fraction outside 0..1 that
+    // the background's dock-position handler rejects — which silently drops
+    // the update and leaves the previous (or default) position in storage.
+    const { w, h } = size();
+    const clampedLeft = Math.min(Math.max(0, left), Math.max(0, innerWidth - w));
+    const clampedTop = Math.min(Math.max(0, top), Math.max(0, innerHeight - h));
+    pos = { fx: clampedLeft / innerWidth, fy: clampedTop / innerHeight }; place();
     // The dock cannot touch chrome.storage directly (it would sit next to
     // account credentials); the background is the only trusted holder of
     // where the dock sits, so persistence goes through a message.
@@ -206,6 +214,7 @@
     position: () => { const r = dockEl.getBoundingClientRect(); return { left: Math.round(r.left), top: Math.round(r.top) }; },
     focused: () => root.activeElement?.className || root.activeElement?.dataset?.action || null,
     visible: () => host.style.visibility !== 'hidden' && host.style.display !== 'none',
+    status: () => $('.dock > .status')?.textContent || '',
   };
   document.documentElement.append(host);
   void send({ kind: 'dock-position' }).then(stored => { pos = stored || null; place(); });
