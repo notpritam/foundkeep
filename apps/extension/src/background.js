@@ -1,4 +1,4 @@
-import { stageSaveReview, readSaveReview, confirmSaveReview, cancelSaveReview, updateSaveReview, clearSaveReview } from "./save-review.js";
+import { readSaveReview, confirmSaveReview, cancelSaveReview, updateSaveReview, clearSaveReview } from "./save-review.js";
 import { PRODUCT_NAME } from "./product.js";
 import { trustedLibrarySender } from "./library-api.js";
 import { summonDock, startCapture, handleDockMessage, withDockHidden, reviewTabFor, dashboardUrl, reconcileAlwaysOn } from "./dock-control.js";
@@ -312,10 +312,6 @@ async function reconcileContextMenus(preferences) {
   }
 }
 
-function openReviewPanel(tab) {
-  // Called before awaiting storage or network so Chrome retains the gesture.
-  return chrome.sidePanel.open({ windowId: tab.windowId });
-}
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   void (async () => {
     if (info.menuItemId === "save-image" && !publicHttpUrl(info.srcUrl)) throw new Error('FoundKeep can only save images from public web addresses.');
@@ -342,62 +338,29 @@ chrome.commands.onCommand.addListener((command, tab) => {
 chrome.tabs.onRemoved.addListener(tabId => { void clearSaveReview(tabId); });
 
 // ---------------------------------------------------------------------------
-// Messages from popup / content scripts
+// Messages from extension pages / content scripts
 // ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (typeof msg?.kind === 'string' && msg.kind.startsWith('dock-')) {
     handleDockMessage(msg, sender).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
-  if (msg?.kind === 'prepare-legacy-save') {
-    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.windowId)) {
-      sendResponse({ ok: false, error: 'Open FoundKeep to choose a destination.' }); return;
-    }
-    const opened = openReviewPanel({ windowId: msg.windowId });
-    void opened.then(async () => {
-      if (!['note','savepage','highlight','region','fullpage'].includes(msg.action)) throw new Error('Choose a supported capture method.');
-      const [tab] = await chrome.tabs.query({ active: true, windowId: msg.windowId });
-      if (!tab) throw new Error('Open a browser tab to continue.');
-      const { preferences } = await getEffectivePreferences();
-      if (!preferences.capture[capturePreferenceKey(msg.action)]) throw new Error('This capture method is disabled in your FoundKeep settings.');
-      if (msg.action === 'note' && (typeof msg.text !== 'string' || !msg.text.trim() || msg.text.length > 50000)) throw new Error('Write a note of up to 50,000 characters.');
-      if (msg.action !== 'note' && !safeHttpUrl(tab.url)) throw new Error('Open a web page to capture it.');
-      const draft = await stageSaveReview({ action: msg.action, tab, trigger: 'sidebar', ...(msg.action === 'note' ? { text: msg.text, attachPage: msg.attachPage === true && preferences.notes.attachSource && !!safeHttpUrl(tab.url) } : {}) });
-      sendResponse({ ok: true, pending: true, draftId: draft.id });
-    }).catch(error => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-  if (['prepare-save', 'save-review-get', 'save-review-confirm', 'save-review-cancel', 'save-review-update'].includes(msg?.kind)) {
-    const isReviewKind = msg.kind !== 'prepare-save';
-    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(isReviewKind ? msg.tabId : msg.windowId)) { sendResponse({ ok: false, error: 'Open the FoundKeep sidebar to choose a destination.' }); return; }
+  if (['save-review-get', 'save-review-confirm', 'save-review-cancel', 'save-review-update'].includes(msg?.kind)) {
+    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.tabId)) { sendResponse({ ok: false, error: 'Open FoundKeep to choose a destination.' }); return; }
     void (async () => {
       // review.html is a web-accessible resource any page could otherwise
       // iframe (or window.open) with someone else's tab id; require it to
       // only ever act on the tab it is actually embedded in (or the popup
-      // fallback tab it was opened for). library.html (the native side
-      // panel) has no such per-tab identity to check, so it keeps trusting
-      // its own tabId.
-      if (isReviewKind && new URL(sender.url).pathname === '/src/review.html') {
+      // fallback tab it was opened for).
+      if (new URL(sender.url).pathname === '/src/review.html') {
         const owner = await reviewTabFor(sender);
         if (owner === null || owner !== msg.tabId) throw new Error('This review no longer matches its page. Reopen it and try again.');
       }
       if (msg.kind === 'save-review-get') return { draft: await readSaveReview(msg.tabId) };
       if (msg.kind === 'save-review-update') { await updateSaveReview(msg.tabId, msg.id, msg.form); return {}; }
       if (msg.kind === 'save-review-cancel') { await cancelSaveReview(msg.tabId, msg.id); return {}; }
-      if (msg.kind === 'save-review-confirm') {
-        const record = await confirmSaveReview(msg, (draft, commit) => performCapture(draft.action, { ...draft, commit }));
-        return { capture: record ? { id: record.id, cloudStatus: record.cloudStatus, type: record.type } : null };
-      }
-      if (!['savepage','highlight','region','fullpage','note'].includes(msg.action)) throw new Error('Choose a supported capture method.');
-      const [tab] = await chrome.tabs.query({ active: true, windowId: msg.windowId });
-      if (!tab) throw new Error('Open a browser tab to continue.');
-      if (msg.action !== 'note' || msg.attachPage) {
-        if (tab.id !== msg.tabId || tab.url !== msg.tabUrl) throw new Error('The page changed. Check the current page and try again.');
-        if (!/^https?:\/\//.test(tab.url || '')) throw new Error('Open a web page and allow page access to capture it.');
-      }
-      if (msg.action === 'note' && (typeof msg.text !== 'string' || !msg.text.trim() || msg.text.length > 50000)) throw new Error('Write a note of up to 50,000 characters.');
-      const draft = await stageSaveReview({ action: msg.action, tab, trigger: 'sidebar', ...(msg.action === 'note' ? { text: msg.text, attachPage: msg.attachPage === true } : {}) });
-      return { draft };
+      const record = await confirmSaveReview(msg, (draft, commit) => performCapture(draft.action, { ...draft, commit }));
+      return { capture: record ? { id: record.id, cloudStatus: record.cloudStatus, type: record.type } : null };
     })().then(data => sendResponse({ ok: true, ...data })).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
@@ -476,36 +439,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
     return true;
   }
-  if (msg?.kind === "capture") {
-    if (!trustedLibrarySender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Open FoundKeep to capture a page.' }); return; }
-    (async () => {
-      const sidebar = trustedLibrarySender(sender, chrome.runtime) && msg.source === "sidebar";
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        ...(sidebar && Number.isInteger(msg.windowId) ? { windowId: msg.windowId } : { currentWindow: true }),
-      });
-      if (!tab) return sendResponse({ ok: false, error: "Open a web page to capture it." });
-      if (sidebar && (tab.id !== msg.tabId || tab.url !== msg.tabUrl))
-        return sendResponse({ ok: false, error: "The page changed. Check the current page and try again." });
-      if (sidebar && !/^https?:\/\//i.test(tab.url || ""))
-        return sendResponse({ ok: false, error: "Open a web page and allow page access to capture it." });
-      const acknowledgeStart = msg.action === "region";
-      if (acknowledgeStart) sendResponse({ ok: true, started: true });
-      const finish = (result) => {
-        if (!acknowledgeStart) sendResponse(result);
-        else if (sidebar) chrome.runtime.sendMessage({ kind: "atlas-capture-finished", requestId: msg.requestId, ...result }).catch(() => {});
-      };
-      try {
-        const capture = await performCapture(msg.action, { tab, trigger: sidebar ? "sidebar" : "popup" });
-        if (capture) configuredFlash(true);
-        finish({ ok: true, capture: capture ? { id: capture.id, type: capture.type, cloudStatus: capture.cloudStatus } : null });
-      } catch (e) {
-        configuredFlash(false, String(e));
-        finish({ ok: false, error: e.message || String(e) });
-      }
-    })();
-    return true;
-  }
   if (msg?.kind === "saveTweet") {
     const trusted = sender.id === chrome.runtime.id && sender.frameId === 0 && /^https:\/\/(?:www\.)?(?:x|twitter)\.com\//.test(sender.url || '');
     const p = msg.payload;
@@ -524,40 +457,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!result.ok) throw new Error(result.error);
       return { pending: true };
     })().then(data => sendResponse({ ok: true, ...data })).catch(error => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-  if (msg?.kind === "saveNote") {
-    if (!trustedLibrarySender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Open FoundKeep to save a note.' }); return; }
-    (async () => {
-      const sidebar = trustedLibrarySender(sender, chrome.runtime) && msg.source === "sidebar";
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        ...(sidebar && Number.isInteger(msg.windowId) ? { windowId: msg.windowId } : { currentWindow: true }),
-      });
-      try {
-        const preferenceState = await getEffectivePreferences();
-        if (!preferenceState.preferences.capture.note) throw new Error("Notes are disabled in your FoundKeep preferences.");
-        const local = msg.source === "library";
-        const attachSource = !local && preferenceState.preferences.notes.attachSource;
-        if (sidebar && attachSource && (tab?.id !== msg.tabId || tab?.url !== msg.tabUrl))
-          throw new Error("The page changed. Check the current page or save without attaching it.");
-        const context = !attachSource
-          ? { articleText: null, provenance: fallbackProvenance(null, local ? "library-note" : "extension-note", Date.now()) }
-          : await capturePageContext(tab, { captureMethod: "extension-note" });
-        const capture = await saveCapture({
-          type: "note",
-          noteText: msg.text,
-          sourceUrl: local ? null : context.provenance.pageUrl,
-          sourceTitle: local ? null : context.provenance.pageTitle,
-          faviconUrl: local ? null : context.provenance.faviconUrl,
-          capturedAt: context.provenance.capturedAt,
-          provenance: context.provenance,
-        });
-        sendResponse({ ok: true, capture: { id: capture.id, cloudStatus: capture.cloudStatus } });
-      } catch (e) {
-        sendResponse({ ok: false, error: String(e) });
-      }
-    })();
     return true;
   }
   if (msg?.kind === "drain") {

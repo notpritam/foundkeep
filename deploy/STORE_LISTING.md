@@ -48,15 +48,14 @@ Password accounts receive a one-time recovery code; FoundKeep does not send pass
 
 Use these justifications in the Privacy tab:
 
-- `activeTab`: Temporarily access the active page after invoking FoundKeep, to read selected content/source metadata or capture visible pixels.
-- `scripting`: Run bundled extraction and screenshot-selection code after an explicit capture action. Full-page capture scrolls and stitches the selected page.
+- `activeTab`: Shows the FoundKeep dock on the page you choose and captures it — reads selected content/source metadata or captures visible pixels only after you invoke FoundKeep.
+- `scripting`: Shows the FoundKeep dock on the page you choose and captures it — runs bundled extraction and screenshot-selection code after an explicit capture action. Full-page capture scrolls and stitches the selected page.
 - `contextMenus`: Offer explicit right-click save actions for pages, highlights, links, images and screenshots. These open the common destination review.
 - `storage`: Retain the account-bound browser credential, preference/policy cache and durable upload state. Capture bytes use extension IndexedDB. Pending reviews expire in trusted session storage; credentials are not exposed to websites or content scripts.
-- `sidePanel`: Keep capture controls, save review, private-library search/editing, local saves, imports and settings beside the page. The toolbar opens this panel directly and has no popup.
 - `alarms`: Retry pending customer-selected uploads and refresh account preferences after temporary failures or browser restarts.
 - Optional `bookmarks`: Read the bookmark tree only after the customer selects import and grants access. Preserve available titles, URLs, folders and dates without editing or deleting browser bookmarks. HTML import remains available if permission is declined.
 - Required host `https://foundkeep.app/*`: Pair the browser, refresh data-only settings/policy and access the customer's library and uploads through fixed FoundKeep routes.
-- Optional `<all_urls>` and HTTP(S) hosts: The visible **Allow page captures** control can request all-site access so explicit sidebar captures continue across tabs; Chrome screenshots require active-tab or all-site access. This is optional and never requested on installation. A right-click image save requests the selected image's exact origin at final confirmation. These grants support customer-triggered capture, not passive browsing collection.
+- Optional `<all_urls>` and HTTP(S) hosts: Requested only when you turn on "Show on every site" from the FoundKeep dock's menu, so the dock and its captures continue across tabs; Chrome screenshots require active-tab or all-site access. This is optional and never requested on installation. A right-click image save requests the selected image's exact origin at final confirmation. These grants support customer-triggered capture, not passive browsing collection.
 - X/Twitter content script: Bundled code on `x.com` and `twitter.com` adds a per-post save button. Clicking it opens review with the selected post's text, author, permalink and available attachment/link hints, excluding neighboring posts.
 - External messaging: Only `https://foundkeep.app` and exact historical origin `https://atlas.notpritam.in` can detect, connect or refresh the extension. A matching signed-in dashboard can issue a short-lived one-use connection code. Account switching requires confirmation; explicit disconnect pauses automatic connection. Websites cannot read extension credentials or replace the API origin.
 

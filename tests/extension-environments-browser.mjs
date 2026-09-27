@@ -15,6 +15,27 @@ async function poll(fn) {
   for (let i = 0; i < 100; i++) { if (await fn()) return; await delay(100); }
   throw new Error('Timed out waiting for extension state');
 }
+// Save a note through the dock's own review flow (stage, then confirm) on
+// the tab this environment already has open — the direct {kind:'saveNote'}
+// message this test used before Task 7 no longer exists; nothing but the
+// deleted popup.js ever sent it.
+async function saveNoteThroughDock(environment, text) {
+  const tabId = await environment.ext.evaluate(
+    url => chrome.tabs.query({ url }).then(tabs => tabs[0].id),
+    environment.origin + '/__pair',
+  );
+  await environment.ext.evaluate(async ({ tabId, text }) => {
+    const { stageSaveReview } = await import('./save-review.js');
+    await stageSaveReview({ action: 'note', tab: await chrome.tabs.get(tabId), text, trigger: 'dock' });
+  }, { tabId, text });
+  return environment.ext.evaluate(async (tabId) => {
+    const { draft } = await chrome.runtime.sendMessage({ kind: 'save-review-get', tabId });
+    return chrome.runtime.sendMessage({
+      kind: 'save-review-confirm', tabId, id: draft.id,
+      choice: { kind: 'library', details: { noteText: draft.text } },
+    });
+  }, tabId);
+}
 
 test('dev and prod install together, pair separately, and save into isolated databases', { timeout: 90000 }, async t => {
   const temporary = await mkdtemp(path.join(tmpdir(), 'foundkeep-two-environments-'));
@@ -98,40 +119,30 @@ test('dev and prod install together, pair separately, and save into isolated dat
       chrome.runtime.sendMessage(id, { kind: 'atlas-ping' }, value => resolve(value || { ok: false, error: chrome.runtime.lastError?.message }));
     }), otherId);
     assert.equal(wrongEnvironment.ok, false, 'Cross-environment website cannot access extension account');
-    const popup = await context.newPage();
-    environment.popup = popup;
-    await popup.goto(`chrome-extension://${id}/src/popup.html`);
-    assert.equal(await popup.locator('[data-product-name]').textContent(), name === 'dev' ? 'FoundKeep Dev' : 'FoundKeep');
-    const installed = await popup.evaluate(() => chrome.runtime.getManifest().version);
-    assert.equal(await popup.locator('[data-build-info]').first().getAttribute('data-environment'), name);
-    assert.equal(await popup.locator('[data-build-info] strong').first().textContent(), name === 'dev' ? 'DEV' : 'Production');
-    assert.ok((await popup.locator('[data-build-info]').first().textContent()).includes(`v${installed}`));
-    assert.equal(await popup.locator('.build-destination').first().textContent(), new URL(origin).host);
+    // popup.html/library.html/dashboard.html (and the build-identity markup
+    // they alone rendered) are deleted in Task 7; dock-settings.html is just
+    // a neutral extension-page context here, the same role popup.html used
+    // to play (Controller Ruling R2). Identity itself is still verified
+    // through the real atlas-ping message, unrelated to any extension page.
+    const ext = await context.newPage();
+    environment.ext = ext;
+    await ext.goto(`chrome-extension://${id}/src/dock-settings.html`);
+    const installed = await ext.evaluate(() => chrome.runtime.getManifest().version);
     const identity = await environment.page.evaluate(id => new Promise(resolve => chrome.runtime.sendMessage(id, { kind: 'atlas-ping' }, resolve)), id);
     assert.equal(identity.environment, name);
     assert.equal(identity.origin, origin);
     assert.equal(identity.version, installed);
-    const save = await popup.evaluate(text => chrome.runtime.sendMessage({ kind: 'saveNote', text }), `${name} isolated note`);
+    const save = await saveNoteThroughDock(environment, `${name} isolated note`);
     assert.equal(save.ok, true, JSON.stringify(save));
     await poll(async () => (await request('/captures')).captures.some(capture => capture.noteText === `${name} isolated note`));
-    const sidebar = await context.newPage();
-    await sidebar.goto(`chrome-extension://${id}/src/library.html`);
-    assert.equal(await sidebar.locator('.brand').getAttribute('href'), null, 'The sidebar brand stays in place');
-    assert.equal(await sidebar.locator('.library-foot a').first().getAttribute('href'), origin + '/dashboard');
-    assert.equal(await sidebar.locator('[data-build-info]').first().getAttribute('data-environment'), name);
-    assert.ok((await sidebar.locator('[data-build-info]').first().textContent()).includes(`v${installed}`));
-    const localLibrary = await context.newPage();
-    await localLibrary.goto(`chrome-extension://${id}/src/dashboard.html`);
-    assert.equal(await localLibrary.locator('[data-build-info]').getAttribute('data-environment'), name);
-    await localLibrary.close();
   }
   assert.notEqual(environments[0].account.id, environments[1].account.id);
   for (const environment of environments) {
     const cloud = (await environment.request('/captures')).captures;
     assert.deepEqual(cloud.map(capture => capture.noteText), [environment.name + ' isolated note']);
-    const local = await environment.popup.evaluate(async () => (await import('./db.js')).listCaptures());
+    const local = await environment.ext.evaluate(async () => (await import('./db.js')).listCaptures());
     assert.deepEqual(local.map(capture => capture.noteText), [environment.name + ' isolated note']);
-    const credential = await environment.popup.evaluate(async () => (await chrome.storage.local.get('atlasCustomer')).atlasCustomer.token);
+    const credential = await environment.ext.evaluate(async () => (await chrome.storage.local.get('atlasCustomer')).atlasCustomer.token);
     const other = environments.find(other => other.name !== environment.name);
     const forbidden = await context.request.get(other.origin + '/api/captures', { headers: { Authorization: 'Bearer ' + credential, Cookie: '' } });
     assert.equal(forbidden.status(), 401, 'An extension token must not work in the other database');
@@ -140,10 +151,10 @@ test('dev and prod install together, pair separately, and save into isolated dat
   const [dev, prod] = environments;
   const worker = context.serviceWorkers().find(worker => worker.url().includes(dev.id));
   await worker.evaluate(() => { globalThis.fetch = async () => { throw new TypeError('Offline test'); }; });
-  await dev.popup.evaluate(() => chrome.runtime.sendMessage({ kind: 'saveNote', text: 'dev offline note' }));
-  const queued = await dev.popup.evaluate(async () => (await import('./db.js')).listCaptures());
+  await saveNoteThroughDock(dev, 'dev offline note');
+  const queued = await dev.ext.evaluate(async () => (await import('./db.js')).listCaptures());
   assert.ok(queued.some(capture => capture.noteText === 'dev offline note' && capture.cloudAccountId === dev.account.id));
-  await prod.popup.evaluate(() => chrome.runtime.sendMessage({ kind: 'saveNote', text: 'prod still online' }));
+  await saveNoteThroughDock(prod, 'prod still online');
   await poll(async () => (await prod.request('/captures')).captures.length === 2);
   assert.deepEqual((await dev.request('/captures')).captures.map(capture => capture.noteText), ['dev isolated note']);
 

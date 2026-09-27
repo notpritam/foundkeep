@@ -37,6 +37,6 @@ export function libraryOperation(operation, args = {}) {
 // the extension id, the extension scheme and the page path rather than the host.
 export function trustedLibrarySender(sender, runtime) {
   if (sender?.id !== runtime.id) return false;
-  try { const url=new URL(sender.url); return url.protocol==='chrome-extension:'&&['library.html','popup.html','dashboard.html','review.html','import.html','dock-settings.html'].some(page=>url.pathname==='/src/'+page); }
+  try { const url=new URL(sender.url); return url.protocol==='chrome-extension:'&&['review.html','import.html','dock-settings.html'].some(page=>url.pathname==='/src/'+page); }
   catch {return false;}
 }

@@ -30,7 +30,7 @@ test('dock: opt-in "show on every site" registers a content script, and per-site
 
   // Step 1: in the default test profile <all_urls> is not granted, so
   // applyAlwaysOn(true) must refuse and store false.
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   const firstAttempt = await ext.evaluate(async () => (await import('./dock-control.js')).applyAlwaysOn(true));
   assert.equal(firstAttempt, false, 'applyAlwaysOn(true) without the <all_urls> permission must return false');
   const registeredBeforeGrant = await worker.evaluate(() => chrome.scripting.getRegisteredContentScripts({ ids: ['foundkeep-dock'] }));
@@ -77,7 +77,7 @@ test('dock: opt-in "show on every site" registers a content script, and per-site
   // Step 5: summoning it directly still shows it, and the menu now offers to
   // show it again on this site.
   const tabId = await worker.evaluate(async origin => (await chrome.tabs.query({ url: origin + '/__always-on*' }))[0].id, origin);
-  const ext2 = await context.newPage(); await ext2.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext2 = await context.newPage(); await ext2.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   await ext2.evaluate(tabId => import('./dock-control.js').then(m => m.summonDock(tabId, { expand: true })), tabId);
   await dockAfterReload.waitFor("__foundkeepDock.state() === 'expanded'");
   await dockAfterReload.click('[data-action="more"]');
@@ -110,7 +110,7 @@ test('dock: enabling "show on every site" from a live dock updates its own menu 
   const dock = await dockWorld(web, extensionId);
   const tabId = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0].id);
 
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   await ext.evaluate(tabId => import('./dock-control.js').then(m => m.summonDock(tabId, { expand: true })), tabId);
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   assert.equal(await dock.evaluate(`__foundkeepDock.text('[data-action="always-on"]')`), 'Show on every site');

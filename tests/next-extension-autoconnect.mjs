@@ -51,23 +51,41 @@ test('installed extension auto-connects from the library, stays paired across ro
   const cookie=response.headers()['set-cookie'].split(';')[0];const me=await context.request.get(base+'/api/me');const account={...(await me.json()).account,password,cookie};accounts.push(account);return account;
  };
  // Before sign-in, merely installing the extension never pairs an account.
- const popup=await context.newPage();await popup.goto(`chrome-extension://${id}/src/library.html`);
- assert.equal(await popup.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account),null);
+ // dock-settings.html is a neutral extension-page context here, the role
+ // popup.html/library.html used to play (both deleted in Task 7).
+ const ext=await context.newPage();await ext.goto(`chrome-extension://${id}/src/dock-settings.html`);
+ assert.equal(await ext.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account),null);
  const accountA=await register();
  const page=await context.newPage();await page.goto(base+'/dashboard');
- await waitFor(async()=>await popup.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account?.id)===accountA.id);
+ await waitFor(async()=>await ext.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account?.id)===accountA.id);
  assert.equal(issuedCodes,1,'Opening My library should issue exactly one automatic pairing code');
  const folderResponse=await context.request.post(base+'/api/mobile/folders',{headers:{Origin:base},data:{name:'Temporary extension destination'}});assert.equal(folderResponse.status(),201);const folder=(await folderResponse.json()).folder;
- const note='Automatic dev sync check '+crypto.randomUUID();await popup.locator('#newNote').click();await popup.locator('#note').fill(note);await popup.locator('#save').click();
- await popup.locator('#saveDestination').selectOption('library');await popup.locator('#destinationFolder').selectOption(folder.id);await popup.locator('#destinationPersonalTitle').fill('A titled note');await popup.locator('#destinationTags input').fill('Personal, To test');await popup.locator('#destinationConfirm').click();
+ const pageTabId=await ext.evaluate(url=>chrome.tabs.query({url}).then(tabs=>tabs[0].id),base+'/*');
+ // Save through the dock's own review flow (stage, then confirm) — the
+ // sidebar's own inline destination dialog these two saves used to drive
+ // directly (#newNote/#saveDestination/#destinationConfirm, …) is deleted
+ // in Task 7 along with library.html itself.
+ async function saveThroughDock(action, extra, choice) {
+   await ext.evaluate(async ({ tabId, action, extra }) => {
+     const { stageSaveReview } = await import('./save-review.js');
+     await stageSaveReview({ action, tab: await chrome.tabs.get(tabId), trigger: 'dock', ...extra });
+   }, { tabId: pageTabId, action, extra });
+   const { draft } = await ext.evaluate(tabId => chrome.runtime.sendMessage({ kind: 'save-review-get', tabId }), pageTabId);
+   return ext.evaluate(({ tabId, id, choice }) => chrome.runtime.sendMessage({ kind: 'save-review-confirm', tabId, id, choice }), { tabId: pageTabId, id: draft.id, choice });
+ }
+ const note='Automatic dev sync check '+crypto.randomUUID();
+ const titledSave=await saveThroughDock('note',{text:note},{kind:'library',details:{noteText:note,sourceTitle:'A titled note',folderId:folder.id,userTags:['Personal','To test']}});
+ assert.equal(titledSave.ok,true,JSON.stringify(titledSave));
  await waitFor(async()=> (await (await context.request.get(base+'/api/captures')).json()).captures.some(c=>c.noteText===note&&c.folderId===folder.id));
  const titled=(await(await context.request.get(base+'/api/captures')).json()).captures.find(c=>c.noteText===note);assert.equal(titled.sourceTitle,'A titled note');assert.deepEqual(titled.userTags,['Personal','To test']);
  const collectionResponse=await context.request.post(base+'/api/collections',{headers:{Origin:base},data:{title:'Temporary destination review',slug:'review-'+crypto.randomUUID(),kind:'personal',visibility:'private',submissionPolicy:'owner'}});assert.equal(collectionResponse.status(),201);const collection=(await collectionResponse.json()).collection;
  const privateText='Private annotation '+crypto.randomUUID(),sharedText='Only the quote chosen for this collection.';
- await popup.locator('#newNote').click();await popup.locator('#note').fill(privateText);await popup.locator('#save').click();await popup.locator('#saveDestination').selectOption('collection:'+collection.id);
- assert.match(await popup.locator('#destinationRules').textContent(),/Private collection/);
- await popup.locator('#destinationNote').fill(privateText+' — extra private context');await popup.locator('#destinationTags input').fill('Private research');
- await popup.locator('#destinationTitle').fill('A chosen quote');await popup.locator('#destinationBody').fill(sharedText);await popup.locator('#destinationSharedTags input').fill('Team references');await popup.locator('#destinationConfirm').click();
+ const collectionSave=await saveThroughDock('note',{text:privateText},{
+   kind:'collection',id:collection.id,visibility:'private',
+   details:{noteText:privateText+' — extra private context',userTags:['Private research']},
+   entry:{title:'A chosen quote',url:'',body:sharedText,tags:['Team references'],shareImage:false},
+ });
+ assert.equal(collectionSave.ok,true,JSON.stringify(collectionSave));
  await waitFor(async()=> (await (await context.request.get(base+'/api/collections/'+collection.id)).json()).entries.some(entry=>entry.body===sharedText));
  const entries=(await(await context.request.get(base+'/api/collections/'+collection.id)).json()).entries;assert.ok(!JSON.stringify(entries).includes(privateText));
  assert.ok(!JSON.stringify(entries).includes('Private research'));assert.deepEqual(entries.find(entry=>entry.body===sharedText).tags,['Team references']);
@@ -81,16 +99,16 @@ test('installed extension auto-connects from the library, stays paired across ro
  // Another signed-in account cannot silently take ownership of the extension.
  const accountB=await register();await page.goto(base+'/dashboard/apps');
  await page.getByRole('button',{name:'Switch FoundKeep account',exact:true}).waitFor();
- assert.equal(issuedCodes,1);assert.equal(await popup.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account?.id),accountA.id);
+ assert.equal(issuedCodes,1);assert.equal(await ext.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account?.id),accountA.id);
  await page.getByRole('button',{name:'Switch FoundKeep account',exact:true}).click();
  await page.getByRole('heading',{name:'Switch this browser’s account?',exact:true}).waitFor();
  assert.equal(issuedCodes,1,'Account confirmation must happen before issuing a switch code');
  await page.getByRole('button',{name:'Switch account',exact:true}).click();
- await waitFor(async()=>await popup.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account?.id)===accountB.id);
+ await waitFor(async()=>await ext.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account?.id)===accountB.id);
  assert.equal(issuedCodes,2);
  // Explicit disconnect remains effective even if the website regains focus.
- await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'cloud-disconnect'}));
+ await ext.evaluate(()=>chrome.runtime.sendMessage({kind:'cloud-disconnect'}));
  await page.reload();await page.getByText('You disconnected this browser. Connect it again when you’re ready.',{exact:true}).waitFor();
- assert.equal(issuedCodes,2);assert.equal(await popup.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account),null);
+ assert.equal(issuedCodes,2);assert.equal(await ext.evaluate(async()=> (await chrome.runtime.sendMessage({kind:'cloud-status'})).account),null);
  assert.deepEqual(errors,[]);
 });

@@ -45,7 +45,7 @@ test('dock: signed out shows only "Sign in to save", which opens the login page'
   await context.route(origin + '/login', r => r.fulfill({ contentType: 'text/html', body: '<title>Login fixture</title>' }));
   await context.route(origin + '/__account-signed-out', r => r.fulfill({ contentType: 'text/html', body: '<title>Signed-out fixture</title><p>Text.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__account-signed-out');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   assert.equal(await summon(ext, origin + '/__account-signed-out*'), true);
   const dock = await dockWorld(web, extensionId);
@@ -63,7 +63,7 @@ test('dock: signed out shows only "Sign in to save", which opens the login page'
 
 test('dock: local-only saves prompt to move into the account, or wait a week', { timeout: 30000 }, async t => {
   const { context, worker, extensionId, origin } = await launch(t);
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   // Seeded before sign-in: a capture with no cloudAccountId is "local-only".
   await ext.evaluate(() => import('./db.js').then(db => db.addCapture({ type: 'note', noteText: 'old local', createdAt: Date.now() })));
   await signIn(context, worker);
@@ -100,7 +100,7 @@ test('dock: the ⋯ menu opens the standalone import page', { timeout: 30000 }, 
   await signIn(context, worker);
   await context.route(origin + '/__account-import', r => r.fulfill({ contentType: 'text/html', body: '<title>Import-menu fixture</title><p>Text.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__account-import');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   assert.equal(await summon(ext, origin + '/__account-import*'), true);
   const dock = await dockWorld(web, extensionId);

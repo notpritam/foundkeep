@@ -44,8 +44,9 @@ test("Chrome Web Store package is a focused MV3 build at the configured version"
   const files = listing.trim().split("\n");
   assert.ok(files.includes("manifest.json"));
   assert.ok(files.includes("src/background.js"));
-  assert.ok(files.includes("src/popup.html"));
-  assert.ok(files.includes("src/dashboard.html"));
+  assert.ok(files.includes("src/review.html"));
+  assert.ok(files.includes("src/dock-settings.html"));
+  assert.ok(files.includes("src/import.html"));
   assert.ok(files.includes("icons/icon128.png"));
   assert.ok(files.every((file) => !file.startsWith("foundkeep/")));
   assert.ok(files.every((file) => !/(?:^|\/)(?:README\.md|.*\.(?:pem|key))$/i.test(file)));
@@ -65,21 +66,17 @@ test("Chrome Web Store package is a focused MV3 build at the configured version"
   );
   assert.equal(manifest.key, undefined);
   assert.equal(manifest.update_url, undefined);
-  assert.deepEqual(manifest.permissions, [
-    "activeTab",
-    "scripting",
-    "contextMenus",
-    "storage",
-    "alarms",
-    "sidePanel",
-  ]);
+  assert.equal(manifest.side_panel, undefined);
+  assert.equal(manifest.permissions.includes('sidePanel'), false);
+  assert.deepEqual(manifest.permissions, ['activeTab', 'scripting', 'contextMenus', 'storage', 'alarms']);
+  assert.ok(manifest.web_accessible_resources[0].resources.includes('src/review.html'));
+  assert.equal(manifest.web_accessible_resources[0].use_dynamic_url, true);
+  const shipped = JSON.parse(await readFile('deploy/extension-files.json', 'utf8'));
+  for (const gone of ['src/library.html', 'src/sidebar-destination.js', 'src/sidebar-local.js']) assert.equal(shipped.includes(gone), false, gone);
   assert.deepEqual(manifest.optional_permissions, ["bookmarks"]);
-  assert.equal(manifest.side_panel.default_path,"src/library.html");
   assert.ok(files.includes("src/bookmark-import.js"));
   assert.deepEqual(manifest.host_permissions, ["https://foundkeep.app/*"]);
   assert.equal(manifest.action.default_popup, undefined);
-  assert.ok(files.includes("src/sidebar-capture.js"));
-  assert.ok(files.includes("src/sidebar-local.js"));
   assert.deepEqual(manifest.optional_host_permissions, [
     "<all_urls>",
     "http://*/*",

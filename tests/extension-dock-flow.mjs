@@ -89,7 +89,7 @@ test('dock: savepage saves into the account queue with the SPA url and auto-coll
   await context.route('**/api/captures', r => { uploads.push(r.request().postDataJSON()); return r.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }); });
   await context.route(origin + '/__flow', r => r.fulfill({ contentType: 'text/html', body: '<title>Flow fixture</title><p>Readable paragraph worth keeping.</p><script>history.pushState({}, "", "/__flow?step=2")</script>' }));
   const web = await context.newPage(); await web.goto(origin + '/__flow');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   assert.equal(await summon(ext, origin + '/__flow*'), true);
   const dock = await dockWorld(web, extensionId);
@@ -130,7 +130,7 @@ test('dock: reload mid-review reopens the card with the same note text', { timeo
   await signIn(context, worker);
   await context.route(origin + '/__reload', r => r.fulfill({ contentType: 'text/html', body: '<title>Reload fixture</title><p>Kept steady across a reload.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__reload');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   assert.equal(await summon(ext, origin + '/__reload*'), true);
   const dock = await dockWorld(web, extensionId);
@@ -163,7 +163,7 @@ test('dock: summonDock({toggle:true}) called twice collapses the second time (R1
   await signIn(context, worker);
   await context.route(origin + '/__toggle', r => r.fulfill({ contentType: 'text/html', body: '<title>Toggle fixture</title><p>Text.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__toggle');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   // Mirrors chrome.action.onClicked's own call shape (background.js): the
   // first click expands a hidden/collapsed dock, the second collapses it.
@@ -180,7 +180,7 @@ test('dock: a fallback popup confirms and closes on success', { timeout: 30000 }
   await context.route(origin + '/__popup-success', r => r.fulfill({ contentType: 'text/html', body: '<title>Popup success fixture</title><p>Text.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__popup-success');
   const tab = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]);
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   const popupPromise = context.waitForEvent('page', { timeout: 10000 });
   // Force the fallback popup path directly, rather than depending on
@@ -238,7 +238,7 @@ test('dock: hiding on x.com survives an X save despite the background\'s redacte
   // Reveal the dock and hide it for this site through its own ⋯ menu. The
   // dock-site message carries sender.url (always accurate, even on x.com),
   // so the background correctly records https://x.com as hidden.
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   await ext.evaluate(tabId => import('./dock-control.js').then(m => m.summonDock(tabId, { expand: true })), tabId);
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   await dock.click('[data-action="more"]');
@@ -278,7 +278,7 @@ test('dock: a strict CSP page loads the framed card (or falls back to a popup)',
   await signIn(context, worker);
   await context.route(origin + '/__strict', r => r.fulfill({ contentType: 'text/html', headers: { 'content-security-policy': "frame-src 'none'; default-src 'self'" }, body: '<title>Strict fixture</title><p>Strict page</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__strict');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   assert.equal(await summon(ext, origin + '/__strict*'), true);
   const dock = await dockWorld(web, extensionId);
@@ -323,7 +323,7 @@ test('dock: summonDock returns false for a restricted chrome:// page', { timeout
   // import() is disallowed in the service worker's own realm, so the id lookup
   // happens there but dock-control.js is loaded from the ext page.)
   const restrictedTabId = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0].id);
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   const result = await ext.evaluate(async restrictedTabId => (await import('./dock-control.js')).summonDock(restrictedTabId, { expand: true }), restrictedTabId);
   assert.equal(result, false);
 });
@@ -333,7 +333,7 @@ test('dock: hides during a full-page screenshot and reappears afterward', { time
   await signIn(context, worker);
   await context.route(origin + '/__shot', r => r.fulfill({ contentType: 'text/html', body: '<title>Shot fixture</title><p style="height:600px">A page worth screenshotting.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__shot');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   assert.equal(await summon(ext, origin + '/__shot*'), true);
   const dock = await dockWorld(web, extensionId);
@@ -369,7 +369,7 @@ test('dock: a capture without a scripting grant surfaces through the fallback po
   // (Dynamic import() is disallowed in the service worker's own realm, so the
   // tab lookup happens there but dock-control.js is loaded from the ext page.)
   const tab = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]);
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   const popupPromise = context.waitForEvent('page', { timeout: 10000 });
   // No activeTab grant (this isn't a real toolbar click) and no host
@@ -400,7 +400,7 @@ test('dock: review.html refuses save-review-get when framed by an unrelated tab'
   // here once there are several same-origin fixture tabs).
   const victimTab = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]);
   const attacker = await context.newPage(); await attacker.goto(origin + '/__attacker');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
   // A real draft on the victim's own tab.
   await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'savepage', { trigger: 'dock' })), victimTab);
@@ -431,7 +431,7 @@ test('dock: review.html?window=1 refuses save-review-confirm without a matching 
   await context.route('https://example.org/', r => r.fulfill({ contentType: 'text/html', body: '<title>No-nonce fixture</title><p>Text.</p>' }));
   const web = await context.newPage(); await web.goto('https://example.org/');
   const tab = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]);
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   await ext.evaluate(tab => import('./save-review.js').then(m => m.stageSaveReview({ action: 'note', tab, trigger: 'dock', text: '', attachPage: false })), tab);
 
   // Not opened via openFallbackReview (chrome.windows.create) — so there is
@@ -461,7 +461,7 @@ test('dock: openFallbackReview does not open a second popup for a tab that alrea
   await context.route(origin + '/__double-popup', r => r.fulfill({ contentType: 'text/html', body: '<title>Double popup fixture</title><p>Text.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__double-popup');
   const tab = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]);
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   await ext.evaluate(tab => import('./save-review.js').then(m => m.stageSaveReview({ action: 'note', tab, trigger: 'dock', text: '', attachPage: false })), tab);
 
   const before = context.pages().length;
