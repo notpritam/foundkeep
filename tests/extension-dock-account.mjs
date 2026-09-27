@@ -135,3 +135,49 @@ test('dock: an external atlas-open-import message from foundkeep.app opens the i
   await importPage.waitForLoadState('domcontentloaded');
   assert.match(importPage.url(), /\/src\/import\.html$/);
 });
+
+// I3 / R15: 1.7.x's side panel staged captures with provenance.captureMethod
+// 'sidebar-*', which the backend's METHODS allowlist rejects (400
+// invalid_capture_context -> permanently failed). On update, 1.8 rewrites
+// them to the equivalent 'popup-*' method and requeues the unsynced ones.
+test('dock: an update migrates stranded 1.7.x sidebar-* captures to popup-* and requeues them (I3)', { timeout: 30000 }, async t => {
+  const { context, worker } = await launch(t);
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  const provenance = method => ({ schemaVersion: 1, captureMethod: method, pageUrl: 'https://example.com/', canonicalUrl: null, pageTitle: 'Example', siteName: null, description: null, authors: [], publishedAt: null, modifiedAt: null, language: null, leadImageUrl: null, faviconUrl: null, targetUrl: null, headings: [], capturedAt: 1, extractedAt: 1, extractorVersion: 1, contentHash: null, extractionStatus: 'complete', extractionError: null });
+  await ext.evaluate(async ({ failed, synced, local, other }) => {
+    const db = await import('./db.js');
+    await db.addCapture({ type: 'bookmark', sourceUrl: 'https://example.com/', cloudAccountId: 'account-a', provenance: failed }, { id: 'cap_failed' });
+    await db.updateCapture('cap_failed', { cloudStatus: 'failed', cloudAttempts: 3, cloudError: 'captureMethod is not supported.', cloudNextRetryAt: Date.now() + 3_600_000 });
+    await db.addCapture({ type: 'screenshot', sourceUrl: 'https://example.com/', cloudAccountId: 'account-a', provenance: synced }, { id: 'cap_synced' });
+    await db.updateCapture('cap_synced', { cloudStatus: 'synced' });
+    await db.addCapture({ type: 'highlight', sourceUrl: 'https://example.com/', provenance: local }, { id: 'cap_local' });
+    await db.addCapture({ type: 'bookmark', sourceUrl: 'https://example.com/', cloudAccountId: 'account-a', provenance: other }, { id: 'cap_other' });
+    await db.updateCapture('cap_other', { cloudStatus: 'failed', cloudAttempts: 2, cloudError: 'Something else.' });
+  }, { failed: provenance('sidebar-save-page'), synced: provenance('sidebar-region'), local: provenance('sidebar-highlight'), other: provenance('popup-full-page') });
+  const read = () => ext.evaluate(async () => Object.fromEntries((await (await import('./db.js')).listCaptures()).map(c => [c.id, {
+    method: c.provenance.captureMethod, cloudStatus: c.cloudStatus, cloudAttempts: c.cloudAttempts, cloudError: c.cloudError, cloudNextRetryAt: c.cloudNextRetryAt, updatedAt: c.updatedAt }])));
+
+  const first = await ext.evaluate(async () => (await import('./cloud.js')).migrateSidebarCaptures());
+  assert.deepEqual(first, { rewritten: 3, requeued: 1 });
+  const after = await read();
+  assert.deepEqual({ ...after.cap_failed, updatedAt: 0 }, { method: 'popup-save-page', cloudStatus: 'queued', cloudAttempts: 0, cloudError: null, cloudNextRetryAt: 0, updatedAt: 0 });
+  assert.equal(after.cap_synced.method, 'popup-region');
+  assert.equal(after.cap_synced.cloudStatus, 'synced', 'an already-synced record is not requeued');
+  assert.equal(after.cap_local.method, 'popup-highlight');
+  assert.equal(after.cap_local.cloudStatus, 'local', 'a local-only record stays local');
+  assert.equal(after.cap_other.method, 'popup-full-page');
+  assert.equal(after.cap_other.cloudStatus, 'failed', 'records that never used a sidebar-* method are untouched');
+
+  // Idempotent: a second run (another update, or a restart mid-update)
+  // changes nothing more.
+  const second = await ext.evaluate(async () => (await import('./cloud.js')).migrateSidebarCaptures());
+  assert.deepEqual(second, { rewritten: 0, requeued: 0 });
+  assert.deepEqual(await read(), after);
+
+  // And the requeued record now uploads with a method the backend accepts.
+  const uploads = [];
+  await signIn(context, worker);
+  await context.route('**/api/captures', r => { uploads.push(r.request().postDataJSON()); return r.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }); });
+  await ext.evaluate(async () => (await import('./capture.js')).drainQueue());
+  assert.deepEqual(uploads.map(u => [u.clientId, u.provenance.captureMethod]), [['cap_failed', 'popup-save-page']]);
+});

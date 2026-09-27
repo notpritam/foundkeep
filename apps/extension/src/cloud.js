@@ -302,6 +302,34 @@ export async function importLocalCaptures({ confirmed, accountId } = {}) {
     return { imported };
   });
 }
+// I3 / R15: 1.7.x's side panel recorded captureMethod "sidebar-<suffix>",
+// which the backend's allowlist (customer-provenance.ts METHODS) never
+// accepted — every such upload failed permanently with a 400. The side
+// panel was the extension's own capture UI, exactly the role "popup-*"
+// covers, so rewrite those records in place and put the unsynced ones back
+// in the upload queue. Runs from onInstalled on update; a stored flag keeps
+// it to once per install, and the rewrite itself is idempotent anyway.
+const SIDEBAR_MIGRATION_KEY = "foundkeepSidebarMethodsMigrated";
+const SIDEBAR_SUFFIXES = ["save-page", "highlight", "region", "full-page"];
+export async function migrateSidebarCaptures() {
+  if ((await chrome.storage.local.get(SIDEBAR_MIGRATION_KEY))[SIDEBAR_MIGRATION_KEY] === true) return { rewritten: 0, requeued: 0 };
+  let rewritten = 0, requeued = 0;
+  for (const record of await db.listCaptures({ limit: Infinity })) {
+    const method = record.provenance?.captureMethod;
+    const suffix = typeof method === "string" && method.startsWith("sidebar-") ? method.slice("sidebar-".length) : null;
+    if (!SIDEBAR_SUFFIXES.includes(suffix)) continue;
+    const patch = { provenance: { ...record.provenance, captureMethod: "popup-" + suffix } };
+    if (["failed", "queued", "error"].includes(record.cloudStatus)) {
+      Object.assign(patch, { cloudStatus: "queued", cloudAttempts: 0, cloudError: null, cloudNextRetryAt: 0 });
+      requeued++;
+    }
+    await db.updateCapture(record.id, patch);
+    rewritten++;
+  }
+  await chrome.storage.local.set({ [SIDEBAR_MIGRATION_KEY]: true });
+  if (rewritten) announce();
+  return { rewritten, requeued };
+}
 async function uploadBody(record) {
   let sourceUrl = null;
   try {

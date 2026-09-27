@@ -14,6 +14,7 @@ import {
   retryCloudSync,
   disconnectCloud,
   trustedPairingSender,
+  migrateSidebarCaptures,
 } from "./cloud.js";
 import {
   capturePreferenceKey,
@@ -255,12 +256,17 @@ function methodFor(action, trigger) {
 // ---------------------------------------------------------------------------
 // Queue drain — periodic cloud retry + on demand.
 // ---------------------------------------------------------------------------
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   getEffectivePreferences({ refresh: true })
     .then((state) => reconcileContextMenus(state.preferences))
     .catch(() => reconcileContextMenus());
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
-  drainQueue().catch(() => {});
+  // I3 / R15: on update, recover 1.7.x side-panel captures (sidebar-* methods
+  // the backend rejects) before draining, so the drain uploads them as popup-*.
+  (details?.reason === "update" ? migrateSidebarCaptures() : Promise.resolve())
+    .catch(() => {})
+    .then(() => drainQueue())
+    .catch(() => {});
   resumeBookmarkImport().catch(() => {});
   reconcileAlwaysOn().catch(() => {});
 });
