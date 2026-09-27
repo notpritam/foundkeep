@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { dockWorld } from './helpers/dock-world.mjs';
+import { pollUntil } from './helpers/poll.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 
 const SIGNED_IN = { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' };
@@ -239,4 +240,22 @@ test('dock: atlas-open-import answers {ok:false} when the import tab cannot open
   ]), extensionId);
   assert.deepEqual(result, { ok: false, error: 'FoundKeep could not open the import page. Try again.' });
   assert.ok(Date.now() - started < 5000);
+});
+
+// M6: import-preview needs an account (cloud.js refuses it without one), so
+// the signed-out import page must not promise a preview or offer one.
+test('dock: the import page asks a signed-out user to sign in first and offers no preview until then (M6)', { timeout: 30000 }, async t => {
+  const { context, worker } = await launch(t);
+  const page = await context.newPage(); await page.goto(await worker.evaluate(() => chrome.runtime.getURL('src/import.html')));
+  await page.waitForSelector('#connect:not([hidden])');
+  const copy = await page.locator('#connect').textContent();
+  assert.doesNotMatch(copy, /preview/i, 'the signed-out copy must not promise a preview');
+  assert.match(copy, /Sign in to FoundKeep first/);
+  await pollUntil(page, () => document.querySelector('#readBrowser').disabled && document.querySelector('#importFile').disabled && document.querySelector('#importSource').disabled, null);
+
+  // Signed in (and the page refreshed on focus/atlas-changed): preview is available.
+  await worker.evaluate(state => chrome.storage.local.set({ atlasCustomer: state }), SIGNED_IN);
+  await page.reload();
+  await page.waitForSelector('#connect[hidden]', { state: 'attached' });
+  await pollUntil(page, () => !document.querySelector('#readBrowser').disabled && !document.querySelector('#importFile').disabled && !document.querySelector('#importSource').disabled, null);
 });

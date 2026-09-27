@@ -24,11 +24,19 @@ async function refresh() {
     accountId = state.account?.id && state.status !== 'reconnect' ? state.account.id : null;
     $('connect').hidden = !!accountId;
   } catch (error) { $('importError').textContent = error.message; }
+  setSignedIn(!!accountId);
   await updateImportProgress();
+}
+// M6: previewing checks bookmarks against the account's library
+// (import-preview needs a connected account), so nothing can be chosen or
+// previewed until the browser is signed in.
+function setSignedIn(signedIn) {
+  for (const id of ['readBrowser', 'importFile', 'importSource']) $(id).disabled = !signedIn;
 }
 
 async function previewImport(parsed) {
   preview = null; $('confirmImport').disabled = true; $('importError').textContent = '';
+  if (!accountId) { $('importPreview').hidden = true; $('importError').textContent = 'Sign in to FoundKeep to preview and import your bookmarks.'; return; }
   $('importPreview').hidden = false; $('importPreview').textContent = 'Checking your bookmarks…';
   const owner = accountId, source = $('importSource').value;
   try {
@@ -48,7 +56,7 @@ $('readBrowser').onclick = async () => {
     const tree = await chrome.bookmarks.getTree();
     await previewImport(flattenBookmarkTree(tree));
   } catch (error) { $('importError').textContent = error.message; }
-  finally { $('readBrowser').disabled = false; }
+  finally { $('readBrowser').disabled = !accountId; }
 };
 $('importFile').onchange = async () => {
   const file = $('importFile').files[0]; if (!file) return;
