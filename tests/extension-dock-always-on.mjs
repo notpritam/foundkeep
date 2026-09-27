@@ -67,11 +67,15 @@ test('dock: opt-in "show on every site" registers a content script, and per-site
   await dock.click('.pill');
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   await dock.click('[data-action="more"]');
+  await dock.waitFor(`__foundkeepDock.rect('[data-menu="more"]').height > 0`);
   await dock.click('[data-action="site"]');
   await dock.waitFor("__foundkeepDock.state() === 'hidden'");
   await web.reload();
   const dockAfterReload = await dockWorld(web, extensionId);
-  await new Promise(r => setTimeout(r, 500));
+  // M10: wait for the positive signal — this dock's own dock-hello answered
+  // and its state applied — before asserting it stayed hidden. A fixed sleep
+  // passed even when hiding was ignored, as long as the hello was slow.
+  await dockAfterReload.waitFor("__foundkeepDock.hello() === 'answered'", 8000);
   assert.equal(await dockAfterReload.evaluate('__foundkeepDock.state()'), 'hidden', 'a hidden site must stay hidden after a reload');
 
   // Step 5: summoning it directly still shows it, and the menu now offers to
@@ -81,6 +85,7 @@ test('dock: opt-in "show on every site" registers a content script, and per-site
   await ext2.evaluate(tabId => import('./dock-control.js').then(m => m.summonDock(tabId, { expand: true })), tabId);
   await dockAfterReload.waitFor("__foundkeepDock.state() === 'expanded'");
   await dockAfterReload.click('[data-action="more"]');
+  await dockAfterReload.waitFor(`__foundkeepDock.rect('[data-menu="more"]').height > 0`);
   assert.equal(await dockAfterReload.evaluate(`__foundkeepDock.text('[data-action="site"]')`), 'Show on this site again');
   await dockAfterReload.click('[data-action="site"]');
   await dockAfterReload.waitFor("__foundkeepDock.state() !== 'hidden'");
@@ -92,6 +97,7 @@ test('dock: opt-in "show on every site" registers a content script, and per-site
   // Step 6: turning always-on off from the dock's own menu unregisters the
   // content script.
   await dockAfterReload.click('[data-action="more"]');
+  await dockAfterReload.waitFor(`__foundkeepDock.rect('[data-menu="more"]').height > 0`);
   await dockAfterReload.click('[data-action="always-on"]');
   await pollUntil(worker, async () => {
     const scripts = await chrome.scripting.getRegisteredContentScripts({ ids: ['foundkeep-dock'] });
@@ -120,6 +126,7 @@ test('dock: enabling "show on every site" from a live dock updates its own menu 
   // (content scripts cannot request permissions themselves).
   const popupPromise = context.waitForEvent('page', { timeout: 10000 });
   await dock.click('[data-action="more"]');
+  await dock.waitFor(`__foundkeepDock.rect('[data-menu="more"]').height > 0`);
   await dock.click('[data-action="always-on"]');
   const settings = await popupPromise;
   await settings.waitForSelector('#enable');

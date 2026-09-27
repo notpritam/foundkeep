@@ -619,13 +619,20 @@ test('dock: openFallbackReview does not open a second popup for a tab that alrea
   const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
   await ext.evaluate(tab => import('./save-review.js').then(m => m.stageSaveReview({ action: 'note', tab, trigger: 'dock', text: '', attachPage: false })), tab);
 
+  // M10: no fixed sleeps. openFallbackReview only resolves after its
+  // chrome.windows.create has, so counting popup windows right after each
+  // call is exact; Playwright's own page list is polled, since its 'page'
+  // event can trail the window.
+  const popupWindows = () => ext.evaluate(async () => (await chrome.windows.getAll({ windowTypes: ['popup'] })).length);
   const before = context.pages().length;
-  await ext.evaluate(tab => import('./dock-control.js').then(m => m.openFallbackReview(tab.id)), tab);
-  await new Promise(r => setTimeout(r, 500));
-  assert.equal(context.pages().length, before + 1, 'the first call opens exactly one popup');
-  await ext.evaluate(tab => import('./dock-control.js').then(m => m.openFallbackReview(tab.id)), tab);
-  await new Promise(r => setTimeout(r, 500));
-  assert.equal(context.pages().length, before + 1, 'a second call for the same tab must focus the existing popup, not open a new one');
+  assert.equal(await popupWindows(), 0);
+  assert.equal(await ext.evaluate(tab => import('./dock-control.js').then(m => m.openFallbackReview(tab.id)), tab), true);
+  assert.equal(await popupWindows(), 1, 'the first call opens exactly one popup');
+  for (let i = 0; i < 100 && context.pages().length !== before + 1; i++) await new Promise(r => setTimeout(r, 50));
+  assert.equal(context.pages().length, before + 1);
+  assert.equal(await ext.evaluate(tab => import('./dock-control.js').then(m => m.openFallbackReview(tab.id)), tab), true);
+  assert.equal(await popupWindows(), 1, 'a second call for the same tab must focus the existing popup, not open a new one');
+  assert.equal(context.pages().length, before + 1);
 });
 
 // C1 / R16 (probe C): review-card -> dock messages used to be

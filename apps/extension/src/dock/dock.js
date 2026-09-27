@@ -60,7 +60,7 @@
     </div>`;
   const $ = selector => root.querySelector(selector);
   const dockEl = $('.dock');
-  let mode = 'hidden', dockState = null, frame = null, readyTimer = 0, collapseTimer = 0, dockReady = null;
+  let mode = 'hidden', dockState = null, frame = null, readyTimer = 0, collapseTimer = 0, dockReady = null, hello = 'pending';
   let pos = null; // {fx, fy} fractions of the viewport for the dock's top-left corner
 
   const send = message => chrome.runtime.sendMessage(message).catch(() => null);
@@ -281,17 +281,25 @@
     visible: () => host.style.visibility !== 'hidden' && host.style.display !== 'none',
     status: () => $('.dock > .status')?.textContent || '',
     text: selector => root.querySelector(selector)?.textContent ?? null,
+    // 'pending' until this dock's own dock-hello round trip settles, then
+    // 'answered' (state applied) or 'failed' — lets tests wait for a
+    // positive signal instead of a fixed sleep (M10).
+    hello: () => hello,
   };
   document.documentElement.append(host);
   void send({ kind: 'dock-position' }).then(stored => { pos = stored || null; place(); });
-  // hello is kept as its own variable (not fire-and-forget) so its .then
+  // helloRequest is kept as its own variable (not fire-and-forget) so its .then
   // below is attached to the real request itself, not to the bounded
   // dockReady race further down — a reply that arrives late (after
   // dockReady's 2s bound already let 'dock-show' proceed with dockState
   // still null) must still land: it updates dockState and re-renders
   // whenever it actually shows up, however late that is.
-  const hello = send({ kind: 'dock-hello' });
-  hello.then(state => { if (!state) return; dockState = state; if (state.show && mode === 'hidden') setMode('collapsed'); else render(); });
+  const helloRequest = send({ kind: 'dock-hello' });
+  helloRequest.then(state => {
+    if (!state) { hello = 'failed'; return; }
+    dockState = state; if (state.show && mode === 'hidden') setMode('collapsed'); else render();
+    hello = 'answered';
+  });
   // Fix round 1: send()'s catch(() => null) only covers an outright
   // rejection — a service worker that's asleep, mid-restart, or wedged can
   // leave this round trip open indefinitely, which used to mean a
@@ -300,5 +308,5 @@
   // 2s timeout with nothing. Either way 'dock-show' gets to render — with
   // dockState possibly still null, which renders the same signed-out/
   // limited view a genuinely disconnected account gets.
-  dockReady = Promise.race([hello, new Promise(resolve => setTimeout(resolve, 2000))]);
+  dockReady = Promise.race([helloRequest, new Promise(resolve => setTimeout(resolve, 2000))]);
 })();
