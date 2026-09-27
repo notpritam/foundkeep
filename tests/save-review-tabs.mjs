@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { pollUntil } from './helpers/poll.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 
 test('save drafts are per tab: two tabs keep separate drafts and closing a tab drops its draft', { timeout: 30000 }, async t => {
@@ -36,6 +37,6 @@ test('save drafts are per tab: two tabs keep separate drafts and closing a tab d
   }, ids[0]);
   assert.match(second, /Finish or cancel the current save first/);
   await a.close();
-  await page.waitForFunction(async ta => !(await (await import('./save-review.js')).readSaveReview(ta)), ids[0]);
+  await pollUntil(page, async ta => !(await (await import('./save-review.js')).readSaveReview(ta)), ids[0]);
   assert.ok(await page.evaluate(async tb => !!(await (await import('./save-review.js')).readSaveReview(tb)), ids[1]));
 });
