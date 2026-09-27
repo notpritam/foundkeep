@@ -1,7 +1,7 @@
 import { stageSaveReview, readSaveReview, confirmSaveReview, cancelSaveReview, updateSaveReview, clearSaveReview } from "./save-review.js";
 import { PRODUCT_NAME } from "./product.js";
 import { trustedLibrarySender } from "./library-api.js";
-import { summonDock, startCapture, handleDockMessage, withDockHidden, reviewTabFor, dashboardUrl } from "./dock-control.js";
+import { summonDock, startCapture, handleDockMessage, withDockHidden, reviewTabFor, dashboardUrl, reconcileAlwaysOn } from "./dock-control.js";
 import { startBookmarkImport, resumeBookmarkImport, cancelBookmarkImport, importProgress } from "./import-queue.js";
 import { drainQueue, saveCapture } from "./capture.js";
 import { extractPageDocument } from "./page-extractor.js";
@@ -254,6 +254,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
   drainQueue().catch(() => {});
   resumeBookmarkImport().catch(() => {});
+  reconcileAlwaysOn().catch(() => {});
 });
 chrome.runtime.onStartup?.addListener(() => {
   getEffectivePreferences()
@@ -262,7 +263,14 @@ chrome.runtime.onStartup?.addListener(() => {
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
   drainQueue().catch(() => {});
   resumeBookmarkImport().catch(() => {});
+  reconcileAlwaysOn().catch(() => {});
 });
+// A user revoking the <all_urls> grant from chrome://extensions (rather than
+// the dock's own "Stop showing on every site") must still drop the
+// registered content script — otherwise it stays registered but silently
+// unable to run anywhere, and reconcileAlwaysOn's own storage flag goes
+// stale relative to reality.
+chrome.permissions.onRemoved.addListener(() => { void reconcileAlwaysOn(); });
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === "atlas-drain") {
     getEffectivePreferences()

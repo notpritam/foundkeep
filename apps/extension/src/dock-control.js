@@ -9,6 +9,27 @@ const HIDDEN_KEY = 'foundkeep-dock-hidden-origins', ALWAYS_KEY = 'foundkeep-dock
 // the dock sits on screen, reached only through the dock-position message.
 const DOCK_POSITION_KEY = 'foundkeep-dock-position';
 const DOCK_FILE = 'src/dock/dock.js';
+// Task 5: the opt-in "show on every site" content script — registered only
+// while chrome.permissions.contains({origins:['<all_urls>']}) is true, since
+// the optional_host_permissions grant (requested from dock-settings.html;
+// content scripts cannot request permissions themselves) is what actually
+// lets it run anywhere. persistAcrossSessions:true keeps the registration
+// across browser restarts without needing to re-run reconcileAlwaysOn — that
+// still runs on onStartup/onInstalled/permissions.onRemoved to unregister it
+// again if the permission was ever revoked out from under it.
+const REGISTRATION = { id: 'foundkeep-dock', matches: ['http://*/*', 'https://*/*'], js: [DOCK_FILE], runAt: 'document_idle', allFrames: false, persistAcrossSessions: true };
+export async function applyAlwaysOn(enabled) {
+  const granted = await chrome.permissions.contains({ origins: ['<all_urls>'] });
+  const on = enabled && granted;
+  const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [REGISTRATION.id] });
+  if (on && !existing.length) await chrome.scripting.registerContentScripts([REGISTRATION]);
+  if (!on && existing.length) await chrome.scripting.unregisterContentScripts({ ids: [REGISTRATION.id] });
+  await chrome.storage.local.set({ [ALWAYS_KEY]: on });
+  return on;
+}
+export async function reconcileAlwaysOn() {
+  await applyAlwaysOn((await chrome.storage.local.get(ALWAYS_KEY))[ALWAYS_KEY] === true);
+}
 export const dashboardUrl = path => CUSTOMER_ORIGIN + path;
 const scriptable = url => /^https?:\/\//i.test(url || '') && !/^https:\/\/chromewebstore\.google\.com\//.test(url) && !/^https:\/\/chrome\.google\.com\/webstore/.test(url);
 const originOf = url => { try { return new URL(url).origin; } catch { return null; } };
@@ -46,7 +67,13 @@ export async function summonDock(tabId, { expand = false, toggle = false } = {})
     try { await chrome.scripting.executeScript({ target: { tabId }, files: [DOCK_FILE] }); }
     catch { return false; }
   }
-  await chrome.tabs.sendMessage(tabId, { kind: 'dock-state', state: await dockState(tab) }).catch(() => {});
+  // x.com redacts tab.url here (it's matched by a static content_scripts
+  // entry, not host_permissions) — dockState(tab) would then compute a null
+  // origin and say hiddenHere:false, overwriting the correct value dock.js
+  // already has from its own dock-hello (which used sender.url). Only push
+  // a fresh dock-state when the URL this background sees is trustworthy;
+  // otherwise the dock keeps whatever origin-dependent state it already has.
+  if (tab.url) await chrome.tabs.sendMessage(tabId, { kind: 'dock-state', state: await dockState(tab) }).catch(() => {});
   await chrome.tabs.sendMessage(tabId, { kind: 'dock-show', expand, toggle }).catch(() => {});
   return true;
 }
@@ -174,8 +201,18 @@ export async function handleDockMessage(msg, sender) {
       await chrome.storage.local.set({ [HIDDEN_KEY]: [...list] }); await refreshState(tab, sender.url); return { ok: true };
     }
     case 'dock-review-fallback': if (await readSaveReview(tab.id)) await openFallbackReview(tab.id); return { ok: true };
-    // dock-always-on and dock-local are added in Tasks 5 and 6.
-    case 'dock-always-on': case 'dock-local': return { ok: false };
+    case 'dock-always-on': {
+      // Content scripts cannot call chrome.permissions.request themselves —
+      // that needs a page context, hence the small popup window. Turning it
+      // off needs no such prompt, so it's applied directly.
+      if (msg.enabled === true) {
+        await chrome.windows.create({ url: chrome.runtime.getURL('src/dock-settings.html'), type: 'popup', width: 380, height: 320, focused: true });
+        return { ok: true };
+      }
+      await applyAlwaysOn(false); await refreshState(tab, sender.url); return { ok: true };
+    }
+    // dock-local is added in Task 6.
+    case 'dock-local': return { ok: false };
     case 'dock-position': {
       // Only a genuine top-frame content script may read or write where the
       // dock sits — never an extension page, and never a subframe. This

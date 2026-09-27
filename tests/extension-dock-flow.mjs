@@ -223,6 +223,42 @@ test('dock: the X save button opens the review card in the dock on x.com', { tim
   await frame.waitForSelector('#reviewForm[data-ready="true"]');
 });
 
+test('dock: hiding on x.com survives an X save despite the background\'s redacted tab.url (carried from Task 4 review)', { timeout: 30000 }, async t => {
+  const { context, worker, extensionId } = await launch(t);
+  await signIn(context, worker);
+  await context.route('https://x.com/**', r => r.fulfill({ contentType: 'text/html', body: TWEET_FIXTURE }));
+  const web = await context.newPage(); await web.goto('https://x.com/home');
+  const dock = await dockWorld(web, extensionId);
+  // x.com has no host_permissions entry (only a static content_scripts
+  // match), so chrome.tabs.query cannot filter on its url — capture the tab
+  // via "active" while it is the only candidate, before the ext page below
+  // takes over activeness.
+  const tabId = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0].id);
+
+  // Reveal the dock and hide it for this site through its own ⋯ menu. The
+  // dock-site message carries sender.url (always accurate, even on x.com),
+  // so the background correctly records https://x.com as hidden.
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  await ext.evaluate(tabId => import('./dock-control.js').then(m => m.summonDock(tabId, { expand: true })), tabId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await dock.click('[data-action="more"]');
+  await dock.click('[data-action="site"]');
+  await dock.waitFor("__foundkeepDock.state() === 'hidden'");
+  assert.equal(await dock.evaluate(`__foundkeepDock.text('[data-action="site"]')`), 'Show on this site again');
+
+  // Trigger a real X save. Its startCapture -> openReview -> summonDock
+  // chain calls chrome.tabs.get(tabId) inside the background, which Chrome
+  // redacts to no tab.url on x.com — before the Task 4 fix, summonDock then
+  // unconditionally pushed a dock-state built from that redacted tab,
+  // silently flipping hiddenHere back to false and losing the hide.
+  const button = web.locator('article [data-state]'); await button.waitFor(); await button.click();
+  await web.waitForFunction(() => document.querySelector('article [data-state]').dataset.state !== 'saving');
+  await dock.waitFor("__foundkeepDock.state() === 'review'", 8000);
+
+  assert.equal(await dock.evaluate(`__foundkeepDock.text('[data-action="site"]')`), 'Show on this site again',
+    'an X save must not silently un-hide the dock on this site');
+});
+
 test('dock: the X save button reaches its error state when signed out', { timeout: 30000 }, async t => {
   const { context } = await launch(t);
   // No signIn(): stageSaveReview inside startCapture throws "Sign in to

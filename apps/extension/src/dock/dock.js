@@ -217,6 +217,7 @@
     focused: () => root.activeElement?.className || root.activeElement?.dataset?.action || null,
     visible: () => host.style.visibility !== 'hidden' && host.style.display !== 'none',
     status: () => $('.dock > .status')?.textContent || '',
+    text: selector => root.querySelector(selector)?.textContent ?? null,
   };
   document.documentElement.append(host);
   void send({ kind: 'dock-position' }).then(stored => { pos = stored || null; place(); });
