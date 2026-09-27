@@ -329,8 +329,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (['prepare-save', 'save-review-get', 'save-review-confirm', 'save-review-cancel', 'save-review-update'].includes(msg?.kind)) {
-    const reviewKind = msg.kind !== 'prepare-save';
-    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(reviewKind ? msg.tabId : msg.windowId)) { sendResponse({ ok: false, error: 'Open the FoundKeep sidebar to choose a destination.' }); return; }
+    const isReviewKind = msg.kind !== 'prepare-save';
+    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(isReviewKind ? msg.tabId : msg.windowId)) { sendResponse({ ok: false, error: 'Open the FoundKeep sidebar to choose a destination.' }); return; }
     void (async () => {
       if (msg.kind === 'save-review-get') return { draft: await readSaveReview(msg.tabId) };
       if (msg.kind === 'save-review-update') { await updateSaveReview(msg.tabId, msg.id, msg.form); return {}; }
