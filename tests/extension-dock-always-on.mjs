@@ -100,3 +100,39 @@ test('dock: opt-in "show on every site" registers a content script, and per-site
   const afterOff = await worker.evaluate(() => chrome.scripting.getRegisteredContentScripts({ ids: ['foundkeep-dock'] }));
   assert.equal(afterOff.length, 0);
 });
+
+test('dock: enabling "show on every site" from a live dock updates its own menu without a reload', { timeout: 30000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  await worker.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' } }));
+
+  await context.route(origin + '/__notify', r => r.fulfill({ contentType: 'text/html', body: '<title>Notify fixture</title><p>Text.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__notify');
+  const dock = await dockWorld(web, extensionId);
+  const tabId = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0].id);
+
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  await ext.evaluate(tabId => import('./dock-control.js').then(m => m.summonDock(tabId, { expand: true })), tabId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  assert.equal(await dock.evaluate(`__foundkeepDock.text('[data-action="always-on"]')`), 'Show on every site');
+
+  // A trusted click on the dock's own ⋯ → "Show on every site" — the real
+  // path, not a direct dock-control.js call — opens the settings popup
+  // (content scripts cannot request permissions themselves).
+  const popupPromise = context.waitForEvent('page', { timeout: 10000 });
+  await dock.click('[data-action="more"]');
+  await dock.click('[data-action="always-on"]');
+  const settings = await popupPromise;
+  await settings.waitForSelector('#enable');
+  await settings.evaluate(() => {
+    chrome.permissions.request = async () => true;
+    chrome.permissions.contains = async () => true;
+  });
+  await settings.click('#enable');
+
+  // No reload and nothing re-summons this exact dock: the fix round 1
+  // dock-always-on-changed broadcast alone must update its ⋯ menu.
+  await dock.waitFor(`__foundkeepDock.text('[data-action="always-on"]') === 'Stop showing on every site'`, 8000);
+  // hiddenHere is untouched by the broadcast — the site menu item must not
+  // have flipped as a side effect.
+  assert.equal(await dock.evaluate(`__foundkeepDock.text('[data-action="site"]')`), 'Hide on this site');
+});

@@ -207,6 +207,11 @@
       case 'dock-unhide': host.style.visibility = ''; break;
       case 'dock-status': if (mode === 'hidden') setMode('expanded'); status(message.text || '', message.tone || ''); break;
       case 'dock-state': dockState = message.state; render(); break;
+      // Fix round 1: a tab-URL-independent patch so every open dock updates
+      // its ⋯ menu the moment always-on changes elsewhere (its own toggle,
+      // dock-settings.html, or a permission revoked out from under it) —
+      // never touches hiddenHere, which is per-origin and unrelated.
+      case 'dock-always-on-changed': dockState = { ...dockState, alwaysOn: message.alwaysOn }; render(); break;
     }
   });
 

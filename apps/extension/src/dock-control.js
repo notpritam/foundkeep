@@ -18,13 +18,27 @@ const DOCK_FILE = 'src/dock/dock.js';
 // still runs on onStartup/onInstalled/permissions.onRemoved to unregister it
 // again if the permission was ever revoked out from under it.
 const REGISTRATION = { id: 'foundkeep-dock', matches: ['http://*/*', 'https://*/*'], js: [DOCK_FILE], runAt: 'document_idle', allFrames: false, persistAcrossSessions: true };
+// Fix round 1: a dock already open when always-on is toggled (from its own
+// ⋯ menu, or from dock-settings.html) has no other way to learn the value
+// changed — nothing re-sends it a full dock-state, and the toggle itself
+// only opens a popup or flips storage. Push a tiny, tab-URL-independent
+// patch to every open tab instead of waiting for the next dock-hello/reload.
+// chrome.tabs.* is available from both the background and an extension page
+// (applyAlwaysOn runs in dock-settings.html's own page context when the
+// permission prompt succeeds there), so this works from either caller.
+async function notifyAlwaysOnChanged(alwaysOn) {
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(tabs.map(t => chrome.tabs.sendMessage(t.id, { kind: 'dock-always-on-changed', alwaysOn }).catch(() => {})));
+}
 export async function applyAlwaysOn(enabled) {
   const granted = await chrome.permissions.contains({ origins: ['<all_urls>'] });
   const on = enabled && granted;
   const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [REGISTRATION.id] });
   if (on && !existing.length) await chrome.scripting.registerContentScripts([REGISTRATION]);
   if (!on && existing.length) await chrome.scripting.unregisterContentScripts({ ids: [REGISTRATION.id] });
+  const previous = (await chrome.storage.local.get(ALWAYS_KEY))[ALWAYS_KEY] === true;
   await chrome.storage.local.set({ [ALWAYS_KEY]: on });
+  if (on !== previous) await notifyAlwaysOnChanged(on);
   return on;
 }
 export async function reconcileAlwaysOn() {
