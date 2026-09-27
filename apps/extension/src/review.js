@@ -195,7 +195,11 @@ $('reviewForm').onsubmit = async event => {
       if (!await chrome.permissions.request({ origins: [origin] })) throw new Error('Allow access to the image’s site to save its original file, then try again.');
     }
     const result = await request('save-review-confirm', { id: pending.id, choice });
-    draft = null; epoch++; document.dispatchEvent(new CustomEvent('foundkeep-save-completed', { detail: { draft: pending, result } })); finish(true);
+    draft = null; epoch++;
+    // I1: `capture: null` means nothing was saved (a region selection was
+    // cancelled on the page) — finish unsaved so the dock never says "Saved".
+    if (!result.capture) { finish(false); return; }
+    document.dispatchEvent(new CustomEvent('foundkeep-save-completed', { detail: { draft: pending, result } })); finish(true);
   } catch (error) { message($('destinationFeedback'), error.message, 'error'); }
   finally { busy = false; selection(); if (draft) changed(); }
 };

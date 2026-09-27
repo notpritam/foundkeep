@@ -688,3 +688,36 @@ test('dock: keyboard — focus moves into the card when it opens and back to the
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   await dock.waitFor("__foundkeepDock.focused() === 'pill'");
 });
+
+test('dock: Escape during a region selection cancels it — no capture, and the dock says "Selection cancelled." (I1)', { timeout: 40000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t, { allUrls: true });
+  await signIn(context, worker);
+  await context.route(origin + '/__region-cancel', r => r.fulfill({ contentType: 'text/html', body: '<title>Region cancel fixture</title><p style="height:600px">Nothing worth keeping.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__region-cancel');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+
+  assert.equal(await summon(ext, origin + '/__region-cancel*'), true);
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await dock.click('[data-action="screenshot"]');
+  await dock.waitFor(`__foundkeepDock.rect('[data-menu="screenshot"]').height > 0`);
+  await dock.click('[data-action="region"]');
+  const frame = await reviewFrame(web);
+  await frame.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+  await web.bringToFront();
+  // Confirming from inside the card leaves keyboard focus in the card's
+  // (now hidden) frame — exactly where a real user's focus would be.
+  await frame.click('#destinationConfirm');
+  const hint = web.getByText('Drag to capture · Esc to cancel');
+  await hint.waitFor();
+  await web.keyboard.press('Escape');
+  await hint.waitFor({ state: 'detached', timeout: 5000 });
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'", 10000);
+  await dock.waitFor("__foundkeepDock.status() === 'Selection cancelled.'");
+  assert.notEqual(await dock.evaluate('__foundkeepDock.status()'), 'Saved');
+  assert.equal(await dock.evaluate(`__foundkeepDock.text('.dock > .status')`), 'Selection cancelled.');
+  assert.equal(await ext.evaluate(async () => (await (await import('./db.js')).listCaptures()).length), 0);
+  // Still expanded (not auto-collapsing like a save), and the draft is gone.
+  await new Promise(r => setTimeout(r, 500));
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'expanded');
+});

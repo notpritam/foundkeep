@@ -243,7 +243,9 @@
         if (message.type === 'done') finishReview(message.saved === true);
         break;
       }
-      case 'dock-hide': host.style.visibility = 'hidden'; break;
+      // I1: a hidden card must not keep keyboard focus — Esc has to reach the
+      // page (e.g. the region-selection overlay injected right after this).
+      case 'dock-hide': if (root.activeElement) root.activeElement.blur(); host.style.visibility = 'hidden'; break;
       case 'dock-unhide': host.style.visibility = ''; break;
       case 'dock-status': if (mode === 'hidden') setMode('expanded'); status(message.text || '', message.tone || ''); break;
       case 'dock-state': dockState = message.state; render(); break;

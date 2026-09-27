@@ -378,6 +378,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.kind === 'save-review-update') { await updateSaveReview(msg.tabId, msg.id, msg.form); return {}; }
       if (msg.kind === 'save-review-cancel') { await cancelSaveReview(msg.tabId, msg.id); return {}; }
       const record = await confirmSaveReview(msg, (draft, commit) => performCapture(draft.action, { ...draft, commit }));
+      // I1: a region selection cancelled on the page (Esc, a too-small drag,
+      // or leaving the tab) confirms with nothing saved. The card finishes
+      // unsaved on `capture: null`; the dock says why, in a neutral tone —
+      // never "Saved".
+      if (!record) await chrome.tabs.sendMessage(msg.tabId, { kind: 'dock-status', text: 'Selection cancelled.', tone: '' }, { frameId: 0 }).catch(() => {});
       return { capture: record ? { id: record.id, cloudStatus: record.cloudStatus, type: record.type } : null };
     })().then(data => sendResponse({ ok: true, ...data })).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -696,6 +701,9 @@ async function regionScreenshot(tab, captureMethod, limits, commit) {
 }
 
 function regionSelectInPage() {
+  // I1: confirming in the review card leaves keyboard focus in the card's
+  // (now hidden) frame; pull it back to the page so Esc reaches this overlay.
+  window.focus();
   return new Promise((resolve) => {
     const dpr = window.devicePixelRatio || 1;
     const overlay = document.createElement("div");
