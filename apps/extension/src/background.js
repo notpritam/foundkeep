@@ -345,6 +345,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     handleDockMessage(msg, sender).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
+  // C1 / R16: the framed review card's ready/resize/done reach the dock only
+  // through here — never window.postMessage, which the host page could read
+  // and answer. Relayed only when the sender is a packaged review.html that
+  // reviewTabFor() ties to this exact tab, and only to that tab's top frame
+  // (the dock), so a page can neither observe nor forge them.
+  if (msg?.kind === 'review-frame') {
+    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.tabId) || !['ready', 'resize', 'done'].includes(msg.type)
+      || new URL(sender.url).pathname !== '/src/review.html') { sendResponse({ ok: false }); return; }
+    void (async () => {
+      if (await reviewTabFor(sender) !== msg.tabId) return { ok: false };
+      const relay = { kind: 'dock-review-frame', type: msg.type };
+      if (msg.type === 'resize') relay.height = Number(msg.height);
+      if (msg.type === 'done') relay.saved = msg.saved === true;
+      await chrome.tabs.sendMessage(msg.tabId, relay, { frameId: 0 });
+      return { ok: true };
+    })().then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
   if (['save-review-get', 'save-review-confirm', 'save-review-cancel', 'save-review-update'].includes(msg?.kind)) {
     if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.tabId)) { sendResponse({ ok: false, error: 'Open FoundKeep to choose a destination.' }); return; }
     void (async () => {

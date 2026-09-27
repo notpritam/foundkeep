@@ -70,7 +70,7 @@ test('review card: account required, note text comes from the form, cancel clear
   assert.equal(capturesAfterCancel, 1, 'cancel must not save a second capture');
 });
 
-test('review card: cancel posts done exactly once to a framing parent', { timeout: 30000 }, async t => {
+test('review card: cancel relays done exactly once to the dock, never to the framing page (R16)', { timeout: 30000 }, async t => {
   const extension = process.env.FOUNDKEEP_TEST_EXTENSION || path.resolve('apps/extension');
   const profile = await mkdtemp('/tmp/foundkeep-review-frame-'); let context;
   t.after(async () => { await context?.close(); await rm(profile, { recursive: true, force: true }); });
@@ -87,18 +87,25 @@ test('review card: cancel posts done exactly once to a framing parent', { timeou
   await context.route('**/api/collections', route => route.fulfill({ json: { collections: [] } }));
   await ext.evaluate(async id => (await import('./save-review.js')).stageSaveReview({ action: 'note', tab: await chrome.tabs.get(id), text: '', trigger: 'dock' }), tabId);
   const reviewUrl = await worker.evaluate(id => chrome.runtime.getURL('src/review.html?tab=' + id), tabId);
+  // Stand-in for the dock: a listener in the extension's isolated world on
+  // this tab's top frame, which is exactly where the background relays the
+  // card's messages (chrome.tabs.sendMessage(tabId, …, {frameId: 0})).
+  await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
+    window.__relayed = [];
+    chrome.runtime.onMessage.addListener(message => { if (message?.kind === 'dock-review-frame') window.__relayed.push(message); });
+  } }), tabId);
+  const relayed = () => worker.evaluate(async tabId => (await chrome.scripting.executeScript({ target: { tabId }, func: () => window.__relayed }))[0].result, tabId);
   // The dock frames review.html on the tab it reviews, so this frame lives
   // on `web` (the same tab the draft was staged for) — reviewTabFor(sender)
   // requires the framing tab's own id to equal the `tab` query param. The
   // cancel handler's own finish(false) and the foundkeep-save-review-changed
   // broadcast it triggers (observed by review.js's own listener, which also
   // tries to finish once it sees the draft is gone) both have a chance to
-  // post; only one "done" message must actually reach the parent.
+  // send; only one "done" message must actually reach the dock. The page's
+  // own window must see none of it (C1).
   await web.evaluate(url => {
-    window.__doneMessages = [];
-    window.addEventListener('message', event => {
-      if (event.data?.foundkeepReview && event.data.type === 'done') window.__doneMessages.push(event.data);
-    });
+    window.__pageMessages = [];
+    window.addEventListener('message', event => window.__pageMessages.push(JSON.stringify(event.data)));
     const frame = document.createElement('iframe');
     frame.id = 'reviewFrame';
     frame.src = url;
@@ -106,14 +113,16 @@ test('review card: cancel posts done exactly once to a framing parent', { timeou
   }, reviewUrl);
   const frame = web.frameLocator('#reviewFrame');
   await frame.locator('#reviewForm[data-ready="true"]').waitFor();
+  await pollUntil(worker, async tabId => ((await chrome.scripting.executeScript({ target: { tabId }, func: () => window.__relayed }))[0].result || []).some(m => m.type === 'ready'), tabId);
   await frame.locator('#reviewCancel').click();
-  await pollUntil(web, () => window.__doneMessages.length > 0, null);
-  // Give a spurious second post (from the foundkeep-save-review-changed
+  await pollUntil(worker, async tabId => ((await chrome.scripting.executeScript({ target: { tabId }, func: () => window.__relayed }))[0].result || []).some(m => m.type === 'done'), tabId);
+  // Give a spurious second done (from the foundkeep-save-review-changed
   // broadcast cancelSaveReview itself emits, which review.js's own listener
   // also reacts to) a chance to arrive before asserting exactly one.
   await web.waitForTimeout(500);
-  assert.equal(await web.evaluate(() => window.__doneMessages.length), 1, JSON.stringify(await web.evaluate(() => window.__doneMessages)));
-  assert.equal(await web.evaluate(() => window.__doneMessages[0].saved), false);
+  const done = (await relayed()).filter(m => m.type === 'done');
+  assert.deepEqual(done, [{ kind: 'dock-review-frame', type: 'done', saved: false }]);
+  assert.deepEqual(await web.evaluate(() => window.__pageMessages), [], 'the framing page must never receive review-card messages');
 });
 
 test('review card: a draft survives a fresh module instance, and a different account cannot confirm it', { timeout: 30000 }, async t => {

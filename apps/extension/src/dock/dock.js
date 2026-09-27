@@ -1,6 +1,5 @@
 (() => {
   if (window.top !== window || window.__foundkeepDock) return;
-  const EXT = new URL(chrome.runtime.getURL('')).origin;
   const EDGE = 16;
   const ICON = {
     grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
@@ -128,9 +127,18 @@
   }
   function openReview(url) {
     closeReview();
-    frame = document.createElement('iframe');
-    frame.className = 'card'; frame.src = url; frame.title = 'Review your FoundKeep save'; frame.dataset.height = '420';
-    root.append(frame); setMode('review'); placeCard();
+    const card = frame = document.createElement('iframe');
+    card.className = 'card'; card.src = url; card.title = 'Review your FoundKeep save'; card.dataset.height = '420';
+    // C1 / R16: review.html loads exactly once per card. A page can still
+    // reach this frame (window.frames includes it, closed shadow root or
+    // not) and navigate it; a second load means the card slot now shows
+    // something other than review.html, so close it instead of framing it.
+    let loads = 0;
+    card.addEventListener('load', () => {
+      if (frame !== card || ++loads < 2) return;
+      closeReview(); setMode('expanded'); status('Review closed. Save again to reopen it.');
+    });
+    root.append(card); setMode('review'); placeCard();
     readyTimer = setTimeout(() => { closeReview(); setMode('expanded'); void send({ kind: 'dock-review-fallback' }); }, 3000);
   }
   function closeReview() { clearTimeout(readyTimer); frame?.remove(); frame = null; }
@@ -182,14 +190,6 @@
   }, true);
   document.addEventListener('fullscreenchange', () => { host.style.display = document.fullscreenElement ? 'none' : ''; });
   addEventListener('resize', place);
-  // Messages from the review card: only its own frame, from the extension origin.
-  addEventListener('message', event => {
-    if (!frame || event.source !== frame.contentWindow || event.origin !== EXT || !event.data?.foundkeepReview) return;
-    const data = event.data;
-    if (data.type === 'ready') clearTimeout(readyTimer);
-    if (data.type === 'resize' && Number.isFinite(data.height)) { frame.dataset.height = String(Math.min(Math.max(160, data.height), 560)); placeCard(); }
-    if (data.type === 'done') finishReview(data.saved === true);
-  });
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message?.kind === 'dock-ping') { respond({ ok: true }); return; }
     switch (message?.kind) {
@@ -224,6 +224,16 @@
       case 'dock-collapse': if (mode === 'expanded') setMode('collapsed'); break;
       case 'dock-review-open': if (mode === 'hidden') setMode('expanded'); openReview(message.url); break;
       case 'dock-review-close': finishReview(message.saved === true); break;
+      // C1 / R16: the card's ready/resize/done, relayed by the background
+      // only after it verified the card belongs to this tab. There is no
+      // window 'message' listener any more — the page shares that channel.
+      case 'dock-review-frame': {
+        if (!frame) break;
+        if (message.type === 'ready') clearTimeout(readyTimer);
+        if (message.type === 'resize' && Number.isFinite(message.height)) { frame.dataset.height = String(Math.min(Math.max(160, message.height), 560)); placeCard(); }
+        if (message.type === 'done') finishReview(message.saved === true);
+        break;
+      }
       case 'dock-hide': host.style.visibility = 'hidden'; break;
       case 'dock-unhide': host.style.visibility = ''; break;
       case 'dock-status': if (mode === 'hidden') setMode('expanded'); status(message.text || '', message.tone || ''); break;

@@ -520,14 +520,22 @@ test('dock: review.html refuses save-review-get when framed by an unrelated tab'
   const attacker = await context.newPage(); await attacker.goto(origin + '/__attacker');
   const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
-  // A real draft on the victim's own tab.
-  await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'savepage', { trigger: 'dock' })), victimTab);
+  // A real draft on the victim's own tab. Staged directly rather than via
+  // startCapture so the victim has no card of its own open — anything that
+  // reaches its top frame below can only have come from the attacker's card.
+  await ext.evaluate(tab => import('./save-review.js').then(m => m.stageSaveReview({ action: 'savepage', tab, trigger: 'dock' })), victimTab);
   await pollUntil(ext, tab => import('./save-review.js').then(m => m.readSaveReview(tab.id)).then(d => !!d), victimTab);
 
   // The attacker page frames review.html for the *victim's* tab id — the
   // same URL form the dock itself uses (chrome.runtime.getURL), which is
   // exactly what web_accessible_resources now allows any page to embed.
   const reviewUrl = await worker.evaluate(id => chrome.runtime.getURL('src/review.html?tab=' + id), victimTab.id);
+  // R16: the background must not relay that card's ready/resize/done to the
+  // victim's dock either — record whatever reaches the victim's top frame.
+  await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
+    window.__relayed = [];
+    chrome.runtime.onMessage.addListener(message => { if (message?.kind === 'dock-review-frame') window.__relayed.push(message); });
+  } }), victimTab.id);
   await attacker.evaluate(url => {
     const frame = document.createElement('iframe'); frame.id = 'evil'; frame.src = url; document.body.append(frame);
   }, reviewUrl);
@@ -541,6 +549,8 @@ test('dock: review.html refuses save-review-get when framed by an unrelated tab'
   // capture was ever created via the attacker's frame.
   assert.ok(await ext.evaluate(tab => import('./save-review.js').then(m => m.readSaveReview(tab.id)).then(d => !!d), victimTab));
   assert.equal(await ext.evaluate(async () => (await (await import('./db.js')).listCaptures()).length), 0);
+  assert.deepEqual(await worker.evaluate(async tabId => (await chrome.scripting.executeScript({ target: { tabId }, func: () => window.__relayed }))[0].result, victimTab.id), [],
+    'a card framed by another tab must never reach the victim tab\'s dock');
 });
 
 test('dock: review.html?window=1 refuses save-review-confirm without a matching fallback-popup reservation', { timeout: 30000 }, async t => {
@@ -589,4 +599,63 @@ test('dock: openFallbackReview does not open a second popup for a tab that alrea
   await ext.evaluate(tab => import('./dock-control.js').then(m => m.openFallbackReview(tab.id)), tab);
   await new Promise(r => setTimeout(r, 500));
   assert.equal(context.pages().length, before + 1, 'a second call for the same tab must focus the existing popup, not open a new one');
+});
+
+// C1 / R16 (probe C): review-card -> dock messages used to be
+// window.parent.postMessage(..., '*'), which the page's own script received
+// with event.source = the card's window — enough to navigate the real card
+// slot to an attacker URL. They now travel only through the extension
+// (review.html -> background -> dock), and the dock closes the card if its
+// frame ever loads a second document.
+test('dock: a page never receives review-card messages and cannot hijack the card (C1)', { timeout: 40000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  await signIn(context, worker);
+  const PAGE = `<title>Hijack fixture</title><p>Text.</p><script>
+    window.__received = [];
+    addEventListener('message', event => {
+      window.__received.push(JSON.stringify(event.data));
+      try { event.source.postMessage({ foundkeepReview: true, type: 'done', saved: true }, '*'); } catch {}
+      try { event.source.location = location.origin + '/__evil'; } catch {}
+    });
+  </script>`;
+  await context.route(origin + '/__hijack-target', r => r.fulfill({ contentType: 'text/html', body: PAGE }));
+  await context.route(origin + '/__evil', r => r.fulfill({ contentType: 'text/html', body: '<title>Evil</title><p>Attacker page</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__hijack-target');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+
+  assert.equal(await summon(ext, origin + '/__hijack-target*'), true);
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await dock.click('[data-action="note"]');
+  const frame = await reviewFrame(web);
+  await frame.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+  // ready and the ResizeObserver's first resize have been sent by now; give
+  // any leaked message (and the page's navigation attempt) time to land.
+  await frame.fill('#reviewNote', 'Grow the card a little\n\n\n\n');
+  await new Promise(r => setTimeout(r, 800));
+  assert.deepEqual(await web.evaluate(() => window.__received), [], 'the page must never receive a review-card message');
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'review');
+  const cardUrls = () => web.frames().filter(f => f !== web.mainFrame()).map(f => f.url());
+  assert.equal(cardUrls().length, 1);
+  assert.match(cardUrls()[0], /^chrome-extension:\/\/[^/]+\/src\/review\.html\?tab=\d+$/);
+  await frame.click('#reviewCancel');
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  assert.deepEqual(await web.evaluate(() => window.__received), [], 'done must not reach the page either');
+
+  // With no message to take event.source from, the page has no handle on
+  // the card at all: an iframe inside the closed shadow root is not one of
+  // window's indexed child frames.
+  await dock.click('[data-action="note"]');
+  const second = await reviewFrame(web);
+  await second.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+  await dock.waitFor("__foundkeepDock.state() === 'review'");
+  assert.equal(await web.evaluate(() => window.length), 0, 'the page must not be able to reach the card frame');
+  // Should the card's frame ever load a second document anyway (forced
+  // here from outside the page, through CDP), the dock must close it rather
+  // than keep showing whatever loaded in the real card slot.
+  await second.goto(origin + '/__evil').catch(() => {});
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'", 5000);
+  assert.deepEqual(cardUrls(), [], 'the navigated card frame must be removed');
+  assert.equal(await dock.evaluate('__foundkeepDock.status()'), 'Review closed. Save again to reopen it.');
+  assert.deepEqual(await web.evaluate(() => window.__received), []);
 });

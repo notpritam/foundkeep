@@ -5,8 +5,15 @@ const tabId = Number(new URLSearchParams(location.search).get('tab'));
 const framed = window.parent !== window;
 let draft = null, collections = [], folders = [], busy = false, creating = false, epoch = 0, saveTimer, finished = false;
 
+// C1 / R16: never window.parent.postMessage — the parent is the web page, and
+// its own script would receive every message with event.source set to this
+// card (enough to navigate the real card slot anywhere). Messages for the
+// dock go through the extension instead: the background only relays them
+// once reviewTabFor(sender) confirms this card belongs to `tabId`, and it
+// delivers them to that tab's top-frame content script (the dock) alone. A
+// fallback popup (window=1) is not framed and has no dock to talk to.
 function post(data) {
-  if (framed) window.parent.postMessage({ foundkeepReview: true, ...data }, '*');
+  if (framed) void chrome.runtime.sendMessage({ kind: 'review-frame', tabId, ...data }).catch(() => {});
 }
 // Cancel's own success path and the foundkeep-save-review-changed broadcast
 // it triggers can both observe "no draft" and try to finish the page; make
