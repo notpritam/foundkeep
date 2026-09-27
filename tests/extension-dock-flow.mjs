@@ -174,6 +174,61 @@ test('dock: summonDock({toggle:true}) called twice collapses the second time (R1
   await dock.waitFor("__foundkeepDock.state() === 'collapsed'");
 });
 
+test('dock: dock-show still shows the dock within its ~2s bound when dock-hello is slow to answer, and a late reply still updates state (fix round 1)', { timeout: 20000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  await context.route(origin + '/__hello-slow', r => r.fulfill({ contentType: 'text/html', body: '<title>Hello-slow fixture</title><p>Text.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__hello-slow');
+  const tabId = await worker.evaluate(async url => (await chrome.tabs.query({ url }))[0]?.id, origin + '/__hello-slow*');
+
+  // Simulate a background that doesn't answer dock-hello in time — asleep,
+  // mid-restart, or wedged. send()'s catch(() => null) in dock.js only
+  // covers an outright rejection, not a slow/silent answer, so before fix
+  // round 1 this left 'dock-show' waiting on dockReady forever and the dock
+  // never appeared. Patch chrome.runtime.sendMessage inside this tab's
+  // isolated content-script world *before* dock.js loads into it — both
+  // executeScript calls below target the same frame, which shares one
+  // persistent isolated world per extension, so the patch is still in
+  // effect when dock.js's own IIFE calls chrome.runtime.sendMessage at the
+  // bottom of the file. Everything except dock-hello passes through to the
+  // real background; dock-hello resolves 4s late (past dockReady's 2s
+  // bound) with a real-looking connected state, to prove a late reply still
+  // lands and re-renders.
+  const lateState = { connected: true, actions: { savepage: true, highlight: true, region: true, fullpage: true, note: true }, alwaysOn: false, hiddenHere: false, localOnly: 0, show: false };
+  await worker.evaluate(({ tabId, lateState }) => chrome.scripting.executeScript({
+    target: { tabId },
+    func: lateState => {
+      const real = chrome.runtime.sendMessage.bind(chrome.runtime);
+      chrome.runtime.sendMessage = message =>
+        message?.kind === 'dock-hello' ? new Promise(resolve => setTimeout(() => resolve(lateState), 4000)) : real(message);
+    },
+    args: [lateState],
+  }), { tabId, lateState });
+
+  // dock.js has no automatic injection path on this origin (no
+  // content_scripts entry, no always-on registration) — inject it directly
+  // and send dock-show straight to the tab, rather than through
+  // summonDock(), which would push its own dock-state message ahead of
+  // dock-show on a host_permissions origin like this one and populate
+  // dockState before the race this test targets could ever matter (that's
+  // exactly why the original x.com race needed a redacted tab.url to show
+  // up at all — see the 'dock-show' comment in dock.js).
+  await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, files: ['src/dock/dock.js'] }), tabId);
+  await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, { kind: 'dock-show', expand: true }), tabId);
+
+  const dock = await dockWorld(web, extensionId);
+  const start = Date.now();
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'", 3500);
+  assert.ok(Date.now() - start < 3500, 'dock-show must not wait for dock-hello past its ~2s bound');
+  // dockState is still null here (the slow dock-hello hasn't answered yet) —
+  // render() falls back to the same signed-out/limited view a genuinely
+  // disconnected account gets (.actions stays hidden), not a stuck empty dock.
+  assert.equal(await dock.evaluate(`__foundkeepDock.rect('.actions').height`), 0);
+
+  // The late dock-hello reply (~4s in) must still update dockState and
+  // re-render once it actually arrives.
+  await dock.waitFor(`__foundkeepDock.rect('[data-action="savepage"]').height > 0`, 6000);
+});
+
 test('dock: a fallback popup confirms and closes on success', { timeout: 30000 }, async t => {
   const { context, worker, origin } = await launch(t);
   await signIn(context, worker);

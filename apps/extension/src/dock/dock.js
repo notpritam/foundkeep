@@ -215,7 +215,9 @@
         // dock a real click can then land past, hitting document's
         // pointerdown-outside handler and collapsing it right back down.
         // Wait for the same dockReady promise dock-hello already set up
-        // instead of rendering blind.
+        // instead of rendering blind — but dockReady is bounded (see below):
+        // a sleeping/restarting/erroring service worker must never leave a
+        // toolbar-icon summon showing no dock at all.
         if (dockState) apply(); else void dockReady.then(apply);
         break;
       }
@@ -245,8 +247,21 @@
   };
   document.documentElement.append(host);
   void send({ kind: 'dock-position' }).then(stored => { pos = stored || null; place(); });
-  // Kept as `dockReady` (not fire-and-forget) so 'dock-show' can wait on
-  // this exact in-flight request instead of rendering against a still-null
-  // dockState — see the case 'dock-show' comment above.
-  dockReady = send({ kind: 'dock-hello' }).then(state => { if (!state) return; dockState = state; if (state.show && mode === 'hidden') setMode('collapsed'); else render(); });
+  // hello is kept as its own variable (not fire-and-forget) so its .then
+  // below is attached to the real request itself, not to the bounded
+  // dockReady race further down — a reply that arrives late (after
+  // dockReady's 2s bound already let 'dock-show' proceed with dockState
+  // still null) must still land: it updates dockState and re-renders
+  // whenever it actually shows up, however late that is.
+  const hello = send({ kind: 'dock-hello' });
+  hello.then(state => { if (!state) return; dockState = state; if (state.show && mode === 'hidden') setMode('collapsed'); else render(); });
+  // Fix round 1: send()'s catch(() => null) only covers an outright
+  // rejection — a service worker that's asleep, mid-restart, or wedged can
+  // leave this round trip open indefinitely, which used to mean a
+  // toolbar-icon summon (case 'dock-show' above) showed no dock at all.
+  // dockReady now resolves on whichever comes first: the real reply, or a
+  // 2s timeout with nothing. Either way 'dock-show' gets to render — with
+  // dockState possibly still null, which renders the same signed-out/
+  // limited view a genuinely disconnected account gets.
+  dockReady = Promise.race([hello, new Promise(resolve => setTimeout(resolve, 2000))]);
 })();
