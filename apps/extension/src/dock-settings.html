@@ -6,7 +6,12 @@
     <title>FoundKeep — Show on every site</title>
     <link rel="stylesheet" href="theme.css" />
     <style>
-      body { width: 380px; height: 320px; padding: 20px; display: flex; flex-direction: column; }
+      /* chrome.windows.create({width:380,height:320}) sizes the outer
+         window, not this document's viewport (browser chrome eats part of
+         it) — fill whatever's left instead of forcing the same 380x320,
+         which would overflow and scroll. */
+      html, body { min-height: 100%; }
+      body { box-sizing: border-box; min-height: 100vh; padding: 20px; display: flex; flex-direction: column; }
       h1 { font-size: 15px; margin: 0 0 10px; }
       p { color: var(--muted); margin: 0 0 20px; flex: 1; }
       .actions { display: flex; gap: 8px; justify-content: flex-end; }
