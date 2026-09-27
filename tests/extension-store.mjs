@@ -67,8 +67,12 @@ test("Chrome Web Store package is a focused MV3 build at the configured version"
   assert.equal(manifest.key, undefined);
   assert.equal(manifest.update_url, undefined);
   assert.equal(manifest.side_panel, undefined);
-  assert.equal(manifest.permissions.includes('sidePanel'), false);
-  assert.deepEqual(manifest.permissions, ['activeTab', 'scripting', 'contextMenus', 'storage', 'alarms']);
+  // R14: 'sidePanel' stays in 1.8.0 (no install warning) only so the startup
+  // chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:false}) reset
+  // can run for installs upgrading from 1.7.x, whose persisted
+  // openPanelOnActionClick:true would otherwise keep the toolbar icon from
+  // ever reaching the dock. No side panel is declared or shown. Drop it in 1.9.
+  assert.deepEqual(manifest.permissions, ['activeTab', 'scripting', 'contextMenus', 'storage', 'alarms', 'sidePanel']);
   assert.ok(manifest.web_accessible_resources[0].resources.includes('src/review.html'));
   assert.equal(manifest.web_accessible_resources[0].use_dynamic_url, true);
   const shipped = JSON.parse(await readFile('deploy/extension-files.json', 'utf8'));

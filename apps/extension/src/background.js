@@ -32,8 +32,11 @@ protectCloudStorage().catch(() => {});
 // version shipped — openPanelOnActionClick persists across updates — so
 // this must run every startup, not just on first install, or the icon keeps
 // opening the side panel and this onClicked listener never fires at all.
-// Optional chaining: stays harmless once the sidePanel permission itself is
-// removed in a later task.
+// R14: the manifest keeps the "sidePanel" permission (no install warning,
+// and no side_panel key — nothing is ever shown) ONLY so this reset can run
+// for installs upgrading from 1.7.x; without it chrome.sidePanel is
+// undefined and the call below silently does nothing. Drop the permission
+// (and this line) in 1.9, once 1.7.x installs have all passed through 1.8.
 chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false }).catch(() => {});
 chrome.action.onClicked.addListener(tab => {
   void summonDock(tab.id, { expand: true, toggle: true }).then(async shown => {

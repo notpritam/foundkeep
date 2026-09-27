@@ -721,3 +721,38 @@ test('dock: Escape during a region selection cancels it — no capture, and the 
   await new Promise(r => setTimeout(r, 500));
   assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'expanded');
 });
+
+// I2 / R14: 1.7.x set openPanelOnActionClick:true, which Chrome persists
+// across updates; while it stays true the toolbar icon opens the (deleted)
+// side panel and chrome.action.onClicked — the dock's entry point — never
+// fires. The startup reset needs the sidePanel permission to run at all.
+test('dock: an upgraded install\'s openPanelOnActionClick:true does not survive the next service-worker start (I2)', { timeout: 30000 }, async t => {
+  const { context, worker } = await launch(t);
+  await worker.evaluate(() => chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }));
+  assert.equal(await worker.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick), true);
+  // Fetch this URL before stopping — evaluate() on a just-stopped worker
+  // has nothing to wake it and hangs.
+  const wakeUrl = await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html'));
+  const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  let versionId, running = true;
+  cdp.on('ServiceWorker.workerVersionUpdated', event => {
+    for (const version of event.versions) {
+      if (version.scriptURL !== worker.url()) continue;
+      if (version.runningStatus === 'running') { versionId = version.versionId; running = true; }
+      if (version.runningStatus === 'stopped') running = false;
+    }
+  });
+  await cdp.send('ServiceWorker.enable');
+  for (let i = 0; i < 100 && !versionId; i++) await new Promise(r => setTimeout(r, 50));
+  assert.ok(versionId, 'found the running service worker version');
+  await cdp.send('ServiceWorker.stopWorker', { versionId });
+  for (let i = 0; i < 100 && running; i++) await new Promise(r => setTimeout(r, 50));
+  assert.equal(running, false, 'the service worker stopped');
+  // Waking it reruns background.js's top level. An extension page alone does
+  // not need the worker; a runtime message to it does.
+  await page.goto(wakeUrl);
+  await page.evaluate(() => chrome.runtime.sendMessage({ kind: 'feature-status', feature: 'note' }));
+  await pollUntil(page, async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick === false, null);
+  assert.equal(await page.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick), false);
+});
