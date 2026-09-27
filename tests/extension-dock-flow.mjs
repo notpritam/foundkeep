@@ -934,3 +934,81 @@ test('dock: highlight, context selection and keyboard highlight upload with back
   assert.deepEqual(methods, ['context-selection', 'keyboard-highlight', 'popup-highlight']);
   for (const method of methods) assert.ok(BACKEND_CAPTURE_METHODS.has(method), method);
 });
+
+// M9a: the X button's whole round trip through the dock review.
+test('dock: an X save confirms through the dock review (twitter-action, button saved) and a cancel resets the button (M9)', { timeout: 40000 }, async t => {
+  const { context, worker, extensionId } = await launch(t);
+  await signIn(context, worker);
+  const uploads = [];
+  await context.route('**/api/captures', r => { uploads.push(r.request().postDataJSON()); return r.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }); });
+  await context.route('https://x.com/**', r => r.fulfill({ contentType: 'text/html', body: TWEET_FIXTURE }));
+  const web = await context.newPage(); await web.goto('https://x.com/home');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  await web.bringToFront();
+  const dock = await dockWorld(web, extensionId);
+
+  // Confirm: the capture is a tweet with the twitter-action method, and the
+  // button on the post ends up "saved".
+  const button = web.locator('article [data-state]'); await button.waitFor(); await button.click();
+  await dock.waitFor("__foundkeepDock.state() === 'review'", 8000);
+  assert.equal(await button.getAttribute('data-state'), 'choosing');
+  let frame = await reviewFrame(web);
+  await frame.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+  assert.equal(await frame.inputValue('#destinationPersonalTitle'), 'Mina (@mina) on X');
+  await frame.click('#destinationConfirm');
+  await dock.waitFor("__foundkeepDock.status() === 'Saved'", 10000);
+  await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state === 'saved', null);
+  const captures = await ext.evaluate(async () => (await (await import('./db.js')).listCaptures()).map(c => ({ cloudType: c.cloudType, sourceUrl: c.sourceUrl, method: c.provenance.captureMethod })));
+  assert.deepEqual(captures, [{ cloudType: 'tweet', sourceUrl: 'https://x.com/mina/status/123456789', method: 'twitter-action' }]);
+  const deadline = Date.now() + 10000;
+  while (uploads.length === 0 && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
+  assert.equal(uploads[0].provenance.captureMethod, 'twitter-action');
+  assert.ok(BACKEND_CAPTURE_METHODS.has(uploads[0].provenance.captureMethod));
+
+  // Cancel: a fresh button (after a reload) goes back to idle, nothing saved.
+  await web.reload();
+  const dockAgain = await dockWorld(web, extensionId);
+  const fresh = web.locator('article [data-state]'); await fresh.waitFor(); await fresh.click();
+  await dockAgain.waitFor("__foundkeepDock.state() === 'review'", 8000);
+  frame = await reviewFrame(web);
+  await frame.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+  await frame.click('#reviewCancel');
+  await dockAgain.waitFor("__foundkeepDock.state() === 'expanded'");
+  await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state === 'idle', null);
+  assert.equal(await ext.evaluate(async () => (await (await import('./db.js')).listCaptures()).length), 1);
+});
+
+// M9b: a right-click image save asks for the image site's permission only at
+// Save; declining keeps the review open with the existing message.
+test('dock: a context-menu image save requests the image origin at confirm, and denial keeps the review open (M9)', { timeout: 30000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  await signIn(context, worker);
+  await context.route(origin + '/__image', r => r.fulfill({ contentType: 'text/html', body: '<title>Image fixture</title><img src="https://images.example.com/photo.png" alt="A photo">' }));
+  await context.route('https://images.example.com/**', r => r.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
+  const web = await context.newPage(); await web.goto(origin + '/__image');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  const tab = await ext.evaluate(async url => (await chrome.tabs.query({ url }))[0], origin + '/__image*');
+  // What chrome.contextMenus.onClicked does for "Save image to FoundKeep".
+  const started = await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'save-image', { trigger: 'context', info: { menuItemId: 'save-image', srcUrl: 'https://images.example.com/photo.png', pageUrl: tab.url } })), tab);
+  assert.deepEqual(started, { ok: true });
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'review'", 8000);
+  const frame = await reviewFrame(web);
+  await frame.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+  await frame.evaluate(() => {
+    window.__permissionRequests = [];
+    chrome.permissions.request = request => { window.__permissionRequests.push(request); return Promise.resolve(false); };
+  });
+  assert.deepEqual(await frame.evaluate(() => window.__permissionRequests), [], 'nothing is requested before Save');
+  await web.bringToFront();
+  await frame.click('#destinationConfirm');
+  const feedback = async () => frame.$eval('#destinationFeedback', el => el.textContent);
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && await feedback() !== 'Allow access to the image’s site to save its original file, then try again.') await new Promise(r => setTimeout(r, 50));
+  assert.equal(await feedback(), 'Allow access to the image’s site to save its original file, then try again.');
+  assert.deepEqual(await frame.evaluate(() => window.__permissionRequests), [{ origins: ['https://images.example.com/*'] }]);
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'review', 'the review stays open');
+  assert.ok(await ext.evaluate(id => import('./save-review.js').then(m => m.readSaveReview(id)).then(d => d?.action === 'save-image'), tab.id), 'the draft is kept');
+  assert.equal(await ext.evaluate(async () => (await (await import('./db.js')).listCaptures()).length), 0);
+  assert.equal(await frame.$eval('#destinationConfirm', el => el.disabled), false, 'Save can be tried again');
+});
