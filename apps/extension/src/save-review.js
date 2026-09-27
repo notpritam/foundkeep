@@ -27,6 +27,7 @@ export async function stageSaveReview(request) {
       throw new Error('Finish or cancel the current save first.');
     }
     const binding = await captureBinding();
+    if (!binding.cloudAccountId) throw new Error('Sign in to FoundKeep to save.');
     const draft = { ...request, id: 'cap_' + crypto.randomUUID(), accountId: binding.cloudAccountId, createdAt: Date.now() };
     await chrome.storage.session.set({ [key(request.tab.id)]: draft }); changed(request.tab.id);
     return draft;
@@ -61,7 +62,7 @@ export async function confirmSaveReview({ tabId, id, choice }, capture) {
     const binding = await captureBinding();
     if (binding.cloudAccountId !== draft.accountId) throw new Error('Your connected account changed. Cancel this review and start again.');
     if (!choice || !['local','library','folder','collection'].includes(choice.kind)) throw new Error('Choose where to save this.');
-    if (choice.kind !== 'local' && !draft.accountId) throw new Error('Sign in to save to your account, or choose this browser.');
+    if (choice.kind === 'local') throw new Error('Sign in to FoundKeep to save.');
     const details = normalizeSaveDetails(choice.details);
     const destination = { kind: choice.kind, reviewAccountId: draft.accountId, details };
     const folderId = choice.kind === 'folder' ? choice.id : details.folderId;
@@ -93,8 +94,9 @@ export async function confirmSaveReview({ tabId, id, choice }, capture) {
       || ('userTags' in details && JSON.stringify(existing.userTags || []) !== JSON.stringify(details.userTags))
       || (destination.collection && JSON.stringify(existing.collectionSubmission?.entry) !== JSON.stringify(destination.collection.entry))))
       throw new Error('This save was already confirmed with different details. Check Local saves before editing it.');
+    if (draft.action === 'note' && (typeof details.noteText !== 'string' || !details.noteText || details.noteText.length > 50000)) throw new Error('Write a note of up to 50,000 characters.');
     // A worker restart after commit can safely acknowledge the original save.
-    const record = existing || await capture(draft, input => saveCapture(input, { destination, id: draft.id }));
+    const record = existing || await capture({ ...draft, text: draft.action === 'note' ? details.noteText : draft.text }, input => saveCapture(input, { destination, id: draft.id }));
     await chrome.storage.session.remove(key(tabId)); changed(tabId);
     if (draft.action === 'tweet') chrome.tabs.sendMessage(draft.tab.id, { kind: 'foundkeep-tweet-result', url: draft.tweet.url, cancelled: !record }).catch(() => {});
     return record;

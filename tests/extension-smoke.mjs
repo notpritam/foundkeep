@@ -152,13 +152,25 @@ test(
       assert.equal(shots.length, 2);
       assert.ok(shots.every((c) => c.bytes > 0));
       assert.ok(shots.some((c) => c.width === 200 && c.height === 140));
+      // Saving through the review flow now requires a signed-in account (the
+      // direct "capture" messages above are a separate, ungated pathway).
+      await worker.evaluate(() =>
+        chrome.storage.local.set({
+          atlasCustomer: {
+            account: { id: "account-a" },
+            connection: { id: "connection-a" },
+            token: "t".repeat(43),
+            status: "connected",
+          },
+        }),
+      );
       await popup.locator("#note").fill("Actual extension note");
       await popup.locator("#save").click();
       await popup.waitForFunction(() => document.querySelector('#saveFeedback').textContent.includes('Choose where'));
       const reviewed = await popup.evaluate(async () => {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         const { draft } = await chrome.runtime.sendMessage({ kind: 'save-review-get', tabId: tab.id });
-        return chrome.runtime.sendMessage({ kind: 'save-review-confirm', tabId: tab.id, id: draft.id, choice: { kind: 'local' } });
+        return chrome.runtime.sendMessage({ kind: 'save-review-confirm', tabId: tab.id, id: draft.id, choice: { kind: 'library', details: { noteText: draft.text } } });
       });
       assert.equal(reviewed.ok, true, reviewed.error);
       await count(5);

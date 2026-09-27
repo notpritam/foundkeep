@@ -11,6 +11,12 @@ test('an X save opens a destination review without saving until confirmation, an
  const extension=process.env.FOUNDKEEP_TEST_EXTENSION||path.resolve('apps/extension');
  context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:process.env.FOUNDKEEP_HEADLESS!=='false',executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox',`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
  const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
+ // Saving now requires a signed-in account; use a fixture account with no
+ // real network, mocking the destination-loading and sync endpoints it hits.
+ await worker.evaluate(()=>chrome.storage.local.set({atlasCustomer:{account:{id:'account-a'},connection:{id:'connection-a'},token:'token-a',status:'connected'}}));
+ await context.route('**/api/organization',route=>route.fulfill({json:{folders:[],tags:[],suggestedTags:[]}}));
+ await context.route('**/api/collections',route=>route.fulfill({json:{collections:[]}}));
+ await context.route('**/api/captures',route=>route.fulfill({json:{capture:{id:'remote-1',status:'done'}}}));
  await context.route('https://x.com/**',route=>route.fulfill({contentType:'text/html',body:`<title>X fixture</title><article data-testid="tweet"><div data-testid="User-Name">Mina</div><a href="/mina/status/123456789"><time>Today</time></a><div data-testid="tweetText">A tweet worth keeping.</div><div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/own.jpg"></div><div data-testid="card.wrapper"><a href="https://t.co/blog" title="https://example.org/blog">Blog</a></div><div role="link"><a href="/neighbor/status/999">A quoted post</a><div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/quoted.jpg"></div><div data-testid="tweetText"><a href="https://example.org/quoted">Quoted link</a></div></div><div data-testid="videoPlayer"><div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/poster.jpg"></div></div><div data-testid="twitterArticleRichTextView">Visible long-form article</div><div role="group"><button data-testid="reply">Reply</button></div></article>`}));
  const web=await context.newPage();await web.goto('https://x.com/home');
  const button=web.locator('article [data-state]');await button.waitFor();await button.click();
@@ -32,11 +38,11 @@ test('an X save opens a destination review without saving until confirmation, an
  await panel.waitFor(`document.querySelector('#destinationDialog')?.open && document.querySelector('#destinationNote')?.value==='Use these for our next project'`);
  assert.equal(await panel.evaluate(`document.querySelector('#destinationPersonalTitle').value`),'UI references');
  assert.equal(await panel.evaluate(`document.querySelectorAll('#destinationTags .selected').length`),2);
- await panel.evaluate('document.querySelector("#saveDestination").value="local";document.querySelector("#saveDestination").dispatchEvent(new Event("change"));document.querySelector("#destinationConfirm").click()');
+ await panel.evaluate('document.querySelector("#saveDestination").value="library";document.querySelector("#saveDestination").dispatchEvent(new Event("change"));document.querySelector("#destinationConfirm").click()');
  await panel.waitFor('!document.querySelector("#destinationDialog").open');
  assert.equal(await count(),1);
  const saved=await panel.evaluate("import('./db.js').then(db=>db.listCaptures()).then(rows=>rows[0])");
- assert.equal(saved.selectionText,'A tweet worth keeping.');assert.equal(saved.cloudAccountId,null);
+ assert.equal(saved.selectionText,'A tweet worth keeping.');assert.equal(saved.cloudAccountId,'account-a');
  assert.equal(saved.sourceTitle,'UI references');assert.equal(saved.noteText,'Use these for our next project');assert.deepEqual(saved.userTags,['UI','React']);
  assert.equal(saved.sourceUrl,'https://x.com/mina/status/123456789');
  assert.deepEqual(saved.socialContext,{version:1,images:['https://pbs.twimg.com/media/own.jpg'],links:['https://example.org/blog'],articleText:'Visible long-form article'});
@@ -50,7 +56,8 @@ test('an X save opens a destination review without saving until confirmation, an
  await panel.evaluate("chrome.storage.local.set({atlasCustomer:{account:{id:'different-account'},connection:{id:'different-connection'},token:null,status:'reconnect'}})");
  const denied=await panel.evaluate(`chrome.runtime.sendMessage({kind:'save-review-confirm',tabId:${pending.tab.id},id:${JSON.stringify(pending.id)},choice:{kind:'local'}})`);
  assert.equal(denied.ok,false);assert.match(denied.error,/account changed/);assert.equal(await count(),1);
- await panel.evaluate('chrome.storage.local.remove("atlasCustomer")');
+ // Leave a (still signed-in, if different) account in place: saving keeps
+ // requiring an account, so the legacy dashboard note below must stage too.
  await panel.evaluate('document.querySelector("#destinationCancel").click()');
 
  // A retained local-library tab must use the same native review, never silently

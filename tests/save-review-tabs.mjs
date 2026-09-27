@@ -16,6 +16,7 @@ test('save drafts are per tab: two tabs keep separate drafts and closing a tab d
   const a = await context.newPage(); await a.goto(origin + '/__draft-a');
   const b = await context.newPage(); await b.goto(origin + '/__draft-b');
   const page = await context.newPage(); await page.goto(await worker.evaluate(() => chrome.runtime.getURL('src/popup.html')));
+  await page.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' } }));
   const ids = await page.evaluate(async () => {
     const tabs = await chrome.tabs.query({});
     return tabs.filter(tab => /__draft-[ab]$/.test(tab.url)).sort((x, y) => x.url.localeCompare(y.url)).map(tab => tab.id);

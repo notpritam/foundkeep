@@ -15,6 +15,12 @@ test('toolbar opens the native sidebar with no popup, and notes, local saves and
       args: ['--no-sandbox', '--window-size=1280,1000', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
     });
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+    // Saving now requires a signed-in account; use a fixture account with no
+    // real network, mocking the destination-loading and sync endpoints it hits.
+    await worker.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' } }));
+    await context.route('**/api/organization', route => route.fulfill({ json: { folders: [], tags: [], suggestedTags: [] } }));
+    await context.route('**/api/collections', route => route.fulfill({ json: { collections: [] } }));
+    await context.route('**/api/captures', route => route.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }));
     assert.equal(await worker.evaluate(() => chrome.action.getPopup({})), '');
     assert.equal(await worker.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick), true);
     const origin = await worker.evaluate(() => new URL(chrome.runtime.getManifest().host_permissions[0]).origin);
@@ -37,7 +43,7 @@ test('toolbar opens the native sidebar with no popup, and notes, local saves and
     await panel.send('Input.insertText', { text: 'Saved from the native sidebar' });
     await panel.evaluate('document.querySelector("#save").click()');
     await panel.waitFor('document.querySelector("#destinationDialog").open');
-    await panel.evaluate('document.querySelector("#saveDestination").value="local";document.querySelector("#saveDestination").dispatchEvent(new Event("change"));document.querySelector("#destinationConfirm").click()');
+    await panel.evaluate('document.querySelector("#saveDestination").value="library";document.querySelector("#saveDestination").dispatchEvent(new Event("change"));document.querySelector("#destinationConfirm").click()');
     await panel.waitFor('!document.querySelector("#destinationDialog").open');
     assert.equal(await panel.evaluate("import('./db.js').then(db => db.listCaptures()).then(rows => rows[0].noteText)"), 'Saved from the native sidebar');
     await panel.evaluate('document.querySelector("#openLocal").click()');
