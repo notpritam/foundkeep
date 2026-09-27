@@ -181,3 +181,32 @@ test('dock: an update migrates stranded 1.7.x sidebar-* captures to popup-* and 
   await ext.evaluate(async () => (await import('./capture.js')).drainQueue());
   assert.deepEqual(uploads.map(u => [u.clientId, u.provenance.captureMethod]), [['cap_failed', 'popup-save-page']]);
 });
+
+// I4: the dashboard shows "Import from this browser" only for an extension
+// that says it can open the import page — released builds (store 1.0.2,
+// friends 1.7.x) answer atlas-ping without it and don't handle
+// atlas-open-import. A feature flag, not a version comparison.
+test('dock: atlas-ping advertises the open-import feature to foundkeep.app (I4)', { timeout: 30000 }, async t => {
+  const { context, extensionId, origin } = await launch(t);
+  await context.route(origin + '/__ping', r => r.fulfill({ contentType: 'text/html', body: '<title>Ping fixture</title>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__ping');
+  const result = await web.evaluate(extensionId => new Promise(resolve => chrome.runtime.sendMessage(extensionId, { kind: 'atlas-ping' }, resolve)), extensionId);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.features, ['open-import']);
+});
+
+// M7: a failing chrome.tabs.create must answer the site right away instead
+// of leaving it waiting out its 15 s timeout.
+test('dock: atlas-open-import answers {ok:false} when the import tab cannot open (M7)', { timeout: 30000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  await context.route(origin + '/__ext-fail', r => r.fulfill({ contentType: 'text/html', body: '<title>External fixture</title>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__ext-fail');
+  await worker.evaluate(() => { chrome.tabs.create = () => Promise.reject(new Error('No window is available.')); });
+  const started = Date.now();
+  const result = await web.evaluate(extensionId => Promise.race([
+    new Promise(resolve => chrome.runtime.sendMessage(extensionId, { kind: 'atlas-open-import' }, resolve)),
+    new Promise(resolve => setTimeout(() => resolve('no answer within 5 s'), 5000)),
+  ]), extensionId);
+  assert.deepEqual(result, { ok: false, error: 'FoundKeep could not open the import page. Try again.' });
+  assert.ok(Date.now() - started < 5000);
+});

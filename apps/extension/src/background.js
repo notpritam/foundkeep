@@ -64,7 +64,11 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
   }
   if (msg?.kind === "atlas-open-import") {
     if (!trustedPairingSender(sender)) { respond({ ok: false, error: "This page cannot open FoundKeep import." }); return; }
-    void chrome.tabs.create({ url: chrome.runtime.getURL("src/import.html") }).then(() => respond({ ok: true }));
+    // M7: always answer — a failed tab open must not leave the site waiting
+    // out its own 15 s timeout.
+    void Promise.resolve()
+      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("src/import.html") }))
+      .then(() => respond({ ok: true }), () => respond({ ok: false, error: "FoundKeep could not open the import page. Try again." }));
     return true;
   }
   handleExternalMessage(msg, sender)

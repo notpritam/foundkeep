@@ -113,6 +113,11 @@ export async function handleExternalMessage(message, sender) {
     return {
       ok: true,
       version: chrome.runtime.getManifest().version,
+      // I4: capabilities the dashboard may offer, so it never has to infer
+      // them from a version number. "open-import": atlas-open-import opens
+      // the standalone bookmark import page (released 1.0.2/1.7.x builds
+      // answer this ping without it and don't handle that message).
+      features: ["open-import"],
       environment: EXTENSION_ENVIRONMENT,
       origin: CUSTOMER_ORIGIN,
       autoConnect: {
