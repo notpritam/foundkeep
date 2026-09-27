@@ -66,7 +66,6 @@ export async function confirmSaveReview({ tabId, id, choice }, capture) {
     const details = normalizeSaveDetails(choice.details);
     const destination = { kind: choice.kind, reviewAccountId: draft.accountId, details };
     const folderId = choice.kind === 'folder' ? choice.id : details.folderId;
-    if (choice.kind === 'local' && folderId) throw new Error('Choose your account library to use a folder.');
     if (folderId) {
       const result = await libraryRequest('organization', {}, draft.accountId);
       if (!result.folders?.some(folder => folder.id === folderId)) throw new Error('That folder is no longer available. Choose another folder.');

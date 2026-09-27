@@ -3,12 +3,17 @@ import { bindSaveTags } from './save-details.js';
 
 const tabId = Number(new URLSearchParams(location.search).get('tab'));
 const framed = window.parent !== window;
-let draft = null, collections = [], folders = [], busy = false, creating = false, epoch = 0, saveTimer;
+let draft = null, collections = [], folders = [], busy = false, creating = false, epoch = 0, saveTimer, finished = false;
 
 function post(data) {
   if (framed) window.parent.postMessage({ foundkeepReview: true, ...data }, '*');
 }
+// Cancel's own success path and the foundkeep-save-review-changed broadcast
+// it triggers can both observe "no draft" and try to finish the page; make
+// finishing idempotent so the dock only ever sees one done message.
 function finish(saved) {
+  if (finished) return;
+  finished = true;
   if (framed) post({ type: 'done', saved });
   else window.close();
 }

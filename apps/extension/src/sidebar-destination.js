@@ -65,7 +65,6 @@ export function bindSidebarDestination() {
   function renderDestinations(selected = $('saveDestination').value) {
     $('saveDestination').replaceChildren(new Option('Choose a destination', ''));
     if (draft?.accountId) $('saveDestination').add(new Option('My library · Private', 'library'));
-    $('saveDestination').add(new Option('This browser only', 'local'));
     if (collections.length) {
       const group = document.createElement('optgroup'); group.label = 'Collections';
       for (const collection of collections) group.append(new Option(`${collection.title} · ${collection.visibility === 'public' ? 'Public' : 'Private'}`, 'collection:' + collection.id));
@@ -117,7 +116,7 @@ export function bindSidebarDestination() {
       $('destinationNewFolderToggle').setAttribute('aria-expanded', String(!!stored.newFolder));
       message($('destinationFolderFeedback'), ''); message($('destinationFeedback'), '');
       tags.set(stored.tags || [], stored.tagInput || ''); sharedTags.set(stored.sharedTags || [], stored.sharedTagInput || '');
-      renderFolders(stored.folderId || ''); renderDestinations(stored.destination || (draft.accountId ? 'library' : 'local'));
+      renderFolders(stored.folderId || ''); renderDestinations(stored.destination || 'library');
       selection(); openDialog(dialog); void loadDestinations();
     } catch (error) { message($('captureFeedback'), error.message, 'error'); }
   }

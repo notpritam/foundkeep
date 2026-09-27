@@ -53,12 +53,12 @@ test('image permission is requested only after destination confirmation and deni
  await page.evaluate(()=>{
   fixture.permissionRequests=[];
   chrome.permissions.request=async value=>{fixture.permissionRequests.push(value);return false;};
-  fixture.reviewDraft={id:'image-review',accountId:null,action:'save-image',tab:{id:12,windowId:1,url:'https://example.org/article',title:'An image worth keeping'},info:{srcUrl:'https://images.example.org/photo.png'}};
+  fixture.reviewDraft={id:'image-review',accountId:'account-a',action:'save-image',tab:{id:12,windowId:1,url:'https://example.org/article',title:'An image worth keeping'},info:{srcUrl:'https://images.example.org/photo.png'}};
   fixture.listeners.forEach(listener=>listener({kind:'foundkeep-save-review-changed'}));
  });
  await page.waitForFunction(()=>document.querySelector('#destinationDialog').open);
  assert.equal(await page.evaluate(()=>fixture.permissionRequests.length),0);
- await page.locator('#saveDestination').selectOption('local');
+ await page.locator('#saveDestination').selectOption('library');
  await page.locator('#destinationConfirm').click();
  await page.waitForFunction(()=>document.querySelector('#destinationFeedback').textContent.includes('Allow access'));
  assert.deepEqual(await page.evaluate(()=>fixture.permissionRequests),[{origins:['https://images.example.org/*']}]);
