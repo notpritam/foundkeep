@@ -43,9 +43,9 @@ tr.hidden,section.hidden{display:none}
 <main>
 <header><h1>FoundKeep — launch tracker</h1><div class="meta">Updated 2026-09-27 · generated from docs/launch/roadmap.json</div></header>
 <div class="hero">
-  <div class="card"><div class="hero-label">Launch readiness</div><div class="hero-value">14%</div>
-    <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="14" aria-label="Launch readiness"><span style="width:14%"></span></div>
-    <div class="hero-sub">10 of 74 launch items done · <b>19 need you</b></div></div>
+  <div class="card"><div class="hero-label">Launch readiness</div><div class="hero-value">13%</div>
+    <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="13" aria-label="Launch readiness"><span style="width:13%"></span></div>
+    <div class="hero-sub">10 of 75 launch items done · <b>19 need you</b></div></div>
   <div><p class="goal" style="margin-top:0">Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.</p>
     <div class="tiles">
       <div class="tile"><div class="tile-label">Accounts</div><div class="tile-value">21</div><div class="tile-sub">0 new in last 7 days</div></div>
@@ -80,7 +80,7 @@ tr.hidden,section.hidden{display:none}
     </a><a class="phase" href="#P5">
       <div class="phase-head"><span class="phase-id">P5</span><span class="phase-name">Product gaps</span><span class="phase-pct">0%</span></div>
       <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Product gaps progress"><span style="width:0%"></span></div>
-      <div class="phase-counts">0/15 done · 1 in progress · <b>2 need you</b></div>
+      <div class="phase-counts">0/16 done · 2 in progress · <b>2 need you</b></div>
     </a><a class="phase" href="#P6">
       <div class="phase-head"><span class="phase-id">P6</span><span class="phase-name">Store launch</span><span class="phase-pct">0%</span></div>
       <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Store launch progress"><span style="width:0%"></span></div>
@@ -420,6 +420,11 @@ tr.hidden,section.hidden{display:none}
         <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Update public copy: versions, 'private beta' wording, beta page build number</td>
         <td class="area">site</td>
         <td><span class="agent">agent</span></td>
+      </tr><tr data-id="P5.16" data-status="doing" data-owner="agent" data-area="extension">
+        <td><span class="status s-doing"><i aria-hidden="true">◐</i>In progress</span></td>
+        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Extension: floating dock replaces the side panel<div class="note">Spec approved 2026-09-27: docs/superpowers/specs/2026-09-27-extension-floating-dock-design.md. Collapsed pill → toolbar → review card; library and settings move to the dashboard; account required. Ships to dev, then friends, then the CWS 1.0.3 update.</div></td>
+        <td class="area">extension</td>
+        <td><span class="agent">agent</span></td>
       </tr></tbody></table>
     </section><section class="phase-section" id="P6">
       <h2><span class="phase-id">P6</span> Store launch</h2>
@@ -607,7 +612,7 @@ tr.hidden,section.hidden{display:none}
 <p class="meta">★ = asked for by Pritam in a FoundKeep thread. Statuses: ✓ Done · ◐ In progress · ○ To do · ■ Blocked.</p>
 </main>
 <script>
-const asked = new Set(["P0.9","P1.8","P3.6","P4.1","P4.2","P4.3","P4.5","P5.1","P5.2","P5.3","P5.4","P5.5","P5.6","P5.7","P5.8","P5.9","P5.10","P5.11","P5.13","P5.14","P5.15","P6.1","P6.2","P6.3","P6.4","P6.5","P6.8","P6.9","P7.2","P7.4","P7.6","L.1","L.2","L.3","L.4","L.5","L.6","L.7","L.8","L.9","L.10","L.11","L.12","L.13","L.14","L.15","L.16","L.17","L.19"]);
+const asked = new Set(["P0.9","P1.8","P3.6","P4.1","P4.2","P4.3","P4.5","P5.1","P5.2","P5.3","P5.4","P5.5","P5.6","P5.7","P5.8","P5.9","P5.10","P5.11","P5.13","P5.14","P5.15","P5.16","P6.1","P6.2","P6.3","P6.4","P6.5","P6.8","P6.9","P7.2","P7.4","P7.6","L.1","L.2","L.3","L.4","L.5","L.6","L.7","L.8","L.9","L.10","L.11","L.12","L.13","L.14","L.15","L.16","L.17","L.19"]);
 const rows = [...document.querySelectorAll('tbody tr')];
 let f = 'all';
 const area = document.querySelector('.filters select');

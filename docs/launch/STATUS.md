@@ -4,7 +4,7 @@
 
 **Goal:** Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.
 
-**Launch readiness: 14%** — 10 of 74 launch items done · 19 waiting on Pritam · updated 2026-09-27
+**Launch readiness: 13%** — 10 of 75 launch items done · 19 waiting on Pritam · updated 2026-09-27
 
 **Production (2026-09-27 04:13 UTC):** 21 accounts (0 new in 7d) · 2 active in 7d · 146 saves (47 in 7d) · 0 paying · 0 open tickets
 
@@ -17,7 +17,7 @@
 | P2 Open signups safely | 0% | 0 | 0 | 9 | 0 |
 | P3 Accounts, email & legal | 0% | 0 | 0 | 9 | 0 |
 | P4 Monetization | 0% | 0 | 0 | 8 | 0 |
-| P5 Product gaps | 0% | 0 | 1 | 14 | 0 |
+| P5 Product gaps | 0% | 0 | 2 | 14 | 0 |
 | P6 Store launch | 0% | 0 | 0 | 9 | 0 |
 | P7 Launch | 0% | 0 | 1 | 5 | 0 |
 | L Later (asked) _(post-launch)_ | 0% | 0 | 0 | 18 | 1 |
@@ -134,6 +134,7 @@ _Exit criteria:_ Every ★ item marked for launch is live in prod and in the shi
 | ○ To do | ★ Admin console: real uptime, actual spend, social-session status | admin | agent |  |
 | ○ To do | ★ Publish launch public collections so Explore isn't empty | collections | **Pritam** | Prod has 0 public collections. |
 | ○ To do | ★ Update public copy: versions, 'private beta' wording, beta page build number | site | agent |  |
+| ◐ In progress | ★ Extension: floating dock replaces the side panel | extension | agent | Spec approved 2026-09-27: docs/superpowers/specs/2026-09-27-extension-floating-dock-design.md. Collapsed pill → toolbar → review card; library and settings move to the dashboard; account required. Ships to dev, then friends, then the CWS 1.0.3 update. |
 
 ## P6 · Store launch
 

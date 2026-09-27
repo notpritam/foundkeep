@@ -625,6 +625,16 @@
       "asked": true
     },
     {
+      "id": "P5.16",
+      "phase": "P5",
+      "title": "Extension: floating dock replaces the side panel",
+      "area": "extension",
+      "status": "doing",
+      "owner": "agent",
+      "asked": true,
+      "note": "Spec approved 2026-09-27: docs/superpowers/specs/2026-09-27-extension-floating-dock-design.md. Collapsed pill → toolbar → review card; library and settings move to the dashboard; account required. Ships to dev, then friends, then the CWS 1.0.3 update."
+    },
+    {
       "id": "P6.1",
       "phase": "P6",
       "title": "Start the Google Play closed test: 12+ testers for 14 days",
