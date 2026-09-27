@@ -40,19 +40,7 @@ http
         url.split("/").some((s) => s.startsWith("."))
       )
         throw new Error("Not found");
-      let body = await readFile(file);
-      if (
-        url === "/apps/extension/src/popup.html" ||
-        url === "/apps/extension/src/dashboard.html"
-      ) {
-        body = body
-          .toString()
-          .replace(
-            /<script type="module" src="(popup|dashboard)\.js"><\/script>/,
-            (_, entry) =>
-              `<script type="module">import {ready} from '/__preview/runtime.js'; await ready; await import('./${entry}.js');</script>`,
-          );
-      }
+      const body = await readFile(file);
       res.writeHead(200, {
         "Content-Type": mime[path.extname(file)] || "application/octet-stream",
         "Cache-Control": "no-store",

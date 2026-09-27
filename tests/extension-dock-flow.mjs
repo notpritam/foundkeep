@@ -358,6 +358,55 @@ test('dock: hides during a full-page screenshot and reappears afterward', { time
   assert.equal(samples[samples.length - 1], true, 'the dock must be visible again once the capture finishes');
 });
 
+test('dock: a region drag saves a screenshot capture with the dragged dimensions', { timeout: 30000 }, async t => {
+  // captureVisibleTab needs the activeTab or all-urls permission specifically;
+  // nothing in this suite can grant a fresh activeTab gesture, so this reuses
+  // the same disposable all-urls extension copy as the full-page test above
+  // (and the deleted tests/extension-smoke.mjs's region test, at 5713572).
+  const { context, worker, extensionId, origin } = await launch(t, { allUrls: true });
+  await signIn(context, worker);
+  await context.route(origin + '/__region', r => r.fulfill({ contentType: 'text/html', body: '<title>Region fixture</title><p style="height:600px">A page worth dragging over.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__region');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+
+  assert.equal(await summon(ext, origin + '/__region*'), true);
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await dock.click('[data-action="screenshot"]');
+  await dock.waitFor(`__foundkeepDock.rect('[data-menu="screenshot"]').height > 0`);
+  await dock.click('[data-action="region"]');
+  const frame = await reviewFrame(web);
+  await frame.waitForSelector('#reviewForm[data-ready="true"]');
+  await frame.selectOption('#saveDestination', 'library');
+  await frame.dispatchEvent('#saveDestination', 'change');
+
+  await web.bringToFront();
+  await frame.click('#destinationConfirm');
+  // Confirming a region draft injects the on-page drag overlay
+  // (regionSelectInPage in background.js) rather than capturing immediately;
+  // the review card hides for the duration (withDockHidden), same as the
+  // full-page case above.
+  await web.getByText('Drag to capture · Esc to cancel').waitFor();
+  await web.mouse.move(50, 70);
+  await web.mouse.down();
+  await web.mouse.move(250, 210);
+  await web.mouse.up();
+  await dock.waitFor("__foundkeepDock.state() !== 'review'", 20000);
+
+  const dpr = await web.evaluate(() => window.devicePixelRatio);
+  // A Blob's own `size` is not JSON-structured-cloneable back across
+  // page.evaluate()'s serialization boundary (it would arrive as `{}`), so
+  // read it from inside the page like the deleted extension-smoke.mjs did.
+  const captures = await ext.evaluate(async () => (await (await import('./db.js')).listCaptures())
+    .map(c => ({ type: c.type, width: c.width, height: c.height, bytes: c.blob?.size ?? 0 })));
+  assert.equal(captures.length, 1);
+  const [capture] = captures;
+  assert.equal(capture.type, 'screenshot');
+  assert.equal(capture.width, Math.round(200 * dpr));
+  assert.equal(capture.height, Math.round(140 * dpr));
+  assert.ok(capture.bytes > 0, 'the screenshot must have non-zero bytes');
+});
+
 test('dock: a capture without a scripting grant surfaces through the fallback popup', { timeout: 30000 }, async t => {
   const { context, worker } = await launch(t);
   await signIn(context, worker);

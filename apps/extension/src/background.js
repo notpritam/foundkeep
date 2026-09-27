@@ -468,7 +468,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ---------------------------------------------------------------------------
 // The one place every capture action is defined.
 // ---------------------------------------------------------------------------
-async function performCapture(action, { tab, info, tweet, text, attachPage, trigger = "popup", commit = saveCapture }) {
+// performCapture's only caller is the save-review-confirm handler, spreading
+// a draft that stageSaveReview always stamps with a trigger ('dock', or
+// 'context'/'keyboard'/'twitter' from the handful of callers that override
+// it) — never undefined, so `trigger` needs no default here.
+async function performCapture(action, { tab, info, tweet, text, attachPage, trigger, commit = saveCapture }) {
   const captureMethod = methodFor(action, trigger);
   const preferenceState = await getEffectivePreferences();
   const preferences = preferenceState.preferences;

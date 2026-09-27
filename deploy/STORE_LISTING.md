@@ -19,18 +19,19 @@ This release is authorized for preparation and review submission. **Defer publis
 
 FoundKeep gives the useful things you find on the web a place to stay.
 
-- Open FoundKeep from the browser toolbar to keep your library in a native sidebar beside the page.
-- Save readable pages, highlights, screenshots, images, X posts and quick notes with their original source.
-- Review each save first: choose a destination, add a title and personal note, organize it in a folder, and choose or create tags.
+- Click the FoundKeep toolbar icon to show a small dock on the page you choose. Save the page, highlight your selection, capture a region or full-page screenshot, or write a note — right from the dock.
+- Right-click to save a selection, link, image or page, or capture a screenshot; save an X/Twitter post with its own button, with original source details kept for each.
+- Review each save first in a small card on the page: choose a destination, add a title and personal note, organize it in a folder, and choose or create tags.
 - Keep personal notes, folders and tags private when submitting selected fields to a collection. Review the collection's audience before confirming.
 - Sign in at foundkeep.app to connect a matching, unpaired extension automatically. Switching an existing connection to another account requires confirmation.
 - Save locally first. New saves sync to your connected account when automatic sync is enabled; offline saves stay in this browser until they can upload.
-- Search and edit your library in the sidebar, browse local saves, and choose system, light or dark appearance.
+- Turn on "Show on every site" from the dock's menu to keep it available across tabs without clicking the toolbar icon again.
+- Search and edit your library, and choose system, light or dark appearance, from your FoundKeep dashboard.
 - Import bookmarks and nested folders from the browser or an HTML export after reviewing the import. FoundKeep never changes browser bookmarks.
 - Control capture methods, page details, context menus, sync and optional organization from account settings.
 - Connect your own MCP-compatible agent with optional, scoped and revocable dashboard access.
 
-An account is optional for local capture. Older local saves stay on the device until you explicitly import them into an account. Local and cloud copies are separate.
+FoundKeep requires a signed-in account to save. Captures kept only in this browser from an earlier version remain there until you move them into your account; local and cloud copies are separate.
 
 Saved pages can retain readable text, headings, source and canonical URLs, title, description, publisher, author, dates, language, images, capture method, timestamps and a content fingerprint when available. FoundKeep does not store raw page HTML. For supported saved social posts, the service can try to retain available source photos, videos and linked article content in your private library. Availability depends on the source, access and storage limits; saving text does not guarantee every media file can be preserved.
 
@@ -84,9 +85,9 @@ Provide a verified dedicated reviewer account only in the private dashboard Test
 
 Fresh 1.0.2 kit assets under `assets/`:
 
-- `native-sidebar.png` — native sidebar and local-save controls, 1280 × 800.
+- `dock-toolbar.png` — the expanded floating dock on a page, 1280 × 800.
 - `save-review.png` — detailed save review, 1280 × 800.
-- `local-library.png` — local note reader, 1280 × 800.
+- `dock-review.png` — the review card, 1280 × 800.
 - `promo-small.png` — 440 × 280 tile.
 - `promo-marquee.png` — optional 1400 × 560 tile.
 - `icon128.png` — packaged 128 × 128 icon.
