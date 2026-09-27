@@ -25,6 +25,8 @@
     .pill{padding:0 10px}
     .status{padding:0 10px;color:#8a8f98;max-width:260px;overflow:hidden;text-overflow:ellipsis}
     .status[data-tone="ok"]{color:#4cc38a}.status[data-tone="error"]{color:#f28b82}
+    .signin{display:flex;flex-direction:column;align-items:stretch;gap:2px}
+    .waiting{padding:8px 10px 2px;color:#8a8f98;max-width:260px;white-space:normal;line-height:1.35}
     .menu{position:absolute;bottom:44px;right:0;display:flex;flex-direction:column;min-width:220px;padding:4px;background:#0f1011;border:1px solid #1d1f22;border-radius:12px}
     .menu button{width:100%}
     .card{position:fixed;width:380px;border:0;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.4);background:transparent;color-scheme:normal}
@@ -45,7 +47,7 @@
         <button data-action="library">${svg('library')}Library</button>
         <button data-action="more" aria-haspopup="menu" aria-label="More">${svg('more')}</button>
       </div>
-      <button data-action="sign-in" hidden>Sign in to save</button>
+      <div class="signin" hidden><span class="waiting" hidden></span><button data-action="sign-in">Sign in to save</button></div>
       <span class="status" role="status" hidden></span>
       <div class="menu" data-menu="screenshot" role="menu" hidden>
         <button data-action="region" role="menuitem">Region</button><button data-action="fullpage" role="menuitem">Full page</button></div>
@@ -67,7 +69,12 @@
     const open = mode === 'expanded' || mode === 'review';
     const connected = !!dockState?.connected;
     $('.actions').hidden = !open || !connected;
-    $('[data-action="sign-in"]').hidden = !open || connected;
+    $('.signin').hidden = !open || connected;
+    // I5: saves made without an account (1.7.12 allowed it) are still in this
+    // browser; say so above "Sign in to save" instead of hiding them.
+    const localOnly = dockState?.localOnly || 0;
+    $('.waiting').hidden = connected || !(localOnly > 0);
+    $('.waiting').textContent = localOnly === 1 ? '1 save from this browser is waiting — sign in to keep it' : `${localOnly} saves from this browser are waiting — sign in to keep them`;
     $('.pill').setAttribute('aria-expanded', String(open));
     for (const [action, enabled] of Object.entries(dockState?.actions || {}))
       for (const button of root.querySelectorAll(`[data-action="${action}"]`)) button.hidden = !enabled;
@@ -76,7 +83,7 @@
     $('[data-action="site"]').textContent = dockState?.hiddenHere ? 'Show on this site again' : 'Hide on this site';
     const local = root.querySelector('.local');
     local.hidden = !open || !connected || !(dockState?.localOnly > 0);
-    local.querySelector('.status').textContent = `${dockState?.localOnly || 0} saves are only in this browser`;
+    local.querySelector('.status').textContent = localOnly === 1 ? '1 save is only in this browser' : `${localOnly} saves are only in this browser`;
     local.querySelector('.status').hidden = false;
     if (!open) closeMenus();
     place();

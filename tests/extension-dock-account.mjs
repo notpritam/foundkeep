@@ -53,6 +53,7 @@ test('dock: signed out shows only "Sign in to save", which opens the login page'
 
   assert.equal((await dock.evaluate(`__foundkeepDock.rect('.actions')`)).height, 0, 'actions must stay hidden while signed out');
   assert.ok((await dock.evaluate(`__foundkeepDock.rect('[data-action="sign-in"]')`)).height > 0, 'the sign-in button must be visible');
+  assert.equal((await dock.evaluate(`__foundkeepDock.rect('.waiting')`)).height, 0, 'no waiting-saves line without local saves');
 
   const loginPromise = context.waitForEvent('page', { timeout: 10000 });
   await dock.click('[data-action="sign-in"]');
@@ -75,7 +76,11 @@ test('dock: local-only saves prompt to move into the account, or wait a week', {
   const dock = await dockWorld(web, extensionId);
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   await dock.waitFor(`__foundkeepDock.rect('.local').height > 0`);
-  assert.equal(await dock.evaluate(`__foundkeepDock.text('.local .status')`), '1 saves are only in this browser');
+  // M5: singular and plural.
+  assert.equal(await dock.evaluate(`__foundkeepDock.text('.local .status')`), '1 save is only in this browser');
+  await ext.evaluate(() => import('./db.js').then(db => db.addCapture({ type: 'note', noteText: 'second local', createdAt: Date.now() })));
+  assert.equal(await summon(ext, origin + '/__account-local*'), true);
+  await dock.waitFor(`__foundkeepDock.text('.local .status') === '2 saves are only in this browser'`);
 
   await dock.click('[data-action="local-later"]');
   await dock.waitFor(`__foundkeepDock.rect('.local').height === 0`);
@@ -91,8 +96,33 @@ test('dock: local-only saves prompt to move into the account, or wait a week', {
   await dock.click('[data-action="local-move"]');
   await dock.waitFor(`__foundkeepDock.rect('.local').height === 0`);
   const captures = await ext.evaluate(() => import('./db.js').then(db => db.listCaptures()));
-  assert.equal(captures.length, 1);
-  assert.equal(captures[0].cloudAccountId, 'account-a');
+  assert.equal(captures.length, 2);
+  assert.ok(captures.every(capture => capture.cloudAccountId === 'account-a'));
+});
+
+// I5: 1.7.12 let signed-out users save locally. After upgrading they only
+// see "Sign in to save" — tell them those saves exist and are waiting.
+test('dock: signed out with local saves, the dock says they are waiting above "Sign in to save" (I5)', { timeout: 30000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  await ext.evaluate(() => import('./db.js').then(db => db.addCapture({ type: 'note', noteText: 'saved in 1.7.12 without an account' })));
+  await context.route(origin + '/__account-waiting', r => r.fulfill({ contentType: 'text/html', body: '<title>Waiting fixture</title><p>Text.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__account-waiting');
+
+  assert.equal(await summon(ext, origin + '/__account-waiting*'), true);
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await dock.waitFor(`__foundkeepDock.rect('.waiting').height > 0`);
+  assert.equal(await dock.evaluate(`__foundkeepDock.text('.waiting')`), '1 save from this browser is waiting — sign in to keep it');
+  const waiting = await dock.evaluate(`__foundkeepDock.rect('.waiting')`);
+  const signInButton = await dock.evaluate(`__foundkeepDock.rect('[data-action="sign-in"]')`);
+  assert.ok(signInButton.height > 0, 'the sign-in button is still there');
+  assert.ok(waiting.y + waiting.height <= signInButton.y + 1, `the line sits above "Sign in to save": ${JSON.stringify({ waiting, signInButton })}`);
+  assert.equal((await dock.evaluate(`__foundkeepDock.rect('.actions')`)).height, 0);
+
+  await ext.evaluate(() => import('./db.js').then(db => db.addCapture({ type: 'note', noteText: 'another one' })));
+  assert.equal(await summon(ext, origin + '/__account-waiting*'), true);
+  await dock.waitFor(`__foundkeepDock.text('.waiting') === '2 saves from this browser are waiting — sign in to keep them'`);
 });
 
 test('dock: the ⋯ menu opens the standalone import page', { timeout: 30000 }, async t => {

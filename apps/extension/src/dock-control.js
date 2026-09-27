@@ -60,10 +60,13 @@ export async function dockState(tab, originHint) {
   const hiddenHere = !!origin && hidden.includes(origin), alwaysOn = stored[ALWAYS_KEY] === true;
   const later = stored[LOCAL_KEY]?.laterUntil || 0;
   const c = preferences.capture;
+  const connected = cloud.status === 'connected' && !!cloud.account?.id;
   return {
-    connected: cloud.status === 'connected' && !!cloud.account?.id,
+    connected,
     actions: { savepage: c.bookmark, highlight: c.highlight, region: c.region, fullpage: c.fullPage, note: c.note },
-    alwaysOn, hiddenHere, localOnly: Date.now() < later ? 0 : cloud.localOnly || 0, show: alwaysOn && !hiddenHere,
+    // "Later" only snoozes the signed-in move prompt; a signed-out dock always
+    // says how many saves are waiting for an account (I5).
+    alwaysOn, hiddenHere, localOnly: connected && Date.now() < later ? 0 : cloud.localOnly || 0, show: alwaysOn && !hiddenHere,
   };
 }
 // A dock that is already there answers a ping; this works on x.com and on
