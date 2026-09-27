@@ -174,3 +174,11 @@ export function capturePreferenceKey(action) {
     highlight: "highlight",
   }[action] || action;
 }
+
+// The one wording for a capture turned off in preferences (or by operator
+// policy) — used both when staging (dock-control.js startCapture) and as the
+// last check at confirm (background.js performCapture).
+export function captureDisabledMessage(action) {
+  const feature = capturePreferenceKey(action);
+  return `${feature === "fullPage" ? "Full-page screenshot" : feature[0].toUpperCase() + feature.slice(1)} capture is disabled in your FoundKeep preferences.`;
+}

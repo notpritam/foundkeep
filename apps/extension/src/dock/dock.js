@@ -236,7 +236,9 @@
         break;
       }
       case 'dock-collapse': if (mode === 'expanded') setMode('collapsed'); break;
-      case 'dock-review-open': if (mode === 'hidden') setMode('expanded'); openReview(message.url); break;
+      // Answers so the background can tell a card that actually opened from
+      // one that didn't (and fall back to the popup, or report it) — M2.
+      case 'dock-review-open': if (mode === 'hidden') setMode('expanded'); openReview(message.url); respond({ ok: true }); break;
       case 'dock-review-close': finishReview(message.saved === true); break;
       // C1 / R16: the card's ready/resize/done, relayed by the background
       // only after it verified the card belongs to this tab. There is no

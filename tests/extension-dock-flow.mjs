@@ -476,7 +476,7 @@ test('dock: a region drag saves a screenshot capture with the dragged dimensions
   assert.ok(capture.bytes > 0, 'the screenshot must have non-zero bytes');
 });
 
-test('dock: a capture without a scripting grant surfaces through the fallback popup', { timeout: 30000 }, async t => {
+test('dock: a capture without a scripting grant is refused at staging, and a grant lost after staging surfaces through the fallback popup', { timeout: 30000 }, async t => {
   const { context, worker } = await launch(t);
   await signIn(context, worker);
   await context.route('https://example.org/', r => r.fulfill({ contentType: 'text/html', body: '<title>No grant fixture</title><p>No host permission here.</p>' }));
@@ -489,11 +489,25 @@ test('dock: a capture without a scripting grant surfaces through the fallback po
   const tab = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]);
   const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
 
+  // M1: no activeTab grant (this isn't a real toolbar click) and no host
+  // permission for example.org — startCapture now says so before staging
+  // anything, instead of opening a review that can only fail at Save.
+  let popups = 0; context.on('page', () => { popups++; });
+  const refused = await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'region', { trigger: 'dock' })), tab);
+  assert.deepEqual(refused, { ok: false, error: 'Click the FoundKeep icon on this page to allow capture.' });
+  assert.equal(await ext.evaluate(id => import('./save-review.js').then(m => m.readSaveReview(id)), tab.id), null);
+  await new Promise(r => setTimeout(r, 300));
+  assert.equal(popups, 0, 'no review opens for a capture that cannot run');
+
+  // R5: a grant can still disappear between staging and Save (e.g. the
+  // activeTab grant ends when the page navigates). Stage directly, as a
+  // capture that had its grant at the time would have, and confirm through
+  // the fallback popup: the popup reads the same remedy.
   const popupPromise = context.waitForEvent('page', { timeout: 10000 });
-  // No activeTab grant (this isn't a real toolbar click) and no host
-  // permission for example.org, so summonDock inside startCapture fails
-  // and it falls back to the popup review card directly.
-  await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'region', { trigger: 'dock' })), tab);
+  await ext.evaluate(async tab => {
+    await (await import('./save-review.js')).stageSaveReview({ action: 'region', tab, trigger: 'dock' });
+    await (await import('./dock-control.js')).openFallbackReview(tab.id);
+  }, tab);
   const popup = await popupPromise;
   await popup.waitForSelector('#reviewForm[data-ready="true"]');
   await popup.selectOption('#saveDestination', 'library');
@@ -755,4 +769,94 @@ test('dock: an upgraded install\'s openPanelOnActionClick:true does not survive 
   await page.evaluate(() => chrome.runtime.sendMessage({ kind: 'feature-status', feature: 'note' }));
   await pollUntil(page, async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick === false, null);
   assert.equal(await page.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick), false);
+});
+
+// M1: x.com is matched only by a static content_scripts entry, so without an
+// icon click the background can't read the tab's url (tabs.get/query redact
+// it) or script the page. Every page capture used to stage fine and then
+// fail at confirm with "The page changed during capture…".
+test('dock: on x.com without an icon grant, page captures fail at staging with the grant message (M1)', { timeout: 30000 }, async t => {
+  const { context, worker, extensionId } = await launch(t);
+  await signIn(context, worker);
+  await context.route('https://x.com/**', r => r.fulfill({ contentType: 'text/html', body: TWEET_FIXTURE }));
+  const web = await context.newPage(); await web.goto('https://x.com/home');
+  const tabId = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0].id);
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  await ext.evaluate(tabId => import('./dock-control.js').then(m => m.summonDock(tabId, { expand: true })), tabId);
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await dock.waitFor(`__foundkeepDock.rect('[data-action="savepage"]').height > 0`);
+  await dock.click('[data-action="savepage"]');
+  await dock.waitFor("__foundkeepDock.status() === 'Click the FoundKeep icon on this page to allow capture.'");
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'expanded', 'no review opens');
+  assert.equal(await ext.evaluate(tabId => import('./save-review.js').then(m => m.readSaveReview(tabId)), tabId), null, 'nothing is staged');
+  // The X button itself needs no page grant and still opens its review.
+  const button = web.locator('article [data-state]'); await button.waitFor(); await button.click();
+  await dock.waitFor("__foundkeepDock.state() === 'review'", 8000);
+});
+
+// M2: a draft whose review is no longer visible (popup closed with the
+// window's X, an open that failed silently) used to block every capture on
+// that tab with "Finish or cancel the current save first." for 30 minutes.
+test('dock: a capture on a tab with an invisible draft reopens that draft\'s review (M2)', { timeout: 30000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  await signIn(context, worker);
+  await context.route(origin + '/__stuck', r => r.fulfill({ contentType: 'text/html', body: '<title>Stuck fixture</title><p>Text.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__stuck');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  const tab = await ext.evaluate(async url => (await chrome.tabs.query({ url }))[0], origin + '/__stuck*');
+  assert.equal(await summon(ext, origin + '/__stuck*'), true);
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  // Staged behind the dock's back (after its dock-hello, which would
+  // otherwise reopen it): a draft with no visible review.
+  const staged = await ext.evaluate(tab => import('./save-review.js').then(m => m.stageSaveReview({ action: 'note', tab, trigger: 'dock', text: 'An earlier thought', attachPage: false })), tab);
+  await new Promise(r => setTimeout(r, 300));
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'expanded');
+  await dock.click('[data-action="savepage"]');
+  await dock.waitFor("__foundkeepDock.state() === 'review'", 8000);
+  const frame = await reviewFrame(web);
+  await frame.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+  assert.equal(await frame.inputValue('#reviewNote'), 'An earlier thought', 'the existing draft is the one reopened');
+  assert.equal(await dock.evaluate('__foundkeepDock.status()'), 'Finish or cancel the current save first.');
+  assert.equal((await ext.evaluate(tabId => import('./save-review.js').then(m => m.readSaveReview(tabId)), tab.id)).id, staged.id);
+});
+
+test('dock: startCapture reports {ok:false} and drops the draft when its review cannot open (M2)', { timeout: 30000 }, async t => {
+  const { context, worker } = await launch(t);
+  await signIn(context, worker);
+  await context.route('https://example.org/', r => r.fulfill({ contentType: 'text/html', body: '<title>No-open fixture</title><p>Text.</p>' }));
+  const web = await context.newPage(); await web.goto('https://example.org/');
+  const tab = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]);
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  // No dock can be summoned on example.org (no grant), and the fallback
+  // popup cannot open either.
+  const result = await ext.evaluate(async tab => {
+    chrome.windows.create = () => Promise.reject(new Error('No window.'));
+    return (await import('./dock-control.js')).startCapture(tab, 'note', { trigger: 'dock', text: '', attachPage: false });
+  }, tab);
+  assert.deepEqual(result, { ok: false, error: 'FoundKeep could not open the save review. Try again.' });
+  assert.equal(await ext.evaluate(id => import('./save-review.js').then(m => m.readSaveReview(id)), tab.id), null, 'a draft nobody can see must not block the next capture');
+});
+
+// M3: a capture method turned off in preferences used to stage and open a
+// review, only to be refused at Save.
+test('dock: a disabled capture method is refused at staging for keyboard, context and dock triggers (M3)', { timeout: 30000 }, async t => {
+  const { context, worker, origin } = await launch(t);
+  await signIn(context, worker);
+  await context.route(origin + '/__disabled', r => r.fulfill({ contentType: 'text/html', body: '<title>Disabled fixture</title><p>Text.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__disabled');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  await ext.evaluate(async () => {
+    const { DEFAULT_PREFERENCES } = await import('./preferences.js');
+    const preferences = JSON.parse(JSON.stringify(DEFAULT_PREFERENCES));
+    preferences.capture.region = false; preferences.capture.image = false; preferences.capture.highlight = false;
+    await chrome.storage.local.set({ atlasPreferenceCache: { accountId: 'account-a', preferences, revision: 1, updatedAt: null, fetchedAt: Date.now() } });
+  });
+  const tab = await ext.evaluate(async url => (await chrome.tabs.query({ url }))[0], origin + '/__disabled*');
+  const attempt = (action, extra) => ext.evaluate(({ tab, action, extra }) => import('./dock-control.js').then(m => m.startCapture(tab, action, extra)), { tab, action, extra });
+  assert.deepEqual(await attempt('region', { trigger: 'keyboard' }), { ok: false, error: 'Region capture is disabled in your FoundKeep preferences.' });
+  assert.deepEqual(await attempt('save-image', { trigger: 'context', info: { srcUrl: 'https://images.example.com/a.png' } }), { ok: false, error: 'Image capture is disabled in your FoundKeep preferences.' });
+  assert.deepEqual(await attempt('highlight', { trigger: 'dock' }), { ok: false, error: 'Highlight capture is disabled in your FoundKeep preferences.' });
+  assert.equal(await ext.evaluate(id => import('./save-review.js').then(m => m.readSaveReview(id)), tab.id), null, 'nothing is staged');
 });

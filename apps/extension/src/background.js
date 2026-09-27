@@ -18,6 +18,7 @@ import {
 } from "./cloud.js";
 import {
   capturePreferenceKey,
+  captureDisabledMessage,
   getEffectivePreferences,
   refreshPreferences,
 } from "./preferences.js";
@@ -514,7 +515,7 @@ async function performCapture(action, { tab, info, tweet, text, attachPage, trig
   const preferences = preferenceState.preferences;
   const limits = preferenceState.policy.limits;
   const feature = capturePreferenceKey(action);
-  if (!preferences.capture[feature]) throw new Error(`${feature === "fullPage" ? "Full-page screenshot" : feature[0].toUpperCase() + feature.slice(1)} capture is disabled in your FoundKeep preferences.`);
+  if (!preferences.capture[feature]) throw new Error(captureDisabledMessage(action));
   if (action !== "note" && action !== "tweet") await assertCaptureTab(tab);
   switch (action) {
     case 'tweet': {

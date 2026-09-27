@@ -24,7 +24,9 @@ export async function stageSaveReview(request) {
     if (current) {
       changed(request.tab.id);
       if (current.action === 'tweet' && request.action === 'tweet' && current.tweet.url === request.tweet.url) return current;
-      throw new Error('Finish or cancel the current save first.');
+      // M2: callers reopen the existing draft's review on this code rather
+      // than only reporting it — the draft may have no visible review left.
+      throw Object.assign(new Error('Finish or cancel the current save first.'), { code: 'review-in-progress' });
     }
     const binding = await captureBinding();
     if (!binding.cloudAccountId) throw new Error('Sign in to FoundKeep to save.');

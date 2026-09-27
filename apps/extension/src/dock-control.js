@@ -1,8 +1,8 @@
 import { CUSTOMER_ORIGIN } from './product.js';
-import { readSaveReview, stageSaveReview } from './save-review.js';
+import { readSaveReview, stageSaveReview, clearSaveReview } from './save-review.js';
 import { getCloudStatus, importLocalCaptures } from './cloud.js';
 import { drainQueue } from './capture.js';
-import { getEffectivePreferences } from './preferences.js';
+import { getEffectivePreferences, capturePreferenceKey, captureDisabledMessage } from './preferences.js';
 
 const HIDDEN_KEY = 'foundkeep-dock-hidden-origins', ALWAYS_KEY = 'foundkeep-dock-always-on', LOCAL_KEY = 'foundkeep-dock-local-prompt';
 // R10: the dock content script can never touch chrome.storage (it sits next
@@ -95,9 +95,15 @@ export async function summonDock(tabId, { expand = false, toggle = false } = {})
   await chrome.tabs.sendMessage(tabId, { kind: 'dock-show', expand, toggle }).catch(() => {});
   return true;
 }
+// Resolves true once a review is actually showing — framed in the dock, or
+// the fallback popup — and false if neither could open (M2).
 export async function openReview(tab) {
-  if (!await summonDock(tab.id, { expand: true })) return openFallbackReview(tab.id);
-  await chrome.tabs.sendMessage(tab.id, { kind: 'dock-review-open', url: chrome.runtime.getURL('src/review.html?tab=' + tab.id) }).catch(() => {});
+  if (await summonDock(tab.id, { expand: true })) {
+    const opened = await chrome.tabs.sendMessage(tab.id, { kind: 'dock-review-open', url: chrome.runtime.getURL('src/review.html?tab=' + tab.id) })
+      .then(reply => reply?.ok === true, () => false);
+    if (opened) return true;
+  }
+  return openFallbackReview(tab.id);
 }
 // nonce -> { tabId, popupTabId?, windowId? }. Kept in chrome.storage.session
 // rather than a module-level Map: an MV3 service worker can be torn down and
@@ -127,7 +133,7 @@ async function findOpenPopup(tabId) {
 }
 export async function openFallbackReview(tabId) {
   const existing = await findOpenPopup(tabId);
-  if (existing) return void (existing.windowId && await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {}));
+  if (existing) { if (existing.windowId) await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {}); return true; }
   const nonce = crypto.randomUUID();
   const map = await popupMap();
   map[nonce] = { tabId };
@@ -143,8 +149,10 @@ export async function openFallbackReview(tabId) {
     const win = await chrome.windows.create({ url, type: 'popup', width: 380, height: 560, focused: true });
     const fresh = await popupMap();
     if (fresh[nonce]) { fresh[nonce] = { tabId, popupTabId: win.tabs?.[0]?.id, windowId: win.id }; await setPopupMap(fresh); }
+    return true;
   } catch {
     const fresh = await popupMap(); delete fresh[nonce]; await setPopupMap(fresh);
+    return false;
   }
 }
 // Drop a popup's reservation once its tab closes — belt and suspenders for
@@ -175,21 +183,47 @@ export async function withDockHidden(tabId, run) {
   try { return await run(); } finally { await chrome.tabs.sendMessage(tabId, { kind: 'dock-unhide' }).catch(() => {}); }
 }
 async function refreshState(tab, originHint) { await chrome.tabs.sendMessage(tab.id, { kind: 'dock-state', state: await dockState(tab, originHint) }).catch(() => {}); }
+const GRANT_MESSAGE = 'Click the FoundKeep icon on this page to allow capture.';
+// Everything except an X post and a note that leaves the page out reads or
+// scripts the page itself at confirm (assertCaptureTab, executeScript).
+const needsPage = (action, extra) => action !== 'tweet' && !(action === 'note' && !extra.attachPage);
+async function showError(tab, text) {
+  await summonDock(tab.id, { expand: true })
+    .then(shown => shown && chrome.tabs.sendMessage(tab.id, { kind: 'dock-status', text, tone: 'error' }).catch(() => {}))
+    .catch(() => {});
+}
 // Returns { ok: true } once the review is open (framed or the fallback
-// popup), or { ok: false, error } if staging the draft itself failed (signed
-// out, another review already in progress, …) — the caller decides what to
-// do with that (e.g. saveTweet forwards it so the X button's own error state
-// still works). Either way the dock shows the error itself when it can.
+// popup), or { ok: false, error } if the capture cannot start (disabled,
+// no page grant, signed out, another review in progress, or no review could
+// open) — the caller decides what to do with that (e.g. saveTweet forwards
+// it so the X button's own error state still works). Either way the dock
+// shows the error itself when it can.
 export async function startCapture(tab, action, extra = {}) {
   try {
+    // M3: refuse a capture method turned off in preferences now, not at Save.
+    const { preferences } = await getEffectivePreferences();
+    if (!preferences.capture[capturePreferenceKey(action)]) throw new Error(captureDisabledMessage(action));
+    // M1: without host access or an activeTab grant (x.com before an icon
+    // click: matched only by a static content_scripts entry) Chrome redacts
+    // the tab's url and refuses scripting, so every page capture would fail
+    // at confirm with "The page changed during capture…". Say what to do now.
+    if (needsPage(action, extra) && !(await chrome.tabs.get(tab.id).catch(() => null))?.url) throw new Error(GRANT_MESSAGE);
     await stageSaveReview({ action, tab, trigger: 'dock', ...extra });
   } catch (error) {
-    await summonDock(tab.id, { expand: true })
-      .then(shown => shown && chrome.tabs.sendMessage(tab.id, { kind: 'dock-status', text: error.message, tone: 'error' }).catch(() => {}))
-      .catch(() => {});
+    await showError(tab, error.message);
+    // M2: the draft in the way may have no visible review left (its popup
+    // closed with the window's X, or an earlier open failed) — bring it back
+    // instead of blocking every capture on this tab until it expires.
+    if (error.code === 'review-in-progress') await openReview(tab).catch(() => false);
     return { ok: false, error: error.message };
   }
-  await openReview(tab).catch(() => {});
+  if (!await openReview(tab).catch(() => false)) {
+    // Nobody can see this draft; don't let it block the next capture.
+    await clearSaveReview(tab.id).catch(() => {});
+    const message = 'FoundKeep could not open the save review. Try again.';
+    await showError(tab, message);
+    return { ok: false, error: message };
+  }
   return { ok: true };
 }
 export async function handleDockMessage(msg, sender) {
