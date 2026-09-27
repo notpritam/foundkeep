@@ -141,7 +141,14 @@
     root.append(card); setMode('review'); placeCard();
     readyTimer = setTimeout(() => { closeReview(); setMode('expanded'); void send({ kind: 'dock-review-fallback' }); }, 3000);
   }
-  function closeReview() { clearTimeout(readyTimer); frame?.remove(); frame = null; }
+  // M4: a card that had keyboard focus hands it back to the pill when it
+  // closes, instead of dropping it on the page's <body>.
+  function closeReview() {
+    clearTimeout(readyTimer);
+    const focused = !!frame && root.activeElement === frame;
+    frame?.remove(); frame = null;
+    if (focused) $('.pill').focus({ preventScroll: true });
+  }
   function finishReview(saved) {
     closeReview();
     if (saved) { setMode('expanded'); status('Saved', 'ok'); collapseTimer = setTimeout(() => { status(''); setMode('collapsed'); }, 4000); }
@@ -229,7 +236,9 @@
       // window 'message' listener any more — the page shares that channel.
       case 'dock-review-frame': {
         if (!frame) break;
-        if (message.type === 'ready') clearTimeout(readyTimer);
+        // M4: move keyboard focus into the card (review.js puts it on its
+        // first field) once it can actually take it.
+        if (message.type === 'ready') { clearTimeout(readyTimer); frame.focus({ preventScroll: true }); }
         if (message.type === 'resize' && Number.isFinite(message.height)) { frame.dataset.height = String(Math.min(Math.max(160, message.height), 560)); placeCard(); }
         if (message.type === 'done') finishReview(message.saved === true);
         break;

@@ -659,3 +659,32 @@ test('dock: a page never receives review-card messages and cannot hijack the car
   assert.equal(await dock.evaluate('__foundkeepDock.status()'), 'Review closed. Save again to reopen it.');
   assert.deepEqual(await web.evaluate(() => window.__received), []);
 });
+
+test('dock: keyboard — focus moves into the card when it opens and back to the pill when it closes (M4)', { timeout: 30000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  await signIn(context, worker);
+  await context.route(origin + '/__keys', r => r.fulfill({ contentType: 'text/html', body: '<title>Keyboard fixture</title><p>Text.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__keys');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  assert.equal(await summon(ext, origin + '/__keys*'), true);
+  await web.bringToFront();
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  // Keyboard only from here: Tab to "Note" and press Enter.
+  for (let i = 0; i < 12 && await dock.evaluate('__foundkeepDock.focused()') !== 'note'; i++) await web.keyboard.press('Tab');
+  assert.equal(await dock.evaluate('__foundkeepDock.focused()'), 'note');
+  await web.keyboard.press('Enter');
+  const frame = await reviewFrame(web);
+  await frame.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+  // Focus lands on the card's first field that needs input (a note's text).
+  await dock.waitFor("__foundkeepDock.focused() === 'card'");
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && await frame.evaluate(() => document.activeElement?.id) !== 'reviewNote') await new Promise(r => setTimeout(r, 50));
+  assert.equal(await frame.evaluate(() => document.activeElement?.id), 'reviewNote');
+  await web.keyboard.type('Typed without a mouse');
+  assert.equal(await frame.inputValue('#reviewNote'), 'Typed without a mouse');
+  // Escape cancels the card; focus returns to the dock's pill.
+  await web.keyboard.press('Escape');
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await dock.waitFor("__foundkeepDock.focused() === 'pill'");
+});

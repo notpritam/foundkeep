@@ -72,6 +72,14 @@ function selection() {
     ? `${collection.visibility === 'public' ? 'Public collection: anyone can read approved entries.' : 'Private collection: accepted members can read.'} ${collection.requireApproval && !collection.canModerate ? 'Your submission needs approval.' : 'Your entry appears immediately.'}${collection.rules ? ' Rules: ' + collection.rules : ''}`
     : value ? 'Private to your account. A copy stays in this browser, including while offline.' : '';
 }
+// M4: keyboard users start on the first field that needs them — the note
+// itself for a note, otherwise "Save in". The dock focuses this frame when
+// the card is ready; the window focus listener below covers a frame that
+// only received focus after this first call.
+function focusFirstField() {
+  if (!draft || (document.activeElement && document.activeElement !== document.body)) return;
+  (draft.action === 'note' ? $('reviewNote') : $('saveDestination')).focus({ preventScroll: true });
+}
 function renderFolders(selected = $('destinationFolder').value) {
   $('destinationFolder').replaceChildren(new Option('No folder', ''));
   for (const folder of folders) $('destinationFolder').add(new Option(folder.displayName || folder.name, folder.id));
@@ -136,7 +144,7 @@ async function refresh() {
     selection();
     const first = $('reviewForm').dataset.ready !== 'true';
     $('reviewForm').dataset.ready = 'true';
-    if (first) post({ type: 'ready' });
+    if (first) { focusFirstField(); post({ type: 'ready' }); }
     void loadDestinations();
   } catch (error) { message($('destinationFeedback'), error.message, 'error'); }
 }
@@ -202,7 +210,7 @@ document.addEventListener('keydown', event => {
 });
 new ResizeObserver(() => post({ type: 'resize', height: Math.ceil(document.body.scrollHeight) })).observe(document.body);
 chrome.runtime.onMessage.addListener(event => { if (event.kind === 'foundkeep-save-review-changed' && event.tabId === tabId) void refresh(); });
-window.addEventListener('focus', () => void refresh());
+window.addEventListener('focus', () => { focusFirstField(); void refresh(); });
 window.addEventListener('pagehide', preserveBeforeClose);
 document.addEventListener('visibilitychange', () => { if (document.hidden) preserveBeforeClose(); });
 void refresh();
