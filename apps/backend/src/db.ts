@@ -1,46 +1,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Association, Capture, SelectionContext } from "@atlas/shared";
 import { config } from "./config.ts";
-
-/** The `captures` row as stored (snake_case). */
-export interface CaptureRow {
-  id: string;
-  type: string;
-  status: string;
-  source_url: string | null;
-  source_title: string | null;
-  favicon_url: string | null;
-  selection_text: string | null;
-  selection_context: string | null;
-  note_text: string | null;
-  blob_path: string | null;
-  blob_mime: string | null;
-  blob_bytes: number | null;
-  blob_sha256: string | null;
-  thumb_path: string | null;
-  width: number | null;
-  height: number | null;
-  ocr_text: string | null;
-  description: string | null;
-  summary: string | null;
-  category: string | null;
-  tags: string | null;
-  associations: string | null;
-  article_text: string | null;
-  lang: string | null;
-  model: string | null;
-  enrich_error: string | null;
-  enrich_attempts: number;
-  lease_owner: string | null;
-  lease_at: number | null;
-  device_id: string | null;
-  captured_at: number | null;
-  created_at: number;
-  updated_at: number;
-  enriched_at: number | null;
-}
 
 /**
  * Append-only migrations. Never reorder or edit a shipped entry — only push new
@@ -609,6 +570,15 @@ const MIGRATIONS: string[] = [
    );`,
   `ALTER TABLE customer_captures ADD COLUMN archived_at INTEGER;
    CREATE INDEX idx_customer_captures_archive ON customer_captures(account_id,archived_at,created_at DESC,id DESC);`,
+  // Pritam's personal Atlas tables (0–3) moved to atlas-personal on 2026-09-27
+  // with verified copies; FoundKeep keeps no Atlas data.
+  `DROP TRIGGER IF EXISTS captures_ai;
+   DROP TRIGGER IF EXISTS captures_ad;
+   DROP TRIGGER IF EXISTS captures_au;
+   DROP TABLE IF EXISTS captures_fts;
+   DROP TABLE IF EXISTS captures;
+   DROP TABLE IF EXISTS devices;
+   DROP TABLE IF EXISTS invite_codes;`,
 ];
 
 export const DATABASE_SCHEMA_VERSION = MIGRATIONS.length;
@@ -633,59 +603,4 @@ export function openDb(path = join(config.dataDir, "atlas.db"), targetVersion = 
   db.exec("PRAGMA foreign_keys = ON;");
   migrate(db, targetVersion);
   return db;
-}
-
-function parseJson<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-/** Map a stored row to the public Capture DTO (never leaks blob paths). */
-export function rowToCapture(row: CaptureRow): Capture {
-  return {
-    id: row.id,
-    type: row.type as Capture["type"],
-    status: row.status as Capture["status"],
-    sourceUrl: row.source_url,
-    sourceTitle: row.source_title,
-    faviconUrl: row.favicon_url,
-    selectionText: row.selection_text,
-    selectionContext: parseJson<SelectionContext | null>(
-      row.selection_context,
-      null,
-    ),
-    noteText: row.note_text,
-    blobMime: row.blob_mime,
-    blobBytes: row.blob_bytes,
-    width: row.width,
-    height: row.height,
-    hasBlob: !!row.blob_path,
-    hasThumb: !!row.thumb_path,
-    ocrText: row.ocr_text,
-    description: row.description,
-    summary: row.summary,
-    category: row.category,
-    tags: parseJson<string[]>(row.tags, []),
-    associations: parseJson<Association[]>(row.associations, []),
-    articleText: row.article_text,
-    lang: row.lang,
-    model: row.model,
-    enrichError: row.enrich_error,
-    enrichAttempts: row.enrich_attempts,
-    deviceId: row.device_id,
-    capturedAt: row.captured_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    enrichedAt: row.enriched_at,
-  };
-}
-
-export function getCaptureRow(db: Database, id: string): CaptureRow | null {
-  return (db.query("SELECT * FROM captures WHERE id = ?").get(id) as
-    | CaptureRow
-    | undefined) ?? null;
 }

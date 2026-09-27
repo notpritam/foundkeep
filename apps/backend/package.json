@@ -6,12 +6,9 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "test": "bun test",
-    "atlas": "bun run bin/atlas.ts"
+    "test": "bun test"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
-    "@atlas/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1",
     "hono": "^4.11.9",
     "linkedom": "0.18.13",

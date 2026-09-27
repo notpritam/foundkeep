@@ -175,11 +175,11 @@
     {
       "id": "P0.10",
       "phase": "P0",
-      "title": "Decide: move your personal Atlas tools off FoundKeep's prod backend",
+      "title": "Move the personal Atlas tools out of FoundKeep",
       "area": "backend",
-      "status": "todo",
-      "owner": "pritam",
-      "note": "The prod backend also serves the old personal Atlas API (/v1; the bb Tracker plugin reads your 35 personal captures through it) and the /agent browser-control relay (atlas-browser MCP + your connected extension). Both work today; splitting them into their own small service keeps FoundKeep's public surface product-only."
+      "status": "done",
+      "owner": "agent",
+      "note": "2026-09-27: Atlas capture API, device/invite admin, browser relay and browser MCP now run as atlas-personal (private repo notpritam/atlas-personal, :8794, own database with verified copies). foundkeep.app and dev.foundkeep.app answer 404 on those paths; FoundKeep code, tests and the old tables (dropped by migration on next deploy) are gone. Your Tracker plugin and atlas-browser MCP were repointed and verified."
     },
     {
       "id": "P1.1",

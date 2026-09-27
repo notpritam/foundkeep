@@ -276,8 +276,10 @@ test("landing page presents FoundKeep and its branded extension download", async
 
 test("legacy website redirects while extension compatibility routes stay live", async () => {
   const caddy = await readFile(path.resolve("deploy/Caddyfile"), "utf8");
-  assert.match(caddy, /foundkeep\.app\s*\{[^}]*handle @backend\s*\{\s*reverse_proxy 127\.0\.0\.1:8790/s);
-  assert.match(caddy, /@backend path .*\/api\/\*.*\/agent\/\*.*\/\.well-known\/\*/);
+  assert.match(caddy, /foundkeep\.app\s*\{.*?handle @backend\s*\{\s*reverse_proxy 127\.0\.0\.1:8790/s);
+  assert.match(caddy, /@backend path .*\/api\/\*.*\/\.well-known\/\*/);
+  assert.doesNotMatch(caddy, /@backend path [^\n]*\/(v1|agent|invite)\b/, "FoundKeep must not serve the personal Atlas tools");
+  assert.match(caddy, /@atlas_personal path [^\n]*\/agent\/\*[^}]*reverse_proxy 127\.0\.0\.1:8794/s);
   assert.match(caddy, /handle\s*\{\s*reverse_proxy 127\.0\.0\.1:8791/s);
   assert.match(caddy, /atlas\.notpritam\.in\s*\{/);
   assert.match(caddy, /@extension_compat path .*\/api\/\*/);

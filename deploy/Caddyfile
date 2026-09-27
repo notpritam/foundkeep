@@ -1,13 +1,23 @@
 # Foundkeep block for omni's SHARED /etc/caddy/Caddyfile.
 #
-# Keep API, uploads, relay, and native/extension compatibility on Bun. Next
-# serves static public pages and request-scoped private React pages.
+# Keep API, uploads, and native/extension compatibility on Bun. Next serves
+# static public pages and request-scoped private React pages. Pritam's personal
+# Atlas tools (capture API, relay, invites) live in atlas-personal on :8794, not
+# here; their old paths answer 404 on FoundKeep hosts.
 foundkeep.app {
 	tls internal
 	encode zstd gzip
-	@backend path /api /api/* /v1 /v1/* /admin /admin/* /agent /agent/* /invite /invite/* /ext /ext/* /healthz /customer-config.json /mobile-policy.json /updates.xml /atlas-extension.zip /foundkeep-extension.zip /.well-known/* /redeem /redeem.html
+	@retired_atlas path /v1 /v1/* /admin /admin/* /agent /agent/* /invite /invite/* /redeem /redeem.html
+	handle @retired_atlas {
+		respond "not found" 404
+	}
+	@backend path /api /api/* /ext /ext/* /healthz /customer-config.json /mobile-policy.json /updates.xml /atlas-extension.zip /foundkeep-extension.zip /.well-known/*
 	handle @backend {
 		reverse_proxy 127.0.0.1:8790
+	}
+	handle_path /downloads/* {
+		root * /var/www/foundkeep-downloads
+		file_server
 	}
 	handle {
 		reverse_proxy 127.0.0.1:8791
@@ -19,10 +29,16 @@ www.foundkeep.app {
 	redir https://foundkeep.app{uri} permanent
 }
 
-# Redirect human-facing Atlas pages while version 1.5 extensions retain their
-# original API, relay, health, and package endpoints during migration.
+# atlas.notpritam.in: Pritam's personal Atlas tools go to atlas-personal
+# (:8794, ~/personal/tools/atlas-personal); version 1.5 FoundKeep extensions keep
+# their original API, health and package endpoints here; everything else
+# redirects to foundkeep.app.
 atlas.notpritam.in {
-	@extension_compat path /api /api/* /v1 /v1/* /admin /admin/* /agent /agent/* /healthz /updates.xml /atlas-extension.zip /foundkeep-extension.zip /ext/*
+	@atlas_personal path /v1 /v1/* /admin /admin/* /agent /agent/* /invite /invite/* /redeem /redeem.html
+	handle @atlas_personal {
+		reverse_proxy 127.0.0.1:8794
+	}
+	@extension_compat path /api /api/* /healthz /updates.xml /atlas-extension.zip /foundkeep-extension.zip /ext/*
 	handle @extension_compat {
 		reverse_proxy localhost:8790
 	}

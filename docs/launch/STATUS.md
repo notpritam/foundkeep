@@ -4,7 +4,7 @@
 
 **Goal:** Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.
 
-**Launch readiness: 12%** — 9 of 74 launch items done · 20 waiting on Pritam · updated 2026-09-27
+**Launch readiness: 14%** — 10 of 74 launch items done · 19 waiting on Pritam · updated 2026-09-27
 
 **Production (2026-09-27 04:13 UTC):** 21 accounts (0 new in 7d) · 2 active in 7d · 146 saves (47 in 7d) · 0 paying · 0 open tickets
 
@@ -12,7 +12,7 @@
 
 | Phase | Progress | Done | In progress | To do | Blocked |
 |---|---|---|---|---|---|
-| P0 Clean house | 90% | 9 | 0 | 1 | 0 |
+| P0 Clean house | 100% | 10 | 0 | 0 | 0 |
 | P1 Safety net | 0% | 0 | 0 | 8 | 0 |
 | P2 Open signups safely | 0% | 0 | 0 | 9 | 0 |
 | P3 Accounts, email & legal | 0% | 0 | 0 | 9 | 0 |
@@ -39,7 +39,7 @@ _Exit criteria:_ main is the only branch; every ask and backlog item is triaged 
 | ✓ Done | Triage the Tracker backlog into this plan | planning | agent | Shipped tasks closed, superseded ones archived; one Tracker initiative now points here. |
 | ✓ Done | Retire atlas-enrich and atlas-bridge, then move ~/personal/apps/atlas to main | ops | agent | 2026-09-27: both stopped and disabled (unit files kept; `sudo systemctl enable --now <unit>` restores). The bb Tracker plugin already does this enrichment, and the browser MCP uses the hosted relay, not the local bridge. ~/personal/apps/atlas is now detached at main and its stale branch is deleted; the atlas-browser MCP was verified working from it. |
 | ✓ Done | ★ Remove dead Atlas apps (apps/agent, apps/desktop) | backend | agent | Removed 2026-09-27; backend 481/481 pass. apps/web is not legacy (static downloads, extension config, brand assets) and stays; browser-mcp and the /agent relay are live personal tools, see P0.10. |
-| ○ To do | Decide: move your personal Atlas tools off FoundKeep's prod backend | backend | **Pritam** | The prod backend also serves the old personal Atlas API (/v1; the bb Tracker plugin reads your 35 personal captures through it) and the /agent browser-control relay (atlas-browser MCP + your connected extension). Both work today; splitting them into their own small service keeps FoundKeep's public surface product-only. |
+| ✓ Done | Move the personal Atlas tools out of FoundKeep | backend | agent | 2026-09-27: Atlas capture API, device/invite admin, browser relay and browser MCP now run as atlas-personal (private repo notpritam/atlas-personal, :8794, own database with verified copies). foundkeep.app and dev.foundkeep.app answer 404 on those paths; FoundKeep code, tests and the old tables (dropped by migration on next deploy) are gone. Your Tracker plugin and atlas-browser MCP were repointed and verified. |
 
 ## P1 · Safety net
 

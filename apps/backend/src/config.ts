@@ -53,9 +53,6 @@ export const config = {
   webDir:
     process.env.ATLAS_WEB_DIR ??
     new URL("../../web", import.meta.url).pathname,
-  /** Guards the HTTP device-admin routes. Empty => those routes are disabled
-   *  (mint tokens with the `atlas devices add` CLI instead). */
-  adminToken: process.env.ATLAS_ADMIN_TOKEN ?? "",
   /** Extra web origins allowed via CORS (the future website). chrome-extension
    *  origins are always allowed. Comma-separated. */
   allowedOrigins: (process.env.ATLAS_ALLOWED_ORIGINS ?? "")
@@ -63,10 +60,3 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
 };
-
-/** How long a `processing` lease can be held before the queue reclaims it. */
-export const LEASE_STALE_MS = 10 * 60 * 1000;
-/** Max enrichment attempts before a capture is left `failed` for good. */
-export const MAX_ENRICH_ATTEMPTS = 4;
-/** A `failed` capture becomes claimable again after this cool-off. */
-export const RETRY_BACKOFF_MS = 30 * 1000;

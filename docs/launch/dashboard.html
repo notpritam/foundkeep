@@ -43,9 +43,9 @@ tr.hidden,section.hidden{display:none}
 <main>
 <header><h1>FoundKeep — launch tracker</h1><div class="meta">Updated 2026-09-27 · generated from docs/launch/roadmap.json</div></header>
 <div class="hero">
-  <div class="card"><div class="hero-label">Launch readiness</div><div class="hero-value">12%</div>
-    <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="12" aria-label="Launch readiness"><span style="width:12%"></span></div>
-    <div class="hero-sub">9 of 74 launch items done · <b>20 need you</b></div></div>
+  <div class="card"><div class="hero-label">Launch readiness</div><div class="hero-value">14%</div>
+    <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="14" aria-label="Launch readiness"><span style="width:14%"></span></div>
+    <div class="hero-sub">10 of 74 launch items done · <b>19 need you</b></div></div>
   <div><p class="goal" style="margin-top:0">Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.</p>
     <div class="tiles">
       <div class="tile"><div class="tile-label">Accounts</div><div class="tile-value">21</div><div class="tile-sub">0 new in last 7 days</div></div>
@@ -58,9 +58,9 @@ tr.hidden,section.hidden{display:none}
   </div>
 </div>
 <div class="phases"><a class="phase" href="#P0">
-      <div class="phase-head"><span class="phase-id">P0</span><span class="phase-name">Clean house</span><span class="phase-pct">90%</span></div>
-      <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="90" aria-label="Clean house progress"><span style="width:90%"></span></div>
-      <div class="phase-counts">9/10 done · <b>1 need you</b></div>
+      <div class="phase-head"><span class="phase-id">P0</span><span class="phase-name">Clean house</span><span class="phase-pct">100%</span></div>
+      <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Clean house progress"><span style="width:100%"></span></div>
+      <div class="phase-counts">10/10 done</div>
     </a><a class="phase" href="#P1">
       <div class="phase-head"><span class="phase-id">P1</span><span class="phase-name">Safety net</span><span class="phase-pct">0%</span></div>
       <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Safety net progress"><span style="width:0%"></span></div>
@@ -150,11 +150,11 @@ tr.hidden,section.hidden{display:none}
         <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Remove dead Atlas apps (apps/agent, apps/desktop)<div class="note">Removed 2026-09-27; backend 481/481 pass. apps/web is not legacy (static downloads, extension config, brand assets) and stays; browser-mcp and the /agent relay are live personal tools, see P0.10.</div></td>
         <td class="area">backend</td>
         <td><span class="agent">agent</span></td>
-      </tr><tr data-id="P0.10" data-status="todo" data-owner="pritam" data-area="backend">
-        <td><span class="status s-todo"><i aria-hidden="true">○</i>To do</span></td>
-        <td class="title">Decide: move your personal Atlas tools off FoundKeep's prod backend<div class="note">The prod backend also serves the old personal Atlas API (/v1; the bb Tracker plugin reads your 35 personal captures through it) and the /agent browser-control relay (atlas-browser MCP + your connected extension). Both work today; splitting them into their own small service keeps FoundKeep's public surface product-only.</div></td>
+      </tr><tr data-id="P0.10" data-status="done" data-owner="agent" data-area="backend">
+        <td><span class="status s-done"><i aria-hidden="true">✓</i>Done</span></td>
+        <td class="title">Move the personal Atlas tools out of FoundKeep<div class="note">2026-09-27: Atlas capture API, device/invite admin, browser relay and browser MCP now run as atlas-personal (private repo notpritam/atlas-personal, :8794, own database with verified copies). foundkeep.app and dev.foundkeep.app answer 404 on those paths; FoundKeep code, tests and the old tables (dropped by migration on next deploy) are gone. Your Tracker plugin and atlas-browser MCP were repointed and verified.</div></td>
         <td class="area">backend</td>
-        <td><span class="you">You</span></td>
+        <td><span class="agent">agent</span></td>
       </tr></tbody></table>
     </section><section class="phase-section" id="P1">
       <h2><span class="phase-id">P1</span> Safety net</h2>

@@ -5,26 +5,15 @@ import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import {customerNativeIdentity} from "./customer-native.ts";
 import { config } from "./config.ts";
-import { authMiddleware, type Env } from "./auth.ts";
-import {
-  captureRoutes,
-  listCategoryFacets,
-  listTagFacets,
-} from "./captures.ts";
-import { deviceRoutes } from "./devices.ts";
-import { inviteRoutes } from "./invites.ts";
-import { buildCaptureGraph } from "./graph.ts";
 import { customerRoutes } from "./customer.ts";
 import { oauthMetadata } from "./customer-mcp-oauth.ts";
 
-function count(db: Database, sql: string): number {
-  return (db.query(sql).get() as { n: number }).n;
-}
+export function createApp(db: Database): Hono {
+  const app = new Hono();
 
-export function createApp(db: Database): Hono<Env> {
-  const app = new Hono<Env>();
-
-  const legacyCors = cors({
+  // Static files (extension policy, customer config, downloads) are fetched by
+  // the extension; customer routes enforce their own exact origin allowlist.
+  const staticCors = cors({
     origin: (origin) => {
       if (!origin) return null; // non-CORS / same-origin request — no ACAO needed
       if (origin.startsWith("chrome-extension://")) return origin;
@@ -35,8 +24,7 @@ export function createApp(db: Database): Hono<Env> {
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     maxAge: 86400,
   });
-  // Customer routes enforce their own exact website/extension origin allowlist.
-  app.use("*", (c, next) => c.req.path === "/api" || c.req.path.startsWith("/api/") ? next() : legacyCors(c, next));
+  app.use("*", (c, next) => c.req.path === "/api" || c.req.path.startsWith("/api/") ? next() : staticCors(c, next));
 
   // Baseline security headers on every response (safe for the API + static site).
   app.use("*", async (c, next) => {
@@ -102,42 +90,6 @@ export function createApp(db: Database): Hono<Env> {
   app.get("/signup", (c) => c.redirect("/auth.html?mode=signup", 302));
   app.get("/login", (c) => c.redirect("/auth.html?mode=login", 302));
   app.get("/dashboard", (c) => c.redirect("/dashboard.html", 302));
-
-  // Admin token minting — own guard, outside the Bearer group.
-  app.route("/admin/devices", deviceRoutes(db));
-
-  // Self-serve onboarding: POST /invite/redeem is public; /invite/admin is guarded.
-  app.route("/invite", inviteRoutes(db));
-  app.get("/redeem", (c) => c.redirect("/redeem.html", 302));
-
-  // Everything under /v1 requires a valid device token.
-  const v1 = new Hono<Env>();
-  v1.use("*", authMiddleware(db));
-
-  v1.get("/health", (c) =>
-    c.json({
-      ok: true,
-      service: "atlas" as const,
-      device: c.get("device").id,
-      pending: count(
-        db,
-        "SELECT COUNT(*) n FROM captures WHERE status IN ('pending','processing')",
-      ),
-      total: count(db, "SELECT COUNT(*) n FROM captures"),
-      diskBytes: count(
-        db,
-        "SELECT COALESCE(SUM(blob_bytes),0) n FROM captures WHERE blob_path IS NOT NULL",
-      ),
-    }),
-  );
-
-  v1.get("/tags", (c) => c.json({ tags: listTagFacets(db) }));
-  v1.get("/categories", (c) => c.json({ categories: listCategoryFacets(db) }));
-  v1.get("/graph", (c) => c.json(buildCaptureGraph(db)));
-
-  v1.route("/captures", captureRoutes(db));
-
-  app.route("/v1", v1);
 
   // Static landing site for everything that isn't the API. hono/bun's
   // serveStatic resolves `root` from cwd, so pass it relative to where the

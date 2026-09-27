@@ -1159,8 +1159,9 @@ describe("private customer captures", () => {
     expect(blob.headers.get("x-content-type-options")).toBe("nosniff");
     const exported = await (await request("/account/export", "GET", undefined, a.cookie)).json();
     expect(exported.captures[0].dataUrl).toBe(PNG);
-    expect((await app.request(`${ORIGIN}/v1/captures`, { headers: { authorization: device.bearer } })).status).toBe(401);
-    expect((db.query("SELECT COUNT(*) n FROM captures").get() as any).n).toBe(0);
+    // The personal Atlas API and its tables moved to atlas-personal.
+    expect((await app.request(`${ORIGIN}/v1/captures`, { headers: { authorization: device.bearer } })).status).toBe(404);
+    expect((db.query("SELECT COUNT(*) n FROM sqlite_master WHERE name IN ('captures','devices','invite_codes')").get() as any).n).toBe(0);
     expect((await request(`/captures/${item.id}`, "DELETE", {}, a.cookie)).status).toBe(200);
     expect((await request(`/captures/${item.id}/blob`, "GET", undefined, a.cookie)).status).toBe(404);
   });
