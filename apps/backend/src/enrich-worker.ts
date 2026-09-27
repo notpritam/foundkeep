@@ -1,6 +1,6 @@
 // Server-side enrichment. Uses the machine's Claude Code (via the Claude Agent
 // SDK — no API key) to OCR/tag/summarize a capture, reading its blob straight
-// from disk. Mirrors apps/agent's logic so behaviour matches the local agent.
+// from disk. Ported from the retired local agent (apps/agent, removed 2026-09-27).
 import { readFileSync } from "node:fs";
 import type { Database } from "bun:sqlite";
 import type { EnrichmentResult } from "@atlas/shared";

@@ -41,26 +41,26 @@ tr.hidden,section.hidden{display:none}
 </head>
 <body>
 <main>
-<header><h1>FoundKeep — launch tracker</h1><div class="meta">Updated 2026-09-26 · generated from docs/launch/roadmap.json</div></header>
+<header><h1>FoundKeep — launch tracker</h1><div class="meta">Updated 2026-09-27 · generated from docs/launch/roadmap.json</div></header>
 <div class="hero">
-  <div class="card"><div class="hero-label">Launch readiness</div><div class="hero-value">10%</div>
-    <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10" aria-label="Launch readiness"><span style="width:10%"></span></div>
-    <div class="hero-sub">7 of 73 launch items done · <b>19 need you</b></div></div>
+  <div class="card"><div class="hero-label">Launch readiness</div><div class="hero-value">12%</div>
+    <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="12" aria-label="Launch readiness"><span style="width:12%"></span></div>
+    <div class="hero-sub">9 of 74 launch items done · <b>20 need you</b></div></div>
   <div><p class="goal" style="margin-top:0">Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.</p>
     <div class="tiles">
       <div class="tile"><div class="tile-label">Accounts</div><div class="tile-value">21</div><div class="tile-sub">0 new in last 7 days</div></div>
       <div class="tile"><div class="tile-label">Active (7d)</div><div class="tile-value">2</div><div class="tile-sub">accounts that saved</div></div>
-      <div class="tile"><div class="tile-label">Saves</div><div class="tile-value">146</div><div class="tile-sub">63 in last 7 days</div></div>
+      <div class="tile"><div class="tile-label">Saves</div><div class="tile-value">146</div><div class="tile-sub">47 in last 7 days</div></div>
       <div class="tile"><div class="tile-label">Paying</div><div class="tile-value">0</div><div class="tile-sub">active subscriptions</div></div>
       <div class="tile"><div class="tile-label">Your asks shipped</div><div class="tile-value">135</div><div class="tile-sub">of 194 · 37 partial · 8 not live</div></div>
     </div>
-    <p class="meta">Production as of 2026-09-26 16:57 UTC · prod backend 20260920-063314-instagram-cover-8d02824 · dev backend 20260921-115951-archive-cf24ebd · extension ext-v1.7.12 (friends) · CWS 1.0.2 · iOS 1.0.0 (23) TestFlight · Android 1.0.0 (6) APK · (7) Play testing</p>
+    <p class="meta">Production as of 2026-09-27 04:13 UTC · prod backend 20260920-063314-instagram-cover-8d02824 · dev backend 20260921-115951-archive-cf24ebd · extension ext-v1.7.12 (friends) · CWS 1.0.2 · iOS 1.0.0 (23) TestFlight · Android 1.0.0 (6) APK · (7) Play testing</p>
   </div>
 </div>
 <div class="phases"><a class="phase" href="#P0">
-      <div class="phase-head"><span class="phase-id">P0</span><span class="phase-name">Clean house</span><span class="phase-pct">78%</span></div>
-      <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="78" aria-label="Clean house progress"><span style="width:78%"></span></div>
-      <div class="phase-counts">7/9 done</div>
+      <div class="phase-head"><span class="phase-id">P0</span><span class="phase-name">Clean house</span><span class="phase-pct">90%</span></div>
+      <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="90" aria-label="Clean house progress"><span style="width:90%"></span></div>
+      <div class="phase-counts">9/10 done · <b>1 need you</b></div>
     </a><a class="phase" href="#P1">
       <div class="phase-head"><span class="phase-id">P1</span><span class="phase-name">Safety net</span><span class="phase-pct">0%</span></div>
       <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Safety net progress"><span style="width:0%"></span></div>
@@ -140,16 +140,21 @@ tr.hidden,section.hidden{display:none}
         <td class="title">Triage the Tracker backlog into this plan<div class="note">Shipped tasks closed, superseded ones archived; one Tracker initiative now points here.</div></td>
         <td class="area">planning</td>
         <td><span class="agent">agent</span></td>
-      </tr><tr data-id="P0.8" data-status="todo" data-owner="agent" data-area="ops">
-        <td><span class="status s-todo"><i aria-hidden="true">○</i>To do</span></td>
-        <td class="title">Retire atlas-enrich and atlas-bridge, then move ~/personal/apps/atlas to main<div class="note">Both units run from the stale feat/foundkeep-gallery checkout; atlas-enrich still holds a write connection to the prod database.</div></td>
+      </tr><tr data-id="P0.8" data-status="done" data-owner="agent" data-area="ops">
+        <td><span class="status s-done"><i aria-hidden="true">✓</i>Done</span></td>
+        <td class="title">Retire atlas-enrich and atlas-bridge, then move ~/personal/apps/atlas to main<div class="note">2026-09-27: both stopped and disabled (unit files kept; `sudo systemctl enable --now &lt;unit&gt;` restores). The bb Tracker plugin already does this enrichment, and the browser MCP uses the hosted relay, not the local bridge. ~/personal/apps/atlas is now detached at main and its stale branch is deleted; the atlas-browser MCP was verified working from it.</div></td>
         <td class="area">ops</td>
         <td><span class="agent">agent</span></td>
-      </tr><tr data-id="P0.9" data-status="todo" data-owner="agent" data-area="backend">
-        <td><span class="status s-todo"><i aria-hidden="true">○</i>To do</span></td>
-        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Remove legacy Atlas code and the unused /agent relay<div class="note">apps/agent, apps/browser-mcp, apps/desktop, apps/web, relay.ts. Your 'full pre-launch audit and cleanup' ask.</div></td>
+      </tr><tr data-id="P0.9" data-status="done" data-owner="agent" data-area="backend">
+        <td><span class="status s-done"><i aria-hidden="true">✓</i>Done</span></td>
+        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Remove dead Atlas apps (apps/agent, apps/desktop)<div class="note">Removed 2026-09-27; backend 481/481 pass. apps/web is not legacy (static downloads, extension config, brand assets) and stays; browser-mcp and the /agent relay are live personal tools, see P0.10.</div></td>
         <td class="area">backend</td>
         <td><span class="agent">agent</span></td>
+      </tr><tr data-id="P0.10" data-status="todo" data-owner="pritam" data-area="backend">
+        <td><span class="status s-todo"><i aria-hidden="true">○</i>To do</span></td>
+        <td class="title">Decide: move your personal Atlas tools off FoundKeep's prod backend<div class="note">The prod backend also serves the old personal Atlas API (/v1; the bb Tracker plugin reads your 35 personal captures through it) and the /agent browser-control relay (atlas-browser MCP + your connected extension). Both work today; splitting them into their own small service keeps FoundKeep's public surface product-only.</div></td>
+        <td class="area">backend</td>
+        <td><span class="you">You</span></td>
       </tr></tbody></table>
     </section><section class="phase-section" id="P1">
       <h2><span class="phase-id">P1</span> Safety net</h2>
@@ -549,7 +554,7 @@ tr.hidden,section.hidden{display:none}
         <td><span class="you">You</span></td>
       </tr><tr data-id="L.10" data-status="todo" data-owner="agent" data-area="desktop">
         <td><span class="status s-todo"><i aria-hidden="true">○</i>To do</span></td>
-        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Desktop capture dock (Electron) on FoundKeep accounts</td>
+        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Desktop capture dock (Electron) on FoundKeep accounts<div class="note">The unshipped Electron prototype is in git history (b71176b).</div></td>
         <td class="area">desktop</td>
         <td><span class="agent">agent</span></td>
       </tr><tr data-id="L.11" data-status="todo" data-owner="agent" data-area="web">

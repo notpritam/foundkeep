@@ -1,15 +1,15 @@
 {
   "title": "FoundKeep — launch tracker",
   "goal": "Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.",
-  "updated": "2026-09-26",
+  "updated": "2026-09-27",
   "snapshot": {
-    "asOf": "2026-09-26 16:57 UTC",
+    "asOf": "2026-09-27 04:13 UTC",
     "metrics": {
       "accounts": 21,
       "newAccounts7d": 0,
       "active7d": 2,
       "saves": 146,
-      "saves7d": 63,
+      "saves7d": 47,
       "collections": 1,
       "paying": 0,
       "openTickets": 0
@@ -158,19 +158,28 @@
       "phase": "P0",
       "title": "Retire atlas-enrich and atlas-bridge, then move ~/personal/apps/atlas to main",
       "area": "ops",
-      "status": "todo",
+      "status": "done",
       "owner": "agent",
-      "note": "Both units run from the stale feat/foundkeep-gallery checkout; atlas-enrich still holds a write connection to the prod database."
+      "note": "2026-09-27: both stopped and disabled (unit files kept; `sudo systemctl enable --now <unit>` restores). The bb Tracker plugin already does this enrichment, and the browser MCP uses the hosted relay, not the local bridge. ~/personal/apps/atlas is now detached at main and its stale branch is deleted; the atlas-browser MCP was verified working from it."
     },
     {
       "id": "P0.9",
       "phase": "P0",
-      "title": "Remove legacy Atlas code and the unused /agent relay",
+      "title": "Remove dead Atlas apps (apps/agent, apps/desktop)",
       "area": "backend",
-      "status": "todo",
+      "status": "done",
       "owner": "agent",
       "asked": true,
-      "note": "apps/agent, apps/browser-mcp, apps/desktop, apps/web, relay.ts. Your 'full pre-launch audit and cleanup' ask."
+      "note": "Removed 2026-09-27; backend 481/481 pass. apps/web is not legacy (static downloads, extension config, brand assets) and stays; browser-mcp and the /agent relay are live personal tools, see P0.10."
+    },
+    {
+      "id": "P0.10",
+      "phase": "P0",
+      "title": "Decide: move your personal Atlas tools off FoundKeep's prod backend",
+      "area": "backend",
+      "status": "todo",
+      "owner": "pritam",
+      "note": "The prod backend also serves the old personal Atlas API (/v1; the bb Tracker plugin reads your 35 personal captures through it) and the /agent browser-control relay (atlas-browser MCP + your connected extension). Both work today; splitting them into their own small service keeps FoundKeep's public surface product-only."
     },
     {
       "id": "P1.1",
@@ -842,7 +851,8 @@
       "area": "desktop",
       "status": "todo",
       "owner": "agent",
-      "asked": true
+      "asked": true,
+      "note": "The unshipped Electron prototype is in git history (b71176b)."
     },
     {
       "id": "L.11",

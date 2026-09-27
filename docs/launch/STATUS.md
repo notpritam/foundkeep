@@ -4,15 +4,15 @@
 
 **Goal:** Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.
 
-**Launch readiness: 10%** — 7 of 73 launch items done · 19 waiting on Pritam · updated 2026-09-26
+**Launch readiness: 12%** — 9 of 74 launch items done · 20 waiting on Pritam · updated 2026-09-27
 
-**Production (2026-09-26 16:57 UTC):** 21 accounts (0 new in 7d) · 2 active in 7d · 146 saves (63 in 7d) · 0 paying · 0 open tickets
+**Production (2026-09-27 04:13 UTC):** 21 accounts (0 new in 7d) · 2 active in 7d · 146 saves (47 in 7d) · 0 paying · 0 open tickets
 
 **Everything Pritam asked for (verified 2026-09-26):** 194 asks — 135 live · 37 partial · 3 dev-only · 5 not built · 6 parked · 8 superseded. The open ones are the ★ items below; full list in `~/.local/share/foundkeep-launch/ASKS.md` (private).
 
 | Phase | Progress | Done | In progress | To do | Blocked |
 |---|---|---|---|---|---|
-| P0 Clean house | 78% | 7 | 0 | 2 | 0 |
+| P0 Clean house | 90% | 9 | 0 | 1 | 0 |
 | P1 Safety net | 0% | 0 | 0 | 8 | 0 |
 | P2 Open signups safely | 0% | 0 | 0 | 9 | 0 |
 | P3 Accounts, email & legal | 0% | 0 | 0 | 9 | 0 |
@@ -37,8 +37,9 @@ _Exit criteria:_ main is the only branch; every ask and backlog item is triaged 
 | ✓ Done | Production-readiness audit | planning | agent | 49 checks, 18 launch blockers. Details (private): ~/.local/share/foundkeep-launch/readiness.json. |
 | ✓ Done | Launch tracker: roadmap.json + dashboard | planning | agent | Edit roadmap.json, then run `/usr/bin/node scripts/launch-dashboard.mjs`. |
 | ✓ Done | Triage the Tracker backlog into this plan | planning | agent | Shipped tasks closed, superseded ones archived; one Tracker initiative now points here. |
-| ○ To do | Retire atlas-enrich and atlas-bridge, then move ~/personal/apps/atlas to main | ops | agent | Both units run from the stale feat/foundkeep-gallery checkout; atlas-enrich still holds a write connection to the prod database. |
-| ○ To do | ★ Remove legacy Atlas code and the unused /agent relay | backend | agent | apps/agent, apps/browser-mcp, apps/desktop, apps/web, relay.ts. Your 'full pre-launch audit and cleanup' ask. |
+| ✓ Done | Retire atlas-enrich and atlas-bridge, then move ~/personal/apps/atlas to main | ops | agent | 2026-09-27: both stopped and disabled (unit files kept; `sudo systemctl enable --now <unit>` restores). The bb Tracker plugin already does this enrichment, and the browser MCP uses the hosted relay, not the local bridge. ~/personal/apps/atlas is now detached at main and its stale branch is deleted; the atlas-browser MCP was verified working from it. |
+| ✓ Done | ★ Remove dead Atlas apps (apps/agent, apps/desktop) | backend | agent | Removed 2026-09-27; backend 481/481 pass. apps/web is not legacy (static downloads, extension config, brand assets) and stays; browser-mcp and the /agent relay are live personal tools, see P0.10. |
+| ○ To do | Decide: move your personal Atlas tools off FoundKeep's prod backend | backend | **Pritam** | The prod backend also serves the old personal Atlas API (/v1; the bb Tracker plugin reads your 35 personal captures through it) and the /agent browser-control relay (atlas-browser MCP + your connected extension). Both work today; splitting them into their own small service keeps FoundKeep's public surface product-only. |
 
 ## P1 · Safety net
 
@@ -182,7 +183,7 @@ Asked for, deliberately after launch.
 | ○ To do | ★ Agent-scheduled daily library cleanup | agents | agent |  |
 | ○ To do | ★ To-dos and reminders with notifications, usable by agents | agents | agent |  |
 | ○ To do | ★ Privacy stance on operator access, then end-to-end encryption | security | **Pritam** |  |
-| ○ To do | ★ Desktop capture dock (Electron) on FoundKeep accounts | desktop | agent |  |
+| ○ To do | ★ Desktop capture dock (Electron) on FoundKeep accounts | desktop | agent | The unshipped Electron prototype is in git history (b71176b). |
 | ○ To do | ★ Upload images from the web dashboard | web | agent |  |
 | ○ To do | ★ No hard reloads anywhere in the web app | web | agent |  |
 | ○ To do | ★ Linear-style list layout for the library | web | agent |  |
