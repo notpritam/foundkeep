@@ -28,10 +28,17 @@ protectCloudStorage().catch(() => {});
 // it (summonDock passes toggle through to the dock's own dock-show handler,
 // which never collapses a dock mid-review). Falls back to the dashboard tab
 // when the dock cannot be injected (e.g. a chrome:// or Web Store page).
+// An upgraded install keeps whatever setPanelBehavior set before this
+// version shipped — openPanelOnActionClick persists across updates — so
+// this must run every startup, not just on first install, or the icon keeps
+// opening the side panel and this onClicked listener never fires at all.
+// Optional chaining: stays harmless once the sidePanel permission itself is
+// removed in a later task.
+chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false }).catch(() => {});
 chrome.action.onClicked.addListener(tab => {
   void summonDock(tab.id, { expand: true, toggle: true }).then(async shown => {
     if (!shown) await chrome.tabs.create({ url: dashboardUrl('/dashboard'), index: tab.index + 1 });
-  });
+  }).catch(() => {});
 });
 chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
   if (msg?.kind === "atlas-refresh-preferences") {
@@ -228,7 +235,13 @@ function methodFor(action, trigger) {
     region: "region",
     fullpage: "full-page",
   }[action];
-  return `${trigger || "popup"}-${suffix}`;
+  // The dock is the extension's own capture UI — the same role the popup
+  // plays — and the backend's captureMethod allowlist
+  // (apps/backend/src/customer-provenance.ts METHODS) has no "dock-*"
+  // entries, only "popup-*" ones; a "dock-*" method here would 400 on
+  // upload with invalid_capture_context.
+  const prefix = trigger === "dock" ? "popup" : trigger || "popup";
+  return `${prefix}-${suffix}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +306,8 @@ function openReviewPanel(tab) {
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   void (async () => {
     if (info.menuItemId === "save-image" && !publicHttpUrl(info.srcUrl)) throw new Error('FoundKeep can only save images from public web addresses.');
-    await startCapture(tab, info.menuItemId, { info, trigger: "context" });
+    const result = await startCapture(tab, info.menuItemId, { info, trigger: "context" });
+    if (!result.ok) throw new Error(result.error);
   })().catch(error => configuredFlash(false, error.message));
 });
 
@@ -302,7 +316,9 @@ chrome.commands.onCommand.addListener((command, tab) => {
   if (!action) return;
   const begin = tab => {
     if (!tab) return;
-    void startCapture(tab, action, { trigger: "keyboard" }).catch(error => configuredFlash(false, error.message));
+    void startCapture(tab, action, { trigger: "keyboard" })
+      .then(result => { if (!result.ok) throw new Error(result.error); })
+      .catch(error => configuredFlash(false, error.message));
   };
   if (tab) begin(tab);
   else void chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => begin(tab));
@@ -484,13 +500,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'Open the tweet on X to save it.' }); return;
     }
     if (p.socialContext !== undefined && (JSON.stringify(p.socialContext).length > 120000 || p.socialContext?.version !== 1)) { sendResponse({ ok: false, error: 'This post is too large to capture.' }); return; }
-    // dock.js is always present on x.com (it is a static content script
-    // entry there), so feedback — including a disabled-preference or
-    // sign-in error surfaced later by performCapture — goes through the
-    // dock's own status line rather than back through this response.
-    void startCapture(sender.tab, 'tweet', { tweet: { url: p.url, text: p.text, title: p.title, socialContext: p.socialContext || null }, trigger: 'twitter' });
-    sendResponse({ ok: true, pending: true });
-    return;
+    void (async () => {
+      const state = await getEffectivePreferences();
+      if (!state.preferences.capture.tweet) throw new Error('Tweet capture is disabled in your FoundKeep preferences.');
+      // dock.js is always present on x.com (it is a static content script
+      // entry there), so it also shows this in its own status line when it
+      // can — but the response still needs to say whether staging actually
+      // succeeded, or twitter.js has nothing to switch the button's state on.
+      const result = await startCapture(sender.tab, 'tweet', { tweet: { url: p.url, text: p.text, title: p.title, socialContext: p.socialContext || null }, trigger: 'twitter' });
+      if (!result.ok) throw new Error(result.error);
+      return { pending: true };
+    })().then(data => sendResponse({ ok: true, ...data })).catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
   }
   if (msg?.kind === "saveNote") {
     if (!trustedLibrarySender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Open FoundKeep to save a note.' }); return; }

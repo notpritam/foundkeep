@@ -87,13 +87,17 @@
     const el = $('.dock > .status'); el.hidden = !text; el.textContent = text; el.dataset.tone = tone;
   }
   function size() { const r = dockEl.getBoundingClientRect(); return { w: r.width || 48, h: r.height || 42 }; }
+  // Shared by place() (render) and setPosition() (what gets persisted) so
+  // the two can never clamp differently.
+  function clamp(left, top) {
+    const { w, h } = size();
+    return { left: Math.min(Math.max(0, left), Math.max(0, innerWidth - w)), top: Math.min(Math.max(0, top), Math.max(0, innerHeight - h)) };
+  }
   function place() {
     if (dockEl.hidden) return;
     const { w, h } = size();
-    let left = pos ? pos.fx * innerWidth : innerWidth - w - EDGE;
-    let top = pos ? pos.fy * innerHeight : innerHeight - h - EDGE;
-    left = Math.min(Math.max(0, left), Math.max(0, innerWidth - w));
-    top = Math.min(Math.max(0, top), Math.max(0, innerHeight - h));
+    const raw = pos ? { left: pos.fx * innerWidth, top: pos.fy * innerHeight } : { left: innerWidth - w - EDGE, top: innerHeight - h - EDGE };
+    const { left, top } = clamp(raw.left, raw.top);
     dockEl.style.left = left + 'px'; dockEl.style.top = top + 'px';
     if (frame) placeCard();
   }
@@ -103,10 +107,8 @@
     // the dock actually landed (the edge), not a fraction outside 0..1 that
     // the background's dock-position handler rejects — which silently drops
     // the update and leaves the previous (or default) position in storage.
-    const { w, h } = size();
-    const clampedLeft = Math.min(Math.max(0, left), Math.max(0, innerWidth - w));
-    const clampedTop = Math.min(Math.max(0, top), Math.max(0, innerHeight - h));
-    pos = { fx: clampedLeft / innerWidth, fy: clampedTop / innerHeight }; place();
+    const clamped = clamp(left, top);
+    pos = { fx: clamped.left / innerWidth, fy: clamped.top / innerHeight }; place();
     // The dock cannot touch chrome.storage directly (it would sit next to
     // account credentials); the background is the only trusted holder of
     // where the dock sits, so persistence goes through a message.

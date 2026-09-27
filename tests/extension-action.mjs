@@ -5,7 +5,7 @@ import path from 'node:path';
 import { actionPanel } from './helpers/action-panel.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 
-test('toolbar opens the native sidebar with no popup, and notes, local saves and settings stay inside it', { timeout: 30000 }, async () => {
+test('the toolbar has no popup and does not open the native side panel; notes, local saves and settings still work inside it once opened explicitly', { timeout: 30000 }, async () => {
   const extension = process.env.FOUNDKEEP_TEST_EXTENSION || path.resolve('apps/extension');
   const profile = await mkdtemp('/tmp/foundkeep-panel-test-');
   let context;
@@ -84,5 +84,54 @@ test('toolbar opens the native sidebar with no popup, and notes, local saves and
     assert.equal(stale.ok, false); assert.match(stale.error, /page changed/i);
     await panel.waitFor('document.querySelector("#saveCurrent").disabled');
     await panel.close();
+  } finally { await context?.close(); await rm(profile, { recursive: true, force: true }); }
+});
+
+test('an upgraded install\'s openPanelOnActionClick:true does not survive the next service-worker start', { timeout: 30000 }, async () => {
+  const extension = process.env.FOUNDKEEP_TEST_EXTENSION || path.resolve('apps/extension');
+  const profile = await mkdtemp('/tmp/foundkeep-panel-restart-');
+  let context;
+  try {
+    context = await chromium.launchPersistentContext(profile, {
+      channel: 'chromium', headless: process.env.FOUNDKEEP_HEADLESS !== 'false', executablePath: process.env.CHROMIUM_PATH || undefined,
+      args: ['--no-sandbox', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+    });
+    const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+    // Simulate what an upgraded install keeps from a previous version that
+    // called setPanelBehavior({openPanelOnActionClick:true}) (or simply
+    // defaulted differently) — the setting persists in Chrome's own state,
+    // not in anything this extension's storage controls, and survives an
+    // MV3 service worker being torn down for inactivity and woken again
+    // (which happens routinely, not just on install/update).
+    await worker.evaluate(() => chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }));
+    assert.equal(await worker.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick), true);
+    const popupUrl = await worker.evaluate(() => chrome.runtime.getURL('src/popup.html'));
+    // Force a real stop (chrome.runtime.reload() does not reliably respawn
+    // the worker in this headless harness) via the browser-level
+    // ServiceWorker domain, then wake it by opening one of its own pages —
+    // stopping alone leaves it dormant until something needs it. Fetch the
+    // popup URL above, before stopping — evaluate() on a just-stopped worker
+    // has nothing to wake it and hangs.
+    const page = await context.newPage();
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('ServiceWorker.enable');
+    let versionId;
+    cdp.on('ServiceWorker.workerVersionUpdated', ev => {
+      const match = ev.versions.find(v => v.scriptURL === worker.url() && v.runningStatus === 'running');
+      if (match) versionId = match.versionId;
+    });
+    await page.waitForTimeout(300);
+    if (!versionId) throw new Error('Could not find the running service worker version to stop.');
+    await cdp.send('ServiceWorker.stopWorker', { versionId });
+    await page.waitForTimeout(300);
+    await page.goto(popupUrl);
+    await page.waitForTimeout(300);
+    // The restarted service worker's own top-level startup code must correct
+    // it back to false — this must run every startup, not just on install,
+    // or the toolbar icon keeps opening the side panel and R1's
+    // chrome.action.onClicked listener never fires. Playwright keeps the
+    // same Worker handle across the restart; evaluate() reaches whichever
+    // execution context is current.
+    assert.equal(await worker.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick), false);
   } finally { await context?.close(); await rm(profile, { recursive: true, force: true }); }
 });

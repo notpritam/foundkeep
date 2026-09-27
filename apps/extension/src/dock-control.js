@@ -13,9 +13,14 @@ export const dashboardUrl = path => CUSTOMER_ORIGIN + path;
 const scriptable = url => /^https?:\/\//i.test(url || '') && !/^https:\/\/chromewebstore\.google\.com\//.test(url) && !/^https:\/\/chrome\.google\.com\/webstore/.test(url);
 const originOf = url => { try { return new URL(url).origin; } catch { return null; } };
 
-export async function dockState(tab) {
+// `originHint` is `sender.url` when a message triggered this (the top-frame
+// content script's own URL, always visible) — pages matched only by a
+// content_scripts entry and not host_permissions (x.com) have their tab.url
+// redacted by chrome.tabs.get/query, so falling back to tab?.url only helps
+// when there is no sender (summonDock's own chrome.tabs.get lookup).
+export async function dockState(tab, originHint) {
   const [{ preferences }, cloud, stored] = await Promise.all([getEffectivePreferences(), getCloudStatus(), chrome.storage.local.get([HIDDEN_KEY, ALWAYS_KEY, LOCAL_KEY])]);
-  const hidden = stored[HIDDEN_KEY] || [], origin = originOf(tab?.url);
+  const hidden = stored[HIDDEN_KEY] || [], origin = originOf(originHint ?? tab?.url);
   const hiddenHere = !!origin && hidden.includes(origin), alwaysOn = stored[ALWAYS_KEY] === true;
   const later = stored[LOCAL_KEY]?.laterUntil || 0;
   const c = preferences.capture;
@@ -47,37 +52,76 @@ export async function summonDock(tabId, { expand = false, toggle = false } = {})
 }
 export async function openReview(tab) {
   if (!await summonDock(tab.id, { expand: true })) return openFallbackReview(tab.id);
-  await chrome.tabs.sendMessage(tab.id, { kind: 'dock-review-open', url: chrome.runtime.getURL('src/review.html?tab=' + tab.id) });
+  await chrome.tabs.sendMessage(tab.id, { kind: 'dock-review-open', url: chrome.runtime.getURL('src/review.html?tab=' + tab.id) }).catch(() => {});
 }
-// popup tab id -> reviewed tab id. Kept in chrome.storage.session rather than
-// a module-level Map: an MV3 service worker can be torn down and restarted by
-// Chrome at any point (e.g. between opening the fallback popup and it being
-// confirmed), which would silently wipe an in-memory Map; session storage
-// survives that and is the same value regardless of which realm reads it.
+// nonce -> { tabId, popupTabId?, windowId? }. Kept in chrome.storage.session
+// rather than a module-level Map: an MV3 service worker can be torn down and
+// restarted by Chrome at any point (e.g. between opening the fallback popup
+// and it being confirmed), which would silently wipe an in-memory Map;
+// session storage survives that and is the same value regardless of which
+// realm reads it. The nonce is generated and written *before*
+// chrome.windows.create, then carried in the popup's own URL, so a slow
+// write can never race the popup's first message — reviewTabFor only needs
+// the entry to exist by the time it's asked about that exact nonce, which is
+// guaranteed since nothing can know the nonce before this function picks it.
 const POPUP_MAP_KEY = 'foundkeep-dock-popup-map';
+async function popupMap() { return (await chrome.storage.session.get(POPUP_MAP_KEY))[POPUP_MAP_KEY] || {}; }
+async function setPopupMap(map) { await chrome.storage.session.set({ [POPUP_MAP_KEY]: map }); }
+async function findOpenPopup(tabId) {
+  const map = await popupMap();
+  let changed = false;
+  let found = null;
+  for (const [nonce, entry] of Object.entries(map)) {
+    if (entry.tabId !== tabId) continue;
+    const stillOpen = entry.popupTabId ? await chrome.tabs.get(entry.popupTabId).then(() => true, () => false) : true;
+    if (stillOpen && !found) { found = entry; continue; }
+    delete map[nonce]; changed = true;
+  }
+  if (changed) await setPopupMap(map);
+  return found;
+}
 export async function openFallbackReview(tabId) {
+  const existing = await findOpenPopup(tabId);
+  if (existing) return void (existing.windowId && await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {}));
+  const nonce = crypto.randomUUID();
+  const map = await popupMap();
+  map[nonce] = { tabId };
+  await setPopupMap(map);
   // review.html is use_dynamic_url in the manifest, and chrome.runtime.getURL()
   // returns that per-session dynamic-host form here. A framed load (openReview,
   // from a matching http(s) page's own content script) resolves that URL fine,
   // but chrome.windows.create has no such matching-page initiator and cannot
   // load the dynamic-host URL at all (the popup ends up on chrome-error://
   // chromewebdata) — so this one call site needs the plain extension-id URL.
-  const url = `chrome-extension://${chrome.runtime.id}/src/review.html?tab=${tabId}&window=1`;
-  const win = await chrome.windows.create({ url, type: 'popup', width: 380, height: 560, focused: true });
-  const popupTab = win.tabs?.[0];
-  if (popupTab) {
-    const map = (await chrome.storage.session.get(POPUP_MAP_KEY))[POPUP_MAP_KEY] || {};
-    map[popupTab.id] = tabId;
-    await chrome.storage.session.set({ [POPUP_MAP_KEY]: map });
+  const url = `chrome-extension://${chrome.runtime.id}/src/review.html?tab=${tabId}&window=1&popup=${nonce}`;
+  try {
+    const win = await chrome.windows.create({ url, type: 'popup', width: 380, height: 560, focused: true });
+    const fresh = await popupMap();
+    if (fresh[nonce]) { fresh[nonce] = { tabId, popupTabId: win.tabs?.[0]?.id, windowId: win.id }; await setPopupMap(fresh); }
+  } catch {
+    const fresh = await popupMap(); delete fresh[nonce]; await setPopupMap(fresh);
   }
 }
+// Drop a popup's reservation once its tab closes — belt and suspenders for
+// findOpenPopup's own liveness check, and keeps storage from accumulating
+// entries for popups the user closed without confirming or cancelling.
+chrome.tabs.onRemoved.addListener(async tabId => {
+  const map = await popupMap();
+  let changed = false;
+  for (const [nonce, entry] of Object.entries(map)) if (entry.popupTabId === tabId) { delete map[nonce]; changed = true; }
+  if (changed) await setPopupMap(map);
+});
 export async function reviewTabFor(sender) {
-  // A framed card must belong to the tab it sits in; a popup must be one we opened.
+  // A framed card must belong to the tab it sits in; a popup must carry the
+  // nonce openFallbackReview minted for that exact tab (unguessable, and
+  // recorded before the popup could possibly have loaded far enough to ask).
   const url = new URL(sender.url), tab = Number(url.searchParams.get('tab'));
   if (!Number.isInteger(tab)) return null;
   if (url.searchParams.get('window') === '1') {
-    const map = (await chrome.storage.session.get(POPUP_MAP_KEY))[POPUP_MAP_KEY] || {};
-    return map[sender.tab?.id] === tab ? tab : null;
+    const nonce = url.searchParams.get('popup');
+    if (!nonce) return null;
+    const map = await popupMap();
+    return map[nonce]?.tabId === tab ? tab : null;
   }
   return sender.tab?.id === tab ? tab : null;
 }
@@ -85,28 +129,38 @@ export async function withDockHidden(tabId, run) {
   await chrome.tabs.sendMessage(tabId, { kind: 'dock-hide' }).catch(() => {});
   try { return await run(); } finally { await chrome.tabs.sendMessage(tabId, { kind: 'dock-unhide' }).catch(() => {}); }
 }
-async function refreshState(tab) { await chrome.tabs.sendMessage(tab.id, { kind: 'dock-state', state: await dockState(tab) }).catch(() => {}); }
+async function refreshState(tab, originHint) { await chrome.tabs.sendMessage(tab.id, { kind: 'dock-state', state: await dockState(tab, originHint) }).catch(() => {}); }
+// Returns { ok: true } once the review is open (framed or the fallback
+// popup), or { ok: false, error } if staging the draft itself failed (signed
+// out, another review already in progress, …) — the caller decides what to
+// do with that (e.g. saveTweet forwards it so the X button's own error state
+// still works). Either way the dock shows the error itself when it can.
 export async function startCapture(tab, action, extra = {}) {
-  try { await stageSaveReview({ action, tab, trigger: 'dock', ...extra }); await openReview(tab); }
-  catch (error) {
-    if (!await summonDock(tab.id, { expand: true })) throw error;
-    await chrome.tabs.sendMessage(tab.id, { kind: 'dock-status', text: error.message, tone: 'error' }).catch(() => {});
+  try {
+    await stageSaveReview({ action, tab, trigger: 'dock', ...extra });
+  } catch (error) {
+    await summonDock(tab.id, { expand: true })
+      .then(shown => shown && chrome.tabs.sendMessage(tab.id, { kind: 'dock-status', text: error.message, tone: 'error' }).catch(() => {}))
+      .catch(() => {});
+    return { ok: false, error: error.message };
   }
+  await openReview(tab).catch(() => {});
+  return { ok: true };
 }
 export async function handleDockMessage(msg, sender) {
   if (sender.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0 || sender.url?.startsWith(chrome.runtime.getURL(''))) return { ok: false };
   const tab = sender.tab;
   switch (msg.kind) {
     case 'dock-hello': {
-      const state = await dockState(tab);
-      if (await readSaveReview(tab.id)) void openReview(tab);
+      const state = await dockState(tab, sender.url);
+      if (await readSaveReview(tab.id)) void openReview(tab).catch(() => {});
       return state;
     }
     case 'dock-capture': {
       if (!['savepage', 'highlight', 'region', 'fullpage', 'note'].includes(msg.action)) return { ok: false };
       const { preferences } = await getEffectivePreferences();
       const extra = msg.action === 'note' ? { text: '', attachPage: preferences.notes.attachSource } : {};
-      await startCapture(tab, msg.action, extra); return { ok: true };
+      return startCapture(tab, msg.action, extra);
     }
     case 'dock-open': {
       const target = { library: dashboardUrl('/dashboard'), settings: dashboardUrl('/dashboard/settings'), 'sign-in': dashboardUrl('/login'), import: chrome.runtime.getURL('src/import.html') }[msg.target];
@@ -114,10 +168,10 @@ export async function handleDockMessage(msg, sender) {
       await chrome.tabs.create({ url: target, index: tab.index + 1 }); return { ok: true };
     }
     case 'dock-site': {
-      const origin = originOf(tab.url); if (!origin) return { ok: false };
+      const origin = originOf(sender.url); if (!origin) return { ok: false };
       const list = new Set((await chrome.storage.local.get(HIDDEN_KEY))[HIDDEN_KEY] || []);
       msg.hidden ? list.add(origin) : list.delete(origin);
-      await chrome.storage.local.set({ [HIDDEN_KEY]: [...list] }); await refreshState(tab); return { ok: true };
+      await chrome.storage.local.set({ [HIDDEN_KEY]: [...list] }); await refreshState(tab, sender.url); return { ok: true };
     }
     case 'dock-review-fallback': if (await readSaveReview(tab.id)) await openFallbackReview(tab.id); return { ok: true };
     // dock-always-on and dock-local are added in Tasks 5 and 6.
