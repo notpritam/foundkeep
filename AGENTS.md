@@ -20,6 +20,8 @@ Pritam's standing preference (2026-09-12): Foundkeep already has a permanent dev
 
 2026-09-21 archive dev rollout: dev is now schema 33; production remains schema 32. Dev rollback must use the schema-compatible backend `~/.local/share/foundkeep-backend/releases/20260921-115951-archive-cf24ebd-fallback/apps/backend`, preserving the current database. Archive is deployed on the permanent dev website; the mobile dev update is awaiting a responsive authenticated release Mac. See `docs/beta/2026-09-21-save-archive.md`.
 
+2026-09-27 Atlas split: Pritam's personal Atlas tools (the `/v1` capture API, device/invite admin, the `/agent` browser relay and browser-mcp) moved out of this repo into `notpritam/atlas-personal` (`~/personal/tools/atlas-personal`, `atlas-personal.service` on :8794). Schema 34 drops the old `captures`, `captures_fts`, `devices` and `invite_codes` tables; their data was copied and verified first, and the pre-split production backup is `~/.local/share/atlas/backups/atlas-20260927-062356-pre-atlas-split.db`. Caddy already answers 404 for those paths on FoundKeep hosts. Do not re-add Atlas routes here.
+
 See [customer web deployment](deploy/NEXT_WEB.md) for packaging and verification details.
 
 Pritam's preference (2026-09-13): keep dev populated and ready for independent testing. `bun run dev:seed` adds dedicated demo accounts, three public collections, a private scratchpad, starter notes, and a pending submission. Reruns preserve existing data and recorded tester changes. Keep credentials/bookkeeping outside the checkout at `~/.local/share/foundkeep-dev-demo`; never seed production or reset dev. See [demo setup](docs/DEV_DEMO.md).
