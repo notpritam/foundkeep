@@ -242,6 +242,20 @@ test('dock: hiding on x.com survives an X save despite the background\'s redacte
   await ext.evaluate(tabId => import('./dock-control.js').then(m => m.summonDock(tabId, { expand: true })), tabId);
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   await dock.click('[data-action="more"]');
+  // Defensive wait for the menu to actually be open before clicking into it
+  // (same pattern already used for the screenshot menu at lines 342/376):
+  // dock.click reads a button's rect over CDP and only then dispatches the
+  // real mouse click, so clicking a button that isn't rendered yet (zero
+  // rect) mis-clicks the page instead. The flake this guarded against here
+  // traced to a real product race, not this timing gap on its own — see the
+  // 'dock-show' fix in apps/extension/src/dock/dock.js (dockReady): on
+  // x.com, summonDock's dock-show could arrive and render mode 'expanded'
+  // before this content script's own dock-hello had populated dockState,
+  // which read connected as false and hid .actions (including "more")
+  // entirely, so the very first click above landed outside the dock and a
+  // document-level listener collapsed it right back down before the menu
+  // ever opened. Kept as a second line of defense regardless.
+  await dock.waitFor(`__foundkeepDock.rect('[data-menu="more"]').height > 0`);
   await dock.click('[data-action="site"]');
   await dock.waitFor("__foundkeepDock.state() === 'hidden'");
   assert.equal(await dock.evaluate(`__foundkeepDock.text('[data-action="site"]')`), 'Show on this site again');

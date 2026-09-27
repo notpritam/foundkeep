@@ -59,7 +59,7 @@
     </div>`;
   const $ = selector => root.querySelector(selector);
   const dockEl = $('.dock');
-  let mode = 'hidden', dockState = null, frame = null, readyTimer = 0, collapseTimer = 0;
+  let mode = 'hidden', dockState = null, frame = null, readyTimer = 0, collapseTimer = 0, dockReady = null;
   let pos = null; // {fx, fy} fractions of the viewport for the dock's top-left corner
 
   const send = message => chrome.runtime.sendMessage(message).catch(() => null);
@@ -195,11 +195,30 @@
     switch (message?.kind) {
       // R1: the toolbar icon toggles the dock — collapse when already
       // expanded, but never while a review card is open.
-      case 'dock-show':
+      case 'dock-show': {
         if (message.toggle && mode === 'expanded') { setMode('collapsed'); break; }
-        if (mode === 'hidden') setMode(message.expand ? 'expanded' : 'collapsed');
-        else if (message.expand && mode === 'collapsed') setMode('expanded');
+        const apply = () => {
+          if (mode === 'hidden') setMode(message.expand ? 'expanded' : 'collapsed');
+          else if (message.expand && mode === 'collapsed') setMode('expanded');
+        };
+        // Product race (found chasing a flake in the x.com hide test):
+        // summonDock() on an origin whose tab.url is redacted (x.com is
+        // matched only by a static content_scripts entry, not
+        // host_permissions — see dock-control.js) skips its usual
+        // dock-state refresh, since it cannot safely recompute hiddenHere
+        // without a trustworthy origin. On those origins the only source
+        // of dockState is this script's own dock-hello round trip below,
+        // which a fast external summonDock({expand:true}) call (e.g. from
+        // an extension page immediately after injection) can win the race
+        // against. Rendering 'expanded' while dockState is still null reads
+        // connected as false and hides .actions entirely — an empty-looking
+        // dock a real click can then land past, hitting document's
+        // pointerdown-outside handler and collapsing it right back down.
+        // Wait for the same dockReady promise dock-hello already set up
+        // instead of rendering blind.
+        if (dockState) apply(); else void dockReady.then(apply);
         break;
+      }
       case 'dock-collapse': if (mode === 'expanded') setMode('collapsed'); break;
       case 'dock-review-open': if (mode === 'hidden') setMode('expanded'); openReview(message.url); break;
       case 'dock-review-close': finishReview(message.saved === true); break;
@@ -226,5 +245,8 @@
   };
   document.documentElement.append(host);
   void send({ kind: 'dock-position' }).then(stored => { pos = stored || null; place(); });
-  void send({ kind: 'dock-hello' }).then(state => { if (!state) return; dockState = state; if (state.show && mode === 'hidden') setMode('collapsed'); else render(); });
+  // Kept as `dockReady` (not fire-and-forget) so 'dock-show' can wait on
+  // this exact in-flight request instead of rendering against a still-null
+  // dockState — see the case 'dock-show' comment above.
+  dockReady = send({ kind: 'dock-hello' }).then(state => { if (!state) return; dockState = state; if (state.show && mode === 'hidden') setMode('collapsed'); else render(); });
 })();

@@ -134,7 +134,7 @@ _Exit criteria:_ Every ★ item marked for launch is live in prod and in the shi
 | ○ To do | ★ Admin console: real uptime, actual spend, social-session status | admin | agent |  |
 | ○ To do | ★ Publish launch public collections so Explore isn't empty | collections | **Pritam** | Prod has 0 public collections. |
 | ○ To do | ★ Update public copy: versions, 'private beta' wording, beta page build number | site | agent |  |
-| ◐ In progress | ★ Extension: floating dock replaces the side panel | extension | agent | Spec approved 2026-09-27: docs/superpowers/specs/2026-09-27-extension-floating-dock-design.md. Collapsed pill → toolbar → review card; library and settings move to the dashboard; account required. Ships to dev, then friends, then the CWS 1.0.3 update. |
+| ◐ In progress | ★ Extension: floating dock replaces the side panel | extension | agent | Spec approved 2026-09-27: docs/superpowers/specs/2026-09-27-extension-floating-dock-design.md. Collapsed pill → toolbar → review card; library and settings move to the dashboard; account required. 1.8.0 dev build verified 2026-09-27 in headed Chromium on github.com, x.com, youtube.com and a public notion.so page: dock renders correctly with no page-style leakage on all four, and the review card loads as a framed iframe (not the fallback popup) on all four, including the two strict-CSP sites named in the spec's risks-to-verify — see docs/beta/2026-09-27-extension-floating-dock.md. Ships to dev, then friends, then the CWS 1.0.3 update. |
 
 ## P6 · Store launch
 
