@@ -4,24 +4,13 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { dockWorld } from './helpers/dock-world.mjs';
 import { pollUntil } from './helpers/poll.mjs';
+import { backendCaptureMethods } from './helpers/backend-methods.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 
 const SIGNED_IN = { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' };
-// Copied from the backend's own allowlist (apps/backend/src/customer-provenance.ts
-// METHODS) — a captureMethod outside this set 400s on upload with
-// invalid_capture_context, and cloud.js marks the capture permanently failed
-// even though the dock already said "Saved" (R12).
-const BACKEND_CAPTURE_METHODS = new Set([
-  "popup-save-page", "keyboard-save-page", "context-selection", "context-link", "context-image",
-  "popup-highlight", "keyboard-highlight", "popup-region", "keyboard-region", "popup-full-page",
-  "keyboard-full-page", "context-save-page", "context-region", "context-full-page",
-  "extension-note", "library-note", "twitter-action", "bookmark-import",
-  "agent-create",
-  "ios-share-url", "ios-share-text", "ios-share-image", "ios-share-video",
-  "ios-share-audio", "ios-share-document", "ios-share-file", "ios-app-note",
-  "android-share-url", "android-share-text", "android-share-image", "android-share-video",
-  "android-share-audio", "android-share-document", "android-share-file", "android-app-note",
-]);
+// M8: read from the backend's own allowlist at test time (see the helper),
+// never a hand-copied literal.
+const BACKEND_CAPTURE_METHODS = await backendCaptureMethods();
 const TWEET_FIXTURE = '<title>X fixture</title><article data-testid="tweet"><div data-testid="User-Name">Mina</div><a href="/mina/status/123456789"><time>Today</time></a><div data-testid="tweetText">A tweet worth keeping.</div><div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/own.jpg"></div><div role="group"><button data-testid="reply">Reply</button></div></article>';
 
 async function launch(t, { allUrls = false } = {}) {
@@ -345,6 +334,8 @@ test('dock: the X save button reaches its error state when signed out', { timeou
 test('dock: a strict CSP page loads the framed card (or falls back to a popup)', { timeout: 30000 }, async t => {
   const { context, worker, extensionId, origin } = await launch(t);
   await signIn(context, worker);
+  const uploads = [];
+  await context.route('**/api/captures', r => { uploads.push(r.request().postDataJSON()); return r.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }); });
   await context.route(origin + '/__strict', r => r.fulfill({ contentType: 'text/html', headers: { 'content-security-policy': "frame-src 'none'; default-src 'self'" }, body: '<title>Strict fixture</title><p>Strict page</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__strict');
   const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
@@ -381,6 +372,12 @@ test('dock: a strict CSP page loads the framed card (or falls back to a popup)',
     await popup.click('#destinationConfirm');
     await popup.waitForEvent('close', { timeout: 10000 });
   }
+  // M8: the upload carries a captureMethod the backend accepts.
+  const uploadDeadline = Date.now() + 10000;
+  while (uploads.length === 0 && Date.now() < uploadDeadline) await new Promise(r => setTimeout(r, 50));
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].provenance.captureMethod, 'extension-note');
+  assert.ok(BACKEND_CAPTURE_METHODS.has(uploads[0].provenance.captureMethod));
 });
 
 test('dock: summonDock returns false for a restricted chrome:// page', { timeout: 30000 }, async t => {
@@ -400,6 +397,8 @@ test('dock: summonDock returns false for a restricted chrome:// page', { timeout
 test('dock: hides during a full-page screenshot and reappears afterward', { timeout: 30000 }, async t => {
   const { context, worker, extensionId, origin } = await launch(t, { allUrls: true });
   await signIn(context, worker);
+  const uploads = [];
+  await context.route('**/api/captures', r => { uploads.push(r.request().postDataJSON()); return r.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }); });
   await context.route(origin + '/__shot', r => r.fulfill({ contentType: 'text/html', body: '<title>Shot fixture</title><p style="height:600px">A page worth screenshotting.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__shot');
   const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
@@ -425,6 +424,12 @@ test('dock: hides during a full-page screenshot and reappears afterward', { time
   samples.push(await dock.evaluate('__foundkeepDock.visible()'));
   assert.ok(samples.includes(false), 'the dock must hide at least once during the capture: ' + JSON.stringify(samples));
   assert.equal(samples[samples.length - 1], true, 'the dock must be visible again once the capture finishes');
+  // M8: the upload carries a captureMethod the backend accepts.
+  const uploadDeadline = Date.now() + 10000;
+  while (uploads.length === 0 && Date.now() < uploadDeadline) await new Promise(r => setTimeout(r, 50));
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].provenance.captureMethod, 'popup-full-page');
+  assert.ok(BACKEND_CAPTURE_METHODS.has(uploads[0].provenance.captureMethod));
 });
 
 test('dock: a region drag saves a screenshot capture with the dragged dimensions', { timeout: 30000 }, async t => {
@@ -434,6 +439,8 @@ test('dock: a region drag saves a screenshot capture with the dragged dimensions
   // (and the deleted tests/extension-smoke.mjs's region test, at 5713572).
   const { context, worker, extensionId, origin } = await launch(t, { allUrls: true });
   await signIn(context, worker);
+  const uploads = [];
+  await context.route('**/api/captures', r => { uploads.push(r.request().postDataJSON()); return r.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }); });
   await context.route(origin + '/__region', r => r.fulfill({ contentType: 'text/html', body: '<title>Region fixture</title><p style="height:600px">A page worth dragging over.</p>' }));
   const web = await context.newPage(); await web.goto(origin + '/__region');
   const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
@@ -474,6 +481,12 @@ test('dock: a region drag saves a screenshot capture with the dragged dimensions
   assert.equal(capture.width, Math.round(200 * dpr));
   assert.equal(capture.height, Math.round(140 * dpr));
   assert.ok(capture.bytes > 0, 'the screenshot must have non-zero bytes');
+  // M8: the upload carries a captureMethod the backend accepts.
+  const uploadDeadline = Date.now() + 10000;
+  while (uploads.length === 0 && Date.now() < uploadDeadline) await new Promise(r => setTimeout(r, 50));
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].provenance.captureMethod, 'popup-region');
+  assert.ok(BACKEND_CAPTURE_METHODS.has(uploads[0].provenance.captureMethod));
 });
 
 test('dock: a capture without a scripting grant is refused at staging, and a grant lost after staging surfaces through the fallback popup', { timeout: 30000 }, async t => {
@@ -859,4 +872,65 @@ test('dock: a disabled capture method is refused at staging for keyboard, contex
   assert.deepEqual(await attempt('save-image', { trigger: 'context', info: { srcUrl: 'https://images.example.com/a.png' } }), { ok: false, error: 'Image capture is disabled in your FoundKeep preferences.' });
   assert.deepEqual(await attempt('highlight', { trigger: 'dock' }), { ok: false, error: 'Highlight capture is disabled in your FoundKeep preferences.' });
   assert.equal(await ext.evaluate(id => import('./save-review.js').then(m => m.readSaveReview(id)), tab.id), null, 'nothing is staged');
+});
+
+// M8: every capture method staging can produce — the dock (savepage,
+// highlight, region, fullpage, note with and without its page), the context
+// menu, keyboard shortcuts and the X button — must be one the backend
+// accepts. captureMethodFor is the single function performCapture uses.
+test('capture methods: every staged trigger/action maps to a method the backend accepts (M8)', async () => {
+  const { captureMethodFor } = await import('../apps/extension/src/capture-method.js');
+  const cases = [
+    ['dock', 'savepage', {}, 'popup-save-page'], ['dock', 'highlight', {}, 'popup-highlight'],
+    ['dock', 'region', {}, 'popup-region'], ['dock', 'fullpage', {}, 'popup-full-page'],
+    ['dock', 'note', { attachPage: true }, 'extension-note'], ['dock', 'note', { attachPage: false }, 'library-note'],
+    ['context', 'save-selection', {}, 'context-selection'], ['context', 'save-link', {}, 'context-link'],
+    ['context', 'save-image', {}, 'context-image'], ['context', 'savepage', {}, 'context-save-page'],
+    ['context', 'region', {}, 'context-region'], ['context', 'fullpage', {}, 'context-full-page'],
+    ['keyboard', 'region', {}, 'keyboard-region'], ['keyboard', 'fullpage', {}, 'keyboard-full-page'],
+    ['keyboard', 'highlight', {}, 'keyboard-highlight'],
+    ['twitter', 'tweet', {}, 'twitter-action'],
+  ];
+  for (const [trigger, action, options, expected] of cases) {
+    const method = captureMethodFor(action, trigger, options);
+    assert.equal(method, expected, `${trigger} ${action}`);
+    assert.ok(BACKEND_CAPTURE_METHODS.has(method), `${trigger} ${action} -> ${method} must be in the backend's METHODS`);
+  }
+});
+
+// M8 end to end: the upload body's provenance.captureMethod for a dock
+// highlight, a context-menu selection and a keyboard highlight.
+test('dock: highlight, context selection and keyboard highlight upload with backend-accepted methods (M8)', { timeout: 40000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t);
+  await signIn(context, worker);
+  const uploads = [];
+  await context.route('**/api/captures', r => { uploads.push(r.request().postDataJSON()); return r.fulfill({ json: { capture: { id: 'remote-' + uploads.length, status: 'done' } } }); });
+  await context.route(origin + '/__methods', r => r.fulfill({ contentType: 'text/html', body: '<title>Methods fixture</title><p id="quote">A sentence worth highlighting.</p>' }));
+  const web = await context.newPage(); await web.goto(origin + '/__methods');
+  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
+  const tab = await ext.evaluate(async url => (await chrome.tabs.query({ url }))[0], origin + '/__methods*');
+  assert.equal(await summon(ext, origin + '/__methods*'), true);
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  const select = () => web.evaluate(() => { const range = document.createRange(); range.selectNodeContents(document.querySelector('#quote')); getSelection().removeAllRanges(); getSelection().addRange(range); });
+  const confirm = async () => {
+    const frame = await reviewFrame(web);
+    await frame.waitForSelector('#reviewForm[data-ready="true"]', { timeout: 8000 });
+    await web.bringToFront();
+    await frame.click('#destinationConfirm');
+    await dock.waitFor("__foundkeepDock.state() !== 'review'", 10000);
+  };
+  await select();
+  await dock.click('[data-action="highlight"]');
+  await confirm();
+  await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'save-selection', { trigger: 'context', info: { selectionText: 'A sentence worth highlighting.' } })), tab);
+  await confirm();
+  await select();
+  await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'highlight', { trigger: 'keyboard' })), tab);
+  await confirm();
+  const deadline = Date.now() + 10000;
+  while (uploads.length < 3 && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
+  const methods = uploads.map(upload => upload.provenance.captureMethod).sort();
+  assert.deepEqual(methods, ['context-selection', 'keyboard-highlight', 'popup-highlight']);
+  for (const method of methods) assert.ok(BACKEND_CAPTURE_METHODS.has(method), method);
 });

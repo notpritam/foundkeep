@@ -24,6 +24,7 @@
   "src/bookmark-import.js",
   "src/background.js",
   "src/capture.js",
+  "src/capture-method.js",
   "src/cloud.js",
   "src/db.js",
   "src/image-formats.js",

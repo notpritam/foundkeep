@@ -23,6 +23,7 @@ import {
   refreshPreferences,
 } from "./preferences.js";
 import { cloudImageMime } from "./image-formats.js";
+import { captureMethodFor } from "./capture-method.js";
 
 protectCloudStorage().catch(() => {});
 // R1: the toolbar icon toggles the floating dock rather than opening the
@@ -237,25 +238,6 @@ async function capturePageContext(tab, {
   } catch {
     return { articleText: null, provenance: fallbackProvenance(tab, captureMethod, capturedAt, targetUrl, "FoundKeep saved the source, but some page details were unavailable.") };
   }
-}
-
-function methodFor(action, trigger) {
-  if (action === "save-selection") return "context-selection";
-  if (action === "save-link") return "context-link";
-  if (action === "save-image") return "context-image";
-  const suffix = {
-    savepage: "save-page",
-    highlight: "highlight",
-    region: "region",
-    fullpage: "full-page",
-  }[action];
-  // The dock is the extension's own capture UI — the same role the popup
-  // plays — and the backend's captureMethod allowlist
-  // (apps/backend/src/customer-provenance.ts METHODS) has no "dock-*"
-  // entries, only "popup-*" ones; a "dock-*" method here would 400 on
-  // upload with invalid_capture_context.
-  const prefix = trigger === "dock" ? "popup" : trigger || "popup";
-  return `${prefix}-${suffix}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -510,9 +492,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // 'context'/'keyboard'/'twitter' from the handful of callers that override
 // it) — never undefined, so `trigger` needs no default here.
 async function performCapture(action, { tab, info, tweet, text, attachPage, trigger, commit = saveCapture }) {
-  const captureMethod = methodFor(action, trigger);
   const preferenceState = await getEffectivePreferences();
   const preferences = preferenceState.preferences;
+  const captureMethod = captureMethodFor(action, trigger, { attachPage: !!attachPage && preferences.notes.attachSource });
   const limits = preferenceState.policy.limits;
   const feature = capturePreferenceKey(action);
   if (!preferences.capture[feature]) throw new Error(captureDisabledMessage(action));
@@ -522,13 +504,13 @@ async function performCapture(action, { tab, info, tweet, text, attachPage, trig
       const capturedAt = Date.now();
       return commit({ type: 'highlight', cloudType: 'tweet', sourceUrl: tweet.url, sourceTitle: tweet.title,
         selectionText: boundedText(tweet.text, limits.selectionCharacters, 'Post text'), socialContext: tweet.socialContext || null, capturedAt,
-        provenance: fallbackProvenance({ url: tweet.url, title: tweet.title }, 'twitter-action', capturedAt) });
+        provenance: fallbackProvenance({ url: tweet.url, title: tweet.title }, captureMethod, capturedAt) });
     }
     case 'note': {
       if (attachPage) await assertCaptureTab(tab);
       const context = attachPage && preferences.notes.attachSource
-        ? await capturePageContext(tab, { captureMethod: 'extension-note' })
-        : { provenance: fallbackProvenance(null, 'library-note', Date.now()) };
+        ? await capturePageContext(tab, { captureMethod })
+        : { provenance: fallbackProvenance(null, captureMethod, Date.now()) };
       return commit({ type: 'note', noteText: text, sourceUrl: context.provenance.pageUrl,
         sourceTitle: context.provenance.pageTitle, faviconUrl: context.provenance.faviconUrl,
         capturedAt: context.provenance.capturedAt, provenance: context.provenance });
