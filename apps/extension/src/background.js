@@ -58,6 +58,11 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
       .catch(() => respond({ ok: false, error: "FoundKeep kept the last saved preferences." }));
     return true;
   }
+  if (msg?.kind === "atlas-open-import") {
+    if (!trustedPairingSender(sender)) { respond({ ok: false, error: "This page cannot open FoundKeep import." }); return; }
+    void chrome.tabs.create({ url: chrome.runtime.getURL("src/import.html") }).then(() => respond({ ok: true }));
+    return true;
+  }
   handleExternalMessage(msg, sender)
     .then((result) => {
       respond(result);

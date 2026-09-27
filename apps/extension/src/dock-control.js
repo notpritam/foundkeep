@@ -1,6 +1,7 @@
 import { CUSTOMER_ORIGIN } from './product.js';
 import { readSaveReview, stageSaveReview } from './save-review.js';
-import { getCloudStatus } from './cloud.js';
+import { getCloudStatus, importLocalCaptures } from './cloud.js';
+import { drainQueue } from './capture.js';
 import { getEffectivePreferences } from './preferences.js';
 
 const HIDDEN_KEY = 'foundkeep-dock-hidden-origins', ALWAYS_KEY = 'foundkeep-dock-always-on', LOCAL_KEY = 'foundkeep-dock-local-prompt';
@@ -225,8 +226,13 @@ export async function handleDockMessage(msg, sender) {
       }
       await applyAlwaysOn(false); await refreshState(tab, sender.url); return { ok: true };
     }
-    // dock-local is added in Task 6.
-    case 'dock-local': return { ok: false };
+    case 'dock-local': {
+      const cloud = await getCloudStatus();
+      if (msg.choice === 'later') await chrome.storage.local.set({ [LOCAL_KEY]: { laterUntil: Date.now() + 7 * 86_400_000 } });
+      else if (msg.choice === 'move' && cloud.account?.id) { await importLocalCaptures({ confirmed: true, accountId: cloud.account.id }); void drainQueue(); }
+      else return { ok: false };
+      await refreshState(tab); return { ok: true };
+    }
     case 'dock-position': {
       // Only a genuine top-frame content script may read or write where the
       // dock sits — never an extension page, and never a subframe. This

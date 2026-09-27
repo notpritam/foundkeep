@@ -100,6 +100,11 @@ test('customer pages present the FoundKeep identity', async () => {
   }
 });
 
+test('the devices page offers "Import from this browser" through the extension message channel', async () => {
+  const source = await readFile(path.resolve('apps/site/components/dashboard/devices.tsx'), 'utf8');
+  assert.match(source, /atlas-open-import/);
+});
+
 test('real API: signup, notes, logout, login, recovery and account deletion', async t => {
   const { page } = await pageFor(t, { mock: false });
   await page.goto(`${base}/auth.html?mode=signup`);

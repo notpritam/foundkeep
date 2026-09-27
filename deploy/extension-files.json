@@ -10,6 +10,8 @@
   "assets/fonts/geist-latin.woff2",
   "src/library.html",
   "src/library.js",
+  "src/import.html",
+  "src/import.js",
   "src/review.html",
   "src/review.js",
   "src/review.css",
