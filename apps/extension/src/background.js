@@ -21,6 +21,12 @@ import {
 } from "./preferences.js";
 import { cloudImageMime } from "./image-formats.js";
 
+// The dock content script cannot read chrome.storage itself (protectCloudStorage
+// below locks it to TRUSTED_CONTEXTS so account credentials never reach a
+// content script); this key holds only where the dock sits on screen, and is
+// read/written on the dock's behalf through the dock-position message below.
+const DOCK_POSITION_KEY = "foundkeep-dock-position";
+
 protectCloudStorage().catch(() => {});
 // Use Chrome's native toolbar behavior so opening the panel keeps activeTab's
 // user-gesture grant. The same panel remains available as the user changes tabs.
@@ -504,6 +510,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } catch (e) {
         sendResponse({ ok: false, error: String(e) });
       }
+    })();
+    return true;
+  }
+  if (msg?.kind === "dock-position") {
+    (async () => {
+      // Only a genuine top-frame content script may read or write where the
+      // dock sits — never an extension page, and never a subframe. This
+      // never touches atlasCustomer or any other cloud/account storage key.
+      const fromDockContentScript =
+        sender.id === chrome.runtime.id &&
+        !!sender.tab &&
+        sender.frameId === 0 &&
+        !sender.url?.startsWith(chrome.runtime.getURL(""));
+      if (!fromDockContentScript) return sendResponse({ ok: false });
+      if (msg.reset === true) {
+        await chrome.storage.local.remove(DOCK_POSITION_KEY);
+        return sendResponse({ ok: true });
+      }
+      if (msg.pos !== undefined) {
+        const { fx, fy } = msg.pos || {};
+        if (!Number.isFinite(fx) || !Number.isFinite(fy) || fx < 0 || fx > 1 || fy < 0 || fy > 1) {
+          return sendResponse({ ok: false });
+        }
+        await chrome.storage.local.set({ [DOCK_POSITION_KEY]: { fx, fy } });
+        return sendResponse({ ok: true });
+      }
+      const stored = await chrome.storage.local.get(DOCK_POSITION_KEY);
+      sendResponse(stored[DOCK_POSITION_KEY] || null);
     })();
     return true;
   }

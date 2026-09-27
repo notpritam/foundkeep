@@ -23,12 +23,6 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: process.env.FOUNDKEEP_HEADLESS !== 'false', executablePath: process.env.CHROMIUM_PATH,
     viewport: { width: 1200, height: 800 }, args: ['--no-sandbox', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`] });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-  // Chrome 140+ gates chrome.storage.local from content scripts behind an
-  // access level that only a trusted context (the background service
-  // worker) can grant. Task 4's background will grant this as part of the
-  // real summon path; here the test stands in for that handshake, exactly
-  // as it stands in for the not-yet-built dock-hello handler below.
-  await worker.evaluate(() => chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS' }));
   const extensionId = new URL(worker.url()).host;
   const origin = await worker.evaluate(() => new URL(chrome.runtime.getManifest().host_permissions[0]).origin);
   await context.route(origin + '/__dock*', route => route.fulfill({ contentType: 'text/html', body: '<title>Dock fixture</title><p style="height:3000px">Long page</p>' }));
@@ -48,6 +42,11 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   assert.equal(await web.evaluate(() => document.querySelector('foundkeep-dock')?.shadowRoot ?? null), null);
   await web.evaluate(() => document.querySelector('foundkeep-dock').click());
   assert.equal(await dock.evaluate(`__foundkeepDock.state()`), 'collapsed', 'a synthetic click must not expand the dock');
+  // R10: the dock must never read chrome.storage itself — the background
+  // (protectCloudStorage) keeps storage.local at TRUSTED_CONTEXTS so
+  // account credentials never reach a content script; the dock's own
+  // position persistence goes through the dock-position message instead.
+  assert.equal(await dock.evaluate(`chrome.storage.local.get(null).then(() => 'readable', () => 'blocked')`), 'blocked');
   // Default bottom-right, 16px from the edges. R4: measure the .dock rect,
   // not .pill — the pill sits inside the dock's 1px border + 2px padding.
   const dockRect = await dock.evaluate(`__foundkeepDock.rect('.dock')`);
@@ -61,6 +60,16 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-show', expand: true, toggle: true }); }, tabId);
   await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);
   await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
+  // R1 negative case: the toggle must never collapse a dock that is
+  // mid-review. (The review card has no draft staged for this tab, so it
+  // may render "no draft" content — that's fine for this assertion.)
+  const reviewUrl = await worker.evaluate(id => chrome.runtime.getURL('src/review.html?tab=' + id), tabId);
+  await worker.evaluate(async ({ id, url }) => { await chrome.tabs.sendMessage(id, { kind: 'dock-review-open', url }); }, { id: tabId, url: reviewUrl });
+  await dock.waitFor(`__foundkeepDock.state() === 'review'`);
+  await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-show', expand: true, toggle: true }); }, tabId);
+  assert.equal(await dock.evaluate(`__foundkeepDock.state()`), 'review', 'toggle must not collapse a dock mid-review');
+  await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-review-close', saved: false }); }, tabId);
+  await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
   // Keyboard: Escape collapses and returns focus to the pill.
   await web.keyboard.press('Escape');
   await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);

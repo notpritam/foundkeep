@@ -1,7 +1,7 @@
 (() => {
   if (window.top !== window || window.__foundkeepDock) return;
   const EXT = new URL(chrome.runtime.getURL('')).origin;
-  const POS_KEY = 'foundkeep-dock-position', EDGE = 16;
+  const EDGE = 16;
   const ICON = {
     grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
     mark: '<path d="M7 3h10a1 1 0 0 1 1 1v17l-6-4-6 4V4a1 1 0 0 1 1-1z"/>',
@@ -99,7 +99,10 @@
   }
   function setPosition(left, top, persist = true) {
     pos = { fx: left / innerWidth, fy: top / innerHeight }; place();
-    if (persist) void chrome.storage.local.set({ [POS_KEY]: pos });
+    // The dock cannot touch chrome.storage directly (it would sit next to
+    // account credentials); the background is the only trusted holder of
+    // where the dock sits, so persistence goes through a message.
+    if (persist) void send({ kind: 'dock-position', pos });
   }
   function placeCard() {
     const d = dockEl.getBoundingClientRect(), h = Number(frame.dataset.height || 420);
@@ -159,7 +162,7 @@
     const step = event.shiftKey ? 64 : 16, r = dockEl.getBoundingClientRect();
     const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
     if (delta) { event.preventDefault(); setPosition(r.left + delta[0], r.top + delta[1]); }
-    if (event.key === 'Home') { event.preventDefault(); pos = null; void chrome.storage.local.remove(POS_KEY); place(); }
+    if (event.key === 'Home') { event.preventDefault(); pos = null; void send({ kind: 'dock-position', reset: true }); place(); }
   });
   document.addEventListener('keydown', event => {
     if (event.isTrusted && event.key === 'Escape' && mode === 'expanded') setMode('collapsed');
@@ -205,6 +208,6 @@
     visible: () => host.style.visibility !== 'hidden' && host.style.display !== 'none',
   };
   document.documentElement.append(host);
-  void chrome.storage.local.get(POS_KEY).then(values => { pos = values[POS_KEY] || null; place(); });
+  void send({ kind: 'dock-position' }).then(stored => { pos = stored || null; place(); });
   void send({ kind: 'dock-hello' }).then(state => { if (!state) return; dockState = state; if (state.show && mode === 'hidden') setMode('collapsed'); else render(); });
 })();
