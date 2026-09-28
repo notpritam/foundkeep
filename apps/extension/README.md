@@ -4,17 +4,22 @@ Keep readable page copies, screenshots, highlights, links, images, and notes wit
 
 ## One floating dock for everything
 
-Click the pinned FoundKeep toolbar icon to show or hide a small dock on the current page (click again to collapse it). Drag its grip to reposition it; it remembers where you left it. Expand the dock to save the current page, highlight the selection, capture a region or full-page screenshot, or write a note. Its **⋯** menu opens **Library** (your FoundKeep dashboard), **Show on every site**, **Hide on this site**, **Import browser bookmarks**, and **Settings** (the account dashboard's browser-capture settings).
+Click the pinned FoundKeep toolbar icon to show or hide a small dock on the current page (click again to collapse it). Drag its grip to reposition it; it remembers where you left it. Expand the dock to save the current page, highlight text, take a screenshot, or write a note — each saves in one click. Its **⋯** menu opens **Library** (your FoundKeep dashboard), **Show on every site**, **Hide on this site**, **Import browser bookmarks**, and **Settings** (the account dashboard's browser-capture settings).
 
-The initial toolbar click grants access to that page. To keep the dock (and capture) available after switching tabs without clicking the icon again, choose **Show on every site** from its **⋯** menu and accept Chrome's optional page-access prompt; **Hide on this site** turns it back off for one origin. Browser-internal pages cannot show the dock or be captured. Region selection happens on the page; Escape or switching tabs cancels it. A page change during a screenshot aborts the capture instead of saving the wrong tab.
+The initial toolbar click grants access to that page. To keep the dock (and capture) available after switching tabs without clicking the icon again, choose **Show on every site** from its **⋯** menu and accept Chrome's optional page-access prompt; **Hide on this site** turns it back off for one origin. Browser-internal pages cannot show the dock or be captured. A page change during a screenshot aborts the capture instead of saving the wrong tab.
 
-## Choose where each save goes
+## Saves are instant; details are optional
 
-Every capture — dock actions, the X/Twitter button, right-click captures, and keyboard captures — opens a small review card on the page (or a fallback popup window if the card cannot be framed there). Choose **My library**, a private folder, or a collection, then confirm; Cancel discards the request without creating a save. An account is required to save — the dock shows **Sign in to save** instead of its actions when signed out.
+Every capture — dock actions, the X/Twitter button, right-click captures, and keyboard captures — saves straight to **My library** in the connected account, with the page's details captured automatically (URL, title, site, description, author and dates, headings and readable text). An account is required to save — the dock shows **Sign in to save** instead of its actions when signed out.
 
-Collection choices show their public/private audience and approval rules. Review the title, link and text that will be shared; images are included only if you select the image checkbox. Your full capture stays in your private account library. The chosen folder or collection stays attached to the upload queue if connectivity drops. The extension checks account ownership again before confirmation.
+- **Save page** saves in one click.
+- **Highlight** saves the selected text at once. With nothing selected it turns on highlighter mode (`Select text to save · Esc to stop`): every selection you make is saved and briefly flashed, until Esc or Highlight again.
+- **Screenshot** goes straight to region selection, with a small toolbar in the tab's top-right corner — **Selection** · **Full page** · **✕**. Drag a region to save it, choose Full page to save the whole page, or press ✕ / Esc to cancel. Screenshots keep the page's details and readable text too, so they are findable. The dock hides while you capture.
+- **Note** opens a small field in the dock: Enter saves, Shift+Enter adds a line, Esc closes it. The page is attached when the notes preference says so.
 
-After updating the extension, refresh open X/Twitter tabs so they load the new FoundKeep bookmark icon and destination-picker button.
+After every save the dock shows **✓ Saved to My library · Add details** for about five seconds (hover or focus keeps it). **Add details** opens a small card on the page where you can change the title and note, add tags, choose or create a folder, or share the save to a collection. Edits apply to the save you just made: before it has uploaded they ride along with the upload; afterwards they are sent as an update — and an edit made while the upload is in flight is sent as soon as it lands. Collection choices show their audience and approval rules; your personal note, folder and tags stay private, and images are shared only if you tick the image checkbox.
+
+After updating the extension, refresh open X/Twitter tabs so they load the new FoundKeep button.
 
 ## Check the environment and version
 
@@ -51,10 +56,10 @@ Existing local-only captures are never uploaded automatically. If any remain, th
 
 ## Capture
 
-- **Dock:** save a readable copy of the current page, highlight the selection, capture a region or full page, or write a note.
-- **Right-click:** save a selection, link, image, or page; capture a region or full-page screenshot.
-- **Keyboard:** `Alt+Shift+S` captures a region, `Alt+Shift+F` a full page, and `Alt+Shift+H` selected text. Change assignments at `chrome://extensions/shortcuts`.
-- **X / Twitter:** the FoundKeep button in a tweet’s action bar saves the author, text, and permalink.
+- **Dock:** save a readable copy of the current page, highlight text, take a screenshot, or write a note.
+- **Right-click:** save a selection, link, image, or page; take a region screenshot (the same corner toolbar) or a full-page screenshot. Saving an image asks for access to the image's site the first time.
+- **Keyboard:** `Alt+Shift+S` and `Alt+Shift+F` open the screenshot corner toolbar (drag a region or choose Full page), and `Alt+Shift+H` saves selected text. Change assignments at `chrome://extensions/shortcuts`.
+- **X / Twitter:** the FoundKeep button (the FoundKeep mark) in a post's action bar saves the author, text, and permalink in one click and turns green once saved.
 
 Page capture requires a normal web page. Chrome restricts capture on internal browser pages and certain protected pages. Notes can still be saved there. Saved images are limited to 8 MiB. A larger generated screenshot remains local with an actionable sync error.
 
