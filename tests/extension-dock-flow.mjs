@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { dockWorld } from './helpers/dock-world.mjs';
 import { pollUntil } from './helpers/poll.mjs';
 import { backendCaptureMethods } from './helpers/backend-methods.mjs';
-import { launch, signIn, extensionPage, summon, fixture, waitForLength, localCaptures, selectText, dragSelect } from './helpers/dock-launch.mjs';
+import { launch, signIn, extensionPage, summon, fixture, waitForLength, localCaptures, selectText, dragSelect, waitForBadge } from './helpers/dock-launch.mjs';
 
 // M8: read from the backend's own allowlist at test time (see the helper),
 // never a hand-copied literal.
@@ -150,44 +150,108 @@ test('dock: Highlight saves selected text at once; with nothing selected it ente
   for (const upload of uploads) assert.ok(BACKEND_CAPTURE_METHODS.has(upload.provenance.captureMethod));
 });
 
-test('dock: Note opens an inline field — Enter saves, Shift+Enter adds a line, Esc closes it', { timeout: 30000 }, async t => {
+// Fix round 1, item 3: the note field is an extension-origin frame, so the
+// page never sees what is typed — not even with capture-phase listeners on
+// window and document.
+async function noteFrame(web, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const frame = web.frames().find(f => f.url().includes('note.html'));
+    if (frame) return frame;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  throw new Error('the note field did not appear');
+}
+async function openNote(web, dock) {
+  await dock.click('[data-action="note"]');
+  const frame = await noteFrame(web);
+  await frame.waitForSelector('#noteForm[data-ready="true"]', { timeout: 8000 });
+  await dock.waitFor('__foundkeepDock.composing() === true');
+  await dock.waitFor(`__foundkeepDock.focused() === 'note-card'`);
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && await frame.evaluate(() => document.activeElement?.id) !== 'noteText') await new Promise(r => setTimeout(r, 50));
+  return frame;
+}
+test('dock: Note opens a field in an extension frame — Enter saves, Shift+Enter adds a line, Esc closes, and the page sees no keystrokes', { timeout: 40000 }, async t => {
   const uploads = [];
   const { web, ext, dock } = await openDock(t, '__note', { uploads });
-  await web.evaluate(() => { window.__keys = []; document.addEventListener('keydown', event => window.__keys.push(event.key)); });
+  await web.evaluate(() => {
+    window.__keys = [];
+    for (const target of [window, document]) for (const type of ['keydown', 'keyup', 'keypress', 'beforeinput', 'input'])
+      target.addEventListener(type, event => window.__keys.push(`${type}:${event.key ?? event.data ?? ''}`), true);
+  });
 
-  await dock.click('[data-action="note"]');
-  await dock.waitFor('__foundkeepDock.composing() === true');
-  await dock.waitFor(`__foundkeepDock.focused() === 'note-text'`);
+  let frame = await openNote(web, dock);
+  assert.match(frame.url(), /^chrome-extension:\/\/[^/]+\/src\/note\.html\?tab=\d+&grant=[\w-]+$/);
   await web.keyboard.type('Line one');
   await web.keyboard.press('Shift+Enter');
   await web.keyboard.type('Line two');
   assert.equal((await localCaptures(ext)).length, 0, 'Shift+Enter does not save');
   await web.keyboard.press('Enter');
   await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 10000);
-  assert.equal(await dock.evaluate('__foundkeepDock.composing()'), false);
+  await dock.waitFor('__foundkeepDock.composing() === false');
   const [note] = await localCaptures(ext);
   assert.equal(note.type, 'note');
   assert.equal(note.noteText, 'Line one\nLine two');
   assert.match(note.sourceUrl, /\/__note$/, 'the page is attached as before');
   assert.equal(note.provenance.captureMethod, 'extension-note');
-  assert.deepEqual(await web.evaluate(() => window.__keys), [], 'the page does not receive the note keystrokes');
+  assert.deepEqual(await web.evaluate(() => window.__keys), [], 'the page observed no keystrokes or input in any phase');
 
-  await dock.click('[data-action="note"]');
-  await dock.waitFor(`__foundkeepDock.focused() === 'note-text'`);
+  frame = await openNote(web, dock);
   await web.keyboard.type('Never mind');
   await web.keyboard.press('Escape');
   await dock.waitFor('__foundkeepDock.composing() === false');
   assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'expanded', 'Esc closes the field, not the dock');
-  await new Promise(r => setTimeout(r, 300));
-  assert.equal((await localCaptures(ext)).length, 1, 'Esc saves nothing');
-  // An empty note is not saved either.
-  await dock.click('[data-action="note"]');
-  await dock.waitFor(`__foundkeepDock.focused() === 'note-text'`);
+  await dock.waitFor(`__foundkeepDock.focused() === 'note'`);
+  // An empty note is not saved.
+  frame = await openNote(web, dock);
   await web.keyboard.press('Enter');
   await new Promise(r => setTimeout(r, 300));
-  assert.equal((await localCaptures(ext)).length, 1);
+  assert.equal((await localCaptures(ext)).length, 1, 'Esc and an empty Enter save nothing');
+  assert.deepEqual(await web.evaluate(() => window.__keys), []);
   assert.equal(await waitForLength(uploads, 1), 1);
   assert.ok(BACKEND_CAPTURE_METHODS.has(uploads[0].provenance.captureMethod));
+});
+
+// Fix round 1, item 6: Enter pressed twice, or held down, saves once.
+test('dock: a double or held Enter in the note field saves one note', { timeout: 40000 }, async t => {
+  const { web, ext, dock } = await openDock(t, '__note-twice');
+  await openNote(web, dock);
+  await web.keyboard.type('Only once');
+  await web.keyboard.press('Enter');
+  await web.keyboard.press('Enter');
+  await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 10000);
+  await openNote(web, dock);
+  await web.keyboard.type('Held key');
+  await web.keyboard.down('Enter');
+  await web.keyboard.down('Enter'); // auto-repeat: event.repeat === true
+  await web.keyboard.up('Enter');
+  await dock.waitFor('__foundkeepDock.composing() === false', 8000);
+  await new Promise(r => setTimeout(r, 500));
+  assert.deepEqual((await localCaptures(ext)).map(c => c.noteText).sort(), ['Held key', 'Only once']);
+});
+
+// The note frame is granted to its own tab: framed anywhere else it saves nothing.
+test('dock: a note frame outside its own tab or grant cannot save', { timeout: 40000 }, async t => {
+  const { context, worker, origin, web, ext, dock } = await openDock(t, '__note-victim');
+  const frame = await openNote(web, dock);
+  const grant = new URL(frame.url()).searchParams.get('grant');
+  const victim = await ext.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__note-victim' }))[0].id);
+  await fixture(context, origin + '/__note-attacker', '<title>Attacker</title><p>Text</p>');
+  const attacker = await context.newPage(); await attacker.goto(origin + '/__note-attacker');
+  const url = await worker.evaluate(({ id, grant }) => chrome.runtime.getURL(`src/note.html?tab=${id}&grant=${grant}`), { id: victim, grant });
+  await attacker.evaluate(url => { const f = document.createElement('iframe'); f.id = 'stolen'; f.src = url; document.body.append(f); }, url);
+  const stolen = attacker.frameLocator('#stolen');
+  await stolen.locator('#noteForm').waitFor();
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && !/no longer available/i.test(await stolen.locator('#noteFeedback').textContent())) await new Promise(r => setTimeout(r, 100));
+  assert.match(await stolen.locator('#noteFeedback').textContent(), /no longer available/i);
+  assert.equal(await stolen.locator('#noteText').isDisabled(), true, 'the field never enables');
+  // Even a direct save request from that frame is refused by the background.
+  const frame2 = attacker.frames().find(f => f.url().includes('note.html'));
+  const refused = await frame2.evaluate(tabId => chrome.runtime.sendMessage({ kind: 'note-save', tabId, text: 'Planted by another page' }), victim);
+  assert.equal(refused.ok, false);
+  assert.equal((await localCaptures(ext)).length, 0, 'the stolen grant saved nothing');
 });
 
 test('dock: right-click and keyboard captures save directly and show the widget', { timeout: 40000 }, async t => {
@@ -222,6 +286,9 @@ test('dock: keyboard shortcuts map to direct saves, and both screenshot shortcut
   assert.equal(actionForCommand('save-highlight', on), 'highlight');
   // With region selection turned off, the full-page shortcut captures the page directly.
   assert.equal(actionForCommand('full-page-screenshot', { ...on, region: false }), 'fullpage');
+  // With full page turned off, it reports that (startCapture refuses a
+  // disabled "fullpage") instead of opening a region-only selector.
+  assert.equal(actionForCommand('full-page-screenshot', { ...on, fullPage: false }), 'fullpage');
   assert.equal(actionForCommand('region-screenshot', { ...on, region: false }), 'region');
   assert.equal(actionForCommand('unknown', on), null);
 });
@@ -406,4 +473,68 @@ test('dock: a context-menu image save asks for the image origin first, saves on 
   assert.equal(captures[0].provenance.captureMethod, 'context-image');
   assert.equal(captures[0].provenance.targetUrl, 'https://images.example.com/photo.png');
   await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`);
+});
+
+// Fix round 1, item 4: if Chrome refuses the permission prompt in the service
+// worker (no usable gesture there), a small FoundKeep window asks with a real
+// click, then finishes the save.
+test('dock: when the image-site prompt cannot show, a FoundKeep window asks for access and completes the save', { timeout: 40000 }, async t => {
+  const { context, worker, extensionId, origin } = await launch(t, { allUrls: true });
+  await signIn(context, worker);
+  await fixture(context, origin + '/__image-window', '<title>Image window fixture</title><img src="https://images.example.com/photo.png" alt="A photo">');
+  await context.route('https://images.example.com/**', r => r.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }));
+  const web = await context.newPage(); await web.goto(origin + '/__image-window');
+  const ext = await extensionPage(context, worker);
+  const tab = await ext.evaluate(async url => (await chrome.tabs.query({ url }))[0], origin + '/__image-window*');
+  await web.bringToFront();
+  const popupPromise = context.waitForEvent('page', { timeout: 10000 });
+  const result = await ext.evaluate(tab => {
+    chrome.permissions.request = () => Promise.reject(new Error('This function must be called during a user gesture'));
+    chrome.permissions.contains = () => Promise.resolve(false);
+    return import('./dock-control.js').then(m => m.startCapture(tab, 'save-image', { trigger: 'context', info: { menuItemId: 'save-image', srcUrl: 'https://images.example.com/photo.png', pageUrl: tab.url } }));
+  }, tab);
+  assert.deepEqual(result, { ok: false, pending: true });
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor(`__foundkeepDock.status() === 'Allow access in the FoundKeep window to save this image.'`);
+  const popup = await popupPromise;
+  assert.match(popup.url(), /\/src\/image-access\.html\?request=[\w-]+$/);
+  await popup.waitForSelector('#allow:not([disabled])');
+  assert.match(await popup.textContent('#imageOrigin'), /images\.example\.com/);
+  await popup.evaluate(() => { window.__requests = []; chrome.permissions.request = request => { window.__requests.push(request); return Promise.resolve(true); }; });
+  const closed = popup.waitForEvent('close', { timeout: 15000 });
+  await popup.click('#allow');
+  await closed;
+  await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 10000);
+  const captures = await localCaptures(ext);
+  assert.equal(captures.length, 1);
+  assert.equal(captures[0].type, 'image');
+  assert.equal(captures[0].provenance.captureMethod, 'context-image');
+  assert.equal(captures[0].provenance.targetUrl, 'https://images.example.com/photo.png');
+});
+
+// Fix round 1, item 11: on a "Hide on this site" origin a save never brings
+// the dock back; the toolbar badge confirms it instead.
+test('dock: a save on a hidden site flashes the toolbar badge and does not bring the dock back', { timeout: 40000 }, async t => {
+  const { worker, web, ext, dock, origin } = await openDock(t, '__hidden-site');
+  await dock.click('[data-action="more"]');
+  await dock.waitFor(`__foundkeepDock.rect('[data-menu="more"]').height > 0`);
+  await dock.click('[data-action="site"]');
+  await dock.waitFor("__foundkeepDock.state() === 'hidden'");
+  // The dock that is still loaded stays hidden…
+  const tab = await ext.evaluate(async url => (await chrome.tabs.query({ url }))[0], origin + '/__hidden-site*');
+  await web.bringToFront();
+  const first = await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'savepage', { trigger: 'context' })), tab);
+  assert.equal(first.ok, true);
+  assert.equal(first.shown, false);
+  await waitForBadge(worker, '✓');
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'hidden');
+  assert.equal(await dock.evaluate('__foundkeepDock.toast()'), '');
+  // …and after a reload no dock is injected for the next save.
+  await web.reload(); await web.bringToFront();
+  const fresh = await ext.evaluate(async url => (await chrome.tabs.query({ url }))[0], origin + '/__hidden-site*');
+  const second = await ext.evaluate(tab => import('./dock-control.js').then(m => m.startCapture(tab, 'savepage', { trigger: 'context' })), fresh);
+  assert.equal(second.ok, true);
+  assert.equal(second.shown, false);
+  assert.equal(await worker.evaluate(async id => (await chrome.scripting.executeScript({ target: { tabId: id }, func: () => !!document.querySelector('foundkeep-dock') }))[0].result, fresh.id), false);
+  assert.equal((await localCaptures(ext)).length, 2);
 });

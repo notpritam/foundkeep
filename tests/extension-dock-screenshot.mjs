@@ -161,3 +161,22 @@ test('screenshot: keyboard and right-click region start the same corner toolbar;
   assert.equal(await waitForLength(uploads, 4), 4);
   for (const upload of uploads) assert.ok(BACKEND_CAPTURE_METHODS.has(upload.provenance.captureMethod), upload.provenance.captureMethod);
 });
+
+// Fix round 1, item 6: a second screenshot while the selector is open (e.g.
+// the shortcut pressed again) does not stack another selector.
+test('screenshot: a second screenshot while one is selecting is refused and does not stack a selector', { timeout: 40000 }, async t => {
+  const { web, ext, dock, tab } = await openShot(t, '__stacked');
+  const start = trigger => ext.evaluate(({ tab, trigger }) => import('./dock-control.js').then(m => m.startCapture(tab, 'region', { trigger })), { tab, trigger });
+  const pending = start('keyboard');
+  await toolbar(dock);
+  assert.deepEqual(await start('keyboard'), { ok: false, error: 'A screenshot is already in progress on this page.' });
+  assert.equal(await web.evaluate(() => document.querySelectorAll('foundkeep-capture').length), 1, 'still one selector');
+  await web.keyboard.press('Escape');
+  assert.deepEqual(await pending, { ok: false, cancelled: true });
+  // Once it is over, a new screenshot can start again.
+  const again = start('keyboard');
+  await toolbar(dock);
+  await web.keyboard.press('Escape');
+  assert.deepEqual(await again, { ok: false, cancelled: true });
+  assert.equal((await localCaptures(ext)).length, 0);
+});

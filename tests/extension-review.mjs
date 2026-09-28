@@ -10,26 +10,41 @@ const SAVED = '✓ Saved to My library · Add details';
 const PAGE = '<title>Details fixture</title><article><h1>A page worth keeping</h1><p>Readable text for the saved page.</p></article>';
 const COLLECTION = { id: 'col_1', title: 'Design refs', visibility: 'public', canSubmit: true, requireApproval: false, canModerate: true };
 
-async function saveAndOpen(t, name, { online = true, collections = [], folders = [] } = {}) {
+// A small stateful stand-in for the backend's capture routes: POST commits
+// once per client id (a retry answers 200 + duplicate:true, like
+// apps/backend/src/customer.ts), GET/PUT /api/mobile/captures/remote-1 read
+// and update the committed row with the same expectedUpdatedAt check.
+async function saveAndOpen(t, name, { online = true, collections = [], folders = [], headers = {} } = {}) {
   const { context, worker, extensionId, origin } = await launch(t, { prefix: 'foundkeep-details-' });
   const uploads = [], puts = [], entries = [];
   await signIn(context, worker, { collections, folders });
-  const state = { online, gate: null };
+  // mode: 'online' | 'offline' (503) | 'lose-response' (commit, then drop the answer)
+  const state = { mode: online ? 'online' : 'offline', gate: null, server: null, beforePut: null, get online() { return this.mode === 'online'; }, set online(value) { this.mode = value ? 'online' : 'offline'; } };
   // Registered after signIn's own route, so this one handles POST uploads.
   await context.route('**/api/captures', async r => {
     if (r.request().method() !== 'POST') return r.fallback();
-    uploads.push(r.request().postDataJSON());
+    const body = r.request().postDataJSON();
+    uploads.push(body);
     if (state.gate) await state.gate;
-    if (!state.online) return r.fulfill({ status: 503, json: { error: 'unavailable', message: 'Try later.' } });
-    return r.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } });
+    if (state.mode === 'offline') return r.fulfill({ status: 503, json: { error: 'unavailable', message: 'Try later.' } });
+    const duplicate = !!state.server;
+    if (!duplicate) state.server = { sourceTitle: body.sourceTitle ?? null, noteText: body.noteText ?? null, userTags: body.userTags || [], folderId: body.folderId ?? null, updatedAt: 111 };
+    if (state.mode === 'lose-response') { state.mode = 'online'; return r.abort('connectionreset'); }
+    return r.fulfill({ status: duplicate ? 200 : 201, json: { capture: { id: 'remote-1', status: 'done' }, duplicate } });
   });
-  await context.route('**/api/mobile/captures/remote-1', r => {
-    if (r.request().method() === 'GET') return r.fulfill({ json: { capture: { id: 'remote-1', updatedAt: 111 } } });
-    puts.push({ method: r.request().method(), body: r.request().postDataJSON() });
-    return r.fulfill({ json: { capture: { id: 'remote-1', updatedAt: 112 } } });
+  await context.route('**/api/mobile/captures/remote-1', async r => {
+    const capture = () => ({ id: 'remote-1', ...state.server });
+    if (r.request().method() === 'GET') return r.fulfill({ json: { capture: capture() } });
+    const body = r.request().postDataJSON();
+    puts.push({ method: r.request().method(), body });
+    await state.beforePut?.(state.server);
+    if (body.expectedUpdatedAt !== state.server.updatedAt) return r.fulfill({ status: 409, json: { error: 'capture_changed', message: 'This capture changed. Refresh it before saving your edits.' } });
+    for (const key of ['sourceTitle', 'noteText', 'folderId', 'userTags']) if (key in body) state.server[key] = body[key];
+    state.server.updatedAt++;
+    return r.fulfill({ json: { capture: capture() } });
   });
   await context.route('**/api/collections/*/entries', r => { entries.push({ url: r.request().url(), body: r.request().postDataJSON() }); return r.fulfill({ status: 201, json: { entry: { id: 'entry-1', status: 'approved' } } }); });
-  await fixture(context, origin + '/' + name, PAGE);
+  await fixture(context, origin + '/' + name, PAGE, headers);
   const web = await context.newPage(); await web.goto(origin + '/' + name);
   const ext = await extensionPage(context, worker);
   assert.equal(await summon(ext, origin + '/' + name + '*'), true);
@@ -38,6 +53,8 @@ async function saveAndOpen(t, name, { online = true, collections = [], folders =
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   return { context, worker, extensionId, origin, web, ext, dock, uploads, puts, entries, state };
 }
+const synced = ext => pollUntil(ext, async () => (await (await import('./db.js')).listCaptures())[0]?.cloudStatus === 'synced', null, { timeout: 15000 });
+const uploaded = ext => pollUntil(ext, async () => (await (await import('./db.js')).listCaptures())[0]?.cloudRemoteId === 'remote-1', null);
 async function cardFrame(web, timeout = 8000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -121,7 +138,9 @@ test('details: after upload, Add details sends PUT with the remote id, shares to
   await card.click('#detailsSave');
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
 
-  assert.deepEqual(puts, [{ method: 'PUT', body: { sourceTitle: 'Edited after upload', noteText: 'A private note', folderId: null, userTags: ['Keep'], expectedUpdatedAt: 111 } }]);
+  // Only what the user changed (title, note, tags); the unchanged folder is
+  // left alone on the server.
+  assert.deepEqual(puts, [{ method: 'PUT', body: { sourceTitle: 'Edited after upload', noteText: 'A private note', userTags: ['Keep'], expectedUpdatedAt: 111 } }]);
   assert.equal(entries.length, 1);
   assert.match(entries[0].url, /\/api\/collections\/col_1\/entries$/);
   assert.equal(entries[0].body.captureId, 'remote-1');
@@ -243,7 +262,7 @@ test('details: the page cannot drive or hijack the card (C1), and a card framed 
   const deadline = Date.now() + 5000;
   while (web.frames().some(f => f !== web.mainFrame()) && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
   assert.deepEqual(web.frames().filter(f => f !== web.mainFrame()).map(f => f.url()), [], 'the navigated card frame is removed');
-  assert.equal(await dock.evaluate('__foundkeepDock.status()'), 'Details closed. Use Add details to reopen them.');
+  assert.equal(await dock.evaluate('__foundkeepDock.status()'), 'Details closed. Your save is kept.');
   assert.deepEqual(await web.evaluate(() => window.__received), []);
 });
 
@@ -288,4 +307,94 @@ test('dock-ui: the toolbar-icon toggle never collapses a dock with the details c
   await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-show', expand: true, toggle: true }); }, tabId);
   await new Promise(r => setTimeout(r, 300));
   assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'toggle must not collapse a dock with its card open');
+});
+
+// Fix round 1, item 1: a first upload that committed on the server but whose
+// answer was lost is retried; the server answers duplicate:true and ignores
+// the retried body, so an edit made in between must still be sent as a PUT.
+test('details: an edit after a committed-but-unanswered upload is sent once the retry comes back duplicate', { timeout: 40000 }, async t => {
+  const { web, ext, dock, uploads, puts, state } = await saveAndOpen(t, '__lost-response');
+  state.mode = 'lose-response';
+  await dock.click('[data-action="savepage"]');
+  await pollUntil(ext, async () => { const [c] = await (await import('./db.js')).listCaptures(); return c?.cloudAttempts > 0 && !c.cloudRemoteId; }, null);
+  assert.equal(uploads.length, 1);
+  assert.equal(state.server.sourceTitle, 'Details fixture', 'the server committed the first upload');
+  const card = await openDetails(web, dock);
+  await card.fill('#detailsTitle', 'Edited after a lost response');
+  await card.click('#detailsSave');
+  await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
+  await synced(ext);
+  assert.equal(uploads.length, 2, 'the upload was retried');
+  assert.equal(puts.length, 1, 'the duplicate answer does not count as delivering the edit');
+  assert.equal(puts[0].body.sourceTitle, 'Edited after a lost response');
+  assert.equal(state.server.sourceTitle, 'Edited after a lost response');
+});
+
+// Fix round 1, item 2: the card starts from the server's current values and
+// the PUT sends only what the user changed — never a stale local copy.
+test('details: a web edit to the title survives a tag edit from the card (pre-filled from the server, PUT sends only the change)', { timeout: 40000 }, async t => {
+  const { web, ext, dock, puts, state } = await saveAndOpen(t, '__server-edit');
+  await dock.click('[data-action="savepage"]');
+  await uploaded(ext);
+  // Renamed and annotated on the web after the upload.
+  Object.assign(state.server, { sourceTitle: 'Renamed on the web', noteText: 'Web note', userTags: ['Web'], folderId: 'folder-web', updatedAt: 150 });
+  const card = await openDetails(web, dock);
+  assert.equal(await card.inputValue('#detailsTitle'), 'Renamed on the web', 'pre-filled from the server');
+  assert.equal(await card.inputValue('#detailsNote'), 'Web note');
+  await addTag(card, '#detailsTags', 'Keep');
+  await card.click('#detailsSave');
+  await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
+  await synced(ext);
+  assert.deepEqual(puts.map(p => p.body), [{ sourceTitle: 'Renamed on the web', noteText: 'Web note', userTags: ['Web', 'Keep'], expectedUpdatedAt: 150 }]);
+  assert.deepEqual({ ...state.server, updatedAt: 0 }, { sourceTitle: 'Renamed on the web', noteText: 'Web note', userTags: ['Web', 'Keep'], folderId: 'folder-web', updatedAt: 0 });
+  const [local] = await localCaptures(ext);
+  assert.deepEqual({ title: local.sourceTitle, tags: local.userTags, folder: local.folderId }, { title: 'Renamed on the web', tags: ['Web', 'Keep'], folder: 'folder-web' }, 'the local copy mirrors the server');
+});
+
+test('details: a server change during the PUT (capture_changed) is re-read, not overwritten', { timeout: 40000 }, async t => {
+  const { web, ext, dock, puts, state } = await saveAndOpen(t, '__conflict');
+  await dock.click('[data-action="savepage"]');
+  await uploaded(ext);
+  const card = await openDetails(web, dock);
+  await card.fill('#detailsNote', 'My note');
+  // Someone renames the save (and files it) between our read and our write.
+  let raced = false;
+  state.beforePut = server => { if (raced) return; raced = true; Object.assign(server, { sourceTitle: 'Renamed meanwhile', folderId: 'folder-b', updatedAt: server.updatedAt + 5 }); };
+  await card.click('#detailsSave');
+  await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
+  await synced(ext);
+  assert.equal(puts.length, 2, 'the conflicting write is retried once against the fresh copy');
+  assert.deepEqual(puts[1].body, { sourceTitle: 'Renamed meanwhile', noteText: 'My note', expectedUpdatedAt: 116 });
+  assert.deepEqual({ title: state.server.sourceTitle, note: state.server.noteText, folder: state.server.folderId }, { title: 'Renamed meanwhile', note: 'My note', folder: 'folder-b' });
+});
+
+// Fix round 1, item 7: the card's own error stays on screen; the dock's 3 s
+// "could not open" fallback is only for a card that never loaded.
+test('details: a card that cannot load its save shows why and stays open', { timeout: 40000 }, async t => {
+  const { worker, web, dock } = await saveAndOpen(t, '__card-error');
+  await dock.click('[data-action="savepage"]');
+  await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 10000);
+  await worker.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'different-account' }, connection: { id: 'different-connection' }, token: 't'.repeat(43), status: 'connected' } }));
+  await dock.click('.toast [data-action="details"]');
+  const card = await cardFrame(web);
+  await feedbackMatches(card, /account changed/i);
+  await new Promise(r => setTimeout(r, 3500));
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'the card stays open with its message');
+  assert.equal(await dock.evaluate('__foundkeepDock.status()'), '', 'no generic "could not open" message replaces it');
+  assert.equal(await card.textContent('#detailsCancel'), 'Close');
+  await card.click('#detailsCancel');
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+});
+
+// Fix round 1, item 5: a page whose CSP forbids frames still gets the card.
+// Chrome does not apply a page's frame-src to the extension's own
+// web-accessible pages, so the card opens framed.
+test('details: the card opens framed on a strict-CSP page (frame-src none) and saves', { timeout: 40000 }, async t => {
+  const { web, ext, dock } = await saveAndOpen(t, '__strict', { headers: { 'content-security-policy': "frame-src 'none'; default-src 'self'" } });
+  await dock.click('[data-action="savepage"]');
+  const card = await openDetails(web, dock);
+  await card.fill('#detailsTitle', 'Saved despite a strict CSP');
+  await card.click('#detailsSave');
+  await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
+  assert.equal((await localCaptures(ext))[0].sourceTitle, 'Saved despite a strict CSP');
 });

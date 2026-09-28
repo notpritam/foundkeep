@@ -15,14 +15,19 @@ test("extension presents the FoundKeep identity while preserving its signed ID",
   assert.equal(manifest.version, "1.8.1");
   // The details card (review.html) is still framed by the dock, so it stays a
   // dynamic-URL web-accessible resource; the before-save drafts are gone.
-  assert.deepEqual(manifest.web_accessible_resources, [{ resources: ["src/review.html"], matches: ["http://*/*", "https://*/*"], use_dynamic_url: true }]);
+  // The note field (note.html) is framed the same way, so the page never sees
+  // what is typed into it.
+  assert.deepEqual(manifest.web_accessible_resources, [{ resources: ["src/review.html", "src/note.html"], matches: ["http://*/*", "https://*/*"], use_dynamic_url: true }]);
+  // Both screenshot shortcuts open the corner toolbar (region or full page).
+  assert.equal(manifest.commands["full-page-screenshot"].description, "Screenshot to FoundKeep (full page or a region)");
+  assert.equal(manifest.commands["region-screenshot"].description, "Screenshot a region to FoundKeep");
   const shipped = JSON.parse(await readFile("deploy/extension-files.json", "utf8"));
   assert.equal(shipped.includes("src/save-review.js"), false);
-  for (const file of ["src/capture-actions.js", "src/capture-details.js", "src/screenshot-overlay.js"]) assert.ok(shipped.includes(file), file);
+  for (const file of ["src/capture-actions.js", "src/capture-details.js", "src/screenshot-overlay.js", "src/note.html", "src/note.js", "src/note.css", "src/image-access.html", "src/image-access.js", "src/badge.js"]) assert.ok(shipped.includes(file), file);
   const background = await readFile("apps/extension/src/background.js", "utf8");
   assert.doesNotMatch(background, /save-review-(?:get|confirm|cancel|update)/, "the before-save review messages are gone");
 
-  for (const file of ["src/review.html", "src/dock-settings.html", "src/import.html"]) {
+  for (const file of ["src/review.html", "src/dock-settings.html", "src/import.html", "src/note.html", "src/image-access.html"]) {
     const source = await readFile(`apps/extension/${file}`, "utf8");
     assert.match(source, /FoundKeep/);
     assert.doesNotMatch(source, />\s*Atlas(?:\s|<)/);

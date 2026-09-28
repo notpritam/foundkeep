@@ -33,7 +33,7 @@ test('installed extension auto-connects from the library, stays paired across ro
   manifest.host_permissions=[base+'/*'];manifest.externally_connectable={matches:[base+'/*']};await writeFile(file,JSON.stringify(manifest));
   const product=path.join(directory,'src/product.js');await writeFile(product,(await readFile(product,'utf8')).replaceAll('https://dev.foundkeep.app',base));
  }
- context=await chromium.launchPersistentContext(path.join(temporary,'profile'),{headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox',`--disable-extensions-except=${directory}`,`--load-extension=${directory}`]});
+ context=await chromium.launchPersistentContext(path.join(temporary,'profile'),{channel:'chromium',headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox',`--disable-extensions-except=${directory}`,`--load-extension=${directory}`]});
  let issuedCodes=0;const errors=[];
  context.on('request',r=>{if(r.url()===base+'/api/pairing'&&r.method()==='POST')issuedCodes++;});
  context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));
@@ -61,35 +61,50 @@ test('installed extension auto-connects from the library, stays paired across ro
  assert.equal(issuedCodes,1,'Opening My library should issue exactly one automatic pairing code');
  const folderResponse=await context.request.post(base+'/api/mobile/folders',{headers:{Origin:base},data:{name:'Temporary extension destination'}});assert.equal(folderResponse.status(),201);const folder=(await folderResponse.json()).folder;
  const pageTabId=await ext.evaluate(url=>chrome.tabs.query({url}).then(tabs=>tabs[0].id),base+'/*');
- // Save through the dock's own review flow (stage, then confirm) — the
- // sidebar's own inline destination dialog these two saves used to drive
- // directly (#newNote/#saveDestination/#destinationConfirm, …) is deleted
- // in Task 7 along with library.html itself.
- async function saveThroughDock(action, extra, choice) {
-   await ext.evaluate(async ({ tabId, action, extra }) => {
-     const { stageSaveReview } = await import('./save-review.js');
-     await stageSaveReview({ action, tab: await chrome.tabs.get(tabId), trigger: 'dock', ...extra });
-   }, { tabId: pageTabId, action, extra });
-   const { draft } = await ext.evaluate(tabId => chrome.runtime.sendMessage({ kind: 'save-review-get', tabId }), pageTabId);
-   return ext.evaluate(({ tabId, id, choice }) => chrome.runtime.sendMessage({ kind: 'save-review-confirm', tabId, id, choice }), { tabId: pageTabId, id: draft.id, choice });
+ // Saves are instant now (1.8.1): save straight to My library, then add the
+ // title, folder, tags or a collection share through the "Add details" card —
+ // framed on the page the save came from, exactly as the dock frames it.
+ const saveNote=text=>ext.evaluate(async({tabId,text})=>{const {startCapture}=await import('./dock-control.js');return startCapture(await chrome.tabs.get(tabId),'note',{trigger:'dock',text,attachPage:false});},{tabId:pageTabId,text});
+ const synced=noteText=>waitFor(async()=>ext.evaluate(async noteText=>(await (await import('./db.js')).listCaptures()).some(c=>c.noteText===noteText&&c.cloudStatus==='synced'),noteText));
+ let cards=0;
+ async function addDetails(){
+  const url=await ext.evaluate(tabId=>import('./capture-details.js').then(m=>m.grantDetails(tabId)),pageTabId);
+  const id='details'+(++cards);
+  await page.evaluate(({id,url})=>{const frame=document.createElement('iframe');frame.id=id;frame.src=url;frame.style.cssText='position:fixed;right:0;bottom:0;width:380px;height:600px;z-index:99999';document.body.append(frame);},{id,url});
+  const card=page.frameLocator('#'+id);await card.locator('#detailsForm[data-ready="true"]').waitFor();return card;
  }
+ async function addTags(card,root,tags){for(const tag of tags){await card.locator(root+' input').fill(tag);await card.locator(root+' input').press('Enter');}}
  const note='Automatic dev sync check '+crypto.randomUUID();
- const titledSave=await saveThroughDock('note',{text:note},{kind:'library',details:{noteText:note,sourceTitle:'A titled note',folderId:folder.id,userTags:['Personal','To test']}});
+ const titledSave=await saveNote(note);
  assert.equal(titledSave.ok,true,JSON.stringify(titledSave));
- await waitFor(async()=> (await (await context.request.get(base+'/api/captures')).json()).captures.some(c=>c.noteText===note&&c.folderId===folder.id));
+ await synced(note);
+ let card=await addDetails();
+ await card.locator(`#detailsFolder option[value="${folder.id}"]`).waitFor({state:'attached'});
+ await card.locator('#detailsTitle').fill('A titled note');
+ await card.locator('#detailsFolder').selectOption(folder.id);
+ await addTags(card,'#detailsTags',['Personal','To test']);
+ await card.locator('#detailsSave').click();
+ await waitFor(async()=> (await (await context.request.get(base+'/api/captures')).json()).captures.some(c=>c.noteText===note&&c.folderId===folder.id&&c.sourceTitle==='A titled note'));
  const titled=(await(await context.request.get(base+'/api/captures')).json()).captures.find(c=>c.noteText===note);assert.equal(titled.sourceTitle,'A titled note');assert.deepEqual(titled.userTags,['Personal','To test']);
  const collectionResponse=await context.request.post(base+'/api/collections',{headers:{Origin:base},data:{title:'Temporary destination review',slug:'review-'+crypto.randomUUID(),kind:'personal',visibility:'private',submissionPolicy:'owner'}});assert.equal(collectionResponse.status(),201);const collection=(await collectionResponse.json()).collection;
  const privateText='Private annotation '+crypto.randomUUID(),sharedText='Only the quote chosen for this collection.';
- const collectionSave=await saveThroughDock('note',{text:privateText},{
-   kind:'collection',id:collection.id,visibility:'private',
-   details:{noteText:privateText+' — extra private context',userTags:['Private research']},
-   entry:{title:'A chosen quote',url:'',body:sharedText,tags:['Team references'],shareImage:false},
- });
+ const collectionSave=await saveNote(privateText);
  assert.equal(collectionSave.ok,true,JSON.stringify(collectionSave));
+ card=await addDetails();
+ await card.locator('#detailsNote').fill(privateText+' — extra private context');
+ await addTags(card,'#detailsTags',['Private research']);
+ await card.locator(`#detailsCollection option[value="${collection.id}"]`).waitFor({state:'attached'});
+ await card.locator('#detailsCollection').selectOption(collection.id);
+ await card.locator('#sharedTitle').fill('A chosen quote');
+ await card.locator('#sharedBody').fill(sharedText);
+ await addTags(card,'#sharedTags',['Team references']);
+ await card.locator('#detailsSave').click();
  await waitFor(async()=> (await (await context.request.get(base+'/api/collections/'+collection.id)).json()).entries.some(entry=>entry.body===sharedText));
  const entries=(await(await context.request.get(base+'/api/collections/'+collection.id)).json()).entries;assert.ok(!JSON.stringify(entries).includes(privateText));
  assert.ok(!JSON.stringify(entries).includes('Private research'));assert.deepEqual(entries.find(entry=>entry.body===sharedText).tags,['Team references']);
+ await waitFor(async()=> (await (await context.request.get(base+'/api/captures')).json()).captures.some(c=>c.noteText===privateText+' — extra private context'));
  const privateCopy=(await(await context.request.get(base+'/api/captures')).json()).captures.find(c=>c.noteText===privateText+' — extra private context');assert.ok(privateCopy);assert.deepEqual(privateCopy.userTags,['Private research']);
+ await page.evaluate(()=>document.querySelectorAll('iframe[id^="details"]').forEach(frame=>frame.remove()));
  await page.locator('#open-setup').click();await page.waitForURL('**/dashboard/apps');
  await waitFor(async()=>await page.locator('#browser-connection-badge').textContent()==='Connected here');
  assert.equal(await page.locator('#connect-extension').isVisible(),false,'No redundant connect button for an already connected account');

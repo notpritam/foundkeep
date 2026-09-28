@@ -44,7 +44,8 @@ export async function signIn(context, worker, { uploads = null, collections = []
   await context.route('**/api/captures', r => {
     if (r.request().method() !== 'POST') return r.fallback();
     uploads?.push(r.request().postDataJSON());
-    return r.fulfill({ json: { capture: { id: 'remote-' + (uploads ? uploads.length : 1), status: 'done' } } });
+    // The backend answers a new capture with 201 + duplicate:false.
+    return r.fulfill({ status: 201, json: { capture: { id: 'remote-' + (uploads ? uploads.length : 1), status: 'done' }, duplicate: false } });
   });
 }
 
@@ -85,6 +86,16 @@ export function localCaptures(ext) {
     articleText: c.articleText, width: c.width, height: c.height, bytes: c.blob?.size ?? 0, provenance: c.provenance,
     collectionSubmission: c.collectionSubmission, detailsRevision: c.detailsRevision || 0,
   })));
+}
+
+// The toolbar badge text (flashed when the dock cannot show a result).
+export async function waitForBadge(worker, text, timeout = 5000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (await worker.evaluate(() => chrome.action.getBadgeText({})) === text) return true;
+    await new Promise(r => setTimeout(r, 25));
+  }
+  throw new Error('badge never showed ' + JSON.stringify(text));
 }
 
 export async function selectText(page, selector) {

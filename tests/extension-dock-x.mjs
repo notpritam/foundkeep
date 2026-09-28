@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { dockWorld } from './helpers/dock-world.mjs';
 import { pollUntil } from './helpers/poll.mjs';
 import { backendCaptureMethods } from './helpers/backend-methods.mjs';
-import { launch, signIn, extensionPage, waitForLength, localCaptures } from './helpers/dock-launch.mjs';
+import { launch, signIn, extensionPage, waitForLength, localCaptures, waitForBadge } from './helpers/dock-launch.mjs';
 
 const BACKEND_CAPTURE_METHODS = await backendCaptureMethods();
 const SAVED = '✓ Saved to My library · Add details';
@@ -79,15 +79,39 @@ test('X: a dev build shows a small emerald dot instead of "Dev" text and a wider
   assert.ok(box.width <= 8 && box.height <= 8, 'small: ' + JSON.stringify(box));
 });
 
-test('X: signed out, the button reaches its error state and says why', { timeout: 30000 }, async t => {
-  const { web } = await openX(t, { signedIn: false });
+// Fix round 1, item 8: the reason is shown in the dock, not written into
+// x.com's DOM (the button's title / aria-label stay generic).
+test('X: signed out, the button reaches its error state with a generic label, and the dock says why', { timeout: 30000 }, async t => {
+  const { web, extensionId } = await openX(t, { signedIn: false });
+  const dock = await dockWorld(web, extensionId);
   await button(web).click();
   await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state !== 'saving', null);
   assert.equal(await button(web).getAttribute('data-state'), 'error');
-  assert.equal(await button(web).getAttribute('title'), 'Sign in to FoundKeep to save.');
+  assert.equal(await button(web).getAttribute('title'), 'Couldn\u2019t save to FoundKeep');
+  assert.equal(await button(web).getAttribute('aria-label'), 'Couldn\u2019t save to FoundKeep');
+  assert.doesNotMatch(await web.evaluate(() => document.body.innerHTML), /Sign in to FoundKeep/, 'no background error text in the page DOM');
+  await dock.waitFor(`__foundkeepDock.status() === 'Sign in to FoundKeep to save.'`);
 });
 
-test('X: hiding the dock on x.com survives an X save despite the background\'s redacted tab.url', { timeout: 40000 }, async t => {
+// Fix round 1, item 9: X re-renders posts (virtualization, reloads); a post
+// already saved this session is not saved again from a new button.
+test('X: the same post saved again from a fresh button is recognized, not duplicated', { timeout: 40000 }, async t => {
+  const { context, worker, extensionId, web } = await openX(t);
+  const ext = await extensionPage(context, worker);
+  await web.bringToFront();
+  await button(web).click();
+  await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state === 'saved', null);
+  await web.reload();
+  await button(web).waitFor();
+  assert.equal(await button(web).getAttribute('data-state'), 'idle', 'a fresh button instance');
+  await button(web).click();
+  await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state === 'saved', null);
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 8000);
+  assert.equal((await localCaptures(ext)).length, 1, 'one capture for the post');
+});
+
+test('X: an X save on a hidden x.com keeps the dock hidden, keeps the site hidden, and flashes the badge', { timeout: 40000 }, async t => {
   const { context, worker, extensionId, web } = await openX(t);
   const dock = await dockWorld(web, extensionId);
   const tabId = await worker.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0].id);
@@ -100,10 +124,14 @@ test('X: hiding the dock on x.com survives an X save despite the background\'s r
   await dock.click('[data-action="site"]');
   await dock.waitFor("__foundkeepDock.state() === 'hidden'");
   assert.equal(await dock.evaluate(`__foundkeepDock.text('[data-action="site"]')`), 'Show on this site again');
-  // The X save summons the dock (to show "Saved") through chrome.tabs.get,
-  // which redacts tab.url on x.com; that must not silently un-hide the site.
+  // An X save on a hidden site must neither un-hide the site (the
+  // background cannot read x.com's url) nor bring the dock back: the badge
+  // confirms the save instead (fix round 1, item 11).
   await button(web).click();
-  await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 8000);
+  await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state === 'saved', null);
+  await waitForBadge(worker, '✓');
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'hidden', 'the dock stays hidden');
+  assert.equal(await dock.evaluate('__foundkeepDock.toast()'), '');
   assert.equal(await dock.evaluate(`__foundkeepDock.text('[data-action="site"]')`), 'Show on this site again',
     'an X save must not silently un-hide the dock on this site');
 });
