@@ -15,6 +15,22 @@ async function poll(fn, timeout=25000) {
   while(Date.now()<end) { const result=await fn(); if(result) return result; await sleep(300); }
   throw new Error('Customer flow did not reach the expected state');
 }
+// Save through the dock's own review flow (stage, then confirm) on a given
+// tab — src/popup.html and its direct {kind:'capture'}/{kind:'saveNote'}
+// messages are deleted in Task 7; nothing but that deleted page ever sent
+// them. `extra` carries action-specific stageSaveReview fields (e.g. `text`
+// for a note); `details` carries confirm-time save-review-choice fields.
+async function saveThroughDock(ext, tabId, action, extra = {}, details = {}) {
+  await ext.evaluate(async ({ tabId, action, extra }) => {
+    const { stageSaveReview } = await import('./save-review.js');
+    await stageSaveReview({ action, tab: await chrome.tabs.get(tabId), trigger: 'dock', ...extra });
+  }, { tabId, action, extra });
+  const { draft } = await ext.evaluate(tabId => chrome.runtime.sendMessage({ kind: 'save-review-get', tabId }), tabId);
+  return ext.evaluate(({ tabId, draft, details }) => chrome.runtime.sendMessage({
+    kind: 'save-review-confirm', tabId, id: draft.id,
+    choice: { kind: 'library', details: draft.action === 'note' ? { noteText: draft.text, ...details } : details },
+  }), { tabId, draft, details });
+}
 async function rewrite(directory, origin) {
   for(const entry of await readdir(directory,{withFileTypes:true})) {
     const file=path.join(directory,entry.name);
@@ -90,7 +106,7 @@ test('customer signs up, configures the real extension, captures a readable page
     assert.equal(connection.account.id,me.account.id);
     const ping=await account.evaluate(id=>new Promise(resolve=>chrome.runtime.sendMessage(id,{kind:'atlas-ping'},resolve)),id);
     assert.equal(ping.account.id,me.account.id);assert.equal(ping.token,undefined);
-    const popup=await context.newPage();await popup.goto(`chrome-extension://${id}/src/popup.html`);
+    const ext=await context.newPage();await ext.goto(`chrome-extension://${id}/src/dock-settings.html`);
     const preferenceState=await request('GET','/api/preferences');
     preferenceState.preferences.capture.region=false;
     preferenceState.preferences.popup.recentCount=5;
@@ -98,30 +114,41 @@ test('customer signs up, configures the real extension, captures a readable page
     assert.equal(preferenceWrite.revision,1);
     const preferenceRefresh=await account.evaluate(id=>new Promise(resolve=>chrome.runtime.sendMessage(id,{kind:'atlas-refresh-preferences'},resolve)),id);
     assert.equal(preferenceRefresh.ok,true,JSON.stringify(preferenceRefresh));
-    const extensionPreferences=await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'preferences-status'}));
+    const extensionPreferences=await ext.evaluate(()=>chrome.runtime.sendMessage({kind:'preferences-status'}));
     assert.equal(extensionPreferences.preferences.capture.region,false);
     assert.equal(extensionPreferences.preferences.popup.recentCount,5);
+    // The signup/dashboard tab is a real tab the dock can key a review draft
+    // to; a quick note need not be about that tab's page (attachPage stays
+    // unset/false).
+    const accountTabId=await ext.evaluate(url=>chrome.tabs.query({url}).then(tabs=>tabs[0].id),origin+'/*');
     const note='Remember the typography workshop and bring a notebook.';
-    const saved=await popup.evaluate(text=>chrome.runtime.sendMessage({kind:'saveNote',text}),note);
+    const saved=await saveThroughDock(ext,accountTabId,'note',{text:note});
     assert.equal(saved.ok,true,JSON.stringify(saved));
     await poll(async()=>{const result=await request('GET','/api/captures');return result.captures.some(c=>c.noteText===note && c.status==='done');});
     const page=await context.newPage();await page.goto(`http://127.0.0.1:${fixture.address().port}/`);
     await page.evaluate(()=>{const r=document.createRange();r.selectNodeContents(document.querySelector('#selection'));getSelection().addRange(r);});
     await page.bringToFront();
-    await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'capture',action:'highlight'}));
+    const pageTabId=await ext.evaluate(url=>chrome.tabs.query({url}).then(tabs=>tabs[0].id),`http://127.0.0.1:${fixture.address().port}/*`);
+    const highlightCapture=await saveThroughDock(ext,pageTabId,'highlight');
+    assert.equal(highlightCapture.ok,true,JSON.stringify(highlightCapture));
     await poll(async()=>{const result=await request('GET','/api/captures');return result.captures.some(c=>c.selectionText?.includes('Good design'));});
     await page.bringToFront();
-    const pageCapture=await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'capture',action:'savepage'}));
+    const pageCapture=await saveThroughDock(ext,pageTabId,'savepage');
     assert.equal(pageCapture.ok,true,JSON.stringify(pageCapture));
     const bookmark=await poll(async()=>{const result=await request('GET','/api/captures');return result.captures.find(c=>c.type==='bookmark'&&c.status==='done');});
     assert.match(bookmark.articleText,/readable copy should remain useful/i);
     assert.match(bookmark.provenance.canonicalUrl,/\/workshop$/);
     assert.deepEqual(bookmark.provenance.authors,['Ada Example']);
     assert.equal(bookmark.provenance.siteName,'Example Studio');
+    // The dock's own capture trigger still reports through the backend's
+    // "popup-*" captureMethod allowlist (background.js's methodFor maps
+    // trigger:'dock' to the 'popup' prefix — the backend has no 'dock-*'
+    // entries).
     assert.equal(bookmark.provenance.captureMethod,'popup-save-page');
     assert.match(bookmark.provenance.contentHash,/^[A-Za-z0-9_-]{43}$/);
     await page.bringToFront();
-    await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'capture',action:'fullpage'}));
+    const fullpageCapture=await saveThroughDock(ext,pageTabId,'fullpage');
+    assert.equal(fullpageCapture.ok,true,JSON.stringify(fullpageCapture));
     const screenshot=await poll(async()=>{const result=await request('GET','/api/captures');return result.captures.find(c=>c.type==='screenshot'&&c.status==='done');},45000);
     assert.match(screenshot.ocrText,/Typography workshop/i);
     const blob=await context.request.get(origin+screenshot.blobUrl);assert.equal(blob.status(),200);assert.match(blob.headers()['content-type'],/image\/(png|jpeg|webp)/);
@@ -136,25 +163,25 @@ test('customer signs up, configures the real extension, captures a readable page
     assert.equal((await fetch(origin+'/api/captures/'+screenshot.id)).status,401);
     assert.equal((await fetch(origin+screenshot.blobUrl)).status,401);
     const after=await request('GET','/api/me');assert.equal(after.connections.length,1);assert.equal(after.usage.captures,4);
-    // Exercise the real service worker import queue and backend from the installed sidebar.
-    const library=await context.newPage();await library.goto(`chrome-extension://${id}/src/library.html`);
-    await library.waitForFunction(()=>document.querySelector('.save-card')||!document.querySelector('#notice').hidden);
-    assert.equal(await library.locator('#notice').innerText(),'');await library.locator('.save-card').first().waitFor();await library.locator('#openImport').click();
-    await library.locator('#importFile').setInputFiles({name:'bookmarks.html',mimeType:'text/html',buffer:Buffer.from('<!DOCTYPE NETSCAPE-Bookmark-file-1><DL><DT><H3>Reading</H3><DL><DT><A HREF="https://example.com/imported-one" ADD_DATE="1000">Imported one</A><DT><A HREF="https://example.com/imported-two">Imported two</A></DL></DL>')});
-    await library.waitForFunction(()=>!document.querySelector('#confirmImport').disabled);
-    assert.match(await library.locator('#importPreview').innerText(),/2 new bookmark/);
-    await library.locator('#confirmImport').click();
+    // Exercise the real service worker import queue and backend from the
+    // standalone import page (src/library.html's own #importDialog, moved
+    // there in Task 6; the sidebar itself is deleted in Task 7).
+    const importPage=await context.newPage();await importPage.goto(`chrome-extension://${id}/src/import.html`);
+    await importPage.locator('#importFile').setInputFiles({name:'bookmarks.html',mimeType:'text/html',buffer:Buffer.from('<!DOCTYPE NETSCAPE-Bookmark-file-1><DL><DT><H3>Reading</H3><DL><DT><A HREF="https://example.com/imported-one" ADD_DATE="1000">Imported one</A><DT><A HREF="https://example.com/imported-two">Imported two</A></DL></DL>')});
+    await importPage.waitForFunction(()=>!document.querySelector('#confirmImport').disabled);
+    assert.match(await importPage.locator('#importPreview').innerText(),/2 new bookmark/);
+    await importPage.locator('#confirmImport').click();
     await poll(async()=>{const state=await request('GET','/api/captures');return state.captures.filter(c=>c.sourceTitle?.startsWith('Imported ')).length===2;});
     const imported=(await request('GET','/api/captures')).captures.find(c=>c.sourceTitle==='Imported one');
     assert.equal(imported.capturedAt,1_000_000);assert.ok(imported.folderId);
     const importedDetail=await request('GET','/api/captures/'+imported.id);assert.ok(importedDetail.capture.importOrigins?.length);
-    await library.reload();await library.locator('.save-card').filter({hasText:'Imported one'}).waitFor();
     await request('DELETE','/api/connections/'+after.connections[0].id);
-    await popup.evaluate(()=>chrome.runtime.sendMessage({kind:'saveNote',text:'Saved safely after connection revoked'}));
+    const revokedSave=await saveThroughDock(ext,accountTabId,'note',{text:'Saved safely after connection revoked'});
+    assert.equal(revokedSave.ok,true,JSON.stringify(revokedSave));
     await sleep(1500);
     assert.equal((await request('GET','/api/me')).usage.captures,6);
     // A revoked upload never discards the local copy.
-    const local=await popup.evaluate(async()=>{const db=await import('./db.js');return db.listCaptures();});
+    const local=await ext.evaluate(async()=>{const db=await import('./db.js');return db.listCaptures();});
     assert.ok(local.some(c=>c.noteText==='Saved safely after connection revoked'));
     await request('DELETE','/api/account',{password:'a-long-test-password-2026'});
     assert.equal((await context.request.get(origin+'/api/me')).status(),401);

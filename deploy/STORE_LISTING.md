@@ -19,18 +19,19 @@ This release is authorized for preparation and review submission. **Defer publis
 
 FoundKeep gives the useful things you find on the web a place to stay.
 
-- Open FoundKeep from the browser toolbar to keep your library in a native sidebar beside the page.
-- Save readable pages, highlights, screenshots, images, X posts and quick notes with their original source.
-- Review each save first: choose a destination, add a title and personal note, organize it in a folder, and choose or create tags.
+- Click the FoundKeep toolbar icon to show a small dock on the page you choose. Save the page, highlight your selection, capture a region or full-page screenshot, or write a note — right from the dock.
+- Right-click to save a selection, link, image or page, or capture a screenshot; save an X/Twitter post with its own button, with original source details kept for each.
+- Review each save first in a small card on the page: choose a destination, add a title and personal note, organize it in a folder, and choose or create tags.
 - Keep personal notes, folders and tags private when submitting selected fields to a collection. Review the collection's audience before confirming.
 - Sign in at foundkeep.app to connect a matching, unpaired extension automatically. Switching an existing connection to another account requires confirmation.
 - Save locally first. New saves sync to your connected account when automatic sync is enabled; offline saves stay in this browser until they can upload.
-- Search and edit your library in the sidebar, browse local saves, and choose system, light or dark appearance.
+- Turn on "Show on every site" from the dock's menu to keep it available across tabs without clicking the toolbar icon again.
+- Search and edit your library, and choose system, light or dark appearance, from your FoundKeep dashboard.
 - Import bookmarks and nested folders from the browser or an HTML export after reviewing the import. FoundKeep never changes browser bookmarks.
 - Control capture methods, page details, context menus, sync and optional organization from account settings.
 - Connect your own MCP-compatible agent with optional, scoped and revocable dashboard access.
 
-An account is optional for local capture. Older local saves stay on the device until you explicitly import them into an account. Local and cloud copies are separate.
+FoundKeep requires a signed-in account to save. Captures kept only in this browser from an earlier version remain there until you move them into your account; local and cloud copies are separate.
 
 Saved pages can retain readable text, headings, source and canonical URLs, title, description, publisher, author, dates, language, images, capture method, timestamps and a content fingerprint when available. FoundKeep does not store raw page HTML. For supported saved social posts, the service can try to retain available source photos, videos and linked article content in your private library. Availability depends on the source, access and storage limits; saving text does not guarantee every media file can be preserved.
 
@@ -48,15 +49,15 @@ Password accounts receive a one-time recovery code; FoundKeep does not send pass
 
 Use these justifications in the Privacy tab:
 
-- `activeTab`: Temporarily access the active page after invoking FoundKeep, to read selected content/source metadata or capture visible pixels.
-- `scripting`: Run bundled extraction and screenshot-selection code after an explicit capture action. Full-page capture scrolls and stitches the selected page.
+- `activeTab`: Shows the FoundKeep dock on the page you choose and captures it — reads selected content/source metadata or captures visible pixels only after you invoke FoundKeep.
+- `scripting`: Shows the FoundKeep dock on the page you choose and captures it — runs bundled extraction and screenshot-selection code after an explicit capture action. Full-page capture scrolls and stitches the selected page.
 - `contextMenus`: Offer explicit right-click save actions for pages, highlights, links, images and screenshots. These open the common destination review.
 - `storage`: Retain the account-bound browser credential, preference/policy cache and durable upload state. Capture bytes use extension IndexedDB. Pending reviews expire in trusted session storage; credentials are not exposed to websites or content scripts.
-- `sidePanel`: Keep capture controls, save review, private-library search/editing, local saves, imports and settings beside the page. The toolbar opens this panel directly and has no popup.
 - `alarms`: Retry pending customer-selected uploads and refresh account preferences after temporary failures or browser restarts.
+- `sidePanel`: Resets the pre-1.8 toolbar behavior; no side panel is shown. Earlier versions opened a side panel from the toolbar icon, and Chrome keeps that setting across updates — FoundKeep 1.8 turns it off at startup so the icon opens the on-page dock instead. The extension declares no side panel, and this permission will be removed in a later release.
 - Optional `bookmarks`: Read the bookmark tree only after the customer selects import and grants access. Preserve available titles, URLs, folders and dates without editing or deleting browser bookmarks. HTML import remains available if permission is declined.
 - Required host `https://foundkeep.app/*`: Pair the browser, refresh data-only settings/policy and access the customer's library and uploads through fixed FoundKeep routes.
-- Optional `<all_urls>` and HTTP(S) hosts: The visible **Allow page captures** control can request all-site access so explicit sidebar captures continue across tabs; Chrome screenshots require active-tab or all-site access. This is optional and never requested on installation. A right-click image save requests the selected image's exact origin at final confirmation. These grants support customer-triggered capture, not passive browsing collection.
+- Optional `<all_urls>` and HTTP(S) hosts: Requested only when you turn on "Show on every site" from the FoundKeep dock's menu, so the dock and its captures continue across tabs; Chrome screenshots require active-tab or all-site access. This is optional and never requested on installation. A right-click image save requests the selected image's exact origin at final confirmation. These grants support customer-triggered capture, not passive browsing collection.
 - X/Twitter content script: Bundled code on `x.com` and `twitter.com` adds a per-post save button. Clicking it opens review with the selected post's text, author, permalink and available attachment/link hints, excluding neighboring posts.
 - External messaging: Only `https://foundkeep.app` and exact historical origin `https://atlas.notpritam.in` can detect, connect or refresh the extension. A matching signed-in dashboard can issue a short-lived one-use connection code. Account switching requires confirmation; explicit disconnect pauses automatic connection. Websites cannot read extension credentials or replace the API origin.
 
@@ -85,9 +86,9 @@ Provide a verified dedicated reviewer account only in the private dashboard Test
 
 Fresh 1.0.2 kit assets under `assets/`:
 
-- `native-sidebar.png` — native sidebar and local-save controls, 1280 × 800.
+- `dock-toolbar.png` — the expanded floating dock on a page, 1280 × 800.
 - `save-review.png` — detailed save review, 1280 × 800.
-- `local-library.png` — local note reader, 1280 × 800.
+- `dock-review.png` — the review card, 1280 × 800.
 - `promo-small.png` — 440 × 280 tile.
 - `promo-marquee.png` — optional 1400 × 560 tile.
 - `icon128.png` — packaged 128 × 128 icon.

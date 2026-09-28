@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FoundKeep — Save what matters",
-  "version": "1.7.12",
+  "version": "1.8.0",
   "description": "Save readable pages, screenshots, highlights, images and notes with original source details in a private, searchable library.",
   "permissions": [
     "activeTab",
@@ -43,9 +43,22 @@
         "*://twitter.com/*"
       ],
       "js": [
-        "src/twitter.js"
+        "src/twitter.js",
+        "src/dock/dock.js"
       ],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/review.html"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "use_dynamic_url": true
     }
   ],
   "externally_connectable": {
@@ -78,8 +91,5 @@
   "update_url": "https://github.com/notpritam/foundkeep/releases/latest/download/updates.xml",
   "optional_permissions": [
     "bookmarks"
-  ],
-  "side_panel": {
-    "default_path": "src/library.html"
-  }
+  ]
 }

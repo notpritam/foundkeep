@@ -1,6 +1,7 @@
-import { stageSaveReview, readSaveReview, confirmSaveReview, cancelSaveReview, updateSaveReview } from "./save-review.js";
+import { readSaveReview, confirmSaveReview, cancelSaveReview, updateSaveReview, clearSaveReview } from "./save-review.js";
 import { PRODUCT_NAME } from "./product.js";
 import { trustedLibrarySender } from "./library-api.js";
+import { summonDock, startCapture, handleDockMessage, withDockHidden, reviewTabFor, dashboardUrl, reconcileAlwaysOn } from "./dock-control.js";
 import { startBookmarkImport, resumeBookmarkImport, cancelBookmarkImport, importProgress } from "./import-queue.js";
 import { drainQueue, saveCapture } from "./capture.js";
 import { extractPageDocument } from "./page-extractor.js";
@@ -13,18 +14,38 @@ import {
   retryCloudSync,
   disconnectCloud,
   trustedPairingSender,
+  migrateSidebarCaptures,
 } from "./cloud.js";
 import {
   capturePreferenceKey,
+  captureDisabledMessage,
   getEffectivePreferences,
   refreshPreferences,
 } from "./preferences.js";
 import { cloudImageMime } from "./image-formats.js";
+import { captureMethodFor } from "./capture-method.js";
 
 protectCloudStorage().catch(() => {});
-// Use Chrome's native toolbar behavior so opening the panel keeps activeTab's
-// user-gesture grant. The same panel remains available as the user changes tabs.
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+// R1: the toolbar icon toggles the floating dock rather than opening the
+// native side panel — a second click on an already-expanded dock collapses
+// it (summonDock passes toggle through to the dock's own dock-show handler,
+// which never collapses a dock mid-review). Falls back to the dashboard tab
+// when the dock cannot be injected (e.g. a chrome:// or Web Store page).
+// An upgraded install keeps whatever setPanelBehavior set before this
+// version shipped — openPanelOnActionClick persists across updates — so
+// this must run every startup, not just on first install, or the icon keeps
+// opening the side panel and this onClicked listener never fires at all.
+// R14: the manifest keeps the "sidePanel" permission (no install warning,
+// and no side_panel key — nothing is ever shown) ONLY so this reset can run
+// for installs upgrading from 1.7.x; without it chrome.sidePanel is
+// undefined and the call below silently does nothing. Drop the permission
+// (and this line) in 1.9, once 1.7.x installs have all passed through 1.8.
+chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false }).catch(() => {});
+chrome.action.onClicked.addListener(tab => {
+  void summonDock(tab.id, { expand: true, toggle: true }).then(async shown => {
+    if (!shown) await chrome.tabs.create({ url: dashboardUrl('/dashboard'), index: tab.index + 1 });
+  }).catch(() => {});
+});
 chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
   if (msg?.kind === "atlas-refresh-preferences") {
     if (!trustedPairingSender(sender)) {
@@ -41,6 +62,15 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
         respond({ ok: true, revision: state.revision });
       })
       .catch(() => respond({ ok: false, error: "FoundKeep kept the last saved preferences." }));
+    return true;
+  }
+  if (msg?.kind === "atlas-open-import") {
+    if (!trustedPairingSender(sender)) { respond({ ok: false, error: "This page cannot open FoundKeep import." }); return; }
+    // M7: always answer — a failed tab open must not leave the site waiting
+    // out its own 15 s timeout.
+    void Promise.resolve()
+      .then(() => chrome.tabs.create({ url: chrome.runtime.getURL("src/import.html") }))
+      .then(() => respond({ ok: true }), () => respond({ ok: false, error: "FoundKeep could not open the import page. Try again." }));
     return true;
   }
   handleExternalMessage(msg, sender)
@@ -210,29 +240,22 @@ async function capturePageContext(tab, {
   }
 }
 
-function methodFor(action, trigger) {
-  if (action === "save-selection") return "context-selection";
-  if (action === "save-link") return "context-link";
-  if (action === "save-image") return "context-image";
-  const suffix = {
-    savepage: "save-page",
-    highlight: "highlight",
-    region: "region",
-    fullpage: "full-page",
-  }[action];
-  return `${trigger || "popup"}-${suffix}`;
-}
-
 // ---------------------------------------------------------------------------
 // Queue drain — periodic cloud retry + on demand.
 // ---------------------------------------------------------------------------
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   getEffectivePreferences({ refresh: true })
     .then((state) => reconcileContextMenus(state.preferences))
     .catch(() => reconcileContextMenus());
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
-  drainQueue().catch(() => {});
+  // I3 / R15: on update, recover 1.7.x side-panel captures (sidebar-* methods
+  // the backend rejects) before draining, so the drain uploads them as popup-*.
+  (details?.reason === "update" ? migrateSidebarCaptures() : Promise.resolve())
+    .catch(() => {})
+    .then(() => drainQueue())
+    .catch(() => {});
   resumeBookmarkImport().catch(() => {});
+  reconcileAlwaysOn().catch(() => {});
 });
 chrome.runtime.onStartup?.addListener(() => {
   getEffectivePreferences()
@@ -241,7 +264,14 @@ chrome.runtime.onStartup?.addListener(() => {
   chrome.alarms.create("atlas-drain", { periodInMinutes: 1 });
   drainQueue().catch(() => {});
   resumeBookmarkImport().catch(() => {});
+  reconcileAlwaysOn().catch(() => {});
 });
+// A user revoking the <all_urls> grant from chrome://extensions (rather than
+// the dock's own "Stop showing on every site") must still drop the
+// registered content script — otherwise it stays registered but silently
+// unable to run anywhere, and reconcileAlwaysOn's own storage flag goes
+// stale relative to reality.
+chrome.permissions.onRemoved.addListener(() => { void reconcileAlwaysOn(); });
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === "atlas-drain") {
     getEffectivePreferences()
@@ -278,16 +308,12 @@ async function reconcileContextMenus(preferences) {
   }
 }
 
-function openReviewPanel(tab) {
-  // Called before awaiting storage or network so Chrome retains the gesture.
-  return chrome.sidePanel.open({ windowId: tab.windowId });
-}
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  const opened = openReviewPanel(tab);
-  void opened.then(async () => {
+  void (async () => {
     if (info.menuItemId === "save-image" && !publicHttpUrl(info.srcUrl)) throw new Error('FoundKeep can only save images from public web addresses.');
-    await stageSaveReview({ action: info.menuItemId, tab, info, trigger: "context" });
-  }).catch(error => configuredFlash(false, error.message));
+    const result = await startCapture(tab, info.menuItemId, { info, trigger: "context" });
+    if (!result.ok) throw new Error(result.error);
+  })().catch(error => configuredFlash(false, error.message));
 });
 
 chrome.commands.onCommand.addListener((command, tab) => {
@@ -295,55 +321,65 @@ chrome.commands.onCommand.addListener((command, tab) => {
   if (!action) return;
   const begin = tab => {
     if (!tab) return;
-    const opened = openReviewPanel(tab);
-    void opened.then(() => stageSaveReview({ action, tab, trigger: "keyboard" })).catch(error => configuredFlash(false, error.message));
+    void startCapture(tab, action, { trigger: "keyboard" })
+      .then(result => { if (!result.ok) throw new Error(result.error); })
+      .catch(error => configuredFlash(false, error.message));
   };
   if (tab) begin(tab);
   else void chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => begin(tab));
 });
 
+// A save review is scoped to the tab that started it; once that tab is gone
+// there is no page left to review against, so drop its draft.
+chrome.tabs.onRemoved.addListener(tabId => { void clearSaveReview(tabId); });
+
 // ---------------------------------------------------------------------------
-// Messages from popup / content scripts
+// Messages from extension pages / content scripts
 // ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.kind === 'prepare-legacy-save') {
-    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.windowId)) {
-      sendResponse({ ok: false, error: 'Open FoundKeep to choose a destination.' }); return;
-    }
-    const opened = openReviewPanel({ windowId: msg.windowId });
-    void opened.then(async () => {
-      if (!['note','savepage','highlight','region','fullpage'].includes(msg.action)) throw new Error('Choose a supported capture method.');
-      const [tab] = await chrome.tabs.query({ active: true, windowId: msg.windowId });
-      if (!tab) throw new Error('Open a browser tab to continue.');
-      const { preferences } = await getEffectivePreferences();
-      if (!preferences.capture[capturePreferenceKey(msg.action)]) throw new Error('This capture method is disabled in your FoundKeep settings.');
-      if (msg.action === 'note' && (typeof msg.text !== 'string' || !msg.text.trim() || msg.text.length > 50000)) throw new Error('Write a note of up to 50,000 characters.');
-      if (msg.action !== 'note' && !safeHttpUrl(tab.url)) throw new Error('Open a web page to capture it.');
-      const draft = await stageSaveReview({ action: msg.action, tab, trigger: 'sidebar', ...(msg.action === 'note' ? { text: msg.text, attachPage: msg.attachPage === true && preferences.notes.attachSource && !!safeHttpUrl(tab.url) } : {}) });
-      sendResponse({ ok: true, pending: true, draftId: draft.id });
-    }).catch(error => sendResponse({ ok: false, error: error.message }));
+  if (typeof msg?.kind === 'string' && msg.kind.startsWith('dock-')) {
+    handleDockMessage(msg, sender).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
-  if (['prepare-save', 'save-review-get', 'save-review-confirm', 'save-review-cancel', 'save-review-update'].includes(msg?.kind)) {
-    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.windowId)) { sendResponse({ ok: false, error: 'Open the FoundKeep sidebar to choose a destination.' }); return; }
+  // C1 / R16: the framed review card's ready/resize/done reach the dock only
+  // through here — never window.postMessage, which the host page could read
+  // and answer. Relayed only when the sender is a packaged review.html that
+  // reviewTabFor() ties to this exact tab, and only to that tab's top frame
+  // (the dock), so a page can neither observe nor forge them.
+  if (msg?.kind === 'review-frame') {
+    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.tabId) || !['ready', 'resize', 'done'].includes(msg.type)
+      || new URL(sender.url).pathname !== '/src/review.html') { sendResponse({ ok: false }); return; }
     void (async () => {
-      if (msg.kind === 'save-review-get') return { draft: await readSaveReview(msg.windowId) };
-      if (msg.kind === 'save-review-update') { await updateSaveReview(msg.windowId, msg.id, msg.form); return {}; }
-      if (msg.kind === 'save-review-cancel') { await cancelSaveReview(msg.windowId, msg.id); return {}; }
-      if (msg.kind === 'save-review-confirm') {
-        const record = await confirmSaveReview(msg, (draft, commit) => performCapture(draft.action, { ...draft, commit }));
-        return { capture: record ? { id: record.id, cloudStatus: record.cloudStatus, type: record.type } : null };
+      if (await reviewTabFor(sender) !== msg.tabId) return { ok: false };
+      const relay = { kind: 'dock-review-frame', type: msg.type };
+      if (msg.type === 'resize') relay.height = Number(msg.height);
+      if (msg.type === 'done') relay.saved = msg.saved === true;
+      await chrome.tabs.sendMessage(msg.tabId, relay, { frameId: 0 });
+      return { ok: true };
+    })().then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
+  if (['save-review-get', 'save-review-confirm', 'save-review-cancel', 'save-review-update'].includes(msg?.kind)) {
+    if (!trustedLibrarySender(sender, chrome.runtime) || !Number.isInteger(msg.tabId)) { sendResponse({ ok: false, error: 'Open FoundKeep to choose a destination.' }); return; }
+    void (async () => {
+      // review.html is a web-accessible resource any page could otherwise
+      // iframe (or window.open) with someone else's tab id; require it to
+      // only ever act on the tab it is actually embedded in (or the popup
+      // fallback tab it was opened for).
+      if (new URL(sender.url).pathname === '/src/review.html') {
+        const owner = await reviewTabFor(sender);
+        if (owner === null || owner !== msg.tabId) throw new Error('This review no longer matches its page. Reopen it and try again.');
       }
-      if (!['savepage','highlight','region','fullpage','note'].includes(msg.action)) throw new Error('Choose a supported capture method.');
-      const [tab] = await chrome.tabs.query({ active: true, windowId: msg.windowId });
-      if (!tab) throw new Error('Open a browser tab to continue.');
-      if (msg.action !== 'note' || msg.attachPage) {
-        if (tab.id !== msg.tabId || tab.url !== msg.tabUrl) throw new Error('The page changed. Check the current page and try again.');
-        if (!/^https?:\/\//.test(tab.url || '')) throw new Error('Open a web page and allow page access to capture it.');
-      }
-      if (msg.action === 'note' && (typeof msg.text !== 'string' || !msg.text.trim() || msg.text.length > 50000)) throw new Error('Write a note of up to 50,000 characters.');
-      const draft = await stageSaveReview({ action: msg.action, tab, trigger: 'sidebar', ...(msg.action === 'note' ? { text: msg.text, attachPage: msg.attachPage === true } : {}) });
-      return { draft };
+      if (msg.kind === 'save-review-get') return { draft: await readSaveReview(msg.tabId) };
+      if (msg.kind === 'save-review-update') { await updateSaveReview(msg.tabId, msg.id, msg.form); return {}; }
+      if (msg.kind === 'save-review-cancel') { await cancelSaveReview(msg.tabId, msg.id); return {}; }
+      const record = await confirmSaveReview(msg, (draft, commit) => performCapture(draft.action, { ...draft, commit }));
+      // I1: a region selection cancelled on the page (Esc, a too-small drag,
+      // or leaving the tab) confirms with nothing saved. The card finishes
+      // unsaved on `capture: null`; the dock says why, in a neutral tone —
+      // never "Saved".
+      if (!record) await chrome.tabs.sendMessage(msg.tabId, { kind: 'dock-status', text: 'Selection cancelled.', tone: '' }, { frameId: 0 }).catch(() => {});
+      return { capture: record ? { id: record.id, cloudStatus: record.cloudStatus, type: record.type } : null };
     })().then(data => sendResponse({ ok: true, ...data })).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
@@ -422,36 +458,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
     return true;
   }
-  if (msg?.kind === "capture") {
-    if (!trustedLibrarySender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Open FoundKeep to capture a page.' }); return; }
-    (async () => {
-      const sidebar = trustedLibrarySender(sender, chrome.runtime) && msg.source === "sidebar";
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        ...(sidebar && Number.isInteger(msg.windowId) ? { windowId: msg.windowId } : { currentWindow: true }),
-      });
-      if (!tab) return sendResponse({ ok: false, error: "Open a web page to capture it." });
-      if (sidebar && (tab.id !== msg.tabId || tab.url !== msg.tabUrl))
-        return sendResponse({ ok: false, error: "The page changed. Check the current page and try again." });
-      if (sidebar && !/^https?:\/\//i.test(tab.url || ""))
-        return sendResponse({ ok: false, error: "Open a web page and allow page access to capture it." });
-      const acknowledgeStart = msg.action === "region";
-      if (acknowledgeStart) sendResponse({ ok: true, started: true });
-      const finish = (result) => {
-        if (!acknowledgeStart) sendResponse(result);
-        else if (sidebar) chrome.runtime.sendMessage({ kind: "atlas-capture-finished", requestId: msg.requestId, ...result }).catch(() => {});
-      };
-      try {
-        const capture = await performCapture(msg.action, { tab, trigger: sidebar ? "sidebar" : "popup" });
-        if (capture) configuredFlash(true);
-        finish({ ok: true, capture: capture ? { id: capture.id, type: capture.type, cloudStatus: capture.cloudStatus } : null });
-      } catch (e) {
-        configuredFlash(false, String(e));
-        finish({ ok: false, error: e.message || String(e) });
-      }
-    })();
-    return true;
-  }
   if (msg?.kind === "saveTweet") {
     const trusted = sender.id === chrome.runtime.id && sender.frameId === 0 && /^https:\/\/(?:www\.)?(?:x|twitter)\.com\//.test(sender.url || '');
     const p = msg.payload;
@@ -459,47 +465,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'Open the tweet on X to save it.' }); return;
     }
     if (p.socialContext !== undefined && (JSON.stringify(p.socialContext).length > 120000 || p.socialContext?.version !== 1)) { sendResponse({ ok: false, error: 'This post is too large to capture.' }); return; }
-    const opened = openReviewPanel(sender.tab);
-    void opened.then(async () => {
+    void (async () => {
       const state = await getEffectivePreferences();
       if (!state.preferences.capture.tweet) throw new Error('Tweet capture is disabled in your FoundKeep preferences.');
-      const draft = await stageSaveReview({ action: 'tweet', tab: sender.tab, tweet: { url: p.url, text: p.text, title: p.title, socialContext: p.socialContext || null }, trigger: 'twitter' });
-      sendResponse({ ok: true, pending: true, draftId: draft.id });
-    }).catch(error => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-  if (msg?.kind === "saveNote") {
-    if (!trustedLibrarySender(sender, chrome.runtime)) { sendResponse({ ok: false, error: 'Open FoundKeep to save a note.' }); return; }
-    (async () => {
-      const sidebar = trustedLibrarySender(sender, chrome.runtime) && msg.source === "sidebar";
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        ...(sidebar && Number.isInteger(msg.windowId) ? { windowId: msg.windowId } : { currentWindow: true }),
-      });
-      try {
-        const preferenceState = await getEffectivePreferences();
-        if (!preferenceState.preferences.capture.note) throw new Error("Notes are disabled in your FoundKeep preferences.");
-        const local = msg.source === "library";
-        const attachSource = !local && preferenceState.preferences.notes.attachSource;
-        if (sidebar && attachSource && (tab?.id !== msg.tabId || tab?.url !== msg.tabUrl))
-          throw new Error("The page changed. Check the current page or save without attaching it.");
-        const context = !attachSource
-          ? { articleText: null, provenance: fallbackProvenance(null, local ? "library-note" : "extension-note", Date.now()) }
-          : await capturePageContext(tab, { captureMethod: "extension-note" });
-        const capture = await saveCapture({
-          type: "note",
-          noteText: msg.text,
-          sourceUrl: local ? null : context.provenance.pageUrl,
-          sourceTitle: local ? null : context.provenance.pageTitle,
-          faviconUrl: local ? null : context.provenance.faviconUrl,
-          capturedAt: context.provenance.capturedAt,
-          provenance: context.provenance,
-        });
-        sendResponse({ ok: true, capture: { id: capture.id, cloudStatus: capture.cloudStatus } });
-      } catch (e) {
-        sendResponse({ ok: false, error: String(e) });
-      }
-    })();
+      // dock.js is always present on x.com (it is a static content script
+      // entry there), so it also shows this in its own status line when it
+      // can — but the response still needs to say whether staging actually
+      // succeeded, or twitter.js has nothing to switch the button's state on.
+      const result = await startCapture(sender.tab, 'tweet', { tweet: { url: p.url, text: p.text, title: p.title, socialContext: p.socialContext || null }, trigger: 'twitter' });
+      if (!result.ok) throw new Error(result.error);
+      return { pending: true };
+    })().then(data => sendResponse({ ok: true, ...data })).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
   if (msg?.kind === "drain") {
@@ -511,34 +487,39 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ---------------------------------------------------------------------------
 // The one place every capture action is defined.
 // ---------------------------------------------------------------------------
-async function performCapture(action, { tab, info, tweet, text, attachPage, trigger = "popup", commit = saveCapture }) {
-  const captureMethod = methodFor(action, trigger);
+// performCapture's only caller is the save-review-confirm handler, spreading
+// a draft that stageSaveReview always stamps with a trigger ('dock', or
+// 'context'/'keyboard'/'twitter' from the handful of callers that override
+// it) — never undefined, so `trigger` needs no default here.
+async function performCapture(action, { tab, info, tweet, text, attachPage, trigger, commit = saveCapture }) {
   const preferenceState = await getEffectivePreferences();
   const preferences = preferenceState.preferences;
+  const captureMethod = captureMethodFor(action, trigger, { attachPage: !!attachPage && preferences.notes.attachSource });
   const limits = preferenceState.policy.limits;
   const feature = capturePreferenceKey(action);
-  if (!preferences.capture[feature]) throw new Error(`${feature === "fullPage" ? "Full-page screenshot" : feature[0].toUpperCase() + feature.slice(1)} capture is disabled in your FoundKeep preferences.`);
+  if (!preferences.capture[feature]) throw new Error(captureDisabledMessage(action));
   if (action !== "note" && action !== "tweet") await assertCaptureTab(tab);
   switch (action) {
     case 'tweet': {
       const capturedAt = Date.now();
       return commit({ type: 'highlight', cloudType: 'tweet', sourceUrl: tweet.url, sourceTitle: tweet.title,
         selectionText: boundedText(tweet.text, limits.selectionCharacters, 'Post text'), socialContext: tweet.socialContext || null, capturedAt,
-        provenance: fallbackProvenance({ url: tweet.url, title: tweet.title }, 'twitter-action', capturedAt) });
+        provenance: fallbackProvenance({ url: tweet.url, title: tweet.title }, captureMethod, capturedAt) });
     }
     case 'note': {
       if (attachPage) await assertCaptureTab(tab);
       const context = attachPage && preferences.notes.attachSource
-        ? await capturePageContext(tab, { captureMethod: 'extension-note' })
-        : { provenance: fallbackProvenance(null, 'library-note', Date.now()) };
+        ? await capturePageContext(tab, { captureMethod })
+        : { provenance: fallbackProvenance(null, captureMethod, Date.now()) };
       return commit({ type: 'note', noteText: text, sourceUrl: context.provenance.pageUrl,
         sourceTitle: context.provenance.pageTitle, faviconUrl: context.provenance.faviconUrl,
         capturedAt: context.provenance.capturedAt, provenance: context.provenance });
     }
     case "region":
-      return regionScreenshot(tab, captureMethod, limits, commit);
+      // The dock sits above the page and must not appear in the screenshot.
+      return withDockHidden(tab.id, () => regionScreenshot(tab, captureMethod, limits, commit));
     case "fullpage":
-      return fullPageScreenshot(tab, captureMethod, limits, commit);
+      return withDockHidden(tab.id, () => fullPageScreenshot(tab, captureMethod, limits, commit));
     case "highlight":
       return saveHighlight(tab, captureMethod, limits, commit);
     case "savepage": {
@@ -637,6 +618,18 @@ async function saveImage(srcUrl, tab, captureMethod, limits, commit) {
   });
 }
 
+// A rejection from chrome.scripting.executeScript / chrome.tabs.captureVisibleTab
+// on a page the extension cannot script (no host permission, and no fresh
+// activeTab grant because the dock triggered this without a toolbar click)
+// carries a Chrome-authored message mentioning permission/access/activeTab.
+// Surface FoundKeep's own remedy instead of that raw message.
+function friendlyCaptureError(error) {
+  const message = String(error?.message || error || "");
+  return /permission|cannot access|activetab/i.test(message)
+    ? new Error("Click the FoundKeep icon on this page to allow capture.")
+    : error;
+}
+
 async function saveHighlight(tab, captureMethod, limits, commit) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
@@ -653,7 +646,7 @@ async function saveHighlight(tab, captureMethod, limits, commit) {
       }
       return { text, paragraph };
     },
-  });
+  }).catch(error => { throw friendlyCaptureError(error); });
   if (!result?.text) throw new Error("no text selected");
   boundedText(result.text, limits.selectionCharacters, "Selected text");
   const context = await capturePageContext(tab, { captureMethod });
@@ -678,13 +671,13 @@ async function regionScreenshot(tab, captureMethod, limits, commit) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: regionSelectInPage,
-  });
+  }).catch(error => { throw friendlyCaptureError(error); });
   if (!result) return;
   const { rect, dpr } = result;
   await assertCaptureTab(tab);
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
     format: "png",
-  });
+  }).catch(error => { throw friendlyCaptureError(error); });
   await assertCaptureTab(tab);
   const encoded = await cropDataUrl(dataUrl, rect, dpr, limits.imageBytes);
   const context = await capturePageContext(tab, { captureMethod });
@@ -704,6 +697,9 @@ async function regionScreenshot(tab, captureMethod, limits, commit) {
 }
 
 function regionSelectInPage() {
+  // I1: confirming in the review card leaves keyboard focus in the card's
+  // (now hidden) frame; pull it back to the page so Esc reaches this overlay.
+  window.focus();
   return new Promise((resolve) => {
     const dpr = window.devicePixelRatio || 1;
     const overlay = document.createElement("div");
@@ -798,7 +794,7 @@ async function fullPageScreenshot(tab, captureMethod, limits, commit) {
   const [{ result: dims }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: prepFullPage,
-  });
+  }).catch(error => { throw friendlyCaptureError(error); });
   const dpr = Math.max(1, Number(dims.dpr) || 1);
   const pixelWidth = Math.round(dims.viewW * dpr);
   if (!pixelWidth || pixelWidth > MAX_IMAGE_DIMENSION) {
@@ -825,7 +821,7 @@ async function fullPageScreenshot(tab, captureMethod, limits, commit) {
       await assertCaptureTab(tab);
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
         format: "png",
-      });
+      }).catch(error => { throw friendlyCaptureError(error); });
       await assertCaptureTab(tab);
       shots.push({ y: actualY, dataUrl });
       if (actualY + dims.viewH >= totalH) break;

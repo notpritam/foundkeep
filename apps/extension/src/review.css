@@ -1,0 +1,194 @@
+body {
+  margin: 0;
+  background: transparent;
+}
+#reviewForm {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: min(560px, 100vh);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 24px 80px #0008;
+  overflow: hidden;
+}
+.review-head {
+  flex-shrink: 0;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.review-head .eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+.review-head h1 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.review-body {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.review-body > .field {
+  display: block;
+  margin: 0 0 14px;
+}
+.review-body input,
+.review-body textarea,
+.review-body select {
+  width: 100%;
+  box-sizing: border-box;
+}
+#destinationOriginal summary {
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+#destinationExcerpt {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 100px;
+  overflow: auto;
+  margin: 8px 0 14px;
+}
+#destinationRules {
+  margin: -6px 0 14px;
+}
+.destination-folder-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+}
+.destination-folder-head .field {
+  margin: 0;
+}
+#destinationNewFolder {
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 8px 0 14px;
+}
+.save-tags-field {
+  padding: 0;
+  margin: 14px 0;
+  border: 0;
+  min-width: 0;
+}
+.save-tags-field legend {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.save-tag-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.save-tag-entry input {
+  min-width: 0;
+  flex: 1;
+}
+.save-tag-selected,
+.save-tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.save-tag-suggestions {
+  margin: 8px 0;
+}
+.save-tag-chip {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--muted);
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 11px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.save-tag-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.save-tag-chip.selected {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.save-tag-error {
+  color: var(--bad);
+}
+.save-tag-error:empty {
+  display: none;
+}
+.attach-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 12px 0 6px;
+}
+.attach-source input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+}
+#destinationShare {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 8px;
+}
+#destinationShare h2 {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+#destinationShare .field {
+  margin-bottom: 12px;
+}
+.review-foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 12px 16px 16px;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+}
+.review-foot .statusline {
+  width: 100%;
+  order: -1;
+}
+.review-foot .statusline:empty {
+  display: none;
+}
+.review-foot #destinationConfirm {
+  flex: 1;
+}
+#destinationFields:disabled {
+  opacity: 0.65;
+}

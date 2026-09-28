@@ -20,9 +20,9 @@ dist = os.path.join(root, "deploy", "dist")
 store_zip = os.path.join(dist, f"foundkeep-store-{version}.zip")
 assets = os.path.join(dist, f"store-assets-{version}")
 required_assets = [
-    "native-sidebar.png",
+    "dock-toolbar.png",
     "save-review.png",
-    "local-library.png",
+    "dock-review.png",
     "promo-small.png",
     "promo-marquee.png",
     "icon128.png",

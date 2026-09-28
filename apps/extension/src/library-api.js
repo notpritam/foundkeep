@@ -33,8 +33,10 @@ export function libraryOperation(operation, args = {}) {
   if (operation === 'import-chunk') return {method:'POST',path:'/api/imports',body:args};
   throw new Error('Unknown library action.');
 }
+// Framed review pages use a per-session dynamic host (use_dynamic_url), so match
+// the extension id, the extension scheme and the page path rather than the host.
 export function trustedLibrarySender(sender, runtime) {
   if (sender?.id !== runtime.id) return false;
-  try { const url=new URL(sender.url); return ['library.html','popup.html','dashboard.html'].some(page=>`${url.protocol}//${url.host}${url.pathname}`===runtime.getURL('src/'+page)); }
+  try { const url=new URL(sender.url); return url.protocol==='chrome-extension:'&&['review.html','import.html','dock-settings.html'].some(page=>url.pathname==='/src/'+page); }
   catch {return false;}
 }

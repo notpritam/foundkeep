@@ -67,8 +67,13 @@ if (!new URLSearchParams(location.search).has("shot")) {
   document.head.append(style);
   const banner = document.createElement("div");
   banner.className = "preview-bar";
+  // The extension's own popup/dashboard preview pages (and this banner's old
+  // links to them) are gone along with the side panel and local library
+  // (Task 7). The dock itself needs a live page + real chrome.* APIs to run,
+  // not just this DOM/CSS fixture, so there's no in-browser preview link for
+  // it here — only the website preview remains.
   banner.innerHTML =
-    'Sample library · browser preview <a href="/apps/extension/src/popup.html">Capture popup</a><a href="/apps/extension/src/dashboard.html">Library</a><a href="/apps/web/">Website</a>';
+    'Sample library · browser preview <a href="/apps/web/">Website</a>';
   document.body.prepend(banner);
 }
 export const ready = (async () => {

@@ -1,3 +1,12 @@
+// STALE (Task 7, 2026-09-27): this still drives the native side panel's own
+// destination dialog (#destinationDialog) and preserved-source detail view
+// (#preservedSource) through helpers/action-panel.mjs. Both library.html and
+// preserved-source.js are deleted in Task 7 with no replacement UI (the new
+// review card has no source-preservation detail view), so this test cannot
+// pass as written; porting it to the dock/review flow is more than a small
+// change (needs a genuinely new #preservedSource-equivalent surface, not
+// just a different selector) and was left for a follow-up task. Not in
+// test:extension; requires a live dev server and FOUNDKEEP_ALLOW_DEV_TEST=1.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm,mkdir} from 'node:fs/promises';

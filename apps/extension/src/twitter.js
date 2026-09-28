@@ -1,5 +1,5 @@
 // Adds a FoundKeep destination-picker button to each X / Twitter action bar.
-// Clicking it opens a sidebar review of this tweet; only confirmation saves it.
+// Clicking it opens a review of this tweet in the floating dock; only confirmation saves it.
 // The original author, text and permalink stay together. Self-contained script — all
 // network goes through the background worker, so no token lives in the page.
 
@@ -63,7 +63,7 @@ function setState(btn, state) {
     btn.style.opacity = "0.6";
   } else if (state === "choosing") {
     btn.style.color = ACCENT; btn.style.opacity = "1";
-    btn.title = "Choose a destination in the sidebar";
+    btn.title = "Choose a destination in the FoundKeep dock";
     btn.setAttribute("aria-label", btn.title);
   } else if (state === "saved") {
     btn.style.color = ACCENT;

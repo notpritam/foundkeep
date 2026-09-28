@@ -8,10 +8,14 @@ test('sidebar operations cannot choose remote origins, credentials or arbitrary 
  const url=new URL(request.path,'https://foundkeep.app');assert.equal(url.searchParams.get('q'),'hello&folderId=foreign');assert.equal(url.searchParams.get('folderId'),'owned');assert.equal(request.method,'GET');
  assert.equal(libraryOperation('preview',{id:'owned-id'}).path,'/api/mobile/captures/owned-id/preview');
 });
-test('only packaged library and popup pages can proxy customer content',()=>{
+test('only packaged review, import and dock-settings pages can proxy customer content',()=>{
  const runtime={id:'own-extension',getURL:path=>'chrome-extension://own-extension/'+path};
- assert.equal(trustedLibrarySender({id:runtime.id,url:runtime.getURL('src/library.html')},runtime),true);
- for(const sender of [{id:'other',url:runtime.getURL('src/library.html')},{id:runtime.id,url:'https://foundkeep.app/dashboard'},{id:runtime.id,url:runtime.getURL('src/twitter.js')},{id:runtime.id,url:runtime.getURL('src/library.html/evil')}])assert.equal(trustedLibrarySender(sender,runtime),false);
+ for(const sender of [{id:'other',url:runtime.getURL('src/review.html')},{id:runtime.id,url:'https://foundkeep.app/dashboard'},{id:runtime.id,url:runtime.getURL('src/twitter.js')},{id:runtime.id,url:runtime.getURL('src/library.html')},{id:runtime.id,url:runtime.getURL('src/review.html/evil')}])assert.equal(trustedLibrarySender(sender,runtime),false);
+ for (const page of ['review.html', 'import.html', 'dock-settings.html'])
+   assert.equal(trustedLibrarySender({ id: runtime.id, url: runtime.getURL('src/' + page) + '?tab=4' }, runtime), true, page);
+ assert.equal(trustedLibrarySender({ id: runtime.id, url: runtime.getURL('src/dock/dock.js') }, runtime), false);
+ assert.equal(trustedLibrarySender({ id: 'other', url: runtime.getURL('src/review.html') }, runtime), false);
+ assert.equal(trustedLibrarySender({ id: runtime.id, url: 'https://evil.example/src/review.html' }, runtime), false);
 });
 
 test('private asset chunks use fixed owned routes and bounded ranges',()=>{

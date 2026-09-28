@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FoundKeep — Show on every site</title>
+    <link rel="stylesheet" href="theme.css" />
+    <style>
+      /* chrome.windows.create({width:380,height:320}) sizes the outer
+         window, not this document's viewport (browser chrome eats part of
+         it) — fill whatever's left instead of forcing the same 380x320,
+         which would overflow and scroll. */
+      html, body { min-height: 100%; }
+      body { box-sizing: border-box; min-height: 100vh; padding: 20px; display: flex; flex-direction: column; }
+      h1 { font-size: 15px; margin: 0 0 10px; }
+      p { color: var(--muted); margin: 0 0 20px; flex: 1; }
+      .actions { display: flex; gap: 8px; justify-content: flex-end; }
+      #result { margin: 14px 0 0; font-size: 12px; color: var(--muted); flex: none; }
+    </style>
+  </head>
+  <body>
+    <h1>Show FoundKeep on every site</h1>
+    <p>Chrome will ask to let FoundKeep read and change data on all sites. FoundKeep only uses this to show the dock and capture pages you choose.</p>
+    <div class="actions">
+      <button id="cancel" class="btn secondary" type="button">Cancel</button>
+      <button id="enable" class="btn primary" type="button">Allow and turn on</button>
+    </div>
+    <p id="result" role="status"></p>
+    <script type="module" src="dock-settings.js"></script>
+  </body>
+</html>

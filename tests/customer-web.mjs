@@ -100,6 +100,17 @@ test('customer pages present the FoundKeep identity', async () => {
   }
 });
 
+test('the devices page offers "Import from this browser" through the extension message channel', async () => {
+  const source = await readFile(path.resolve('apps/site/components/dashboard/devices.tsx'), 'utf8');
+  assert.match(source, /atlas-open-import/);
+  // I4: only extensions whose atlas-ping advertises the feature get the
+  // button (released 1.0.2/1.7.x builds don't handle atlas-open-import) —
+  // never a version comparison — and it is disabled while a request runs.
+  assert.match(source, /features\.includes\('open-import'\)/);
+  assert.match(source, /\{canOpenImport \? <button[^>]*id="import-from-browser"[^>]*disabled=\{importing\}/);
+  assert.doesNotMatch(source, /version[^\n]*open-import|open-import[^\n]*version/);
+});
+
 test('real API: signup, notes, logout, login, recovery and account deletion', async t => {
   const { page } = await pageFor(t, { mock: false });
   await page.goto(`${base}/auth.html?mode=signup`);

@@ -1,16 +1,16 @@
 # FoundKeep — browser extension (Chromium MV3)
 
-Keep readable page copies, screenshots, highlights, links, images, and notes with a record of where they came from. Connect your FoundKeep account to sync new captures to a private dashboard, with a local library available offline.
+Keep readable page copies, screenshots, highlights, links, images, and notes with a record of where they came from. Connect your FoundKeep account so captures sync to your private dashboard.
 
-## One sidebar for everything
+## One floating dock for everything
 
-Click the pinned FoundKeep toolbar icon to open the native sidebar directly. Save the current page, selected text, a region or a full-page screenshot; use **+** for a note. Search and edit your account library, import bookmarks, open **Local saves**, and manage your connection from **Settings** without leaving the sidebar. The panel stays open as you browse.
+Click the pinned FoundKeep toolbar icon to show or hide a small dock on the current page (click again to collapse it). Drag its grip to reposition it; it remembers where you left it. Expand the dock to save the current page, highlight the selection, capture a region or full-page screenshot, or write a note. Its **⋯** menu opens **Library** (your FoundKeep dashboard), **Show on every site**, **Hide on this site**, **Import browser bookmarks**, and **Settings** (the account dashboard's browser-capture settings).
 
-The initial toolbar click grants access to that page. To keep capturing after switching tabs, choose **Allow page captures** once and accept Chrome’s optional page-access prompt. Declining leaves notes and the library available. Browser-internal pages cannot be captured. Region selection happens on the page; Escape or switching tabs cancels it. A page change during a screenshot aborts the capture instead of saving the wrong tab.
+The initial toolbar click grants access to that page. To keep the dock (and capture) available after switching tabs without clicking the icon again, choose **Show on every site** from its **⋯** menu and accept Chrome's optional page-access prompt; **Hide on this site** turns it back off for one origin. Browser-internal pages cannot show the dock or be captured. Region selection happens on the page; Escape or switching tabs cancels it. A page change during a screenshot aborts the capture instead of saving the wrong tab.
 
 ## Choose where each save goes
 
-Tweet buttons, sidebar captures and notes, right-click captures, and keyboard captures open **Where should this go?** in the sidebar. Choose **My library**, a private folder, a collection, or **This browser only**, then confirm. Cancel discards the request without creating a save. Sign in on your matching FoundKeep dashboard to see account destinations.
+Every capture — dock actions, the X/Twitter button, right-click captures, and keyboard captures — opens a small review card on the page (or a fallback popup window if the card cannot be framed there). Choose **My library**, a private folder, or a collection, then confirm; Cancel discards the request without creating a save. An account is required to save — the dock shows **Sign in to save** instead of its actions when signed out.
 
 Collection choices show their public/private audience and approval rules. Review the title, link and text that will be shared; images are included only if you select the image checkbox. Your full capture stays in your private account library. The chosen folder or collection stays attached to the upload queue if connectivity drops. The extension checks account ownership again before confirmation.
 
@@ -18,7 +18,7 @@ After updating the extension, refresh open X/Twitter tabs so they load the new F
 
 ## Check the environment and version
 
-The sidebar and local library show **DEV / Production**, the installed manifest version, and the fixed cloud destination. For dev testing, use **DEV · v1.7.6 · dev.foundkeep.app**, then sign in to the same account at [your dev dashboard](https://dev.foundkeep.app/dashboard). The extension connects automatically; no Connect button is needed. That page also shows the detected extension version and destination.
+For dev testing, use the extension built as **FoundKeep Dev**, then sign in to the same account at [your dev dashboard](https://dev.foundkeep.app/dashboard). The extension connects automatically; no Connect button is needed. The dashboard's Apps & devices page shows the detected extension's version and destination.
 
 Save a note named **Dev sync test**. Confirm it appears in My library at `dev.foundkeep.app` under the same account. A local save or a pending upload is not yet a cloud save. The production library at `foundkeep.app` is separate.
 
@@ -47,11 +47,11 @@ Open [FoundKeep](https://foundkeep.app/dashboard), then create an account or sig
 
 New captures made while an account is selected are saved locally and queued for that account. FoundKeep retries automatically after network failures when automatic sync is enabled. **Try sync again** requests an immediate retry; **Reconnect** appears if the browser credential expires or is revoked. Captures remain available locally throughout.
 
-Existing local captures are never uploaded automatically. To include them, open **Settings → Import local captures**, review the destination account, then confirm. Switching accounts never moves captures or pending uploads between accounts. Reconnecting the original account resumes its pending captures.
+Existing local-only captures are never uploaded automatically. If any remain, the dock shows a **Move to My library** prompt (see **Your library** below); moving them uploads them to the signed-in account. Switching accounts never moves captures or pending uploads between accounts. Reconnecting the original account resumes its pending captures.
 
 ## Capture
 
-- **Popup:** save a readable copy of the current page, select a region, capture a full page, save selected text, or write a note. Notes also save with ⌘/Ctrl + Enter.
+- **Dock:** save a readable copy of the current page, highlight the selection, capture a region or full page, or write a note.
 - **Right-click:** save a selection, link, image, or page; capture a region or full-page screenshot.
 - **Keyboard:** `Alt+Shift+S` captures a region, `Alt+Shift+F` a full page, and `Alt+Shift+H` selected text. Change assignments at `chrome://extensions/shortcuts`.
 - **X / Twitter:** the FoundKeep button in a tweet’s action bar saves the author, text, and permalink.
@@ -62,19 +62,17 @@ Saving a page keeps the useful article or main text, available headings and stru
 
 ## Capture settings
 
-Open **Account & settings → Browser capture** in the FoundKeep dashboard to control capture methods, readable bookmark content, note source attachment, popup action order and recent items, right-click actions, automatic sync, OCR, summaries, tags, and success feedback. The policy belongs to the customer account and is shared by its connected Chromium browsers. Saving it asks the installed extension to refresh immediately; the extension also refreshes on startup and keeps a brief account-bound cache for offline use.
+Open **Account & settings → Browser capture** in the FoundKeep dashboard to control capture methods, readable bookmark content, note source attachment, right-click actions, automatic sync, OCR, summaries, tags, and success feedback. The policy belongs to the customer account and is shared by its connected Chromium browsers. Saving it asks the installed extension to refresh immediately; the extension also refreshes on startup and keeps a brief account-bound cache for offline use.
 
 FoundKeep also reads a validated data-only operator policy. It can globally disable an existing capture or sync feature and lower packaged size limits without downloading executable code. A cached or bundled safe policy is applied immediately so an offline capture never waits for the network. JavaScript, UI, permissions, origins, schemas, and capture algorithms still require a reviewed extension update.
 
 Changing these settings does not require an extension update. Manifest permissions, capture engine changes, security fixes, or new extension code still require an updated extension build.
 
-## Your libraries
+## Your library
 
-**Your library** in the sidebar searches and edits your synced account saves. **Local saves** opens an in-panel browser of local captures: search, read text, view or download images, and delete browser copies. **+** creates a note through the same durable account-bound queue as page captures. **Open dashboard** remains available for full account administration.
+The extension has no library browser of its own — the dock's **Library** action opens your FoundKeep dashboard, where every save (readable pages, screenshots, highlights, images, notes and collection entries) lives and can be searched, organized and exported.
 
-Local copies remain in IndexedDB. Deleting a local copy does not delete a synced account copy; use the account dashboard to manage that copy. Local **Export metadata** includes text and metadata but not image files, so it is not a complete backup. The account dashboard has its own export and account-deletion controls.
-
-You can also use FoundKeep without an account. Disconnected captures stay local until you explicitly import them. Disconnecting keeps existing pending captures assigned to their original account. Manage and revoke connected browsers in your account dashboard.
+Saves made before this version of the extension may still hold captures that were kept only in this browser. If any remain, the dock shows **N saves are only in this browser** with a **Move to My library** action (or **Later**, which reminds you again in about a week). Moving them uploads those local-only captures to your signed-in account; nothing is deleted from the browser in the process. The account dashboard has its own export and account-deletion controls.
 
 The customer extension has no browser-control integration and does not request the debugger permission. This package supports Chromium browsers. Firefox and Safari builds are not currently shipped.
 
