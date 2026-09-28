@@ -3,7 +3,9 @@ import { captureBinding, getCloudStatus, importLocalCaptures } from './cloud.js'
 import { drainQueue } from './capture.js';
 import { getEffectivePreferences, capturePreferenceKey, captureDisabledMessage } from './preferences.js';
 import { performCapture } from './capture-actions.js';
-import { rememberSave, grantDetails, revokeDetails } from './capture-details.js';
+import { rememberSave, grantDetails, revokeDetails, grantNote, revokeNote } from './capture-details.js';
+import { configuredFlash } from './badge.js';
+import * as db from './db.js';
 
 const HIDDEN_KEY = 'foundkeep-dock-hidden-origins', ALWAYS_KEY = 'foundkeep-dock-always-on', LOCAL_KEY = 'foundkeep-dock-local-prompt';
 // R10: the dock content script can never touch chrome.storage (it sits next
@@ -99,20 +101,36 @@ export async function summonDock(tabId, { expand = false, toggle = false } = {})
 async function refreshState(tab, originHint) { await chrome.tabs.sendMessage(tab.id, { kind: 'dock-state', state: await dockState(tab, originHint) }).catch(() => {}); }
 const GRANT_MESSAGE = 'Click the FoundKeep icon on this page to allow capture.';
 const IMAGE_ACCESS_MESSAGE = 'Allow access to the image’s site to save its original file, then try again.';
+const SCREENSHOT_BUSY = 'A screenshot is already in progress on this page.';
 // Everything except an X post and a note that leaves the page out reads or
 // scripts the page itself (assertCaptureTab, executeScript).
 const needsPage = (action, extra) => action !== 'tweet' && !(action === 'note' && !extra.attachPage);
+// Show a result in the tab's dock. Resolves whether the dock showed it: a
+// dock on a "Hide on this site" origin stays hidden (it answers shown:false),
+// and no dock is injected into a hidden origin — the caller flashes the
+// toolbar badge instead.
 async function tell(tab, message) {
-  const shown = await summonDock(tab.id).catch(() => false);
-  if (shown) await chrome.tabs.sendMessage(tab.id, message, { frameId: 0 }).catch(() => {});
+  if (!await hasDock(tab.id)) {
+    const origin = originOf((await chrome.tabs.get(tab.id).catch(() => null))?.url);
+    if (!origin) return false;
+    if (((await chrome.storage.local.get(HIDDEN_KEY))[HIDDEN_KEY] || []).includes(origin)) return false;
+    if (!await summonDock(tab.id).catch(() => false)) return false;
+  }
+  const reply = await chrome.tabs.sendMessage(tab.id, message, { frameId: 0 }).catch(() => null);
+  return reply?.shown === true;
+}
+async function report(tab, message) {
+  const shown = await tell(tab, message);
+  if (!shown && message.kind === 'dock-saved') await configuredFlash(true).catch(() => {});
+  if (!shown && message.tone === 'error') await configuredFlash(false, message.text).catch(() => {});
   return shown;
 }
 // A right-click image save downloads the original from the image's own site,
 // which needs that exact origin's permission. Ask inside the click that
 // started the save (the context-menu event is the user gesture), before
-// anything awaits. 'unavailable' means Chrome could not show the prompt here;
-// the download is then attempted anyway (it works for images their site
-// serves to any origin).
+// anything awaits. 'unavailable' means Chrome would not show the prompt here
+// (e.g. no usable gesture in the service worker); a small FoundKeep window
+// then asks with a real click instead (requestImageAccessInWindow).
 function requestImageAccess(srcUrl) {
   let origin;
   try { origin = new URL(srcUrl).origin + '/*'; } catch { return Promise.resolve('denied'); }
@@ -120,15 +138,99 @@ function requestImageAccess(srcUrl) {
     return Promise.resolve(chrome.permissions.request({ origins: [origin] })).then(granted => granted ? 'granted' : 'denied', () => 'unavailable');
   } catch { return Promise.resolve('unavailable'); }
 }
+const IMAGE_REQUESTS_KEY = 'foundkeep-image-requests';
+const imageRequests = async () => (await chrome.storage.session.get(IMAGE_REQUESTS_KEY))[IMAGE_REQUESTS_KEY] || {};
+async function requestImageAccessInWindow(tab, info) {
+  const nonce = crypto.randomUUID(), requests = await imageRequests();
+  // Only what finishing the save needs; requests older than 10 minutes lapse.
+  for (const [key, entry] of Object.entries(requests)) if (Date.now() - entry.at > 600_000) delete requests[key];
+  requests[nonce] = { tabId: tab.id, info: { menuItemId: 'save-image', srcUrl: info.srcUrl, pageUrl: info.pageUrl || null }, at: Date.now() };
+  await chrome.storage.session.set({ [IMAGE_REQUESTS_KEY]: requests });
+  await chrome.windows.create({ url: chrome.runtime.getURL(`src/image-access.html?request=${nonce}`), type: 'popup', width: 400, height: 300, focused: true });
+}
+// The packaged image-access.html window, carrying a request this background
+// issued. Returns [nonce, entry] or null.
+async function imageRequestFor(sender) {
+  let url;
+  try { url = new URL(sender.url); } catch { return null; }
+  if (sender.id !== chrome.runtime.id || url.protocol !== 'chrome-extension:' || url.host !== chrome.runtime.id || url.pathname !== '/src/image-access.html' || sender.frameId !== 0) return null;
+  const nonce = url.searchParams.get('request'), entry = nonce && (await imageRequests())[nonce];
+  return entry && Date.now() - entry.at <= 600_000 ? [nonce, entry] : null;
+}
+export async function imageRequestOrigin(sender) {
+  const found = await imageRequestFor(sender);
+  if (!found) throw new Error('This request is no longer available.');
+  return new URL(found[1].info.srcUrl).origin;
+}
+/** The window's answer: save the image now that its site is allowed, or say why not. */
+export async function finishImageRequest(sender, granted) {
+  const found = await imageRequestFor(sender);
+  if (!found) throw new Error('This request is no longer available. Right-click the image and choose Save image again.');
+  const [nonce, entry] = found, requests = await imageRequests();
+  delete requests[nonce];
+  await chrome.storage.session.set({ [IMAGE_REQUESTS_KEY]: requests });
+  const tab = await chrome.tabs.get(entry.tabId).catch(() => null);
+  if (!tab) throw new Error('The page with this image was closed.');
+  const allowed = granted === true && await chrome.permissions.contains({ origins: [new URL(entry.info.srcUrl).origin + '/*'] }).catch(() => false);
+  if (!allowed) { await report(tab, { kind: 'dock-status', text: IMAGE_ACCESS_MESSAGE, tone: 'error' }); return { ok: false, error: IMAGE_ACCESS_MESSAGE }; }
+  return startCapture(tab, 'save-image', { info: entry.info, trigger: 'context', imageAccess: 'granted' });
+}
+
+// Screenshots in progress, per tab: a second one (e.g. the shortcut pressed
+// again) must not stack another selector on the page.
+const screenshotTabs = new Set();
+// X posts saved this session: X re-renders posts (and their buttons) as you
+// scroll, so a post already saved is recognized rather than saved twice.
+const POSTS_KEY = 'foundkeep-saved-posts';
+const postSaves = new Map();
+let postsQueue = Promise.resolve();
+async function savedPost(url) {
+  const id = ((await chrome.storage.session.get(POSTS_KEY))[POSTS_KEY] || {})[url];
+  return id ? db.getCapture(id) : null;
+}
+function rememberPost(url, captureId) {
+  postsQueue = postsQueue.catch(() => {}).then(async () => {
+    const posts = (await chrome.storage.session.get(POSTS_KEY))[POSTS_KEY] || {};
+    posts[url] = captureId;
+    await chrome.storage.session.set({ [POSTS_KEY]: posts });
+  });
+  return postsQueue;
+}
+
 // Every capture saves instantly, straight into the connected account's
-// library — no destination step first. Resolves { ok: true, capture } once
-// the save is committed (the dock then offers "Add details"), { ok: false,
-// cancelled: true } when a screenshot selection was cancelled, or { ok:
-// false, error } when the capture could not run (disabled, signed out, no
-// page grant) — callers decide what to do with that (the X button shows its
-// error state). Either way the dock says what happened when it can.
-export async function startCapture(tab, action, extra = {}) {
-  const imageAccess = action === 'save-image' ? requestImageAccess(extra.info?.srcUrl) : null;
+// library — no destination step first. Resolves { ok: true, capture, shown }
+// once the save is committed (the dock then offers "Add details"), { ok:
+// false, cancelled: true } when a screenshot selection was cancelled, { ok:
+// false, pending: true } while a FoundKeep window asks for an image site's
+// access, or { ok: false, error } when the capture could not run (disabled,
+// signed out, no page grant) — callers decide what to do with that (the X
+// button shows its error state). The dock says what happened when it can;
+// otherwise the toolbar badge flashes.
+export function startCapture(tab, action, extra = {}) {
+  if (action === 'tweet') {
+    const url = extra.tweet?.url;
+    if (postSaves.has(url)) return postSaves.get(url);
+    const run = (async () => {
+      const existing = await savedPost(url).catch(() => null);
+      if (!existing) return runCapture(tab, action, extra);
+      await rememberSave(tab.id, existing.id).catch(() => {});
+      const shown = await report(tab, { kind: 'dock-saved' });
+      return { ok: true, shown, already: true, capture: { id: existing.id, type: existing.type, cloudStatus: existing.cloudStatus } };
+    })().finally(() => postSaves.delete(url));
+    postSaves.set(url, run);
+    return run;
+  }
+  if (action === 'region' || action === 'fullpage') {
+    if (screenshotTabs.has(tab.id)) return Promise.resolve({ ok: false, error: SCREENSHOT_BUSY });
+    screenshotTabs.add(tab.id);
+    return runCapture(tab, action, extra).finally(() => screenshotTabs.delete(tab.id));
+  }
+  return runCapture(tab, action, extra);
+}
+async function runCapture(tab, action, extra) {
+  // Synchronously, before any await: the permission prompt must run inside
+  // the right-click that started this save.
+  const imageAccess = action === 'save-image' && !extra.imageAccess ? requestImageAccess(extra.info?.srcUrl) : null;
   let record;
   try {
     // M3: refuse a capture method turned off in preferences.
@@ -139,22 +241,32 @@ export async function startCapture(tab, action, extra = {}) {
     // click: matched only by a static content_scripts entry) Chrome redacts
     // the tab's url and refuses scripting. Say what to do.
     if (needsPage(action, extra) && !(await chrome.tabs.get(tab.id).catch(() => null))?.url) throw new Error(GRANT_MESSAGE);
-    const access = imageAccess ? await imageAccess : undefined;
+    let access = extra.imageAccess || (imageAccess ? await imageAccess : undefined);
+    if (access === 'unavailable') {
+      const origin = new URL(extra.info.srcUrl).origin + '/*';
+      if (await chrome.permissions.contains({ origins: [origin] }).catch(() => false)) access = 'granted';
+      else {
+        await requestImageAccessInWindow(tab, extra.info);
+        await report(tab, { kind: 'dock-status', text: 'Allow access in the FoundKeep window to save this image.', tone: '' });
+        return { ok: false, pending: true };
+      }
+    }
     if (access === 'denied') throw new Error(IMAGE_ACCESS_MESSAGE);
     record = await performCapture(action, { tab, trigger: 'dock', ...extra, ...(access ? { imageAccess: access } : {}) });
   } catch (error) {
     const message = error?.message || 'FoundKeep could not save this. Try again.';
-    await tell(tab, { kind: 'dock-status', text: message, tone: 'error' });
+    await report(tab, { kind: 'dock-status', text: message, tone: 'error' });
     return { ok: false, error: message };
   }
   // I1: a screenshot selection cancelled on the page (✕, Esc, or leaving the
   // tab) saves nothing; the dock says so in a neutral tone — never "Saved".
   if (!record) {
-    await tell(tab, { kind: 'dock-status', text: 'Selection cancelled.', tone: '' });
+    await report(tab, { kind: 'dock-status', text: 'Selection cancelled.', tone: '' });
     return { ok: false, cancelled: true };
   }
+  if (action === 'tweet') await rememberPost(extra.tweet.url, record.id).catch(() => {});
   await rememberSave(tab.id, record.id).catch(() => {});
-  const shown = await tell(tab, { kind: 'dock-saved' });
+  const shown = await report(tab, { kind: 'dock-saved' });
   return { ok: true, shown, capture: { id: record.id, type: record.type, cloudStatus: record.cloudStatus } };
 }
 export async function handleDockMessage(msg, sender) {
@@ -162,13 +274,18 @@ export async function handleDockMessage(msg, sender) {
   const tab = sender.tab;
   switch (msg.kind) {
     case 'dock-hello': return dockState(tab, sender.url);
+    // A note is written in its own extension frame (note.html), never in the
+    // page: the dock only asks for one, and the frame saves through
+    // note-save (background.js).
     case 'dock-capture': {
-      if (!['savepage', 'highlight', 'region', 'fullpage', 'note'].includes(msg.action)) return { ok: false };
-      if (msg.action !== 'note') return startCapture(tab, msg.action);
-      if (typeof msg.text !== 'string' || !msg.text.trim() || msg.text.length > 50000) return { ok: false, error: 'Write a note of up to 50,000 characters.' };
-      const { preferences } = await getEffectivePreferences();
-      return startCapture(tab, 'note', { text: msg.text, attachPage: preferences.notes.attachSource });
+      if (!['savepage', 'highlight', 'region', 'fullpage'].includes(msg.action)) return { ok: false };
+      return startCapture(tab, msg.action);
     }
+    case 'dock-note': {
+      await chrome.tabs.sendMessage(tab.id, { kind: 'dock-note-open', url: await grantNote(tab.id) }, { frameId: 0 });
+      return { ok: true };
+    }
+    case 'dock-note-closed': await revokeNote(tab.id); return { ok: true };
     // "Add details" in the dock's Saved widget: frame the details card for
     // this tab's last save (capture-details.js grants it to this tab only).
     case 'dock-details': {

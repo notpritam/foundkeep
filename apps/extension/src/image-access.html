@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FoundKeep — Save this image</title>
+    <link rel="stylesheet" href="theme.css" />
+    <style>
+      /* Sized by chrome.windows.create; fill whatever the window leaves. */
+      html, body { min-height: 100%; }
+      body { box-sizing: border-box; min-height: 100vh; padding: 20px; display: flex; flex-direction: column; }
+      h1 { font-size: 15px; margin: 0 0 10px; }
+      p { color: var(--muted); margin: 0 0 16px; }
+      #imageOrigin { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+      .spacer { flex: 1; }
+      .actions { display: flex; gap: 8px; justify-content: flex-end; }
+      #result { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
+      #result[data-state="error"] { color: var(--bad); }
+    </style>
+  </head>
+  <body>
+    <!-- Opened when Chrome could not show the image-site permission prompt
+         from the right-click itself: asks again with a real click here, then
+         the background finishes the save. -->
+    <h1>Save this image to FoundKeep</h1>
+    <p>To keep the original image, FoundKeep needs access to <span id="imageOrigin">its site</span>. It only downloads the image you chose.</p>
+    <div class="spacer"></div>
+    <div class="actions">
+      <button id="cancel" class="btn secondary" type="button">Cancel</button>
+      <button id="allow" class="btn primary" type="button" disabled>Allow and save</button>
+    </div>
+    <p id="result" role="status"></p>
+    <script type="module" src="image-access.js"></script>
+  </body>
+</html>

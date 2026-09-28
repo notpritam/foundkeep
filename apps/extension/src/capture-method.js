@@ -23,11 +23,13 @@ export function captureMethodFor(action, trigger, { attachPage = false } = {}) {
 
 // Keyboard shortcuts save directly. Both screenshot shortcuts start the same
 // corner-toolbar flow as the dock's Screenshot button ("region": drag a
-// selection, or choose Full page there); with region selection turned off in
-// preferences, the full-page shortcut captures the page directly instead.
+// selection, or choose Full page there). The full-page shortcut captures the
+// page directly when region selection is turned off, and when full page
+// itself is turned off it asks for "fullpage" so the capture says so,
+// instead of opening a selector that cannot do what the shortcut promises.
 export function actionForCommand(command, capture = {}) {
   if (command === "region-screenshot") return "region";
-  if (command === "full-page-screenshot") return capture.region === false ? "fullpage" : "region";
+  if (command === "full-page-screenshot") return capture.region === false || capture.fullPage === false ? "fullpage" : "region";
   if (command === "save-highlight") return "highlight";
   return null;
 }

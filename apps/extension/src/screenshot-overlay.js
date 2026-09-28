@@ -7,9 +7,12 @@
 //   { rect: {x, y, w, h}, dpr }  a dragged region (CSS pixels)
 //   { fullPage: true }           Full page was chosen
 //   null                         ✕, Esc, or the tab was hidden
+//   { busy: true }               a selector is already open on this page
 // Only trusted input counts: a page script can dispatch synthetic events at
 // the host element, but it can neither select a region nor pick a choice.
 export function screenshotSelectInPage({ fullPage = true } = {}) {
+  // Never stack a second selector over one that is already open.
+  if (document.querySelector("foundkeep-capture")) return Promise.resolve({ busy: true });
   // Keyboard focus may be in the dock (hidden now) or elsewhere; bring it to
   // the page so Esc reaches this overlay.
   window.focus();

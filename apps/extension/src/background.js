@@ -1,7 +1,8 @@
 import { PRODUCT_NAME } from "./product.js";
 import { trustedLibrarySender } from "./library-api.js";
-import { summonDock, startCapture, handleDockMessage, dashboardUrl, reconcileAlwaysOn } from "./dock-control.js";
-import { detailsCaptureFor, readCaptureDetails, applyCaptureDetails, forgetTab } from "./capture-details.js";
+import { summonDock, startCapture, handleDockMessage, dashboardUrl, reconcileAlwaysOn, imageRequestOrigin, finishImageRequest } from "./dock-control.js";
+import { detailsCaptureFor, readCaptureDetails, applyCaptureDetails, forgetTab, noteGrantFor, consumeNote, releaseNote, frameMayRelay } from "./capture-details.js";
+import { configuredFlash } from "./badge.js";
 import { publicHttpUrl } from "./capture-actions.js";
 import { startBookmarkImport, resumeBookmarkImport, cancelBookmarkImport, importProgress } from "./import-queue.js";
 import { drainQueue } from "./capture.js";
@@ -93,23 +94,6 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, respond) => {
   return true;
 });
 
-// ---------------------------------------------------------------------------
-// Feedback: a short badge flash (no notifications permission needed).
-// ---------------------------------------------------------------------------
-async function flash(ok, label) {
-  await chrome.action.setBadgeBackgroundColor({
-    color: ok ? "#0d7a50" : "#ad3b35",
-  });
-  await chrome.action.setBadgeText({ text: ok ? "✓" : "!" });
-  if (!ok && label) console.error("[atlas]", label);
-  setTimeout(() => chrome.action.setBadgeText({ text: "" }), 1500);
-}
-
-async function configuredFlash(ok, label) {
-  if (!ok || (await getEffectivePreferences()).preferences.feedback.success)
-    await flash(ok, label);
-}
-
 function announcePreferenceChange() {
   try { chrome.runtime.sendMessage({ kind: "atlas-preferences-changed" }).catch(() => {}); }
   catch { /* no extension view is open */ }
@@ -188,18 +172,11 @@ async function reconcileContextMenus(preferences) {
 
 // Right-click items save directly. startCapture runs synchronously up to its
 // first await, so a "Save image" permission prompt still happens inside this
-// click. The dock shows "Saved · Add details"; where it cannot appear, the
-// badge flashes instead.
-function reportCapture(result) {
-  if (result.cancelled) return;
-  if (!result.ok) throw new Error(result.error);
-  if (!result.shown) void configuredFlash(true);
-}
+// click. startCapture reports the result itself — in the dock, or with a
+// toolbar badge flash where the dock cannot (or must not) show.
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  void (async () => {
-    if (info.menuItemId === "save-image" && !publicHttpUrl(info.srcUrl)) throw new Error('FoundKeep can only save images from public web addresses.');
-    reportCapture(await startCapture(tab, info.menuItemId, { info, trigger: "context" }));
-  })().catch(error => configuredFlash(false, error.message));
+  if (info.menuItemId === "save-image" && !publicHttpUrl(info.srcUrl)) { void configuredFlash(false, 'FoundKeep can only save images from public web addresses.'); return; }
+  void startCapture(tab, info.menuItemId, { info, trigger: "context" }).catch(error => configuredFlash(false, error.message));
 });
 
 // Keyboard shortcuts save directly too; both screenshot shortcuts start the
@@ -208,22 +185,25 @@ chrome.commands.onCommand.addListener((command, tab) => {
   const begin = async tab => {
     if (!tab) return;
     const action = actionForCommand(command, (await getEffectivePreferences()).preferences.capture);
-    if (!action) return;
-    reportCapture(await startCapture(tab, action, { trigger: "keyboard" }));
+    if (action) await startCapture(tab, action, { trigger: "keyboard" });
   };
   void (tab ? begin(tab) : chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => begin(tab)))
     .catch(error => configuredFlash(false, error.message));
 });
 
-// A tab's last save and its details grant end with the tab.
+// A tab's last save and its frame grants end with the tab.
 chrome.tabs.onRemoved.addListener(tabId => { void forgetTab(tabId); });
 
 // ---------------------------------------------------------------------------
 // Messages from extension pages / content scripts
 // ---------------------------------------------------------------------------
-// A packaged review.html (the details card) speaking for a numeric tab id.
-const detailsCardSender = (sender, msg) => trustedLibrarySender(sender, chrome.runtime) && Number.isInteger(msg.tabId)
-  && new URL(sender.url).pathname === '/src/review.html';
+// A packaged extension frame (the details card or the note field) speaking
+// for a numeric tab id; its grant is checked separately (capture-details.js).
+function trustedFrameSender(sender, msg, pathname) {
+  if (sender?.id !== chrome.runtime.id || !Number.isInteger(msg.tabId)) return false;
+  try { const url = new URL(sender.url); return url.protocol === 'chrome-extension:' && url.pathname === pathname; } catch { return false; }
+}
+const detailsCardSender = (sender, msg) => trustedLibrarySender(sender, chrome.runtime) && trustedFrameSender(sender, msg, '/src/review.html');
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (typeof msg?.kind === 'string' && msg.kind.startsWith('dock-')) {
     handleDockMessage(msg, sender).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
@@ -245,6 +225,39 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       await chrome.tabs.sendMessage(msg.tabId, relay, { frameId: 0 });
       return { ok: true };
     })().then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
+  // The note field (note.html): same relay and ownership rules as the
+  // details card. Its grant allows one saved note for its tab.
+  if (msg?.kind === 'note-frame' || msg?.kind === 'note-open' || msg?.kind === 'note-save') {
+    if (!trustedFrameSender(sender, msg, '/src/note.html')) { sendResponse({ ok: false, error: 'This note field is no longer available.' }); return; }
+    void (async () => {
+      if (msg.kind === 'note-frame') {
+        if (!['ready', 'resize', 'done'].includes(msg.type) || !await frameMayRelay('note', sender, msg.tabId)) return { ok: false };
+        const relay = { kind: 'dock-note-frame', type: msg.type };
+        if (msg.type === 'resize') relay.height = Number(msg.height);
+        if (msg.type === 'done') relay.saved = msg.saved === true;
+        await chrome.tabs.sendMessage(msg.tabId, relay, { frameId: 0 });
+        return { ok: true };
+      }
+      if (msg.kind === 'note-open') return (await noteGrantFor(sender, msg.tabId)) ? { ok: true } : { ok: false, error: 'This note field is no longer available.' };
+      if (typeof msg.text !== 'string' || !msg.text.trim() || msg.text.length > 50000) return { ok: false, error: 'Write a note of up to 50,000 characters.' };
+      const nonce = await consumeNote(sender, msg.tabId);
+      if (!nonce) return { ok: false, error: 'This note field is no longer available.' };
+      const tab = await chrome.tabs.get(msg.tabId);
+      const { preferences } = await getEffectivePreferences();
+      const result = await startCapture(tab, 'note', { text: msg.text, attachPage: preferences.notes.attachSource });
+      if (!result.ok) await releaseNote(msg.tabId, nonce);
+      return result.ok ? { ok: true } : { ok: false, error: result.error || 'FoundKeep could not save this note. Try again.' };
+    })().then(sendResponse, error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+  // The fallback window for a right-click image save (image-access.html).
+  if (msg?.kind === 'image-access-get' || msg?.kind === 'image-access-done') {
+    void (async () => {
+      if (msg.kind === 'image-access-get') return { ok: true, origin: await imageRequestOrigin(sender) };
+      return finishImageRequest(sender, msg.granted === true);
+    })().then(sendResponse, error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
   // The details card reads and edits exactly the save its grant names.
@@ -349,7 +362,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // switches the button's own state on it.
       const result = await startCapture(sender.tab, 'tweet', { tweet: { url: p.url, text: p.text, title: p.title, socialContext: p.socialContext || null }, trigger: 'twitter' });
       if (!result.ok) throw new Error(result.error);
-      return { saved: true };
+      return { saved: true, already: result.already === true };
     })().then(data => sendResponse({ ok: true, ...data })).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }

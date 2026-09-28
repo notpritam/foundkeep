@@ -6,8 +6,11 @@
   // a message, and every handler ignores untrusted (page-synthesized) events.
   //
   // Sections: markup & styles · rendering & position · highlighter mode ·
-  // note field · "Saved · Add details" widget · details card · input ·
+  // note frame · "Saved · Add details" widget · details card · input ·
   // background messages · test handle.
+  //
+  // Anything the user types (a note, details) lives in an extension-origin
+  // frame the page can neither read nor drive — never in this page DOM.
   const EDGE = 16;
   const SAVED_TEXT = '✓ Saved to My library';
   const HIGHLIGHT_HINT = 'Select text to save · Esc to stop';
@@ -41,12 +44,8 @@
     .waiting{padding:8px 10px 2px;color:#8a8f98;max-width:260px;white-space:normal;line-height:1.35}
     .menu{position:absolute;bottom:44px;right:0;display:flex;flex-direction:column;min-width:220px;padding:4px;background:#0f1011;border:1px solid #1d1f22;border-radius:12px}
     .menu button{width:100%}
-    .composer{position:absolute;right:0;bottom:44px;width:320px;box-sizing:border-box;padding:8px;background:#0f1011;border:1px solid #1d1f22;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
-    .composer.below,.menu.below{bottom:auto;top:44px}
-    .note-text{all:unset;display:block;box-sizing:border-box;width:100%;min-height:64px;max-height:200px;overflow:auto;padding:8px 10px;border:1px solid #34373d;border-radius:8px;
-      background:#08090a;color:#f7f8f8;font:400 13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;resize:vertical}
-    .note-text:focus{border-color:#4cc38a}
-    .note-hint{display:block;padding:6px 2px 0;color:#8a8f98;font-size:11px}
+    .menu.below{bottom:auto;top:44px}
+    .note-card{position:fixed;width:320px;border:0;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35);background:transparent;color-scheme:normal}
     .toast{position:fixed;display:flex;align-items:center;gap:0;padding:2px 2px 2px 12px;background:#0f1011;color:#d6d8db;border:1px solid #1d1f22;border-radius:10px;
       box-shadow:0 8px 28px rgba(0,0,0,.35);font:500 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif;white-space:nowrap;transition:opacity .2s ease}
     .toast .saved{color:#4cc38a}
@@ -78,9 +77,6 @@
       </div>
       <div class="signin" hidden><span class="waiting" hidden></span><button data-action="sign-in">Sign in to save</button></div>
       <span class="status" role="status" hidden></span>
-      <div class="composer" hidden>
-        <textarea class="note-text" rows="3" maxlength="50000" aria-label="Note" placeholder="Write a note…"></textarea>
-        <span class="note-hint">Enter to save · Shift+Enter for a new line · Esc to close</span></div>
       <div class="menu" data-menu="more" role="menu" hidden>
         <button data-action="always-on" role="menuitem">Show on every site</button>
         <button data-action="site" role="menuitem">Hide on this site</button>
@@ -91,10 +87,10 @@
     <div class="toast" role="status" hidden><span class="saved">${SAVED_TEXT}</span><span class="sep" aria-hidden="true"> · </span><button data-action="details">Add details</button></div>
     <div class="flashes"></div>`;
   const $ = selector => root.querySelector(selector);
-  const dockEl = $('.dock'), toastEl = $('.toast'), composer = $('.composer'), noteText = $('.note-text');
+  const dockEl = $('.dock'), toastEl = $('.toast');
   let mode = 'hidden', dockState = null, frame = null, readyTimer = 0, dockReady = null, hello = 'pending';
   let pos = null; // {fx, fy} fractions of the viewport for the dock's top-left corner
-  let highlighting = false, lastHighlight = null, flashCount = 0, toastTimer = 0, capturing = false;
+  let highlighting = false, lastHighlight = null, flashCount = 0, toastTimer = 0, capturing = false, noteFrame = null, noteTimer = 0;
 
   const send = message => chrome.runtime.sendMessage(message).catch(() => null);
 
@@ -124,7 +120,7 @@
     local.hidden = !open || !connected || !(dockState?.localOnly > 0);
     local.querySelector('.status').textContent = localOnly === 1 ? '1 save is only in this browser' : `${localOnly} saves are only in this browser`;
     local.querySelector('.status').hidden = false;
-    if (!open || !connected) { closeMenus(); stopHighlighting(); closeComposer(false); }
+    if (!open || !connected) { closeMenus(); stopHighlighting(); closeNote(true, false); }
     place();
   }
   function closeMenus() { for (const menu of root.querySelectorAll('.menu')) menu.hidden = true; }
@@ -147,8 +143,9 @@
     dockEl.style.left = left + 'px'; dockEl.style.top = top + 'px';
     // Popovers open above the dock, or below it when it sits near the top.
     const below = top < 220;
-    for (const el of [composer, ...root.querySelectorAll('.menu')]) el.classList.toggle('below', below);
+    for (const el of root.querySelectorAll('.menu')) el.classList.toggle('below', below);
     if (frame) placeCard();
+    if (noteFrame) placeNote();
     if (!toastEl.hidden) placeToast();
   }
   function setPosition(left, top, persist = true) {
@@ -239,30 +236,44 @@
   }, true);
 
   // ---------------------------------------------------------------------------
-  // Note field: Enter saves, Shift+Enter adds a line, Esc closes. Its key
-  // events stop at the dock so page shortcuts don't fire while typing.
+  // Note frame: note.html, an extension page framed next to the dock (like
+  // the details card), so the page never sees what is typed. Enter saves,
+  // Shift+Enter adds a line, Esc closes — handled inside the frame, which
+  // reaches this dock only through the background (note-frame relay).
   // ---------------------------------------------------------------------------
-  const composing = () => !composer.hidden;
-  function openComposer() {
-    closeMenus(); stopHighlighting(); status('');
-    composer.hidden = false; noteText.value = '';
+  const composing = () => !!noteFrame;
+  function openComposer() { closeMenus(); stopHighlighting(); status(''); void send({ kind: 'dock-note' }); }
+  function placeNote() {
+    const d = dockEl.getBoundingClientRect(), h = Math.min(Number(noteFrame.dataset.height || 132), innerHeight - 24);
+    noteFrame.style.height = h + 'px';
+    noteFrame.style.left = Math.min(Math.max(8, d.right - 320), innerWidth - 328) + 'px';
+    const above = d.top - h - 8;
+    noteFrame.style.top = (above >= 8 ? above : Math.min(d.bottom + 8, innerHeight - h - 8)) + 'px';
+  }
+  function openNote(url) {
+    closeNote(false, false);
+    const note = noteFrame = document.createElement('iframe');
+    note.className = 'note-card'; note.src = url; note.title = 'Write a FoundKeep note'; note.dataset.height = '132';
+    // As with the card: a second document in this frame means someone
+    // navigated it, so close it rather than keep framing it.
+    let loads = 0;
+    note.addEventListener('load', () => {
+      if (noteFrame !== note || ++loads < 2) return;
+      closeNote(); status('Note closed. Nothing was saved.');
+    });
+    root.append(note); placeNote();
     $('[data-action="note"]').setAttribute('aria-expanded', 'true');
-    noteText.focus({ preventScroll: true });
+    noteTimer = setTimeout(() => { closeNote(); status('FoundKeep could not open a note field on this page.', 'error'); }, 3000);
   }
-  function closeComposer(focusBack = true) {
-    if (composer.hidden) return;
-    composer.hidden = true; noteText.value = '';
+  function closeNote(notify = true, focusBack = true) {
+    clearTimeout(noteTimer);
+    if (!noteFrame) return;
+    const focused = root.activeElement === noteFrame;
+    noteFrame.remove(); noteFrame = null;
     $('[data-action="note"]').setAttribute('aria-expanded', 'false');
-    if (focusBack && !$('[data-action="note"]').hidden) $('[data-action="note"]').focus({ preventScroll: true });
+    if (notify) void send({ kind: 'dock-note-closed' });
+    if (focused && focusBack && !$('[data-action="note"]').hidden) $('[data-action="note"]').focus({ preventScroll: true });
   }
-  for (const type of ['keydown', 'keyup', 'keypress', 'input', 'beforeinput']) noteText.addEventListener(type, event => event.stopPropagation());
-  noteText.addEventListener('keydown', event => {
-    if (!event.isTrusted || event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
-    event.preventDefault();
-    const text = noteText.value;
-    if (!text.trim()) return;
-    void capture('note', { text }).then(result => { if (result?.ok) closeComposer(); });
-  });
 
   // ---------------------------------------------------------------------------
   // "✓ Saved to My library · Add details" — shown after every save, near the
@@ -290,7 +301,7 @@
   function hideToast() {
     clearTimeout(toastTimer); toastEl.hidden = true; toastEl.classList.remove('fading');
     // Back to the pill once the moment has passed, unless the dock is busy.
-    if (mode === 'expanded' && !highlighting && !composing() && [...root.querySelectorAll('.menu')].every(menu => menu.hidden)) setMode('collapsed');
+    if (mode === 'expanded' && !highlighting && !composing() && !frame && [...root.querySelectorAll('.menu')].every(menu => menu.hidden)) setMode('collapsed');
   }
   toastEl.addEventListener('mouseenter', () => { clearTimeout(toastTimer); toastEl.classList.remove('fading'); });
   toastEl.addEventListener('focusin', () => { clearTimeout(toastTimer); toastEl.classList.remove('fading'); });
@@ -313,7 +324,7 @@
   function openCard(url) {
     closeCard(false);
     clearTimeout(toastTimer); toastEl.hidden = true;
-    closeComposer(false); stopHighlighting(); closeMenus(); status('');
+    closeNote(true, false); stopHighlighting(); closeMenus(); status('');
     const card = frame = document.createElement('iframe');
     card.className = 'card'; card.src = url; card.title = 'Add details to your FoundKeep save'; card.dataset.height = '420';
     // C1 / R16: review.html loads exactly once per card. A page can still
@@ -322,9 +333,11 @@
     let loads = 0;
     card.addEventListener('load', () => {
       if (frame !== card || ++loads < 2) return;
-      closeCard(); setMode('expanded'); status('Details closed. Use Add details to reopen them.');
+      closeCard(); setMode('expanded'); status('Details closed. Your save is kept.');
     });
     root.append(card); setMode('details'); placeCard();
+    // Only for a card that never loaded at all: a card that loaded reports
+    // ready even when it shows an error, so its own message stays on screen.
     readyTimer = setTimeout(() => { closeCard(); setMode('expanded'); status('FoundKeep could not open details on this page. Edit this save in your library.', 'error'); }, 3000);
   }
   // M4: a card that had keyboard focus hands it back to the pill when it
@@ -351,11 +364,11 @@
     if (action === 'details') { hideToastOnly(); return void send({ kind: 'dock-details' }); }
     if (action === 'highlight') {
       if (highlighting) return void stopHighlighting();
-      closeComposer(false);
+      closeNote(true, false);
       return void (selectedText().trim() ? capture('highlight') : startHighlighting());
     }
-    if (action === 'note') return void (composing() ? closeComposer() : openComposer());
-    closeComposer(false); stopHighlighting(); status('');
+    if (action === 'note') return void (composing() ? closeNote() : openComposer());
+    closeNote(true, false); stopHighlighting(); status('');
     if (action === 'savepage') return void capture('savepage');
     if (action === 'screenshot') return void capture(dockState?.actions?.region === false ? 'fullpage' : 'region');
     if (['library', 'settings', 'import', 'sign-in'].includes(action)) return void send({ kind: 'dock-open', target: action });
@@ -386,7 +399,7 @@
   // mode, then the expanded dock.
   document.addEventListener('keydown', event => {
     if (!event.isTrusted || event.key !== 'Escape') return;
-    if (composing()) { event.stopPropagation(); closeComposer(); return; }
+    if (composing()) { closeNote(); return; }
     if (highlighting) { stopHighlighting(); return; }
     if (mode === 'expanded') setMode('collapsed');
   }, true);
@@ -421,10 +434,35 @@
         break;
       }
       case 'dock-collapse': if (mode === 'expanded') setMode('collapsed'); break;
-      case 'dock-saved': {
-        if (mode === 'hidden') setMode('collapsed');
-        if (!highlighting) status('');
-        showToast();
+      // A result to show. On a "Hide on this site" origin the dock stays
+      // hidden and says so (shown:false), so the background flashes the
+      // toolbar badge instead. dockState may still be on its way.
+      case 'dock-saved':
+      case 'dock-status': {
+        const decide = () => {
+          if (mode === 'hidden' && dockState?.hiddenHere) return respond({ shown: false });
+          if (message.kind === 'dock-saved') {
+            if (mode === 'hidden') setMode('collapsed');
+            if (!highlighting) status('');
+            showToast();
+          } else {
+            if (mode === 'hidden') setMode('expanded');
+            status(message.text || '', message.tone || '');
+          }
+          respond({ shown: true });
+        };
+        if (dockState || mode !== 'hidden') decide(); else void dockReady.then(decide);
+        return true;
+      }
+      case 'dock-note-open':
+        if (mode === 'hidden') setMode('expanded');
+        openNote(message.url);
+        respond({ ok: true }); break;
+      case 'dock-note-frame': {
+        if (!noteFrame) break;
+        if (message.type === 'ready') { clearTimeout(noteTimer); noteFrame.focus({ preventScroll: true }); }
+        if (message.type === 'resize' && Number.isFinite(message.height)) { noteFrame.dataset.height = String(Math.min(Math.max(80, message.height), 320)); placeNote(); }
+        if (message.type === 'done') closeNote();
         break;
       }
       case 'dock-details-open':
@@ -447,7 +485,6 @@
       // page (e.g. the screenshot selection injected right after this).
       case 'dock-hide': if (root.activeElement) root.activeElement.blur(); capturing = true; host.style.visibility = 'hidden'; break;
       case 'dock-unhide': capturing = false; host.style.visibility = ''; break;
-      case 'dock-status': if (mode === 'hidden') setMode('expanded'); status(message.text || '', message.tone || ''); break;
       case 'dock-state': dockState = message.state; render(); break;
       // Fix round 1: a tab-URL-independent patch so every open dock updates
       // its ⋯ menu the moment always-on changes elsewhere.

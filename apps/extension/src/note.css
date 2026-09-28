@@ -1,0 +1,33 @@
+/* Matches the dock: always dark, compact. */
+html, body { margin: 0; background: transparent; color-scheme: dark; }
+#noteForm {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  background: #0f1011;
+  border: 1px solid #1d1f22;
+  border-radius: 12px;
+  font: 400 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #f7f8f8;
+}
+#noteText {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  max-height: 200px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #34373d;
+  border-radius: 8px;
+  background: #08090a;
+  color: #f7f8f8;
+  font: inherit;
+  resize: vertical;
+  outline: none;
+}
+#noteText:focus { border-color: #4cc38a; }
+#noteText:disabled { opacity: .7; }
+p { margin: 6px 2px 0; font-size: 11px; line-height: 1.35; color: #8a8f98; }
+#noteFeedback:empty { display: none; }
+#noteFeedback[data-state="error"] { color: #f28b82; }

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FoundKeep — Note</title>
+<link rel="stylesheet" href="note.css"></head>
+<body>
+<!-- The dock's note field. An extension-origin frame, so the page it sits on
+     never sees what is typed here. It can save one note for the tab its
+     grant was minted for (capture-details.js). -->
+<form id="noteForm" data-ready="false">
+  <textarea id="noteText" rows="3" maxlength="50000" aria-label="Note" placeholder="Write a note…" disabled></textarea>
+  <p id="noteFeedback" role="status"></p>
+  <p class="hint">Enter to save · Shift+Enter for a new line · Esc to close</p>
+</form>
+<script src="note.js" type="module"></script>
+</body></html>

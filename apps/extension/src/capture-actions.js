@@ -327,6 +327,7 @@ async function screenshotFlow(tab, trigger, preferenceState) {
     args: [{ fullPage: !!preferences.capture.fullPage }],
   }).catch(error => { throw friendlyCaptureError(error); });
   if (!result) return null;
+  if (result.busy) throw new Error("A screenshot is already in progress on this page.");
   if (result.fullPage) {
     if (!preferences.capture.fullPage) throw new Error(captureDisabledMessage("fullpage"));
     return fullPageScreenshot(tab, captureMethodFor("fullpage", trigger), preferenceState);
