@@ -26,13 +26,18 @@ signed-out dock only offers **Sign in to save**.
   Esc to cancel (`Selection cancelled.`). The dock hides during the capture.
   Screenshots now also store the page's URL, title, site, description,
   headings and readable text, so they are findable like saved pages.
-- **Note** opens a small field in the dock: Enter saves, Shift+Enter adds a
-  line, Esc closes it. The page is attached as before (notes preference).
+- **Note** opens a small field next to the dock: Enter saves, Shift+Enter
+  adds a line, Esc closes it. The page is attached as before (notes
+  preference). The field is an extension frame (`note.html`), so the page
+  cannot read what you type. A double or held Enter saves once.
 - **Right-click items, keyboard shortcuts and the X button** save directly.
   `Alt+Shift+S` and `Alt+Shift+F` both open the screenshot corner toolbar;
-  the right-click "Full-page screenshot" item captures the page directly. A
-  right-click image save asks for the image site's permission inside that
-  click (declining saves nothing).
+  the right-click "Full-page screenshot" item captures the page directly.
+  Pressing a screenshot shortcut again while a selection is open does not
+  stack a second one. A right-click image save asks for the image site's
+  permission inside that click (declining saves nothing); if Chrome cannot
+  show that prompt there, a small FoundKeep window asks instead and finishes
+  the save once you allow it.
 - **After every save** the dock shows `✓ Saved to My library · Add details`
   for about five seconds; hovering or focusing it keeps it. **Add details**
   opens the old review card in an edit mode, pre-filled from the save: title,
@@ -40,18 +45,34 @@ signed-out dock only offers **Sign in to save**.
   apply to the save just made:
   - not uploaded yet — the local record is updated and the pending upload
     carries the details;
-  - already uploaded — the change is sent as an update to that capture
-    (`PUT /api/mobile/captures/<remote id>`), and a share as a collection
-    entry, and mirrored locally;
-  - uploading right now — each edit bumps a details revision on the record;
-    when the upload lands, any newer revision is sent as an update. A record
-    with unsent details stays in the durable outbox, so no edit is lost to a
-    service-worker restart or a dropped connection.
+  - already uploaded — the card starts from the server's current copy, and
+    only the fields you changed are sent as an update to that capture
+    (`PUT /api/mobile/captures/<remote id>`); title and note you did not
+    touch repeat the server's current values, and folder and tags you did not
+    touch are left out. If the server copy changes during the update
+    (`capture_changed`), it is re-read and only your changes are re-applied.
+    A share goes out as a collection entry. The local copy mirrors the result;
+  - uploading right now — each edit bumps a details revision on the record
+    and records which fields changed. When the upload lands, any edit it did
+    not carry is sent as an update. An upload the server answers as a
+    duplicate (an earlier attempt already committed) is not counted as
+    carrying anything, so the edit still goes out.
+  - A record with unsent details stays queued in the extension's outbox and
+    is retried on the usual schedule (while the browser keeps this profile's
+    extension storage). A permanent server refusal — for example a folder
+    deleted meanwhile — marks the save as failed with that message rather
+    than retrying forever.
 - **X button** now shows the FoundKeep mark (the bookmark with the folded
   corner and dot) as a thin outline at X's own icon size, and turns emerald
-  once saved. Its label says "Save to FoundKeep" / "Saved to FoundKeep". Dev
+  once saved. Its label says "Save to FoundKeep" / "Saved to FoundKeep", and
+  on failure a generic "Couldn't save to FoundKeep" (the reason is shown in
+  the dock, never written into x.com's page). A post already saved this
+  browser session is recognized when X re-renders it, not saved twice. Dev
   builds no longer add "Dev" text or widen the button; they show a small
   emerald dot on the icon instead.
+- **Hidden sites.** On an origin set to "Hide on this site", a save (X,
+  right-click, keyboard) keeps the dock hidden and flashes ✓ on the toolbar
+  icon instead.
 - **Removed:** the before-save review, its per-tab drafts
   (`save-review.js`, the `save-review-*` messages, reopening a draft when a
   page reloads) and the fallback popup window with its nonce map.
@@ -67,10 +88,11 @@ signed-out dock only offers **Sign in to save**.
 - The dock still never touches `chrome.storage` and ignores untrusted
   (page-synthesized) events; the screenshot toolbar and highlighter only act
   on trusted input.
-- One trade-off to know: the note field now lives in the dock (the page's DOM,
-  closed shadow root) rather than in the extension frame. Its key events are
-  stopped at the dock so page shortcuts don't fire while typing, but a page
-  listening to every key in the capture phase could still observe typing.
+- The note field is framed the same way as the card (`note.html`, a one-time
+  grant per tab, messages only through the background), so keystrokes typed
+  into it never reach the page — not even capture-phase listeners.
+- The image-access window (`image-access.html`) is an ordinary extension page
+  (not web-accessible) and only acts on a request the background issued.
 
 ## How to test
 
@@ -86,10 +108,14 @@ signed-out dock only offers **Sign in to save**.
    passages, then press Esc.
 5. **Screenshot** → drag a region; again → **Full page**; again → **✕**.
 6. **Note** → type, Shift+Enter, type, Enter.
-7. Right-click a selection and an image; press `Alt+Shift+S`.
+7. Right-click a selection and an image; press `Alt+Shift+S` (and again while
+   the toolbar is open: nothing stacks). Hide the dock on a site, then save
+   from the right-click menu there: the toolbar icon flashes ✓.
 8. On x.com, click the FoundKeep mark on a post.
 
-Automated coverage: `tests/extension-dock-flow.mjs`,
+Automated coverage (fix round 1 added the lost-response, server-edit,
+conflict, card-error, strict-CSP, note-frame, image-window, stacking,
+X-dedupe and hidden-site cases): `tests/extension-dock-flow.mjs`,
 `tests/extension-dock-screenshot.mjs`, `tests/extension-dock-x.mjs`,
 `tests/extension-review.mjs` (the details card) and
 `tests/extension-details-tabs.mjs`.

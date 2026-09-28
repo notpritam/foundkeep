@@ -15,9 +15,9 @@ Every capture — dock actions, the X/Twitter button, right-click captures, and 
 - **Save page** saves in one click.
 - **Highlight** saves the selected text at once. With nothing selected it turns on highlighter mode (`Select text to save · Esc to stop`): every selection you make is saved and briefly flashed, until Esc or Highlight again.
 - **Screenshot** goes straight to region selection, with a small toolbar in the tab's top-right corner — **Selection** · **Full page** · **✕**. Drag a region to save it, choose Full page to save the whole page, or press ✕ / Esc to cancel. Screenshots keep the page's details and readable text too, so they are findable. The dock hides while you capture.
-- **Note** opens a small field in the dock: Enter saves, Shift+Enter adds a line, Esc closes it. The page is attached when the notes preference says so.
+- **Note** opens a small field next to the dock: Enter saves, Shift+Enter adds a line, Esc closes it. The page is attached when the notes preference says so. The field is a FoundKeep frame, so the page cannot read what you type.
 
-After every save the dock shows **✓ Saved to My library · Add details** for about five seconds (hover or focus keeps it). **Add details** opens a small card on the page where you can change the title and note, add tags, choose or create a folder, or share the save to a collection. Edits apply to the save you just made: before it has uploaded they ride along with the upload; afterwards they are sent as an update — and an edit made while the upload is in flight is sent as soon as it lands. Collection choices show their audience and approval rules; your personal note, folder and tags stay private, and images are shared only if you tick the image checkbox.
+After every save the dock shows **✓ Saved to My library · Add details** for about five seconds (hover or focus keeps it). **Add details** opens a small card on the page where you can change the title and note, add tags, choose or create a folder, or share the save to a collection. Edits apply to the save you just made: before it has uploaded they ride along with the upload; afterwards only the fields you changed are sent as an update, so changes made on the web or another device meanwhile are kept — and an edit made while the upload is in flight is sent as soon as it lands. Collection choices show their audience and approval rules; your personal note, folder and tags stay private, and images are shared only if you tick the image checkbox.
 
 After updating the extension, refresh open X/Twitter tabs so they load the new FoundKeep button.
 
@@ -57,9 +57,11 @@ Existing local-only captures are never uploaded automatically. If any remain, th
 ## Capture
 
 - **Dock:** save a readable copy of the current page, highlight text, take a screenshot, or write a note.
-- **Right-click:** save a selection, link, image, or page; take a region screenshot (the same corner toolbar) or a full-page screenshot. Saving an image asks for access to the image's site the first time.
+- **Right-click:** save a selection, link, image, or page; take a region screenshot (the same corner toolbar) or a full-page screenshot. Saving an image asks for access to the image's site the first time (in a small FoundKeep window if Chrome cannot show the prompt from the menu).
 - **Keyboard:** `Alt+Shift+S` and `Alt+Shift+F` open the screenshot corner toolbar (drag a region or choose Full page), and `Alt+Shift+H` saves selected text. Change assignments at `chrome://extensions/shortcuts`.
-- **X / Twitter:** the FoundKeep button (the FoundKeep mark) in a post's action bar saves the author, text, and permalink in one click and turns green once saved.
+- **X / Twitter:** the FoundKeep button (the FoundKeep mark) in a post's action bar saves the author, text, and permalink in one click and turns green once saved. A post already saved in this browser session is not saved twice.
+
+On a site where the dock is hidden (**Hide on this site**), saves still work; the toolbar icon flashes ✓ instead of the dock appearing.
 
 Page capture requires a normal web page. Chrome restricts capture on internal browser pages and certain protected pages. Notes can still be saved there. Saved images are limited to 8 MiB. A larger generated screenshot remains local with an actionable sync error.
 
