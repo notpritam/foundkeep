@@ -66,7 +66,7 @@ function label(btn, text) {
   btn.title = text;
   btn.setAttribute("aria-label", text);
 }
-function setState(btn, state, detail) {
+function setState(btn, state) {
   updatePalette(btn);
   btn.dataset.state = state;
   btn.style.opacity = "1";
@@ -80,7 +80,9 @@ function setState(btn, state, detail) {
     label(btn, `Saved to ${PRODUCT_NAME}`);
   } else if (state === "error") {
     btn.style.color = "#f4212e";
-    label(btn, detail || `Couldn't save to ${PRODUCT_NAME}. Try again.`);
+    // Generic on purpose: the reason (signed out, disabled in preferences…)
+    // is shown in the FoundKeep dock, never written into x.com's DOM.
+    label(btn, `Couldn’t save to ${PRODUCT_NAME}`);
     setTimeout(() => {
       if (btn.dataset.state === "error") reset(btn);
     }, 2500);
@@ -139,7 +141,7 @@ function makeButton() {
     setState(btn, "saving");
     try {
       chrome.runtime.sendMessage({ kind: "saveTweet", payload: data }, (res) => {
-        if (chrome.runtime.lastError || !res?.ok) return setState(btn, "error", res?.error);
+        if (chrome.runtime.lastError || !res?.ok) return setState(btn, "error");
         setState(btn, "saved");
       });
     } catch {
