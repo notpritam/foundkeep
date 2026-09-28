@@ -180,13 +180,19 @@ export async function finishImageRequest(sender, granted) {
 // again) must not stack another selector on the page.
 const screenshotTabs = new Set();
 // X posts saved this session: X re-renders posts (and their buttons) as you
-// scroll, so a post already saved is recognized rather than saved twice.
+// scroll, so a post already saved is recognized rather than saved twice —
+// but only while that save still counts: it belongs to the account connected
+// now and has not failed. After an account switch, or a save the server
+// refused for good, the post is saved again. (A save deleted from the
+// library elsewhere is not visible here; the local record stays.)
 const POSTS_KEY = 'foundkeep-saved-posts';
 const postSaves = new Map();
 let postsQueue = Promise.resolve();
 async function savedPost(url) {
   const id = ((await chrome.storage.session.get(POSTS_KEY))[POSTS_KEY] || {})[url];
-  return id ? db.getCapture(id) : null;
+  if (!id) return null;
+  const [record, { cloudAccountId }] = await Promise.all([db.getCapture(id), captureBinding()]);
+  return record && cloudAccountId && record.cloudAccountId === cloudAccountId && record.cloudStatus !== 'failed' ? record : null;
 }
 function rememberPost(url, captureId) {
   postsQueue = postsQueue.catch(() => {}).then(async () => {

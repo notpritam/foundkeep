@@ -111,12 +111,22 @@ const SHAREABLE_IMAGE = ['screenshot', 'image'];
 const FIELDS = { title: 'sourceTitle', note: 'noteText', folderId: 'folderId', tags: 'userTags' };
 // What the save looks like now: the server's copy once it has uploaded (it
 // may have been edited on the web, on mobile or by an agent since), except
-// for local edits that have not reached the server yet.
+// for local edits that have not reached the server yet. The read is bounded
+// well inside the dock's 3 s window for the card to report ready; a slow or
+// failed read shows the local copy instead. That stays safe: the card sends
+// only fields the user changes, and the update fills untouched ones from
+// the server's copy at that moment (cloud.js putCaptureDetails).
+const SERVER_READ_MS = 1500;
 async function currentValues(record, accountId) {
   const local = { sourceTitle: record.sourceTitle ?? null, noteText: record.noteText ?? null, folderId: record.folderId ?? null, userTags: record.userTags || [] };
   if (!record.cloudRemoteId) return local;
-  let server;
-  try { server = (await libraryRequest('detail', { id: record.cloudRemoteId }, accountId))?.capture; } catch { return local; }
+  let server, timer;
+  try {
+    server = (await Promise.race([
+      libraryRequest('detail', { id: record.cloudRemoteId }, accountId),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('slow')), SERVER_READ_MS); }),
+    ]))?.capture;
+  } catch { return local; } finally { clearTimeout(timer); }
   if (!server) return local;
   const pending = new Set(record.detailsChanged || []);
   const values = { ...local };
