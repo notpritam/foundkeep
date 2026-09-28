@@ -33,7 +33,7 @@ export function libraryOperation(operation, args = {}) {
   if (operation === 'import-chunk') return {method:'POST',path:'/api/imports',body:args};
   throw new Error('Unknown library action.');
 }
-// Framed review pages use a per-session dynamic host (use_dynamic_url), so match
+// The framed details card (review.html) uses a per-session dynamic host (use_dynamic_url), so match
 // the extension id, the extension scheme and the page path rather than the host.
 export function trustedLibrarySender(sender, runtime) {
   if (sender?.id !== runtime.id) return false;

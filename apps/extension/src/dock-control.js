@@ -1,8 +1,9 @@
 import { CUSTOMER_ORIGIN } from './product.js';
-import { readSaveReview, stageSaveReview, clearSaveReview } from './save-review.js';
-import { getCloudStatus, importLocalCaptures } from './cloud.js';
+import { captureBinding, getCloudStatus, importLocalCaptures } from './cloud.js';
 import { drainQueue } from './capture.js';
 import { getEffectivePreferences, capturePreferenceKey, captureDisabledMessage } from './preferences.js';
+import { performCapture } from './capture-actions.js';
+import { rememberSave, grantDetails, revokeDetails } from './capture-details.js';
 
 const HIDDEN_KEY = 'foundkeep-dock-hidden-origins', ALWAYS_KEY = 'foundkeep-dock-always-on', LOCAL_KEY = 'foundkeep-dock-local-prompt';
 // R10: the dock content script can never touch chrome.storage (it sits next
@@ -95,152 +96,91 @@ export async function summonDock(tabId, { expand = false, toggle = false } = {})
   await chrome.tabs.sendMessage(tabId, { kind: 'dock-show', expand, toggle }).catch(() => {});
   return true;
 }
-// Resolves true once a review is actually showing — framed in the dock, or
-// the fallback popup — and false if neither could open (M2).
-export async function openReview(tab) {
-  if (await summonDock(tab.id, { expand: true })) {
-    const opened = await chrome.tabs.sendMessage(tab.id, { kind: 'dock-review-open', url: chrome.runtime.getURL('src/review.html?tab=' + tab.id) })
-      .then(reply => reply?.ok === true, () => false);
-    if (opened) return true;
-  }
-  return openFallbackReview(tab.id);
-}
-// nonce -> { tabId, popupTabId?, windowId? }. Kept in chrome.storage.session
-// rather than a module-level Map: an MV3 service worker can be torn down and
-// restarted by Chrome at any point (e.g. between opening the fallback popup
-// and it being confirmed), which would silently wipe an in-memory Map;
-// session storage survives that and is the same value regardless of which
-// realm reads it. The nonce is generated and written *before*
-// chrome.windows.create, then carried in the popup's own URL, so a slow
-// write can never race the popup's first message — reviewTabFor only needs
-// the entry to exist by the time it's asked about that exact nonce, which is
-// guaranteed since nothing can know the nonce before this function picks it.
-const POPUP_MAP_KEY = 'foundkeep-dock-popup-map';
-async function popupMap() { return (await chrome.storage.session.get(POPUP_MAP_KEY))[POPUP_MAP_KEY] || {}; }
-async function setPopupMap(map) { await chrome.storage.session.set({ [POPUP_MAP_KEY]: map }); }
-async function findOpenPopup(tabId) {
-  const map = await popupMap();
-  let changed = false;
-  let found = null;
-  for (const [nonce, entry] of Object.entries(map)) {
-    if (entry.tabId !== tabId) continue;
-    const stillOpen = entry.popupTabId ? await chrome.tabs.get(entry.popupTabId).then(() => true, () => false) : true;
-    if (stillOpen && !found) { found = entry; continue; }
-    delete map[nonce]; changed = true;
-  }
-  if (changed) await setPopupMap(map);
-  return found;
-}
-export async function openFallbackReview(tabId) {
-  const existing = await findOpenPopup(tabId);
-  if (existing) { if (existing.windowId) await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {}); return true; }
-  const nonce = crypto.randomUUID();
-  const map = await popupMap();
-  map[nonce] = { tabId };
-  await setPopupMap(map);
-  // review.html is use_dynamic_url in the manifest, and chrome.runtime.getURL()
-  // returns that per-session dynamic-host form here. A framed load (openReview,
-  // from a matching http(s) page's own content script) resolves that URL fine,
-  // but chrome.windows.create has no such matching-page initiator and cannot
-  // load the dynamic-host URL at all (the popup ends up on chrome-error://
-  // chromewebdata) — so this one call site needs the plain extension-id URL.
-  const url = `chrome-extension://${chrome.runtime.id}/src/review.html?tab=${tabId}&window=1&popup=${nonce}`;
-  try {
-    const win = await chrome.windows.create({ url, type: 'popup', width: 380, height: 560, focused: true });
-    const fresh = await popupMap();
-    if (fresh[nonce]) { fresh[nonce] = { tabId, popupTabId: win.tabs?.[0]?.id, windowId: win.id }; await setPopupMap(fresh); }
-    return true;
-  } catch {
-    const fresh = await popupMap(); delete fresh[nonce]; await setPopupMap(fresh);
-    return false;
-  }
-}
-// Drop a popup's reservation once its tab closes — belt and suspenders for
-// findOpenPopup's own liveness check, and keeps storage from accumulating
-// entries for popups the user closed without confirming or cancelling.
-chrome.tabs.onRemoved.addListener(async tabId => {
-  const map = await popupMap();
-  let changed = false;
-  for (const [nonce, entry] of Object.entries(map)) if (entry.popupTabId === tabId) { delete map[nonce]; changed = true; }
-  if (changed) await setPopupMap(map);
-});
-export async function reviewTabFor(sender) {
-  // A framed card must belong to the tab it sits in; a popup must carry the
-  // nonce openFallbackReview minted for that exact tab (unguessable, and
-  // recorded before the popup could possibly have loaded far enough to ask).
-  const url = new URL(sender.url), tab = Number(url.searchParams.get('tab'));
-  if (!Number.isInteger(tab)) return null;
-  if (url.searchParams.get('window') === '1') {
-    const nonce = url.searchParams.get('popup');
-    if (!nonce) return null;
-    const map = await popupMap();
-    return map[nonce]?.tabId === tab ? tab : null;
-  }
-  return sender.tab?.id === tab ? tab : null;
-}
-export async function withDockHidden(tabId, run) {
-  await chrome.tabs.sendMessage(tabId, { kind: 'dock-hide' }).catch(() => {});
-  try { return await run(); } finally { await chrome.tabs.sendMessage(tabId, { kind: 'dock-unhide' }).catch(() => {}); }
-}
 async function refreshState(tab, originHint) { await chrome.tabs.sendMessage(tab.id, { kind: 'dock-state', state: await dockState(tab, originHint) }).catch(() => {}); }
 const GRANT_MESSAGE = 'Click the FoundKeep icon on this page to allow capture.';
+const IMAGE_ACCESS_MESSAGE = 'Allow access to the image’s site to save its original file, then try again.';
 // Everything except an X post and a note that leaves the page out reads or
-// scripts the page itself at confirm (assertCaptureTab, executeScript).
+// scripts the page itself (assertCaptureTab, executeScript).
 const needsPage = (action, extra) => action !== 'tweet' && !(action === 'note' && !extra.attachPage);
-async function showError(tab, text) {
-  await summonDock(tab.id, { expand: true })
-    .then(shown => shown && chrome.tabs.sendMessage(tab.id, { kind: 'dock-status', text, tone: 'error' }).catch(() => {}))
-    .catch(() => {});
+async function tell(tab, message) {
+  const shown = await summonDock(tab.id).catch(() => false);
+  if (shown) await chrome.tabs.sendMessage(tab.id, message, { frameId: 0 }).catch(() => {});
+  return shown;
 }
-// Returns { ok: true } once the review is open (framed or the fallback
-// popup), or { ok: false, error } if the capture cannot start (disabled,
-// no page grant, signed out, another review in progress, or no review could
-// open) — the caller decides what to do with that (e.g. saveTweet forwards
-// it so the X button's own error state still works). Either way the dock
-// shows the error itself when it can.
-export async function startCapture(tab, action, extra = {}) {
+// A right-click image save downloads the original from the image's own site,
+// which needs that exact origin's permission. Ask inside the click that
+// started the save (the context-menu event is the user gesture), before
+// anything awaits. 'unavailable' means Chrome could not show the prompt here;
+// the download is then attempted anyway (it works for images their site
+// serves to any origin).
+function requestImageAccess(srcUrl) {
+  let origin;
+  try { origin = new URL(srcUrl).origin + '/*'; } catch { return Promise.resolve('denied'); }
   try {
-    // M3: refuse a capture method turned off in preferences now, not at Save.
+    return Promise.resolve(chrome.permissions.request({ origins: [origin] })).then(granted => granted ? 'granted' : 'denied', () => 'unavailable');
+  } catch { return Promise.resolve('unavailable'); }
+}
+// Every capture saves instantly, straight into the connected account's
+// library — no destination step first. Resolves { ok: true, capture } once
+// the save is committed (the dock then offers "Add details"), { ok: false,
+// cancelled: true } when a screenshot selection was cancelled, or { ok:
+// false, error } when the capture could not run (disabled, signed out, no
+// page grant) — callers decide what to do with that (the X button shows its
+// error state). Either way the dock says what happened when it can.
+export async function startCapture(tab, action, extra = {}) {
+  const imageAccess = action === 'save-image' ? requestImageAccess(extra.info?.srcUrl) : null;
+  let record;
+  try {
+    // M3: refuse a capture method turned off in preferences.
     const { preferences } = await getEffectivePreferences();
     if (!preferences.capture[capturePreferenceKey(action)]) throw new Error(captureDisabledMessage(action));
+    if (!(await captureBinding()).cloudAccountId) throw new Error('Sign in to FoundKeep to save.');
     // M1: without host access or an activeTab grant (x.com before an icon
     // click: matched only by a static content_scripts entry) Chrome redacts
-    // the tab's url and refuses scripting, so every page capture would fail
-    // at confirm with "The page changed during capture…". Say what to do now.
+    // the tab's url and refuses scripting. Say what to do.
     if (needsPage(action, extra) && !(await chrome.tabs.get(tab.id).catch(() => null))?.url) throw new Error(GRANT_MESSAGE);
-    await stageSaveReview({ action, tab, trigger: 'dock', ...extra });
+    const access = imageAccess ? await imageAccess : undefined;
+    if (access === 'denied') throw new Error(IMAGE_ACCESS_MESSAGE);
+    record = await performCapture(action, { tab, trigger: 'dock', ...extra, ...(access ? { imageAccess: access } : {}) });
   } catch (error) {
-    await showError(tab, error.message);
-    // M2: the draft in the way may have no visible review left (its popup
-    // closed with the window's X, or an earlier open failed) — bring it back
-    // instead of blocking every capture on this tab until it expires.
-    if (error.code === 'review-in-progress') await openReview(tab).catch(() => false);
-    return { ok: false, error: error.message };
-  }
-  if (!await openReview(tab).catch(() => false)) {
-    // Nobody can see this draft; don't let it block the next capture.
-    await clearSaveReview(tab.id).catch(() => {});
-    const message = 'FoundKeep could not open the save review. Try again.';
-    await showError(tab, message);
+    const message = error?.message || 'FoundKeep could not save this. Try again.';
+    await tell(tab, { kind: 'dock-status', text: message, tone: 'error' });
     return { ok: false, error: message };
   }
-  return { ok: true };
+  // I1: a screenshot selection cancelled on the page (✕, Esc, or leaving the
+  // tab) saves nothing; the dock says so in a neutral tone — never "Saved".
+  if (!record) {
+    await tell(tab, { kind: 'dock-status', text: 'Selection cancelled.', tone: '' });
+    return { ok: false, cancelled: true };
+  }
+  await rememberSave(tab.id, record.id).catch(() => {});
+  const shown = await tell(tab, { kind: 'dock-saved' });
+  return { ok: true, shown, capture: { id: record.id, type: record.type, cloudStatus: record.cloudStatus } };
 }
 export async function handleDockMessage(msg, sender) {
   if (sender.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0 || sender.url?.startsWith(chrome.runtime.getURL(''))) return { ok: false };
   const tab = sender.tab;
   switch (msg.kind) {
-    case 'dock-hello': {
-      const state = await dockState(tab, sender.url);
-      if (await readSaveReview(tab.id)) void openReview(tab).catch(() => {});
-      return state;
-    }
+    case 'dock-hello': return dockState(tab, sender.url);
     case 'dock-capture': {
       if (!['savepage', 'highlight', 'region', 'fullpage', 'note'].includes(msg.action)) return { ok: false };
+      if (msg.action !== 'note') return startCapture(tab, msg.action);
+      if (typeof msg.text !== 'string' || !msg.text.trim() || msg.text.length > 50000) return { ok: false, error: 'Write a note of up to 50,000 characters.' };
       const { preferences } = await getEffectivePreferences();
-      const extra = msg.action === 'note' ? { text: '', attachPage: preferences.notes.attachSource } : {};
-      return startCapture(tab, msg.action, extra);
+      return startCapture(tab, 'note', { text: msg.text, attachPage: preferences.notes.attachSource });
     }
+    // "Add details" in the dock's Saved widget: frame the details card for
+    // this tab's last save (capture-details.js grants it to this tab only).
+    case 'dock-details': {
+      const url = await grantDetails(tab.id);
+      if (!url) {
+        await chrome.tabs.sendMessage(tab.id, { kind: 'dock-status', text: 'That save is no longer available here.', tone: 'error' }, { frameId: 0 }).catch(() => {});
+        return { ok: false };
+      }
+      await chrome.tabs.sendMessage(tab.id, { kind: 'dock-details-open', url }, { frameId: 0 });
+      return { ok: true };
+    }
+    case 'dock-details-closed': await revokeDetails(tab.id); return { ok: true };
     case 'dock-open': {
       const target = { library: dashboardUrl('/dashboard'), settings: dashboardUrl('/dashboard/settings'), 'sign-in': dashboardUrl('/login'), import: chrome.runtime.getURL('src/import.html') }[msg.target];
       if (!target) return { ok: false };
@@ -252,7 +192,6 @@ export async function handleDockMessage(msg, sender) {
       msg.hidden ? list.add(origin) : list.delete(origin);
       await chrome.storage.local.set({ [HIDDEN_KEY]: [...list] }); await refreshState(tab, sender.url); return { ok: true };
     }
-    case 'dock-review-fallback': if (await readSaveReview(tab.id)) await openFallbackReview(tab.id); return { ok: true };
     case 'dock-always-on': {
       // Content scripts cannot call chrome.permissions.request themselves —
       // that needs a page context, hence the small popup window. Turning it
