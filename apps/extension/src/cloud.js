@@ -456,12 +456,16 @@ async function drain({ force = false } = {}) {
           );
         remoteId = result.capture.id;
         enrichmentStatus = result.capture.status;
-        // The upload body was built from `record`, so the server now holds
-        // the details as of that snapshot's revision — never a later edit
-        // made while the request was in flight.
+        // A new capture (201, duplicate:false) was stored from this body, so
+        // the server holds the details as of this snapshot's revision — never
+        // a later edit made while the request was in flight. A duplicate
+        // answer means an earlier attempt already committed and this body
+        // was ignored: nothing it carried counts as delivered, so any edit
+        // still goes out as an update below.
+        const created = result.duplicate === false || (result.duplicate === undefined && response.status === 201);
         await db.updateCaptureWith(record.id, current => ({
           cloudRemoteId: remoteId, cloudEnrichmentStatus: enrichmentStatus,
-          detailsSyncedRevision: Math.max(current.detailsSyncedRevision || 0, record.detailsRevision || 0),
+          ...(created ? delivered(current, record.detailsRevision || 0) : {}),
         }));
       }
       // Details added after the save (Add details) and a collection share
@@ -491,14 +495,25 @@ async function drain({ force = false } = {}) {
   }
 }
 // ---------------------------------------------------------------------------
-// Details added after a save ("Add details"): the local record is the source
-// of truth. Each edit bumps record.detailsRevision; detailsSyncedRevision is
-// the revision the server is known to hold. A record with unsent details or
-// an unsubmitted collection share stays "queued", so the durable outbox (and
-// a service-worker restart) can never drop an edit.
+// Details added after a save ("Add details"). Each edit bumps
+// record.detailsRevision and adds the fields it changed to
+// record.detailsChanged; detailsSyncedRevision is the revision the server is
+// known to hold. The update sends only the changed fields — the others keep
+// the server's current values, so an edit made on the web, on mobile or by an
+// agent in the meantime is never reverted. A record with unsent details or an
+// unsubmitted collection share stays "queued" in the durable outbox.
 // ---------------------------------------------------------------------------
+const DETAIL_FIELDS = ["sourceTitle", "noteText", "folderId", "userTags"];
 const detailsPending = record => (record.detailsRevision || 0) > (record.detailsSyncedRevision || 0)
   || (!!record.collectionSubmission && !record.collectionEntryId);
+// The server now holds `revision`: credit it, and forget the changed fields
+// unless a newer edit arrived meanwhile (that edit re-sends them).
+function delivered(current, revision) {
+  return {
+    detailsSyncedRevision: Math.max(current.detailsSyncedRevision || 0, revision),
+    ...((current.detailsRevision || 0) <= revision ? { detailsChanged: [] } : {}),
+  };
+}
 const detailLocks = new Map();
 /** Send a synced capture's newer details and pending share; serialized per capture. */
 export function syncCaptureDetails(id) {
@@ -511,17 +526,23 @@ function permanentFailure(error) {
   if (Number.isInteger(error.status) && error.status >= 400 && error.status < 500 && ![408, 429].includes(error.status) && error.code !== "capture_changed") error.permanent = true;
   return error;
 }
-async function putCaptureDetails(record, accountId) {
-  // expectedUpdatedAt guards the server copy against lost updates; a
-  // concurrent server-side change (e.g. enrichment finishing) just means
-  // reading the current revision and trying again.
+async function putCaptureDetails(record, changed, accountId) {
+  // The PUT requires a title and a note: unchanged ones repeat the server's
+  // current values; folder and tags are sent only when changed.
+  // expectedUpdatedAt guards the server copy against lost updates; on a
+  // concurrent change the fresh copy is read and only our changes re-applied.
   for (let attempt = 0; ; attempt++) {
-    const { capture } = await libraryRequest("detail", { id: record.cloudRemoteId }, accountId);
+    const { capture: server } = await libraryRequest("detail", { id: record.cloudRemoteId }, accountId);
+    const value = {
+      sourceTitle: changed.has("sourceTitle") ? record.sourceTitle ?? null : server?.sourceTitle ?? null,
+      noteText: changed.has("noteText") ? record.noteText ?? null : server?.noteText ?? null,
+      ...(changed.has("folderId") ? { folderId: record.folderId || null } : {}),
+      ...(changed.has("userTags") ? { userTags: record.userTags || [] } : {}),
+      expectedUpdatedAt: server?.updatedAt,
+    };
     try {
-      return await libraryRequest("update", { id: record.cloudRemoteId, value: {
-        sourceTitle: record.sourceTitle ?? null, noteText: record.noteText ?? null,
-        folderId: record.folderId || null, userTags: record.userTags || [], expectedUpdatedAt: capture?.updatedAt,
-      } }, accountId);
+      const result = await libraryRequest("update", { id: record.cloudRemoteId, value }, accountId);
+      return result?.capture || null;
     } catch (error) {
       if (error.code !== "capture_changed" || attempt >= 2) throw error;
     }
@@ -536,8 +557,15 @@ async function syncDetails(id) {
   try {
     const revision = record.detailsRevision || 0;
     if (revision > (record.detailsSyncedRevision || 0)) {
-      await putCaptureDetails(record, accountId);
-      await db.updateCaptureWith(id, current => ({ detailsSyncedRevision: Math.max(current.detailsSyncedRevision || 0, revision) }));
+      const changed = new Set((record.detailsChanged || []).filter(field => DETAIL_FIELDS.includes(field)));
+      const server = changed.size ? await putCaptureDetails(record, changed, accountId) : null;
+      await db.updateCaptureWith(id, current => {
+        const patch = delivered(current, revision);
+        // Mirror the server's copy locally, except fields edited again since.
+        const newer = (current.detailsRevision || 0) > revision ? new Set(current.detailsChanged || []) : new Set();
+        if (server) for (const field of DETAIL_FIELDS) if (field in server && !newer.has(field)) patch[field] = field === "userTags" ? server.userTags || [] : server[field] ?? null;
+        return patch;
+      });
     }
     record = await db.getCapture(id);
     if (record?.collectionSubmission && !record.collectionEntryId) {

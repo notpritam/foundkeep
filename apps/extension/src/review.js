@@ -5,7 +5,7 @@ import { $, message } from './ui.js';
 import { bindSaveTags } from './save-details.js';
 
 const tabId = Number(new URLSearchParams(location.search).get('tab'));
-let details = null, collections = [], folders = [], busy = false, creating = false, finished = false, epoch = 0, sharedTouched = false;
+let details = null, initial = null, collections = [], folders = [], busy = false, creating = false, finished = false, epoch = 0, sharedTouched = false;
 
 // C1 / R16: never window.parent.postMessage — the parent is the web page, and
 // its own script would receive every message with event.source set to this
@@ -80,7 +80,16 @@ function focusFirstField() {
 async function load() {
   try {
     details = (await request('details-get')).details;
-  } catch (error) { message($('detailsFeedback'), error.message, 'error'); return; }
+  } catch (error) {
+    // Keep the card open with the real reason (the dock would otherwise
+    // replace it with a generic "could not open" after 3 s). Only a card
+    // that belongs to this tab can reach the dock at all.
+    message($('detailsFeedback'), error.message, 'error');
+    $('detailsFields').hidden = true; $('detailsSave').hidden = true;
+    $('detailsCancel').textContent = 'Close';
+    post({ type: 'ready' });
+    return;
+  }
   const note = details.type === 'note';
   $('detailsHeading').textContent = details.title || (note ? 'Your note' : 'Your save');
   $('detailsTitle').value = details.title;
@@ -96,6 +105,9 @@ async function load() {
   if (details.shared) $('detailsShared').textContent = `Shared with ${details.shared.title}${details.shared.status === 'pending' ? ' (waiting to sync or for approval)' : ''}.`;
   $('sharedUrl').value = details.sourceUrl;
   $('sharedBody').value = details.excerpt.slice(0, 5000);
+  // What the card showed; only fields that differ from it are sent, so an
+  // untouched field never overwrites the server's copy.
+  initial = { title: details.title, note: details.note, folderId: details.folderId || '', tags: [...details.tags] };
   $('detailsForm').dataset.ready = 'true';
   update(); focusFirstField(); post({ type: 'ready' });
   void loadOptions();
@@ -132,11 +144,14 @@ $('detailsForm').onsubmit = async event => {
   if (!tags.flush() || (collection && !sharedTags.flush())) return;
   if (details.type === 'note' && !$('detailsNote').value.trim()) { message($('detailsFeedback'), 'A note needs some text.', 'error'); $('detailsNote').focus(); return; }
   if (collection && !$('sharedTitle').value.trim()) { message($('detailsFeedback'), 'Add a title for the collection.', 'error'); $('sharedTitle').focus(); return; }
-  const form = {
-    title: $('detailsTitle').value, note: $('detailsNote').value, folderId: $('detailsFolder').value || null, tags: tags.get(),
-    share: collection ? { collectionId: collection.id, title: $('sharedTitle').value, url: $('sharedUrl').value, body: $('sharedBody').value,
-      tags: sharedTags.get(), shareImage: !$('shareImageLabel').hidden && $('shareImage').checked } : null,
-  };
+  const form = {};
+  if ($('detailsTitle').value !== initial.title) form.title = $('detailsTitle').value;
+  if ($('detailsNote').value !== initial.note) form.note = $('detailsNote').value;
+  if ($('detailsFolder').value !== initial.folderId) form.folderId = $('detailsFolder').value || null;
+  if (JSON.stringify(tags.get()) !== JSON.stringify(initial.tags)) form.tags = tags.get();
+  if (collection) form.share = { collectionId: collection.id, title: $('sharedTitle').value, url: $('sharedUrl').value, body: $('sharedBody').value,
+    tags: sharedTags.get(), shareImage: !$('shareImageLabel').hidden && $('shareImage').checked };
+  if (!Object.keys(form).length) { finish(false); return; }
   busy = true; update(); message($('detailsFeedback'), 'Saving…');
   try {
     await request('details-save', { form });

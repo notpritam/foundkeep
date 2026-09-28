@@ -174,6 +174,11 @@ body {
   margin-bottom: 12px;
 }
 .review-foot {
+  /* Always above the scrolling body: a disabled (translucent) fieldset
+     forms its own stacking layer and would otherwise swallow clicks on
+     Cancel wherever the two overlap. */
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
   display: flex;
   align-items: center;
