@@ -1,4 +1,4 @@
-// Shared rules for the save-review UI and its trusted background commit.
+// Shared rules for the details card (review.html) and its trusted background edit (capture-details.js).
 export const STARTER_TAGS = ['Read later', 'Inspiration', 'Work', 'Personal'];
 export function normalizeSaveTags(values, maxTags = 20) {
   if (!Array.isArray(values) || values.length > maxTags) throw new Error(`Choose up to ${maxTags} tags.`);

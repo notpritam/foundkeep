@@ -1,35 +1,38 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FoundKeep — Review your save</title>
+<title>FoundKeep — Add details</title>
 <link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="review.css">
 <script src="theme.js" type="module"></script></head>
 <body>
-<form id="reviewForm" data-ready="false">
-  <header class="review-head"><p class="eyebrow">Save to <span data-product-name>FoundKeep</span></p><h1 id="destinationSource">Your next good find</h1></header>
-  <fieldset id="destinationFields" class="review-body">
-    <details id="destinationOriginal"><summary>View original content</summary><p id="destinationExcerpt"></p></details>
-    <label class="field">Save in<select id="saveDestination" required></select></label>
-    <p id="destinationRules" class="fine"></p>
-    <label class="field">Title<input id="destinationPersonalTitle" maxlength="1000" placeholder="Give this save a useful name"></label>
-    <label class="field"><span id="destinationNoteLabel">Personal note</span><textarea id="reviewNote" rows="3" maxlength="50000" placeholder="Why are you saving this?"></textarea></label>
-    <div class="destination-folder-head"><label for="destinationFolder" class="field">Folder</label><button id="destinationNewFolderToggle" type="button" class="btn quiet" aria-expanded="false">New folder</button></div>
-    <label class="field"><select id="destinationFolder" aria-label="Folder"></select></label>
-    <div id="destinationNewFolder" hidden><label class="field">New folder name<input id="destinationFolderName" maxlength="80"></label><button id="destinationCreateFolder" type="button" class="btn secondary">Create</button><p id="destinationFolderFeedback" class="statusline" role="status"></p></div>
-    <fieldset class="save-tags-field"><legend>Personal tags</legend><div id="destinationTags" data-label="Add a personal tag"></div></fieldset>
-    <p id="destinationPreservation" class="fine" hidden>FoundKeep will also try to keep this post’s photos, videos and linked articles in your private library.</p>
-    <section id="destinationShare" hidden>
+<!-- The details card: opened from the dock's "Saved · Add details" widget to
+     edit a save that has already happened. It edits only the save the
+     background granted it (capture-details.js). -->
+<form id="detailsForm" data-ready="false">
+  <header class="review-head"><p id="detailsEyebrow" class="eyebrow">Saved to My library</p><h1 id="detailsHeading">Your save</h1></header>
+  <fieldset id="detailsFields" class="review-body" disabled><div id="detailsContent">
+    <details id="detailsOriginal" hidden><summary>View saved content</summary><p id="detailsExcerpt"></p></details>
+    <label class="field">Title<input id="detailsTitle" maxlength="1000" placeholder="Give this save a useful name"></label>
+    <label class="field"><span id="detailsNoteLabel">Personal note</span><textarea id="detailsNote" rows="3" maxlength="50000" placeholder="Why are you saving this?"></textarea></label>
+    <div class="destination-folder-head"><label for="detailsFolder" class="field">Folder</label><button id="detailsNewFolderToggle" type="button" class="btn quiet" aria-expanded="false">New folder</button></div>
+    <label class="field"><select id="detailsFolder" aria-label="Folder"></select></label>
+    <div id="detailsNewFolder" hidden><label class="field">New folder name<input id="detailsFolderName" maxlength="80"></label><button id="detailsCreateFolder" type="button" class="btn secondary">Create</button><p id="detailsFolderFeedback" class="statusline" role="status"></p></div>
+    <fieldset class="save-tags-field"><legend>Personal tags</legend><div id="detailsTags" data-label="Add a personal tag"></div></fieldset>
+    <label id="detailsCollectionLabel" class="field">Share to a collection<select id="detailsCollection"><option value="">Don’t share</option></select></label>
+    <p id="detailsShared" class="fine" hidden></p>
+    <p id="detailsRules" class="fine"></p>
+    <section id="detailsShare" hidden>
       <h2>Shared with this collection</h2><p class="fine">Your personal note, folder and personal tags stay private.</p>
-      <label class="field">Title in collection<input id="destinationTitle" maxlength="200"></label>
-      <label class="field">Source link<input id="destinationUrl" type="url" maxlength="2048"></label>
-      <label class="field">Text in collection<textarea id="destinationBody" rows="4" maxlength="5000"></textarea></label>
-      <fieldset class="save-tags-field"><legend>Tags in collection</legend><div id="destinationSharedTags" data-label="Add a collection tag"></div></fieldset>
-      <label id="destinationImageLabel" class="attach-source" hidden><input id="destinationImage" type="checkbox">Include the saved image</label>
+      <label class="field">Title in collection<input id="sharedTitle" maxlength="200"></label>
+      <label class="field">Source link<input id="sharedUrl" type="url" maxlength="2048"></label>
+      <label class="field">Text in collection<textarea id="sharedBody" rows="4" maxlength="5000"></textarea></label>
+      <fieldset class="save-tags-field"><legend>Tags in collection</legend><div id="sharedTags" data-label="Add a collection tag"></div></fieldset>
+      <label id="shareImageLabel" class="attach-source" hidden><input id="shareImage" type="checkbox">Include the saved image</label>
     </section>
-  </fieldset>
-  <footer class="review-foot"><p id="destinationFeedback" class="statusline" role="status"></p>
-    <button id="destinationReload" type="button" class="btn quiet" hidden>Retry</button>
-    <button id="reviewCancel" type="button" class="btn quiet">Cancel</button>
-    <button id="destinationConfirm" type="submit" class="btn primary">Save</button></footer>
+  </div></fieldset>
+  <footer class="review-foot"><p id="detailsFeedback" class="statusline" role="status"></p>
+    <button id="detailsReload" type="button" class="btn quiet" hidden>Retry</button>
+    <button id="detailsCancel" type="button" class="btn quiet">Cancel</button>
+    <button id="detailsSave" type="submit" class="btn primary" disabled>Save details</button></footer>
 </form>
 <script src="review.js" type="module"></script>
 </body></html>

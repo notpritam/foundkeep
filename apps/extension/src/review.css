@@ -2,10 +2,10 @@ body {
   margin: 0;
   background: transparent;
 }
-#reviewForm {
+#detailsForm {
   box-sizing: border-box;
   width: 100%;
-  max-height: min(560px, 100vh);
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -43,7 +43,7 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.review-body > .field {
+#detailsContent > .field {
   display: block;
   margin: 0 0 14px;
 }
@@ -53,12 +53,12 @@ body {
   width: 100%;
   box-sizing: border-box;
 }
-#destinationOriginal summary {
+#detailsOriginal summary {
   font-size: 11px;
   color: var(--muted);
   cursor: pointer;
 }
-#destinationExcerpt {
+#detailsExcerpt {
   font-size: 12px;
   color: var(--muted);
   white-space: pre-wrap;
@@ -67,8 +67,12 @@ body {
   overflow: auto;
   margin: 8px 0 14px;
 }
-#destinationRules {
+#detailsRules,
+#detailsShared {
   margin: -6px 0 14px;
+}
+#detailsRules:empty {
+  display: none;
 }
 .destination-folder-head {
   display: flex;
@@ -80,7 +84,7 @@ body {
 .destination-folder-head .field {
   margin: 0;
 }
-#destinationNewFolder {
+#detailsNewFolder {
   padding: 12px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -157,16 +161,16 @@ body {
   height: 15px;
   accent-color: var(--accent);
 }
-#destinationShare {
+#detailsShare {
   border-top: 1px solid var(--line);
   padding-top: 14px;
   margin-top: 8px;
 }
-#destinationShare h2 {
+#detailsShare h2 {
   font-size: 13px;
   margin: 0 0 8px;
 }
-#destinationShare .field {
+#detailsShare .field {
   margin-bottom: 12px;
 }
 .review-foot {
@@ -186,9 +190,9 @@ body {
 .review-foot .statusline:empty {
   display: none;
 }
-.review-foot #destinationConfirm {
+.review-foot #detailsSave {
   flex: 1;
 }
-#destinationFields:disabled {
+#detailsFields:disabled {
   opacity: 0.65;
 }
