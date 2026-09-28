@@ -59,7 +59,7 @@ Existing local-only captures are never uploaded automatically. If any remain, th
 - **Dock:** save a readable copy of the current page, highlight text, take a screenshot, or write a note.
 - **Right-click:** save a selection, link, image, or page; take a region screenshot (the same corner toolbar) or a full-page screenshot. Saving an image asks for access to the image's site the first time (in a small FoundKeep window if Chrome cannot show the prompt from the menu).
 - **Keyboard:** `Alt+Shift+S` and `Alt+Shift+F` open the screenshot corner toolbar (drag a region or choose Full page), and `Alt+Shift+H` saves selected text. Change assignments at `chrome://extensions/shortcuts`.
-- **X / Twitter:** the FoundKeep button (the FoundKeep mark) in a post's action bar saves the author, text, and permalink in one click and turns green once saved. A post already saved in this browser session is not saved twice.
+- **X / Twitter:** the FoundKeep button (the FoundKeep mark) in a post's action bar saves the author, text, and permalink in one click and turns green once saved. A post already saved in this browser session to the same account is not saved twice (unless that save failed).
 
 On a site where the dock is hidden (**Hide on this site**), saves still work; the toolbar icon flashes ✓ instead of the dock appearing.
 

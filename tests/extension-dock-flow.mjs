@@ -489,21 +489,33 @@ test('dock: when the image-site prompt cannot show, a FoundKeep window asks for 
   await web.bringToFront();
   const popupPromise = context.waitForEvent('page', { timeout: 10000 });
   const result = await ext.evaluate(tab => {
-    chrome.permissions.request = () => Promise.reject(new Error('This function must be called during a user gesture'));
-    chrome.permissions.contains = () => Promise.resolve(false);
+    // What the service worker sees when Chrome will not show a prompt there.
+    window.__requests = []; window.__contains = [];
+    chrome.permissions.request = request => { window.__requests.push(request); return Promise.reject(new Error('This function must be called during a user gesture')); };
+    chrome.permissions.contains = request => { window.__contains.push(request); return Promise.resolve(false); };
     return import('./dock-control.js').then(m => m.startCapture(tab, 'save-image', { trigger: 'context', info: { menuItemId: 'save-image', srcUrl: 'https://images.example.com/photo.png', pageUrl: tab.url } }));
   }, tab);
   assert.deepEqual(result, { ok: false, pending: true });
+  // The prompt was attempted for exactly the image's origin, refused, and
+  // then checked before falling back to the window.
+  assert.deepEqual(await ext.evaluate(() => window.__requests), [{ origins: ['https://images.example.com/*'] }]);
+  assert.deepEqual(await ext.evaluate(() => window.__contains), [{ origins: ['https://images.example.com/*'] }]);
   const dock = await dockWorld(web, extensionId);
   await dock.waitFor(`__foundkeepDock.status() === 'Allow access in the FoundKeep window to save this image.'`);
   const popup = await popupPromise;
   assert.match(popup.url(), /\/src\/image-access\.html\?request=[\w-]+$/);
   await popup.waitForSelector('#allow:not([disabled])');
   assert.match(await popup.textContent('#imageOrigin'), /images\.example\.com/);
-  await popup.evaluate(() => { window.__requests = []; chrome.permissions.request = request => { window.__requests.push(request); return Promise.resolve(true); }; });
+  // Grant in the window (its real click is the gesture); report what it
+  // asked for back to the test through the page title before it closes.
+  await popup.evaluate(() => { chrome.permissions.request = request => { document.title = JSON.stringify(request); return Promise.resolve(true); }; });
+  let asked = null;
+  popup.on('framenavigated', () => {});
   const closed = popup.waitForEvent('close', { timeout: 15000 });
+  const titleWatch = (async () => { while (!asked) { asked = await popup.title().then(t => t.startsWith('{') ? t : null, () => 'closed'); await new Promise(r => setTimeout(r, 10)); } })();
   await popup.click('#allow');
-  await closed;
+  await closed; await titleWatch;
+  assert.equal(asked, JSON.stringify({ origins: ['https://images.example.com/*'] }), 'the window asked for the image origin');
   await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 10000);
   const captures = await localCaptures(ext);
   assert.equal(captures.length, 1);

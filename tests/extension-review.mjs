@@ -19,7 +19,7 @@ async function saveAndOpen(t, name, { online = true, collections = [], folders =
   const uploads = [], puts = [], entries = [];
   await signIn(context, worker, { collections, folders });
   // mode: 'online' | 'offline' (503) | 'lose-response' (commit, then drop the answer)
-  const state = { mode: online ? 'online' : 'offline', gate: null, server: null, beforePut: null, get online() { return this.mode === 'online'; }, set online(value) { this.mode = value ? 'online' : 'offline'; } };
+  const state = { mode: online ? 'online' : 'offline', gate: null, server: null, beforePut: null, detailDelay: 0, get online() { return this.mode === 'online'; }, set online(value) { this.mode = value ? 'online' : 'offline'; } };
   // Registered after signIn's own route, so this one handles POST uploads.
   await context.route('**/api/captures', async r => {
     if (r.request().method() !== 'POST') return r.fallback();
@@ -34,7 +34,10 @@ async function saveAndOpen(t, name, { online = true, collections = [], folders =
   });
   await context.route('**/api/mobile/captures/remote-1', async r => {
     const capture = () => ({ id: 'remote-1', ...state.server });
-    if (r.request().method() === 'GET') return r.fulfill({ json: { capture: capture() } });
+    if (r.request().method() === 'GET') {
+      if (state.detailDelay) await new Promise(resolve => setTimeout(resolve, state.detailDelay));
+      return r.fulfill({ json: { capture: capture() } });
+    }
     const body = r.request().postDataJSON();
     puts.push({ method: r.request().method(), body });
     await state.beforePut?.(state.server);
@@ -397,4 +400,30 @@ test('details: the card opens framed on a strict-CSP page (frame-src none) and s
   await card.click('#detailsSave');
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   assert.equal((await localCaptures(ext))[0].sourceTitle, 'Saved despite a strict CSP');
+});
+
+// Fix round 2, item 1: the card must not wait on a slow server read past the
+// dock's 3 s "ready" window. It opens from the local copy, and the save still
+// sends only what the user changed in the card.
+test('details: with a slow server read the card opens from the local copy, and the PUT sends only the changed field', { timeout: 60000 }, async t => {
+  const { web, ext, dock, puts, state } = await saveAndOpen(t, '__slow-read');
+  await dock.click('[data-action="savepage"]');
+  await uploaded(ext);
+  Object.assign(state.server, { sourceTitle: 'Renamed on the web', updatedAt: 200 });
+  state.detailDelay = 4500;
+  const started = Date.now();
+  const card = await openDetails(web, dock);
+  assert.ok(Date.now() - started < 4000, 'the card was ready before the slow read returned');
+  assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture', 'pre-filled from the local copy');
+  await new Promise(r => setTimeout(r, 1500));
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'the dock keeps the card open');
+  assert.equal(await dock.evaluate('__foundkeepDock.status()'), '');
+  await addTag(card, '#detailsTags', 'Keep');
+  await card.click('#detailsSave');
+  await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 20000);
+  await synced(ext);
+  // The untouched title is the server's current one (read at update time),
+  // not the stale local title the card showed.
+  assert.deepEqual(puts.map(p => p.body), [{ sourceTitle: 'Renamed on the web', noteText: null, userTags: ['Keep'], expectedUpdatedAt: 200 }]);
+  assert.equal(state.server.sourceTitle, 'Renamed on the web');
 });

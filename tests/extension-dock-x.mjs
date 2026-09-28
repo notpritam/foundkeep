@@ -154,3 +154,37 @@ test('X: without an icon grant, page captures fail with the grant message while 
   await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 8000);
   assert.equal((await localCaptures(ext)).length, 1);
 });
+
+// Fix round 2, item 2: the session dedupe must not report "Saved" for a
+// post whose earlier save belongs to another account or failed.
+test('X: after an account switch, the same post is saved again for the new account', { timeout: 40000 }, async t => {
+  const { context, worker, web } = await openX(t);
+  const ext = await extensionPage(context, worker);
+  await web.bringToFront();
+  await button(web).click();
+  await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state === 'saved', null);
+  await worker.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-b' }, connection: { id: 'connection-b' }, token: 'token-b', status: 'connected' } }));
+  await web.reload(); await web.bringToFront();
+  await button(web).waitFor();
+  await button(web).click();
+  await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state === 'saved', null);
+  const captures = await localCaptures(ext);
+  assert.deepEqual(captures.map(c => c.cloudAccountId).sort(), ['account-a', 'account-b'], 'a new capture for the new account');
+});
+
+test('X: a post whose first save failed permanently is saved again, not reported as saved', { timeout: 40000 }, async t => {
+  const { context, worker, web } = await openX(t);
+  // Registered after signIn's route: every upload is refused for good.
+  await context.route('**/api/captures', r => r.request().method() === 'POST'
+    ? r.fulfill({ status: 400, json: { error: 'invalid_input', message: 'Refused for this test.' } }) : r.fallback());
+  const ext = await extensionPage(context, worker);
+  await web.bringToFront();
+  await button(web).click();
+  await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures()).some(c => c.cloudStatus === 'failed'), null);
+  await web.reload(); await web.bringToFront();
+  await button(web).waitFor();
+  await button(web).click();
+  await pollUntil(web, () => document.querySelector('article [data-state]').dataset.state === 'saved', null);
+  await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures()).length === 2, null);
+  assert.equal((await localCaptures(ext)).length, 2, 'the failed save does not block saving the post again');
+});

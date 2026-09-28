@@ -45,7 +45,8 @@ signed-out dock only offers **Sign in to save**.
   apply to the save just made:
   - not uploaded yet — the local record is updated and the pending upload
     carries the details;
-  - already uploaded — the card starts from the server's current copy, and
+  - already uploaded — the card starts from the server's current copy (or
+    the local one if the server does not answer within ~1.5 s), and
     only the fields you changed are sent as an update to that capture
     (`PUT /api/mobile/captures/<remote id>`); title and note you did not
     touch repeat the server's current values, and folder and tags you did not
@@ -67,7 +68,8 @@ signed-out dock only offers **Sign in to save**.
   once saved. Its label says "Save to FoundKeep" / "Saved to FoundKeep", and
   on failure a generic "Couldn't save to FoundKeep" (the reason is shown in
   the dock, never written into x.com's page). A post already saved this
-  browser session is recognized when X re-renders it, not saved twice. Dev
+  browser session (to the same account, and not failed) is recognized when X
+  re-renders it, not saved twice. Dev
   builds no longer add "Dev" text or widen the button; they show a small
   emerald dot on the icon instead.
 - **Hidden sites.** On an origin set to "Hide on this site", a save (X,
