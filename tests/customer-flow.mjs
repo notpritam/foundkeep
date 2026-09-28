@@ -15,21 +15,13 @@ async function poll(fn, timeout=25000) {
   while(Date.now()<end) { const result=await fn(); if(result) return result; await sleep(300); }
   throw new Error('Customer flow did not reach the expected state');
 }
-// Save through the dock's own review flow (stage, then confirm) on a given
-// tab — src/popup.html and its direct {kind:'capture'}/{kind:'saveNote'}
-// messages are deleted in Task 7; nothing but that deleted page ever sent
-// them. `extra` carries action-specific stageSaveReview fields (e.g. `text`
-// for a note); `details` carries confirm-time save-review-choice fields.
-async function saveThroughDock(ext, tabId, action, extra = {}, details = {}) {
-  await ext.evaluate(async ({ tabId, action, extra }) => {
-    const { stageSaveReview } = await import('./save-review.js');
-    await stageSaveReview({ action, tab: await chrome.tabs.get(tabId), trigger: 'dock', ...extra });
+// Save the way the dock does — instantly, straight into My library — on a
+// given tab. `extra` carries action-specific fields (e.g. `text` for a note).
+async function saveThroughDock(ext, tabId, action, extra = {}) {
+  return ext.evaluate(async ({ tabId, action, extra }) => {
+    const { startCapture } = await import('./dock-control.js');
+    return startCapture(await chrome.tabs.get(tabId), action, { trigger: 'dock', ...extra });
   }, { tabId, action, extra });
-  const { draft } = await ext.evaluate(tabId => chrome.runtime.sendMessage({ kind: 'save-review-get', tabId }), tabId);
-  return ext.evaluate(({ tabId, draft, details }) => chrome.runtime.sendMessage({
-    kind: 'save-review-confirm', tabId, id: draft.id,
-    choice: { kind: 'library', details: draft.action === 'note' ? { noteText: draft.text, ...details } : details },
-  }), { tabId, draft, details });
 }
 async function rewrite(directory, origin) {
   for(const entry of await readdir(directory,{withFileTypes:true})) {
@@ -117,9 +109,8 @@ test('customer signs up, configures the real extension, captures a readable page
     const extensionPreferences=await ext.evaluate(()=>chrome.runtime.sendMessage({kind:'preferences-status'}));
     assert.equal(extensionPreferences.preferences.capture.region,false);
     assert.equal(extensionPreferences.preferences.popup.recentCount,5);
-    // The signup/dashboard tab is a real tab the dock can key a review draft
-    // to; a quick note need not be about that tab's page (attachPage stays
-    // unset/false).
+    // The signup/dashboard tab is a real tab the dock can save from; a quick
+    // note need not be about that tab's page (attachPage stays unset/false).
     const accountTabId=await ext.evaluate(url=>chrome.tabs.query({url}).then(tabs=>tabs[0].id),origin+'/*');
     const note='Remember the typography workshop and bring a notebook.';
     const saved=await saveThroughDock(ext,accountTabId,'note',{text:note});

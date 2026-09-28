@@ -15,26 +15,17 @@ async function poll(fn) {
   for (let i = 0; i < 100; i++) { if (await fn()) return; await delay(100); }
   throw new Error('Timed out waiting for extension state');
 }
-// Save a note through the dock's own review flow (stage, then confirm) on
-// the tab this environment already has open — the direct {kind:'saveNote'}
-// message this test used before Task 7 no longer exists; nothing but the
-// deleted popup.js ever sent it.
+// Save a note the way the dock's Note field does (it saves instantly) on the
+// tab this environment already has open.
 async function saveNoteThroughDock(environment, text) {
   const tabId = await environment.ext.evaluate(
     url => chrome.tabs.query({ url }).then(tabs => tabs[0].id),
     environment.origin + '/__pair',
   );
-  await environment.ext.evaluate(async ({ tabId, text }) => {
-    const { stageSaveReview } = await import('./save-review.js');
-    await stageSaveReview({ action: 'note', tab: await chrome.tabs.get(tabId), text, trigger: 'dock' });
+  return environment.ext.evaluate(async ({ tabId, text }) => {
+    const { startCapture } = await import('./dock-control.js');
+    return startCapture(await chrome.tabs.get(tabId), 'note', { trigger: 'dock', text, attachPage: false });
   }, { tabId, text });
-  return environment.ext.evaluate(async (tabId) => {
-    const { draft } = await chrome.runtime.sendMessage({ kind: 'save-review-get', tabId });
-    return chrome.runtime.sendMessage({
-      kind: 'save-review-confirm', tabId, id: draft.id,
-      choice: { kind: 'library', details: { noteText: draft.text } },
-    });
-  }, tabId);
 }
 
 test('dev and prod install together, pair separately, and save into isolated databases', { timeout: 90000 }, async t => {
@@ -151,6 +142,9 @@ test('dev and prod install together, pair separately, and save into isolated dat
   const [dev, prod] = environments;
   const worker = context.serviceWorkers().find(worker => worker.url().includes(dev.id));
   await worker.evaluate(() => { globalThis.fetch = async () => { throw new TypeError('Offline test'); }; });
+  // saveNoteThroughDock runs the (instant) save in the dev extension page's
+  // own realm, so that realm goes offline too.
+  await dev.ext.evaluate(() => { globalThis.fetch = async () => { throw new TypeError('Offline test'); }; });
   await saveNoteThroughDock(dev, 'dev offline note');
   const queued = await dev.ext.evaluate(async () => (await import('./db.js')).listCaptures());
   assert.ok(queued.some(capture => capture.noteText === 'dev offline note' && capture.cloudAccountId === dev.account.id));
@@ -161,7 +155,10 @@ test('dev and prod install together, pair separately, and save into isolated dat
   await context.route('https://x.com/__environment-test', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><article data-testid="tweet"><a href="/example/status/123"><time>Today</time></a><div data-testid="tweetText">Separate tweet capture</div><div role="group"><button data-testid="reply">Reply</button></div></article>' }));
   const tweet = await context.newPage();
   await tweet.goto('https://x.com/__environment-test');
-  await tweet.getByRole('button', { name: 'Choose where to save in FoundKeep Dev', exact: true }).waitFor();
-  await tweet.getByRole('button', { name: 'Choose where to save in FoundKeep', exact: true }).waitFor();
+  await tweet.getByRole('button', { name: 'Save to FoundKeep Dev', exact: true }).waitFor();
+  await tweet.getByRole('button', { name: 'Save to FoundKeep', exact: true }).waitFor();
+  assert.equal(await tweet.locator('[data-foundkeep-dev] [data-foundkeep-dev-dot]').count(), 1, 'the dev build marks its button with a dot');
+  assert.equal(await tweet.locator('[data-atlas] [data-foundkeep-dev-dot]').count(), 0);
+  assert.doesNotMatch(await tweet.locator('[data-foundkeep-dev]').innerText(), /Dev/);
   assert.equal(await tweet.locator('[data-atlas], [data-foundkeep-dev]').count(), 2, 'Both extension buttons must coexist');
 });

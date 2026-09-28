@@ -12,6 +12,15 @@ test("extension presents the FoundKeep identity while preserving its signed ID",
   ]);
   assert.ok(Object.values(manifest.commands).every((command) => command.description.includes("FoundKeep")));
   assert.equal(manifest.key.startsWith("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A"), true);
+  assert.equal(manifest.version, "1.8.1");
+  // The details card (review.html) is still framed by the dock, so it stays a
+  // dynamic-URL web-accessible resource; the before-save drafts are gone.
+  assert.deepEqual(manifest.web_accessible_resources, [{ resources: ["src/review.html"], matches: ["http://*/*", "https://*/*"], use_dynamic_url: true }]);
+  const shipped = JSON.parse(await readFile("deploy/extension-files.json", "utf8"));
+  assert.equal(shipped.includes("src/save-review.js"), false);
+  for (const file of ["src/capture-actions.js", "src/capture-details.js", "src/screenshot-overlay.js"]) assert.ok(shipped.includes(file), file);
+  const background = await readFile("apps/extension/src/background.js", "utf8");
+  assert.doesNotMatch(background, /save-review-(?:get|confirm|cancel|update)/, "the before-save review messages are gone");
 
   for (const file of ["src/review.html", "src/dock-settings.html", "src/import.html"]) {
     const source = await readFile(`apps/extension/${file}`, "utf8");
@@ -26,12 +35,8 @@ test("extension presents the FoundKeep identity while preserving its signed ID",
   }
 });
 
-// The former "installed extension captures selected text, a link,
-// screenshots, and a note into its shared library" test drove all of this
-// through src/popup.html's direct {kind:'capture'}/{kind:'saveNote'}
-// messages and src/dashboard.html's local-library card list. Task 7 deletes
-// both surfaces and the message handlers that only they used; the same real
-// MV3-worker + IndexedDB coverage for savepage/highlight/region/fullpage now
-// lives in tests/extension-dock-flow.mjs (dock capture through save-review)
-// and tests/extension-review.mjs (review-card confirm/cancel/draft
-// lifecycle), which exercise the current product surface instead.
+// Real MV3-worker + IndexedDB coverage of every capture lives in the dock
+// suites: tests/extension-dock-flow.mjs (instant saves from the dock, the
+// right-click menu and keyboard), tests/extension-dock-screenshot.mjs (the
+// corner-toolbar screenshot flow), tests/extension-dock-x.mjs (the X button)
+// and tests/extension-review.mjs (the after-save "Add details" card).

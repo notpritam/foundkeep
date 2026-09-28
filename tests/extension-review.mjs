@@ -1,183 +1,291 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
-import path from 'node:path';
+import { dockWorld } from './helpers/dock-world.mjs';
 import { pollUntil } from './helpers/poll.mjs';
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
+import { launch, signIn, extensionPage, summon, fixture, waitForLength, localCaptures } from './helpers/dock-launch.mjs';
 
-// The dock frames review.html on the very tab it is reviewing (dock-control's
-// openReview sends dock-review-open with `review.html?tab=<tab.id>` to that
-// same tab), so the background's reviewTabFor(sender) check — which a Task 4
-// hardening pass added because review.html is now a web-accessible resource
-// any page could otherwise iframe for someone else's tab id — requires the
-// framing tab's own id to equal the `tab` query param. These tests frame the
-// card on the fixture page itself (`web`) rather than on an unrelated
-// extension tab, matching that real topology.
-async function frameReview(web, worker, tabId, frameId) {
-  const url = await worker.evaluate(id => chrome.runtime.getURL('src/review.html?tab=' + id), tabId);
-  const handle = await web.evaluateHandle(({ url, frameId }) => {
-    const frame = document.createElement('iframe');
-    frame.id = frameId; frame.src = url;
-    document.body.append(frame);
-    return frame;
-  }, { url, frameId });
-  return handle.asElement().contentFrame();
+// The details card is review.html in its "edit" mode: an extension-origin
+// page the dock frames after a save, which edits that save and nothing else.
+const SAVED = '✓ Saved to My library · Add details';
+const PAGE = '<title>Details fixture</title><article><h1>A page worth keeping</h1><p>Readable text for the saved page.</p></article>';
+const COLLECTION = { id: 'col_1', title: 'Design refs', visibility: 'public', canSubmit: true, requireApproval: false, canModerate: true };
+
+async function saveAndOpen(t, name, { online = true, collections = [], folders = [] } = {}) {
+  const { context, worker, extensionId, origin } = await launch(t, { prefix: 'foundkeep-details-' });
+  const uploads = [], puts = [], entries = [];
+  await signIn(context, worker, { collections, folders });
+  const state = { online, gate: null };
+  // Registered after signIn's own route, so this one handles POST uploads.
+  await context.route('**/api/captures', async r => {
+    if (r.request().method() !== 'POST') return r.fallback();
+    uploads.push(r.request().postDataJSON());
+    if (state.gate) await state.gate;
+    if (!state.online) return r.fulfill({ status: 503, json: { error: 'unavailable', message: 'Try later.' } });
+    return r.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } });
+  });
+  await context.route('**/api/mobile/captures/remote-1', r => {
+    if (r.request().method() === 'GET') return r.fulfill({ json: { capture: { id: 'remote-1', updatedAt: 111 } } });
+    puts.push({ method: r.request().method(), body: r.request().postDataJSON() });
+    return r.fulfill({ json: { capture: { id: 'remote-1', updatedAt: 112 } } });
+  });
+  await context.route('**/api/collections/*/entries', r => { entries.push({ url: r.request().url(), body: r.request().postDataJSON() }); return r.fulfill({ status: 201, json: { entry: { id: 'entry-1', status: 'approved' } } }); });
+  await fixture(context, origin + '/' + name, PAGE);
+  const web = await context.newPage(); await web.goto(origin + '/' + name);
+  const ext = await extensionPage(context, worker);
+  assert.equal(await summon(ext, origin + '/' + name + '*'), true);
+  await web.bringToFront();
+  const dock = await dockWorld(web, extensionId);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  return { context, worker, extensionId, origin, web, ext, dock, uploads, puts, entries, state };
+}
+async function cardFrame(web, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const frame = web.frames().find(f => f.url().includes('review.html'));
+    if (frame) return frame;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  throw new Error('the details card did not appear');
+}
+async function openDetails(web, dock) {
+  await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 10000);
+  await dock.click('.toast [data-action="details"]');
+  const card = await cardFrame(web);
+  await card.waitForSelector('#detailsForm[data-ready="true"]', { timeout: 8000 });
+  await dock.waitFor("__foundkeepDock.state() === 'details'");
+  return card;
+}
+async function feedbackMatches(frame, pattern, timeout = 5000) {
+  const deadline = Date.now() + timeout;
+  let text = '';
+  while (Date.now() < deadline) {
+    text = await frame.locator('#detailsFeedback').textContent().catch(() => '');
+    if (pattern.test(text)) return true;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  throw new Error(`feedback never matched ${pattern}: ${JSON.stringify(text)}`);
+}
+async function addTag(card, root, value) {
+  await card.fill(`${root} input`, value);
+  await card.press(`${root} input`, 'Enter');
+  await card.waitForSelector(`${root} .selected`, { state: 'attached' });
 }
 
-test('review card: account required, note text comes from the form, cancel clears the draft', { timeout: 30000 }, async t => {
-  const extension = process.env.FOUNDKEEP_TEST_EXTENSION || path.resolve('apps/extension');
-  const profile = await mkdtemp('/tmp/foundkeep-review-'); let context;
-  t.after(async () => { await context?.close(); await rm(profile, { recursive: true, force: true }); });
-  context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: process.env.FOUNDKEEP_HEADLESS !== 'false', executablePath: process.env.CHROMIUM_PATH,
-    args: ['--no-sandbox', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`] });
-  const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-  const origin = await worker.evaluate(() => new URL(chrome.runtime.getManifest().host_permissions[0]).origin);
-  await context.route(origin + '/__review', route => route.fulfill({ contentType: 'text/html', body: '<title>Review fixture</title>' }));
-  const web = await context.newPage(); await web.goto(origin + '/__review');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
-  const tabId = await ext.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__review' }))[0].id);
-  // Signed out: staging is refused with a sign-in message.
-  const signedOut = await ext.evaluate(async id => { try { await (await import('./save-review.js')).stageSaveReview({ action: 'note', tab: await chrome.tabs.get(id), text: '', trigger: 'dock' }); return 'staged'; } catch (e) { return e.message; } }, tabId);
-  assert.match(signedOut, /Sign in to FoundKeep to save/);
-  // Signed in (fixture account with no network): a draft stages and renders.
-  await ext.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' } }));
-  await context.route('**/api/organization', route => route.fulfill({ json: { folders: [], tags: [], suggestedTags: [] } }));
-  await context.route('**/api/collections', route => route.fulfill({ json: { collections: [] } }));
-  await context.route('**/api/captures', route => route.fulfill({ json: { capture: { id: 'remote-1', status: 'done' } } }));
-  await ext.evaluate(async id => (await import('./save-review.js')).stageSaveReview({ action: 'note', tab: await chrome.tabs.get(id), text: '', trigger: 'dock' }), tabId);
-  const card = await frameReview(web, worker, tabId, 'cardFrame');
-  await card.waitForSelector('#reviewForm[data-ready="true"]');
-  assert.deepEqual(await card.$$eval('#saveDestination option', options => options.map(o => o.value)), ['library']);
-  assert.equal(await card.getAttribute('#reviewNote', 'required'), '');
-  // Note text comes from the confirmed form, not from whatever was staged.
-  await card.fill('#reviewNote', 'Written in the review card');
-  await card.click('#destinationConfirm');
-  await pollUntil(ext, async id => !(await (await import('./save-review.js')).readSaveReview(id)), tabId);
-  // Confirm works offline: the record is stored locally (and queued for
-  // sync) before any network round trip settles. Poll rather than reading
-  // once — the card's own tab can close itself right after confirming
-  // (unframed finish() calls window.close()), and Playwright's click()
-  // resolves once the click dispatches, not once the confirm round trip
-  // (message to the background, capture, IndexedDB write) has settled.
-  await pollUntil(ext, async text => (await (await import('./db.js')).listCaptures()).some(c => c.noteText === text), 'Written in the review card');
-  // A second draft on the same tab: cancel clears it without confirming.
-  await ext.evaluate(async id => (await import('./save-review.js')).stageSaveReview({ action: 'note', tab: await chrome.tabs.get(id), text: '', trigger: 'dock' }), tabId);
-  const card2 = await frameReview(web, worker, tabId, 'card2Frame');
-  await card2.waitForSelector('#reviewForm[data-ready="true"]');
-  await card2.click('#reviewCancel');
-  await pollUntil(ext, async id => !(await (await import('./save-review.js')).readSaveReview(id)), tabId);
-  const capturesAfterCancel = await ext.evaluate(async () => (await (await import('./db.js')).listCaptures()).length);
-  assert.equal(capturesAfterCancel, 1, 'cancel must not save a second capture');
+test('details: Add details opens the edit card pre-filled from the save, and before upload the local record carries the edits into the upload', { timeout: 40000 }, async t => {
+  const { web, ext, dock, uploads, puts, state } = await saveAndOpen(t, '__before', { online: false, folders: [{ id: 'folder-a', name: 'Reading' }] });
+  await dock.click('[data-action="savepage"]');
+  await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures()).some(c => c.cloudStatus === 'queued' && c.cloudAttempts > 0), null);
+  const card = await openDetails(web, dock);
+  assert.match(card.url(), /^chrome-extension:\/\/[^/]+\/src\/review\.html\?tab=\d+&grant=[\w-]+$/);
+  assert.equal(await card.textContent('#detailsEyebrow'), 'Saved to My library');
+  assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture', 'pre-filled from the saved capture');
+  assert.equal(await card.inputValue('#detailsNote'), '');
+  await card.waitForSelector('#detailsFolder option[value="folder-a"]', { state: 'attached' });
+  assert.deepEqual(await card.$$eval('#detailsCollection option', options => options.map(o => o.value)), ['']);
+
+  await card.fill('#detailsTitle', 'Edited before upload');
+  await card.fill('#detailsNote', 'Why this matters');
+  await addTag(card, '#detailsTags', 'Research');
+  await card.selectOption('#detailsFolder', 'folder-a');
+  await card.click('#detailsSave');
+  await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  assert.deepEqual(web.frames().filter(f => f !== web.mainFrame()).map(f => f.url()), [], 'the card closes');
+  const [local] = await localCaptures(ext);
+  assert.deepEqual({ title: local.sourceTitle, note: local.noteText, tags: local.userTags, folder: local.folderId, remote: local.cloudRemoteId },
+    { title: 'Edited before upload', note: 'Why this matters', tags: ['Research'], folder: 'folder-a', remote: null });
+
+  state.online = true;
+  await ext.evaluate(() => import('./cloud.js').then(m => m.retryCloudSync()));
+  await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures())[0]?.cloudStatus === 'synced', null);
+  const last = uploads[uploads.length - 1];
+  assert.deepEqual({ title: last.sourceTitle, note: last.noteText, tags: last.userTags, folder: last.folderId },
+    { title: 'Edited before upload', note: 'Why this matters', tags: ['Research'], folder: 'folder-a' }, 'the pending upload carries the details');
+  assert.deepEqual(puts, [], 'no separate update is needed before upload');
 });
 
-test('review card: cancel relays done exactly once to the dock, never to the framing page (R16)', { timeout: 30000 }, async t => {
-  const extension = process.env.FOUNDKEEP_TEST_EXTENSION || path.resolve('apps/extension');
-  const profile = await mkdtemp('/tmp/foundkeep-review-frame-'); let context;
-  t.after(async () => { await context?.close(); await rm(profile, { recursive: true, force: true }); });
-  context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: process.env.FOUNDKEEP_HEADLESS !== 'false', executablePath: process.env.CHROMIUM_PATH,
-    args: ['--no-sandbox', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`] });
-  const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-  const origin = await worker.evaluate(() => new URL(chrome.runtime.getManifest().host_permissions[0]).origin);
-  await context.route(origin + '/__review3', route => route.fulfill({ contentType: 'text/html', body: '<title>Review fixture 3</title>' }));
-  const web = await context.newPage(); await web.goto(origin + '/__review3');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
-  const tabId = await ext.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__review3' }))[0].id);
-  await ext.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' } }));
-  await context.route('**/api/organization', route => route.fulfill({ json: { folders: [], tags: [], suggestedTags: [] } }));
-  await context.route('**/api/collections', route => route.fulfill({ json: { collections: [] } }));
-  await ext.evaluate(async id => (await import('./save-review.js')).stageSaveReview({ action: 'note', tab: await chrome.tabs.get(id), text: '', trigger: 'dock' }), tabId);
-  const reviewUrl = await worker.evaluate(id => chrome.runtime.getURL('src/review.html?tab=' + id), tabId);
-  // Stand-in for the dock: a listener in the extension's isolated world on
-  // this tab's top frame, which is exactly where the background relays the
-  // card's messages (chrome.tabs.sendMessage(tabId, …, {frameId: 0})).
+test('details: after upload, Add details sends PUT with the remote id, shares to a collection, and mirrors the change locally', { timeout: 40000 }, async t => {
+  const { web, ext, dock, puts, entries } = await saveAndOpen(t, '__after', { collections: [COLLECTION] });
+  await dock.click('[data-action="savepage"]');
+  await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures())[0]?.cloudRemoteId === 'remote-1', null);
+  const card = await openDetails(web, dock);
+  await card.fill('#detailsTitle', 'Edited after upload');
+  await card.fill('#detailsNote', 'A private note');
+  await addTag(card, '#detailsTags', 'Keep');
+  await card.waitForSelector('#detailsCollection option[value="col_1"]', { state: 'attached' });
+  await card.selectOption('#detailsCollection', 'col_1');
+  await card.waitForSelector('#detailsShare:not([hidden])');
+  assert.equal(await card.inputValue('#sharedTitle'), 'Edited after upload');
+  assert.match(await card.inputValue('#sharedUrl'), /\/__after$/);
+  await card.fill('#sharedBody', 'Worth a look');
+  await card.click('#detailsSave');
+  await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
+
+  assert.deepEqual(puts, [{ method: 'PUT', body: { sourceTitle: 'Edited after upload', noteText: 'A private note', folderId: null, userTags: ['Keep'], expectedUpdatedAt: 111 } }]);
+  assert.equal(entries.length, 1);
+  assert.match(entries[0].url, /\/api\/collections\/col_1\/entries$/);
+  assert.equal(entries[0].body.captureId, 'remote-1');
+  assert.equal(entries[0].body.title, 'Edited after upload');
+  assert.equal(entries[0].body.body, 'Worth a look');
+  assert.equal(entries[0].body.noteText, undefined, 'the private note is never shared');
+  const [local] = await localCaptures(ext);
+  assert.deepEqual({ title: local.sourceTitle, note: local.noteText, tags: local.userTags, status: local.cloudStatus, shared: local.collectionSubmission?.id },
+    { title: 'Edited after upload', note: 'A private note', tags: ['Keep'], status: 'synced', shared: 'col_1' });
+});
+
+test('details: an edit made while the upload is in flight is sent once the upload lands', { timeout: 40000 }, async t => {
+  const { web, ext, dock, uploads, puts, state } = await saveAndOpen(t, '__race');
+  let release; state.gate = new Promise(resolve => { release = resolve; });
+  await dock.click('[data-action="savepage"]');
+  assert.equal(await waitForLength(uploads, 1), 1, 'the upload is in flight');
+  const card = await openDetails(web, dock);
+  await card.fill('#detailsTitle', 'Edited mid-upload');
+  await card.click('#detailsSave');
+  await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
+  assert.equal(uploads[0].sourceTitle, 'Details fixture', 'the in-flight upload still has the old title');
+  release();
+  await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures())[0]?.cloudStatus === 'synced', null, { timeout: 15000 });
+  assert.equal(puts.length, 1, 'the edit follows as an update');
+  assert.equal(puts[0].body.sourceTitle, 'Edited mid-upload');
+  const [local] = await localCaptures(ext);
+  assert.equal(local.sourceTitle, 'Edited mid-upload');
+});
+
+test('details: Cancel changes nothing and relays done exactly once to the dock, never to the page (R16)', { timeout: 40000 }, async t => {
+  const { worker, web, ext, dock } = await saveAndOpen(t, '__cancel');
+  await web.evaluate(() => { window.__pageMessages = []; addEventListener('message', event => window.__pageMessages.push(JSON.stringify(event.data))); });
+  await dock.click('[data-action="savepage"]');
+  const tabId = await ext.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__cancel' }))[0].id);
   await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
     window.__relayed = [];
-    chrome.runtime.onMessage.addListener(message => { if (message?.kind === 'dock-review-frame') window.__relayed.push(message); });
+    chrome.runtime.onMessage.addListener(message => { if (message?.kind === 'dock-details-frame') window.__relayed.push(message); });
   } }), tabId);
-  const relayed = () => worker.evaluate(async tabId => (await chrome.scripting.executeScript({ target: { tabId }, func: () => window.__relayed }))[0].result, tabId);
-  // The dock frames review.html on the tab it reviews, so this frame lives
-  // on `web` (the same tab the draft was staged for) — reviewTabFor(sender)
-  // requires the framing tab's own id to equal the `tab` query param. The
-  // cancel handler's own finish(false) and the foundkeep-save-review-changed
-  // broadcast it triggers (observed by review.js's own listener, which also
-  // tries to finish once it sees the draft is gone) both have a chance to
-  // send; only one "done" message must actually reach the dock. The page's
-  // own window must see none of it (C1).
-  await web.evaluate(url => {
-    window.__pageMessages = [];
-    window.addEventListener('message', event => window.__pageMessages.push(JSON.stringify(event.data)));
-    const frame = document.createElement('iframe');
-    frame.id = 'reviewFrame';
-    frame.src = url;
-    document.body.append(frame);
-  }, reviewUrl);
-  const frame = web.frameLocator('#reviewFrame');
-  await frame.locator('#reviewForm[data-ready="true"]').waitFor();
-  await pollUntil(worker, async tabId => ((await chrome.scripting.executeScript({ target: { tabId }, func: () => window.__relayed }))[0].result || []).some(m => m.type === 'ready'), tabId);
-  await frame.locator('#reviewCancel').click();
-  await pollUntil(worker, async tabId => ((await chrome.scripting.executeScript({ target: { tabId }, func: () => window.__relayed }))[0].result || []).some(m => m.type === 'done'), tabId);
-  // Give a spurious second done (from the foundkeep-save-review-changed
-  // broadcast cancelSaveReview itself emits, which review.js's own listener
-  // also reacts to) a chance to arrive before asserting exactly one.
-  await web.waitForTimeout(500);
-  const done = (await relayed()).filter(m => m.type === 'done');
-  assert.deepEqual(done, [{ kind: 'dock-review-frame', type: 'done', saved: false }]);
-  assert.deepEqual(await web.evaluate(() => window.__pageMessages), [], 'the framing page must never receive review-card messages');
+  const card = await openDetails(web, dock);
+  await card.fill('#detailsTitle', 'Not kept');
+  await card.click('#detailsCancel');
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await new Promise(r => setTimeout(r, 500));
+  const relayed = await worker.evaluate(async tabId => (await chrome.scripting.executeScript({ target: { tabId }, func: () => window.__relayed }))[0].result, tabId);
+  assert.deepEqual(relayed.filter(m => m.type === 'done'), [{ kind: 'dock-details-frame', type: 'done', saved: false }]);
+  assert.deepEqual(await web.evaluate(() => window.__pageMessages), [], 'the page never receives card messages');
+  assert.equal((await localCaptures(ext))[0].sourceTitle, 'Details fixture');
+  // The grant ends with the card: its URL cannot be used again.
+  await pollUntil(worker, async tabId => !((await chrome.storage.session.get('foundkeep-details-grants'))['foundkeep-details-grants'] || {})[tabId], tabId);
 });
 
-test('review card: a draft survives a fresh module instance, and a different account cannot confirm it', { timeout: 30000 }, async t => {
-  const extension = process.env.FOUNDKEEP_TEST_EXTENSION || path.resolve('apps/extension');
-  const profile = await mkdtemp('/tmp/foundkeep-review-restart-'); let context;
-  t.after(async () => { await context?.close(); await rm(profile, { recursive: true, force: true }); });
-  context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: process.env.FOUNDKEEP_HEADLESS !== 'false', executablePath: process.env.CHROMIUM_PATH,
-    args: ['--no-sandbox', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`] });
-  const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-  const origin = await worker.evaluate(() => new URL(chrome.runtime.getManifest().host_permissions[0]).origin);
-  await context.route(origin + '/__review4', route => route.fulfill({ contentType: 'text/html', body: '<title>Review fixture 4</title>' }));
-  const web = await context.newPage(); await web.goto(origin + '/__review4');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
-  const tabId = await ext.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__review4' }))[0].id);
-  await ext.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' } }));
-  await context.route('**/api/organization', route => route.fulfill({ json: { folders: [], tags: [], suggestedTags: [] } }));
-  await context.route('**/api/collections', route => route.fulfill({ json: { collections: [] } }));
-  const draft = await ext.evaluate(async id => (await import('./save-review.js')).stageSaveReview({ action: 'note', tab: await chrome.tabs.get(id), text: 'Keep this thought', trigger: 'dock' }), tabId);
-  // A fresh module instance (cache-busted import) has no in-memory state of
-  // its own — the draft it reads must come from chrome.storage.session,
-  // which is exactly what would also survive a real MV3 service-worker
-  // restart between staging and confirming.
-  const pending = await ext.evaluate(async id => (await import('./save-review.js?fresh')).readSaveReview(id), tabId);
-  assert.equal(pending.id, draft.id);
-  assert.equal(pending.text, 'Keep this thought');
-  // A different account cannot confirm someone else's outstanding draft.
-  await ext.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'different-account' }, connection: { id: 'different-connection' }, token: 't'.repeat(43), status: 'connected' } }));
-  const denied = await ext.evaluate(({ tabId, id }) => chrome.runtime.sendMessage({ kind: 'save-review-confirm', tabId, id, choice: { kind: 'library', details: {} } }), { tabId, id: draft.id });
-  assert.equal(denied.ok, false);
-  assert.match(denied.error, /account changed/);
+test('details: the page cannot drive or hijack the card (C1), and a card framed without its grant or for another tab never loads a save', { timeout: 60000 }, async t => {
+  const { context, worker, extensionId, origin, web, ext, dock } = await saveAndOpen(t, '__victim');
+  const PAGE_SCRIPT = `<title>Hijack fixture</title><p>Text.</p><script>
+    window.__received = [];
+    addEventListener('message', event => {
+      window.__received.push(JSON.stringify(event.data));
+      try { event.source.postMessage({ type: 'done', saved: true }, '*'); } catch {}
+      try { event.source.location = location.origin + '/__evil'; } catch {}
+    });
+  </script>`;
+  await fixture(context, origin + '/__evil', '<title>Evil</title><p>Attacker page</p>');
+  await fixture(context, origin + '/__attacker', PAGE_SCRIPT);
+  await web.evaluate(() => {
+    window.__received = [];
+    addEventListener('message', event => { window.__received.push(JSON.stringify(event.data)); try { event.source.location = location.origin + '/__evil'; } catch {} });
+  });
+  await dock.click('[data-action="savepage"]');
+  const card = await openDetails(web, dock);
+  assert.equal(await web.evaluate(() => window.length), 0, 'the page cannot reach the card frame');
+  await card.fill('#detailsNote', 'Grow the card a little\n\n\n\n');
+  await new Promise(r => setTimeout(r, 800));
+  assert.deepEqual(await web.evaluate(() => window.__received), [], 'the page never receives a card message');
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details');
+  const victimTab = await ext.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__victim' }))[0]);
+  // The card's own URL, in the per-session dynamic form (use_dynamic_url) a
+  // page would have to use — Playwright reports frames by the plain id.
+  const grant = new URL(card.url()).searchParams.get('grant');
+  assert.ok(grant);
+  const grantUrl = await worker.evaluate(({ id, grant }) => chrome.runtime.getURL(`src/review.html?tab=${id}&grant=${grant}`), { id: victimTab.id, grant });
+
+  // Another tab frames the victim's exact card URL (grant included): the
+  // grant is bound to the victim's tab, so it never loads the save.
+  const attacker = await context.newPage(); await attacker.goto(origin + '/__attacker');
+  for (const [id, url] of [['stolen', grantUrl], ['guessed', await worker.evaluate(id => chrome.runtime.getURL('src/review.html?tab=' + id), victimTab.id)]]) {
+    await attacker.evaluate(({ id, url }) => { const frame = document.createElement('iframe'); frame.id = id; frame.src = url; document.body.append(frame); }, { id, url });
+    const frame = attacker.frameLocator('#' + id);
+    await frame.locator('#detailsForm').waitFor();
+    let ready = false;
+    try { await frame.locator('#detailsForm[data-ready="true"]').waitFor({ timeout: 2500 }); ready = true; } catch { /* expected */ }
+    assert.equal(ready, false, `${id}: a card outside its own tab/grant must never become ready`);
+    await feedbackMatches(frame, /no longer available/i);
+  }
+  // The victim's own page cannot load a second card without the grant either.
+  await web.bringToFront();
+  await web.evaluate(url => { const frame = document.createElement('iframe'); frame.id = 'noGrant'; frame.src = url; document.body.append(frame); },
+    await worker.evaluate(id => chrome.runtime.getURL('src/review.html?tab=' + id), victimTab.id));
+  const noGrant = web.frameLocator('#noGrant');
+  await noGrant.locator('#detailsForm').waitFor();
+  await feedbackMatches(noGrant, /no longer available/i);
+  assert.equal(await noGrant.locator('#detailsForm').getAttribute('data-ready'), 'false');
+  await web.evaluate(() => document.getElementById('noGrant').remove());
+  // Nor can a top-level tab opened at the card's own URL, grant included
+  // (what the removed fallback popup used to be): it is not framed in the
+  // victim's tab.
+  const top = await context.newPage();
+  await top.goto(`chrome-extension://${extensionId}/src/review.html?tab=${victimTab.id}&grant=${grant}`);
+  await top.waitForSelector('#detailsForm');
+  await feedbackMatches(top, /no longer available/i);
+  assert.equal(await top.getAttribute('#detailsForm', 'data-ready'), 'false');
+  await top.close();
+  await web.bringToFront();
+  assert.equal((await localCaptures(ext))[0].sourceTitle, 'Details fixture', 'nothing was edited by any of them');
+
+  // Should the real card's frame ever load a second document (forced here
+  // through CDP), the dock closes it rather than keep framing it.
+  await card.goto(origin + '/__evil').catch(() => {});
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'", 5000);
+  const deadline = Date.now() + 5000;
+  while (web.frames().some(f => f !== web.mainFrame()) && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
+  assert.deepEqual(web.frames().filter(f => f !== web.mainFrame()).map(f => f.url()), [], 'the navigated card frame is removed');
+  assert.equal(await dock.evaluate('__foundkeepDock.status()'), 'Details closed. Use Add details to reopen them.');
+  assert.deepEqual(await web.evaluate(() => window.__received), []);
 });
 
-test('review card: a collection destination shows the shared fields and label', { timeout: 30000 }, async t => {
-  const extension = process.env.FOUNDKEEP_TEST_EXTENSION || path.resolve('apps/extension');
-  const profile = await mkdtemp('/tmp/foundkeep-review-collection-'); let context;
-  t.after(async () => { await context?.close(); await rm(profile, { recursive: true, force: true }); });
-  context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: process.env.FOUNDKEEP_HEADLESS !== 'false', executablePath: process.env.CHROMIUM_PATH,
-    args: ['--no-sandbox', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`] });
-  const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-  const origin = await worker.evaluate(() => new URL(chrome.runtime.getManifest().host_permissions[0]).origin);
-  await context.route(origin + '/__review2', route => route.fulfill({ contentType: 'text/html', body: '<title>Review fixture 2</title>' }));
-  const web = await context.newPage(); await web.goto(origin + '/__review2');
-  const ext = await context.newPage(); await ext.goto(await worker.evaluate(() => chrome.runtime.getURL('src/dock-settings.html')));
-  const tabId = await ext.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__review2' }))[0].id);
-  await ext.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'account-a' }, connection: { id: 'connection-a' }, token: 'token-a', status: 'connected' } }));
-  await context.route('**/api/organization', route => route.fulfill({ json: { folders: [], tags: [], suggestedTags: [] } }));
-  await context.route('**/api/collections', route => route.fulfill({ json: { collections: [{ id: 'col_1', title: 'Design refs', visibility: 'public', canSubmit: true, requireApproval: false, canModerate: true }] } }));
-  await ext.evaluate(async id => (await import('./save-review.js')).stageSaveReview({ action: 'savepage', tab: await chrome.tabs.get(id), trigger: 'dock' }), tabId);
-  const card = await frameReview(web, worker, tabId, 'cardFrame2');
-  await card.waitForSelector('#reviewForm[data-ready="true"]');
-  // <option> elements never report as "visible" to Playwright's default
-  // actionability check, so wait for attachment rather than visibility.
-  await card.waitForSelector('#saveDestination option[value="collection:col_1"]', { state: 'attached' });
-  await card.selectOption('#saveDestination', 'collection:col_1');
-  await card.dispatchEvent('#saveDestination', 'change');
-  await card.waitForSelector('#destinationShare:not([hidden])');
-  assert.equal(await card.$eval('#destinationConfirm', el => el.textContent), 'Save to collection');
+test('details: after the account changes, the card cannot edit the earlier account\'s save', { timeout: 40000 }, async t => {
+  const { worker, web, ext, dock } = await saveAndOpen(t, '__account');
+  await dock.click('[data-action="savepage"]');
+  const card = await openDetails(web, dock);
+  await worker.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'different-account' }, connection: { id: 'different-connection' }, token: 't'.repeat(43), status: 'connected' } }));
+  await card.fill('#detailsTitle', 'Should not land');
+  await card.click('#detailsSave');
+  await pollUntil(card, () => /account changed/i.test(document.querySelector('#detailsFeedback')?.textContent || ''), null);
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'the card stays open with the error');
+  assert.equal((await localCaptures(ext))[0].sourceTitle, 'Details fixture');
+});
+
+test('details: keyboard — Add details moves focus into the card, and Esc returns it to the pill (M4)', { timeout: 40000 }, async t => {
+  const { web, dock } = await saveAndOpen(t, '__keys');
+  await dock.click('[data-action="savepage"]');
+  await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 10000);
+  for (let i = 0; i < 16 && await dock.evaluate('__foundkeepDock.focused()') !== 'details'; i++) await web.keyboard.press('Tab');
+  assert.equal(await dock.evaluate('__foundkeepDock.focused()'), 'details', 'Tab reaches Add details');
+  await web.keyboard.press('Enter');
+  const card = await cardFrame(web);
+  await card.waitForSelector('#detailsForm[data-ready="true"]', { timeout: 8000 });
+  await dock.waitFor("__foundkeepDock.focused() === 'card'");
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && await card.evaluate(() => document.activeElement?.id) !== 'detailsTitle') await new Promise(r => setTimeout(r, 50));
+  assert.equal(await card.evaluate(() => document.activeElement?.id), 'detailsTitle');
+  await web.keyboard.press('End');
+  await web.keyboard.type(' (typed)');
+  assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture (typed)');
+  await web.keyboard.press('Escape');
+  await dock.waitFor("__foundkeepDock.state() === 'expanded'");
+  await dock.waitFor("__foundkeepDock.focused() === 'pill'");
+});
+
+test('dock-ui: the toolbar-icon toggle never collapses a dock with the details card open', { timeout: 30000 }, async t => {
+  const { worker, web, ext, dock } = await saveAndOpen(t, '__toggle-card');
+  await dock.click('[data-action="savepage"]');
+  await openDetails(web, dock);
+  const tabId = await ext.evaluate(async () => (await chrome.tabs.query({ url: '*://*/__toggle-card' }))[0].id);
+  await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-show', expand: true, toggle: true }); }, tabId);
+  await new Promise(r => setTimeout(r, 300));
+  assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'toggle must not collapse a dock with its card open');
 });

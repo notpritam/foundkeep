@@ -59,21 +59,16 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
   for (const action of ['savepage', 'highlight', 'screenshot', 'note', 'library', 'more'])
     assert.ok(await dock.evaluate(`!!__foundkeepDock.rect('[data-action="${action}"]').width`), action);
+  // Screenshot goes straight to region selection: no Region / Full page popover.
+  assert.equal(await dock.evaluate(`__foundkeepDock.rect('[data-menu="screenshot"]').height`), 0);
+  assert.equal(await dock.evaluate(`__foundkeepDock.attr('[data-action="screenshot"]', 'aria-haspopup')`), null);
   // R1: the toolbar icon toggles the dock. Sending dock-show with
-  // toggle:true while expanded collapses it (never while review).
+  // toggle:true while expanded collapses it.
   await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-show', expand: true, toggle: true }); }, tabId);
   await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);
   await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
-  // R1 negative case: the toggle must never collapse a dock that is
-  // mid-review. (The review card has no draft staged for this tab, so it
-  // may render "no draft" content — that's fine for this assertion.)
-  const reviewUrl = await worker.evaluate(id => chrome.runtime.getURL('src/review.html?tab=' + id), tabId);
-  await worker.evaluate(async ({ id, url }) => { await chrome.tabs.sendMessage(id, { kind: 'dock-review-open', url }); }, { id: tabId, url: reviewUrl });
-  await dock.waitFor(`__foundkeepDock.state() === 'review'`);
-  await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-show', expand: true, toggle: true }); }, tabId);
-  assert.equal(await dock.evaluate(`__foundkeepDock.state()`), 'review', 'toggle must not collapse a dock mid-review');
-  await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-review-close', saved: false }); }, tabId);
-  await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
+  // (R1 negative case — the toggle never collapses a dock whose details card
+  // is open — lives in tests/extension-review.mjs, which opens a real card.)
   // Keyboard: Escape collapses and returns focus to the pill.
   await web.keyboard.press('Escape');
   await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);
