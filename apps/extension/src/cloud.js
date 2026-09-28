@@ -456,31 +456,19 @@ async function drain({ force = false } = {}) {
           );
         remoteId = result.capture.id;
         enrichmentStatus = result.capture.status;
-        await db.updateCapture(record.id, { cloudRemoteId: remoteId, cloudEnrichmentStatus: enrichmentStatus });
+        // The upload body was built from `record`, so the server now holds
+        // the details as of that snapshot's revision — never a later edit
+        // made while the request was in flight.
+        await db.updateCaptureWith(record.id, current => ({
+          cloudRemoteId: remoteId, cloudEnrichmentStatus: enrichmentStatus,
+          detailsSyncedRevision: Math.max(current.detailsSyncedRevision || 0, record.detailsRevision || 0),
+        }));
       }
-      if (record.collectionSubmission) {
-        const submission = record.collectionSubmission;
-        const available = await libraryRequest('collections', {}, connection.account.id);
-        const target = available.collections?.find(item => item.id === submission.id && item.canSubmit);
-        if (!target || target.visibility !== submission.visibility) {
-          const error = new Error('The collection access or visibility changed. Your private copy is saved; choose the collection again from your library.');
-          error.permanent = true; throw error;
-        }
-        if (!sameConnection(connection, await readState()) || !(await db.getCapture(record.id))) continue;
-        const result = await libraryRequest('submit-collection', { id: submission.id, value: {
-          ...submission.entry, clientId: record.cloudClientId || record.id, captureId: remoteId,
-        } }, connection.account.id);
-        if (!result.entry?.id) throw new Error('FoundKeep did not confirm the collection entry. It will be retried safely.');
-        await db.updateCapture(record.id, { collectionEntryId: result.entry?.id, collectionEntryStatus: result.entry?.status });
-      }
-      await db.updateCapture(record.id, {
-        cloudStatus: "synced",
-        cloudRemoteId: remoteId,
-        cloudEnrichmentStatus: enrichmentStatus,
-        cloudError: null,
-        cloudNextRetryAt: 0,
-        status: "done",
-      });
+      // Details added after the save (Add details) and a collection share
+      // travel after the capture itself: PUT any edit newer than what the
+      // upload carried, submit the share, then settle the record's status.
+      if (!sameConnection(connection, await readState()) || !(await db.getCapture(record.id))) continue;
+      await syncCaptureDetails(record.id);
       await updateConnection(connection, { status: "connected", error: null });
     } catch (error) {
       const attempts = (record.cloudAttempts || 0) + 1;
@@ -502,6 +490,80 @@ async function drain({ force = false } = {}) {
     }
   }
 }
+// ---------------------------------------------------------------------------
+// Details added after a save ("Add details"): the local record is the source
+// of truth. Each edit bumps record.detailsRevision; detailsSyncedRevision is
+// the revision the server is known to hold. A record with unsent details or
+// an unsubmitted collection share stays "queued", so the durable outbox (and
+// a service-worker restart) can never drop an edit.
+// ---------------------------------------------------------------------------
+const detailsPending = record => (record.detailsRevision || 0) > (record.detailsSyncedRevision || 0)
+  || (!!record.collectionSubmission && !record.collectionEntryId);
+const detailLocks = new Map();
+/** Send a synced capture's newer details and pending share; serialized per capture. */
+export function syncCaptureDetails(id) {
+  const next = (detailLocks.get(id) || Promise.resolve()).catch(() => {}).then(() => syncDetails(id));
+  detailLocks.set(id, next);
+  next.then(() => {}, () => {}).then(() => { if (detailLocks.get(id) === next) detailLocks.delete(id); });
+  return next;
+}
+function permanentFailure(error) {
+  if (Number.isInteger(error.status) && error.status >= 400 && error.status < 500 && ![408, 429].includes(error.status) && error.code !== "capture_changed") error.permanent = true;
+  return error;
+}
+async function putCaptureDetails(record, accountId) {
+  // expectedUpdatedAt guards the server copy against lost updates; a
+  // concurrent server-side change (e.g. enrichment finishing) just means
+  // reading the current revision and trying again.
+  for (let attempt = 0; ; attempt++) {
+    const { capture } = await libraryRequest("detail", { id: record.cloudRemoteId }, accountId);
+    try {
+      return await libraryRequest("update", { id: record.cloudRemoteId, value: {
+        sourceTitle: record.sourceTitle ?? null, noteText: record.noteText ?? null,
+        folderId: record.folderId || null, userTags: record.userTags || [], expectedUpdatedAt: capture?.updatedAt,
+      } }, accountId);
+    } catch (error) {
+      if (error.code !== "capture_changed" || attempt >= 2) throw error;
+    }
+  }
+}
+async function syncDetails(id) {
+  const connection = await readState();
+  let record = await db.getCapture(id);
+  if (!record?.cloudRemoteId || !connection?.token || connection.status === "reconnect" || record.cloudAccountId !== connection.account.id)
+    return { synced: false };
+  const accountId = connection.account.id;
+  try {
+    const revision = record.detailsRevision || 0;
+    if (revision > (record.detailsSyncedRevision || 0)) {
+      await putCaptureDetails(record, accountId);
+      await db.updateCaptureWith(id, current => ({ detailsSyncedRevision: Math.max(current.detailsSyncedRevision || 0, revision) }));
+    }
+    record = await db.getCapture(id);
+    if (record?.collectionSubmission && !record.collectionEntryId) {
+      const submission = record.collectionSubmission;
+      const available = await libraryRequest('collections', {}, accountId);
+      const target = available.collections?.find(item => item.id === submission.id && item.canSubmit);
+      if (!target || target.visibility !== submission.visibility) {
+        const error = new Error('The collection access or visibility changed. Your private copy is saved; choose the collection again from your library.');
+        error.permanent = true; throw error;
+      }
+      if (!sameConnection(connection, await readState()) || !(await db.getCapture(id))) return { synced: false };
+      const result = await libraryRequest('submit-collection', { id: submission.id, value: {
+        ...submission.entry, clientId: submission.clientId || record.cloudClientId || record.id, captureId: record.cloudRemoteId,
+      } }, accountId);
+      if (!result.entry?.id) throw new Error('FoundKeep did not confirm the collection entry. It will be retried safely.');
+      await db.updateCapture(id, { collectionEntryId: result.entry.id, collectionEntryStatus: result.entry.status });
+    }
+  } catch (error) {
+    throw permanentFailure(error);
+  }
+  const settled = await db.updateCaptureWith(id, current => detailsPending(current)
+    ? { cloudStatus: "queued" }
+    : { cloudStatus: "synced", cloudError: null, cloudNextRetryAt: 0, status: "done" });
+  return { synced: settled?.cloudStatus === "synced" };
+}
+
 export function drainCloudQueue({ force = false } = {}) {
   if (force && draining)
     return draining.then(() => drainCloudQueue({ force: true }));
@@ -575,7 +637,7 @@ export async function libraryRequest(operation, args, accountId) {
   }
   let data;try{data=JSON.parse(await blob.text());}catch{throw new Error('FoundKeep could not read the collection response.');}
   if(!sameConnection(connection,await readState()))throw new Error('Your account changed. Open the collection again.');
-  if(!response.ok)throw new Error(String(data?.message||'FoundKeep could not complete this action.').slice(0,300));
+  if(!response.ok)throw Object.assign(new Error(String(data?.message||'FoundKeep could not complete this action.').slice(0,300)),{status:response.status,code:typeof data?.error==='string'?data.error:null});
   if(request.method!=='GET')announce();
   return data;
 }
