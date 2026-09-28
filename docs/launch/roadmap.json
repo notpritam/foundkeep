@@ -1,7 +1,7 @@
 {
   "title": "FoundKeep — launch tracker",
   "goal": "Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.",
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "snapshot": {
     "asOf": "2026-09-27 04:13 UTC",
     "metrics": {
@@ -632,7 +632,7 @@
       "status": "doing",
       "owner": "agent",
       "asked": true,
-      "note": "Spec approved 2026-09-27: docs/superpowers/specs/2026-09-27-extension-floating-dock-design.md. Collapsed pill → toolbar → review card; library and settings move to the dashboard; account required. 1.8.0 dev build verified 2026-09-27 in headed Chromium on github.com, x.com, youtube.com and a public notion.so page: dock renders correctly with no page-style leakage on all four, and the review card loads as a framed iframe (not the fallback popup) on all four, including the two strict-CSP sites named in the spec's risks-to-verify — see docs/beta/2026-09-27-extension-floating-dock.md. Ships to dev, then friends, then the CWS 1.0.3 update."
+      "note": "Merged to main 2026-09-28 (PR #2, c6bdf56): dock, review card, always-on, import page, account-only saves, 1.7.x side-panel save recovery; extension 1.8.0. Dev build on Pritam's Mac for testing. Before friends: keep review mode after \"Hide on this site\" mid-review, verify a real 1.7.12 → 1.8.0 upgrade, then publish ext-v1.8.0."
     },
     {
       "id": "P6.1",

@@ -4,7 +4,7 @@
 
 **Goal:** Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.
 
-**Launch readiness: 13%** — 10 of 75 launch items done · 19 waiting on Pritam · updated 2026-09-27
+**Launch readiness: 13%** — 10 of 75 launch items done · 19 waiting on Pritam · updated 2026-09-28
 
 **Production (2026-09-27 04:13 UTC):** 21 accounts (0 new in 7d) · 2 active in 7d · 146 saves (47 in 7d) · 0 paying · 0 open tickets
 
@@ -134,7 +134,7 @@ _Exit criteria:_ Every ★ item marked for launch is live in prod and in the shi
 | ○ To do | ★ Admin console: real uptime, actual spend, social-session status | admin | agent |  |
 | ○ To do | ★ Publish launch public collections so Explore isn't empty | collections | **Pritam** | Prod has 0 public collections. |
 | ○ To do | ★ Update public copy: versions, 'private beta' wording, beta page build number | site | agent |  |
-| ◐ In progress | ★ Extension: floating dock replaces the side panel | extension | agent | Spec approved 2026-09-27: docs/superpowers/specs/2026-09-27-extension-floating-dock-design.md. Collapsed pill → toolbar → review card; library and settings move to the dashboard; account required. 1.8.0 dev build verified 2026-09-27 in headed Chromium on github.com, x.com, youtube.com and a public notion.so page: dock renders correctly with no page-style leakage on all four, and the review card loads as a framed iframe (not the fallback popup) on all four, including the two strict-CSP sites named in the spec's risks-to-verify — see docs/beta/2026-09-27-extension-floating-dock.md. Ships to dev, then friends, then the CWS 1.0.3 update. |
+| ◐ In progress | ★ Extension: floating dock replaces the side panel | extension | agent | Merged to main 2026-09-28 (PR #2, c6bdf56): dock, review card, always-on, import page, account-only saves, 1.7.x side-panel save recovery; extension 1.8.0. Dev build on Pritam's Mac for testing. Before friends: keep review mode after "Hide on this site" mid-review, verify a real 1.7.12 → 1.8.0 upgrade, then publish ext-v1.8.0. |
 
 ## P6 · Store launch
 
