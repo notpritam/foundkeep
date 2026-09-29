@@ -172,3 +172,26 @@
 @media (prefers-reduced-motion: reduce) {
   .fkp *, .fkp *::after, .fkp-list { transition: none !important; animation: none !important; }
 }
+
+/* 6 · Quiet sheet, refined */
+.fkp-dest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fkp-dest:first-child { margin: -4px -6px 2px 0; }
+.fkp-pill.static { cursor: default; background: var(--panel); border-color: transparent !important; }
+.fkp-pill.static .fkp-i { color: var(--accent); }
+.fkp-plus { color: var(--muted); font-weight: 400; }
+.fkp-titlerow { display: flex; align-items: center; gap: 8px; }
+.fkp-titlerow .fkp-title { flex: 1; min-width: 0; width: auto; margin: 0 0 0 -8px; }
+.fkp-titlerow > .fkp-icon { margin-right: -6px; }
+.fkp-fav.small { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 7px; background: #1f2023; color: #fff; font: 700 12px/1 Georgia, serif; }
+.fkp-noterow { display: flex; align-items: flex-start; gap: 8px; margin-top: -6px; }
+.fkp-noterow > .fkp-i { flex: none; margin-top: 6px; color: var(--muted); }
+.fkp-noterow .fkp-note.bare { margin: 0 0 0 -8px; width: auto; flex: 1; }
+.fkp-noterow.with-icon .fkp-note.bare { margin-left: -6px; }
+.fkp-list-heading { margin: 6px 10px 2px; color: var(--muted); font: 500 11.5px/1.2 var(--font); }
+/* On top, the destination row shares its line with Close: slightly tighter
+   pills, and the share label gives way before anything wraps. */
+.fkp-dest:first-child { flex-wrap: nowrap; gap: 5px; }
+.fkp-dest:first-child .fkp-pill { height: 28px; padding: 0 9px 0 10px; gap: 5px; font-size: 12.5px !important; min-width: 0; }
+.fkp-dest:first-child .fkp-pill.ghost { flex: 0 1 auto; overflow: hidden; white-space: nowrap; }
+.fkp-dest:first-child > .fkp-icon { flex: none; width: 28px; height: 28px; }
+.fkp-dest:first-child .fkp-spacer { flex: 1 0 0; }

@@ -11,6 +11,8 @@ const P = {
   collection: '<path d="M12 4.2 19.4 8a.6.6 0 0 1 0 1.1L12 12.8 4.6 9.1a.6.6 0 0 1 0-1.1z"/><path d="m4.5 12.6 7.5 3.8 7.5-3.8"/><path d="m4.5 16.2 7.5 3.8 7.5-3.8"/>',
   note: '<path d="M11.5 4.5H7.5a3 3 0 0 0-3 3v9a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3v-4"/><path d="M17.3 4.2a2 2 0 0 1 2.8 2.8l-6.1 6.1a2 2 0 0 1-.93.52l-2.2.55a.5.5 0 0 1-.6-.6l.55-2.2a2 2 0 0 1 .52-.93z"/>',
   globe: '<circle cx="12" cy="12" r="8"/><path d="M4 12h16"/><path d="M12 4c2.2 2.3 3.2 5 3.2 8s-1 5.7-3.2 8c-2.2-2.3-3.2-5-3.2-8s1-5.7 3.2-8z"/>',
+  // The dock's Library notebook (and the web sidebar's My library).
+  library: '<rect x="4.5" y="3.5" width="15" height="17" rx="3"/><path d="M8.5 3.5v17M12 8.5h4M12 12h4"/>',
   lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
 };
 export const icon = (name, size = 16) => `<svg class="fkp-i" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name]}</svg>`;
