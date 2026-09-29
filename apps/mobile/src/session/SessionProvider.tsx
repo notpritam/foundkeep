@@ -10,7 +10,7 @@ import { syncNotificationRegistration } from '../notifications/notifications.ts'
 import { pendingOAuth } from '../auth-oauth.ts';
 
 type Credentials = { email: string; password: string };
-type SessionValue = {
+export type SessionValue = {
   ready: boolean; account: Account | null; usage: Usage | null; token: string | null; recoveryCode: string | null;
   policy: MobilePolicy; updateRequired: boolean;
   pendingRoute: string | null;
@@ -27,7 +27,8 @@ type SessionValue = {
   deleteAccount(proof: string | { reauthToken: string }): Promise<void>;
 };
 
-const SessionContext = createContext<SessionValue | null>(null);
+// Exported so Storybook can render screens inside a sample session.
+export const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);

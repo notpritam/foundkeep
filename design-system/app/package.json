@@ -1,0 +1,16 @@
+{
+  "name": "@foundkeep/design-app",
+  "private": true,
+  "type": "module",
+  "description": "The FoundKeep app in Storybook: real React Native components rendered on the web.",
+  "scripts": {
+    "storybook": "storybook dev -p 6107 --no-open",
+    "build": "storybook build -o ../dist/app --quiet"
+  },
+  "devDependencies": {
+    "@storybook/addon-docs": "^10.6.0",
+    "@storybook/react-native-web-vite": "^10.6.0",
+    "storybook": "^10.6.0",
+    "vite": "^8.3.1"
+  }
+}
