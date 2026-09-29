@@ -1,0 +1,16 @@
+{
+  "name": "@foundkeep/design-dashboard",
+  "private": true,
+  "type": "module",
+  "description": "The FoundKeep dashboard in Storybook: real Next components on sample data.",
+  "scripts": {
+    "storybook": "storybook dev -p 6108 --no-open",
+    "build": "storybook build -o ../dist/dashboard --quiet"
+  },
+  "devDependencies": {
+    "@storybook/addon-docs": "^10.6.0",
+    "@storybook/nextjs-vite": "^10.6.0",
+    "storybook": "^10.6.0",
+    "vite": "^8.3.1"
+  }
+}
