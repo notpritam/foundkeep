@@ -52,6 +52,8 @@
     .tucked .pill{height:32px;padding:0 0 5px;border-radius:12px 12px 0 0}
     .actions{display:flex;align-items:center;gap:2px}
     .actions button{width:36px;padding:0}
+    [data-action="library"]{position:relative}
+    .count{position:absolute;top:3px;right:2px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:999px;background:#4cc38a;color:#05130d;font:700 10px/15px system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;pointer-events:none}
     .status{padding:0 10px;color:#8a8f98;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .status[data-tone="ok"]{color:#4cc38a}.status[data-tone="error"]{color:#f28b82}
     .signin{display:flex;flex-direction:column;align-items:stretch;gap:2px}
@@ -96,7 +98,7 @@
         ${tool('highlight', 'Highlight text to save it', ' aria-pressed="false"')}
         ${tool('screenshot', 'Take a screenshot')}
         ${tool('note', 'Write a note', ' aria-expanded="false"')}
-        ${tool('library', 'Open your library')}
+        ${tool('library', 'Open your library').replace('</button>', '<span class="count" aria-hidden="true" hidden></span></button>')}
         ${tool('more', 'More options', ' aria-haspopup="menu" aria-expanded="false"')}
       </div>
       <div class="signin" hidden><span class="waiting" hidden></span><button data-action="sign-in">${svg('mark')}Sign in to save</button></div>
@@ -150,12 +152,19 @@
     $('[data-action="screenshot"]').hidden = !(actions.region || actions.fullpage);
     $('[data-action="always-on"]').textContent = dockState?.alwaysOn ? 'Stop showing on every site' : 'Show on every site';
     $('[data-action="site"]').textContent = dockState?.hiddenHere ? 'Show on this site again' : 'Hide on this site';
+    renderPending(dockState?.pending || 0);
     const local = root.querySelector('.local');
     local.hidden = !open || !connected || !(dockState?.localOnly > 0);
     local.querySelector('.status').textContent = localOnly === 1 ? '1 save is only in this browser' : `${localOnly} saves are only in this browser`;
     local.querySelector('.status').hidden = false;
     if (!open || !connected) { closeMenus(); stopHighlighting(); closeNote(true, false); }
     place();
+  }
+  // A quiet count on Library: saves that have not reached the library yet.
+  function renderPending(count) {
+    const badge = $('.count'), library = $('[data-action="library"]');
+    badge.hidden = !(count > 0); badge.textContent = count > 99 ? '99+' : count > 0 ? String(count) : '';
+    library.setAttribute('aria-label', count > 0 ? `Open your library, ${count} ${count === 1 ? 'save' : 'saves'} waiting to sync` : 'Open your library');
   }
   function closeMenus() { for (const menu of root.querySelectorAll('.menu')) menu.hidden = true; $('[data-action="more"]').setAttribute('aria-expanded', 'false'); }
   function status(text, tone = '') {
@@ -631,6 +640,7 @@
       case 'dock-hide': if (root.activeElement) root.activeElement.blur(); capturing = true; host.style.visibility = 'hidden'; break;
       case 'dock-unhide': capturing = false; host.style.visibility = ''; break;
       case 'dock-state': dockState = message.state; render(); break;
+      case 'dock-pending': if (Number.isFinite(message.count)) { dockState = { ...dockState, pending: message.count }; renderPending(message.count); } break;
       // Fix round 1: a tab-URL-independent patch so every open dock updates
       // its ⋯ menu the moment always-on changes elsewhere.
       case 'dock-always-on-changed': dockState = { ...dockState, alwaysOn: message.alwaysOn }; render(); break;
@@ -651,6 +661,7 @@
     text: selector => root.querySelector(selector)?.textContent ?? null,
     attr: (selector, name) => root.querySelector(selector)?.getAttribute(name) ?? null,
     toast: () => toastEl.hidden ? '' : toastEl.textContent,
+    pending: () => $('.count').hidden ? 0 : Number($('.count').textContent) || $('.count').textContent,
     highlighting: () => highlighting,
     composing,
     flashes: () => flashCount,

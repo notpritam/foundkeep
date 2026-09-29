@@ -17,7 +17,7 @@ const titled = (heading, about, node) => { const w = wall([[heading, about, node
 
 export default {
   title: 'Proposals/Drafts',
-  parameters: { layout: 'padded', controls: { disable: true }, docs: { description: { component: 'Saves that exist only in the extension: **waiting to sync** (offline or the server is slow), **didn’t sync** (an error — Retry), or **only in this browser** (saved while signed out — Sign in). Two places in the extension (A, B) and three on the web dashboard (C–E); they combine — for example A with C.' } } },
+  parameters: { layout: 'padded', controls: { disable: true }, docs: { description: { component: '**Decided (2026-09-29):** B, the quiet count on Library (built into the extension), and C, the banner above the library (built with the website). A continues as Proposals / Draft status. — Saves that exist only in the extension: **waiting to sync** (offline or the server is slow), **didn’t sync** (an error — Retry), or **only in this browser** (saved while signed out — Sign in). Two places in the extension (A, B) and three on the web dashboard (C–E); they combine — for example A with C.' } } },
 };
 export const OnTheCard = {
   name: 'A. On the Add details card',

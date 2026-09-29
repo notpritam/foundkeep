@@ -1,5 +1,5 @@
 import { CUSTOMER_ORIGIN } from './product.js';
-import { captureBinding, getCloudStatus, importLocalCaptures } from './cloud.js';
+import { captureBinding, getCloudStatus, importLocalCaptures, onCloudChange } from './cloud.js';
 import { drainQueue } from './capture.js';
 import { getEffectivePreferences, capturePreferenceKey, captureDisabledMessage } from './preferences.js';
 import { performCapture } from './capture-actions.js';
@@ -70,8 +70,23 @@ export async function dockState(tab, originHint) {
     // "Later" only snoozes the signed-in move prompt; a signed-out dock always
     // says how many saves are waiting for an account (I5).
     alwaysOn, hiddenHere, localOnly: connected && Date.now() < later ? 0 : cloud.localOnly || 0, show: alwaysOn && !hiddenHere,
+    // Saves that have not reached the library yet: shown as a quiet count on
+    // the dock's Library button.
+    pending: connected ? (cloud.pending || 0) + (cloud.failed || 0) : 0,
   };
 }
+// When sync status changes, open docks get the new count (not the whole,
+// tab-specific state). Debounced: one sync can announce several times.
+let pendingTimer = 0;
+onCloudChange(() => {
+  clearTimeout(pendingTimer);
+  pendingTimer = setTimeout(async () => {
+    const cloud = await getCloudStatus().catch(() => null);
+    if (!cloud) return;
+    const count = cloud.status === 'connected' && cloud.account?.id ? (cloud.pending || 0) + (cloud.failed || 0) : 0;
+    for (const tab of await chrome.tabs.query({})) chrome.tabs.sendMessage(tab.id, { kind: 'dock-pending', count }, { frameId: 0 }).catch(() => {});
+  }, 400);
+});
 // A dock that is already there answers a ping; this works on x.com and on
 // always-on pages, where the extension may lack a scripting grant.
 const hasDock = tabId => chrome.tabs.sendMessage(tabId, { kind: 'dock-ping' }).then(r => r?.ok === true, () => false);

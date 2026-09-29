@@ -95,6 +95,15 @@ test('dock: bookmark tab, icon-only toolbar with tooltips, keyboard, drag and po
   await dock.click('[data-action="more"]');
   assert.equal(await dock.evaluate(`__foundkeepDock.attr('[data-action="more"]', 'aria-expanded')`), 'false');
   await web.mouse.move(200, 200);
+  // A quiet count on Library for saves that have not reached the library;
+  // the background sends new counts as sync status changes (dock-pending).
+  assert.equal(await dock.evaluate(`__foundkeepDock.pending()`), 0, 'no count when everything is synced');
+  await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-pending', count: 2 }); }, tabId);
+  await dock.waitFor(`__foundkeepDock.pending() === 2`);
+  assert.equal(await dock.evaluate(`__foundkeepDock.attr('[data-action="library"]', 'aria-label')`), 'Open your library, 2 saves waiting to sync');
+  await worker.evaluate(async id => { await chrome.tabs.sendMessage(id, { kind: 'dock-pending', count: 0 }); }, tabId);
+  await dock.waitFor(`__foundkeepDock.pending() === 0`);
+  assert.equal(await dock.evaluate(`__foundkeepDock.attr('[data-action="library"]', 'aria-label')`), 'Open your library');
   // Screenshot goes straight to region selection: no Region / Full page popover.
   assert.equal(await dock.evaluate(`__foundkeepDock.rect('[data-menu="screenshot"]').height`), 0);
   assert.equal(await dock.evaluate(`__foundkeepDock.attr('[data-action="screenshot"]', 'aria-haspopup')`), null);
