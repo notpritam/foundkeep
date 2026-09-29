@@ -63,13 +63,16 @@ function Keyboard({ device, dark }: { device: Device; dark: boolean }) {
   </div>;
 }
 
-export function PhoneFrame({ device, src, dark, keyboard = false }: { device: Device; src: string; dark: boolean; keyboard?: boolean }) {
+/** insetContent: the page inside knows nothing of safe areas (a live web build), so
+ * keep it clear of the status bar and home indicator, as iOS would. */
+export function PhoneFrame({ device, src, dark, keyboard = false, insetContent = false, background }: { device: Device; src: string; dark: boolean; keyboard?: boolean; insetContent?: boolean; background?: string }) {
   const bezel = device.kind === 'tablet' ? 16 : 12;
   const kb = keyboard ? KEYBOARD[device.platform] : 0;
   return <Scaled width={device.width + bezel * 2} height={device.height + bezel * 2}>
     <div style={{ padding: bezel, borderRadius: device.radius + bezel, background: '#1b1c1e', boxShadow: '0 0 0 1px #3a3b3e, 0 30px 80px rgba(0,0,0,.35)' }}>
-      <div style={{ position: 'relative', width: device.width, height: device.height, borderRadius: device.radius, overflow: 'hidden', background: dark ? '#000' : '#fff' }}>
-        <iframe title={`${device.label} screen`} src={src} style={{ display: 'block', width: device.width, height: device.height - kb, border: 0 }} />
+      <div style={{ position: 'relative', width: device.width, height: device.height, borderRadius: device.radius, overflow: 'hidden', background: background || (dark ? '#000' : '#fff') }}>
+        <iframe title={`${device.label} screen`} src={src} style={{ display: 'block', width: device.width, height: device.height - kb - (insetContent ? device.insets.top + device.insets.bottom : 0), marginTop: insetContent ? device.insets.top : 0, border: 0, background }} />
+        {insetContent ? <span aria-hidden="true" style={{ position: 'absolute', inset: '0 0 auto 0', height: device.insets.top, background }} /> : null}
         <StatusBar device={device} dark={dark} />
         {keyboard ? <Keyboard device={device} dark={dark} /> : null}
         {device.insets.bottom ? <span aria-hidden="true" style={{ position: 'absolute', left: '50%', bottom: 8, width: 134, height: 5, marginLeft: -67, borderRadius: 3, background: dark ? '#fff' : '#000', opacity: keyboard ? 0 : 0.85, pointerEvents: 'none', zIndex: 3 }} /> : null}
