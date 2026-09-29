@@ -28,7 +28,7 @@ const visibilityIcon = c => c?.visibility === 'public' ? 'globe' : 'lock';
  * type: 'save' | 'note'; shared: an existing share ({ title, status }) or null
  * open: 'folder' | 'tags' | 'collection' — a list open on first render
  */
-export function card({ state = 'ready', type = 'save', title = TITLE, note = NOTE, folderId = 'f-reading', tags = ['Memory'], collectionId = '', caption = '', shared = null, open = null } = {}) {
+export function card({ state = 'ready', type = 'save', title = TITLE, note = NOTE, folderId = 'f-reading', tags = ['Memory'], collectionId = '', caption = '', shared = null, open = null, decorate = null } = {}) {
   const form = template.cloneNode(true);
   const $ = id => form.querySelector('#' + id);
   const s = { folderId, tags: [...tags], collectionId };
@@ -99,6 +99,9 @@ export function card({ state = 'ready', type = 'save', title = TITLE, note = NOT
   $('detailsTags').onclick = event => { const chip = event.target.closest('.fk-tag'); if (chip) { s.tags = s.tags.filter(t => t !== chip.dataset.tag); render(); } };
   form.onsubmit = event => event.preventDefault();
   render();
+
+  // Proposals add to the real card (e.g. a preview of the save) through decorate(form).
+  decorate?.(form);
 
   // The extension frames the card 380px wide.
   const frame = document.createElement('div');
