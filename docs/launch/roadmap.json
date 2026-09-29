@@ -642,7 +642,7 @@
       "status": "doing",
       "owner": "agent",
       "asked": true,
-      "note": "Storybook in design-system/ (omni :8814, bb Connect) renders the product's own CSS and markup. Next: name components as a design system (Button, Tag, Select, Listbox, Badge, Text field, Tooltip…) with variants and sizes, move their CSS to one shared stylesheet the extension pages use, and tidy the previews."
+      "note": "Storybook in design-system/ (omni :8814, bb Connect) renders the product's own CSS and markup. Next: name components as a design system (Button, Tag, Select, Listbox, Badge, Text field, Tooltip…) with variants and sizes, move their CSS to one shared stylesheet the extension pages use, and tidy the previews. 2026-09-29: components shipped in the extension; the dock shows a quiet count of unsynced saves. Open: the Banner preview treatment and the draft status icon (Storybook Proposals)."
     },
     {
       "id": "P5.18",
@@ -662,7 +662,7 @@
       "status": "todo",
       "owner": "agent",
       "asked": true,
-      "note": "After the app. The Next.js site and dashboard adopt the same tokens and components; Storybook grows a Web section."
+      "note": "After the app. The Next.js site and dashboard adopt the same tokens and components; Storybook grows a Web section. Includes the chosen drafts banner above the library (\"3 saves are still in your extension · Sync now\", Storybook Proposals / Drafts C), which needs the site to ask the extension for its unsynced saves."
     },
     {
       "id": "P6.1",
