@@ -1,21 +1,20 @@
-// A sample session for stories: a signed-in account whose API client answers
-// from the sample world instead of the network.
+// A sample session for stories: the sample world's signed-in account. Its API
+// client makes real requests, which the mock service worker answers.
 import type { ReactNode } from 'react';
 import { createFoundkeepClient } from '../../../apps/mobile/src/api/client.ts';
-import type { Account } from '../../../apps/mobile/src/api/types.ts';
+import * as world from '../../fixtures/world.ts';
 import { DEFAULT_MOBILE_POLICY } from '../../../apps/mobile/src/policy/mobilePolicy.ts';
 import { SessionContext, type SessionValue } from '../../../apps/mobile/src/session/SessionProvider.tsx';
 
-export const storyAccount: Account = { id: 'acc-story', email: 'lena@foundkeep.example', name: 'Lena Kovacs', createdAt: Date.parse('2026-06-01T09:00:00Z'), hasPassword: true };
-const notFound = async () => Response.json({ error: 'not_found' }, { status: 404 });
 
-export function storySession(fetcher: typeof fetch = notFound, overrides: Partial<SessionValue> = {}): SessionValue {
+// Requests go to the real fetch; the mock service worker answers them.
+export function storySession(overrides: Partial<SessionValue> = {}): SessionValue {
   const idle = async () => {};
   return {
-    ready: true, account: storyAccount, usage: { captures: 128, bytes: 412_000_000, maxCaptures: 1000, maxBytes: 1_000_000_000 },
+    ready: true, account: world.account, usage: world.usage,
     token: 'story', recoveryCode: null, policy: DEFAULT_MOBILE_POLICY, updateRequired: false, pendingRoute: null,
     setPendingRoute() {}, consumePendingRoute: () => null,
-    client: createFoundkeepClient({ getToken: async () => 'story', fetcher }),
+    client: createFoundkeepClient({ getToken: async () => 'story' }),
     register: idle, login: idle, recover: idle, acceptOAuthSession: idle, acknowledgeRecovery() {}, refresh: idle, logout: idle, deleteAccount: idle,
     ...overrides,
   };
