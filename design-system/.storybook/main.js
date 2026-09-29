@@ -7,8 +7,8 @@ export default {
   addons: ['@storybook/addon-docs', 'storybook-addon-pseudo-states'],
   core: { disableTelemetry: true },
   // downloads/ holds the latest dev extension (scripts/dev-extension.mjs).
-  // The dashboard's CSS asks for its fonts at the site root, so the hub serves them.
-  staticDirs: ['../public', { from: '../downloads', to: '/downloads' }, { from: '../../apps/site/public/assets/fonts', to: '/assets/fonts' }],
+  // The dashboard asks for its fonts and images at the site root (/assets), so the hub serves them.
+  staticDirs: ['../public', { from: '../downloads', to: '/downloads' }, { from: '../../apps/site/public/assets', to: '/assets' }],
   docs: { defaultName: 'Docs' },
   // The App and Dashboard Storybooks are built into dist/app and dist/dashboard
   // (scripts/build-all.mjs) and composed here, so one address shows all three.
