@@ -212,8 +212,10 @@ const compact = {
 export const VARIANTS = [quiet, properties, quick, tabs, compact];
 
 // --- 6. Quiet sheet, refined (Pritam's pick: 1 with 2's note) -------------------------------
-// No "Saved to My library" line: where the save lives is a pill like "Share
-// to a collection" (opts.destination: 'top' | 'bottom' | 'merged' | 'none').
+// Nothing above the title. Where the save lives sits in the row with the
+// folder and tags (opts.destination: 'inline' — a "My library" pill and
+// "Share to a collection" — | 'merged' — one "My library" pill whose list also
+// offers the collections — | 'none').
 // opts.noteIcon puts the note icon beside the boxless note, like 2's property
 // rows; opts.siteIcon puts the page's icon beside the title.
 const libraryPill = '<span class="fkp-pill static" data-tip="Saved to My library">' + icon('library', 15) + 'My library</span>';
@@ -224,23 +226,21 @@ const refined = {
   about: 'Quiet sheet with Properties\' boxless note (and its icon), and no "Saved to My library" line: where the save lives is a pill, like Share to a collection.',
   html: s => {
     const o = s.opts || {};
-    const dest = o.destination || 'top';
-    const destRow = dest === 'merged' ? destinationPill(s) : `${libraryPill}${sharePill(s)}`;
-    const top = dest === 'top' || dest === 'merged';
+    const dest = o.destination || 'inline';
     return `
-    ${top ? `<div class="fkp-dest">${destRow}<span class="fkp-spacer"></span>${closeButton}</div>` : ''}
-    <div class="fkp-titlerow">${o.siteIcon ? '<span class="fkp-fav small" aria-hidden="true">M</span>' : ''}${title(s)}${top ? '' : closeButton}</div>
+    <div class="fkp-titlerow">${o.siteIcon ? '<span class="fkp-fav small" aria-hidden="true">M</span>' : ''}${title(s)}${closeButton}</div>
     <div class="fkp-noterow ${o.noteIcon ? 'with-icon' : ''}">${o.noteIcon ? icon('note', 16) : ''}${note(s, 'bare', 2)}</div>
     <div class="fkp-pills">
+      ${dest === 'inline' ? libraryPill : dest === 'merged' ? destinationPill(s) : ''}
       <button type="button" class="fkp-pill" data-pick="folder" aria-haspopup="listbox">${icon('folder', 15)}${esc(s.folder || 'No folder')}${icon('chevron', 14)}</button>
       ${s.tags.map(tagChip).join('')}
       <button type="button" class="fkp-pill ghost" data-pick="tags" aria-haspopup="listbox">${icon('plus', 14)}Tag</button>
+      ${dest === 'merged' ? '' : sharePill(s)}
     </div>
-    ${dest === 'bottom' ? `<div class="fkp-dest">${destRow}</div>` : dest === 'none' ? sharePill(s).replace('class="fkp-pill', 'class="fkp-share-pill fkp-pill') : ''}
     ${shareFields(s)}
     <footer class="fkp-foot">${primary(submitLabel(s))}</footer>`;
   },
 };
-export const refinedProposal = ({ destination = 'top', noteIcon = true, siteIcon = false, open = null, collection = null } = {}) =>
+export const refinedProposal = ({ destination = 'inline', noteIcon = true, siteIcon = false, open = null, collection = null } = {}) =>
   mount(refined, initialState({ collection, opts: { destination, noteIcon, siteIcon } }), { open });
 export const proposal = (index, { state = {}, open = null } = {}) => mount(VARIANTS[index], initialState(state), { open });

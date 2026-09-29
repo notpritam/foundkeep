@@ -43,15 +43,14 @@ export const V5Sharing = { name: '5. Icon row · sharing', render: one(4, SHARIN
 // --- 6. Quiet sheet, refined: controls for the choices still open ------------------------------
 import { refinedProposal } from './add-details/variants.js';
 const refinedArgTypes = {
-  destination: { control: 'inline-radio', options: ['top', 'bottom', 'merged', 'none'], description: 'Where "My library" shows: a pill on top or at the bottom next to Share to a collection, one pill that also offers the collections, or not at all.' },
+  destination: { control: 'inline-radio', options: ['inline', 'merged', 'none'], description: 'In the row with the folder and tags: a "My library" pill plus Share to a collection, one "My library" pill whose list also offers the collections, or Share to a collection alone.' },
   noteIcon: { control: 'boolean', description: 'Note icon beside the note, like the property rows.' },
   siteIcon: { control: 'boolean', description: 'The page\'s icon beside the title.' },
   open: { table: { disable: true } },
   collection: { table: { disable: true } },
 };
-const refinedStory = (name, args, extra = {}) => ({ name, render: a => refinedProposal(a), args: { destination: 'top', noteIcon: true, siteIcon: false, ...args }, argTypes: refinedArgTypes, ...extra });
-export const V6 = refinedStory('6. Quiet sheet, refined', {}, { parameters: { docs: { description: { story: 'Pritam\'s pick: Quiet sheet with Properties\' boxless note and its icon, and "My library" as a pill instead of the Saved line. Use the controls to try where the pill goes and which icons show.' } } } });
-export const V6Bottom = refinedStory('6. Refined · My library at the bottom', { destination: 'bottom' });
+const refinedStory = (name, args, extra = {}) => ({ name, render: a => refinedProposal(a), args: { destination: 'inline', noteIcon: true, siteIcon: false, ...args }, argTypes: refinedArgTypes, ...extra });
+export const V6 = refinedStory('6. Quiet sheet, refined', {}, { parameters: { docs: { description: { story: 'Pritam\'s pick: Quiet sheet with Properties\' boxless note and its icon; nothing above the title — "My library" and Share to a collection sit in the row with the folder and tags. Use the controls to try one merged pill, and which icons show.' } } } });
 export const V6Merged = refinedStory('6. Refined · one My library pill', { destination: 'merged' });
 export const V6MergedOpen = refinedStory('6. Refined · one My library pill, open', { destination: 'merged', open: 'destination' });
 export const V6None = refinedStory('6. Refined · no My library pill', { destination: 'none' });
