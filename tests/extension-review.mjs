@@ -135,7 +135,9 @@ test('details: Add details opens the edit card pre-filled from the save, and bef
   await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures()).some(c => c.cloudStatus === 'queued' && c.cloudAttempts > 0), null);
   const card = await openDetails(web, dock);
   assert.match(card.url(), /^chrome-extension:\/\/[^/]+\/src\/review\.html\?tab=\d+&grant=[\w-]+$/);
-  assert.equal(await card.$eval('#detailsForm', form => form.firstElementChild.className), 'details__title-row', 'nothing above the title');
+  assert.deepEqual(await card.$eval('#detailsForm', form => [...form.children].filter(el => !el.hidden).slice(0, 2).map(el => el.className)), ['details__preview', 'details__title-row'], 'only the preview sits above the title');
+  assert.ok(await card.$('#detailsPreview .fk-preview--page'), 'a saved page previews as a page');
+  assert.equal(await card.getAttribute('#detailsPreview .fk-sync', 'data-state'), 'queued', 'offline: waiting to sync, in the preview corner');
   assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture', 'pre-filled from the saved capture');
   assert.equal(await card.inputValue('#detailsNote'), '');
   await card.waitForSelector('#detailsFeedback:empty', { state: 'attached' }); // folders and collections loaded
@@ -192,6 +194,57 @@ test('details: after upload, Add details sends PUT with the remote id, shares to
   const [local] = await localCaptures(ext);
   assert.deepEqual({ title: local.sourceTitle, note: local.noteText, tags: local.userTags, status: local.cloudStatus, shared: local.collectionSubmission?.id },
     { title: 'Edited after upload', note: 'A private note', tags: ['Keep'], status: 'synced', shared: 'col_1' });
+});
+
+test('details: the preview corner shows the sync state, and clicking a failed sync retries it', { timeout: 60000 }, async t => {
+  const { web, ext, dock, state } = await saveAndOpen(t, '__sync-status', { online: false });
+  await dock.click('[data-action="savepage"]');
+  await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures()).some(c => c.cloudStatus === 'queued' && c.cloudAttempts > 0), null);
+  const card = await openDetails(web, dock);
+  await card.waitForSelector('#detailsPreview .fk-sync--queued');
+  assert.equal(await card.getAttribute('#detailsPreview .fk-sync', 'data-tooltip'), 'Waiting to sync');
+  // The sync gives up: the card, asking every 2s, shows it and offers a retry.
+  await ext.evaluate(async () => { const db = await import('./db.js'); const [c] = await db.listCaptures(); await db.updateCapture(c.id, { cloudStatus: 'failed', cloudError: 'Try later.' }); });
+  await card.waitForSelector('#detailsPreview .fk-sync--failed', { timeout: 5000 });
+  assert.equal(await card.getAttribute('#detailsPreview .fk-sync', 'data-tooltip'), 'Didn’t sync — click to retry');
+  state.online = true;
+  await card.click('#detailsPreview .fk-sync');
+  await card.waitForSelector('#detailsPreview .fk-sync--synced', { timeout: 10000 });
+  await card.waitForSelector('#detailsPreview .fk-sync', { state: 'detached', timeout: 5000 });
+  assert.equal((await localCaptures(ext))[0].cloudStatus, 'synced');
+});
+
+test('details: the preview draws each kind of save from a small copy, never the capture bytes', { timeout: 40000 }, async t => {
+  const { ext } = await saveAndOpen(t, '__preview-kinds');
+  const previews = await ext.evaluate(async () => {
+    const db = await import('./db.js'), { readCaptureDetails } = await import('./capture-details.js'), { captureBinding } = await import('./cloud.js');
+    const { cloudAccountId } = await captureBinding();
+    const canvas = new OffscreenCanvas(1600, 4000); const g = canvas.getContext('2d'); g.fillStyle = '#4cc38a'; g.fillRect(0, 0, 1600, 4000);
+    const blob = await canvas.convertToBlob({ type: 'image/png' });
+    const add = input => db.addCapture({ cloudAccountId, sourceUrl: 'https://www.example.com/a', sourceTitle: 'A', ...input });
+    const ids = {
+      fullpage: await add({ type: 'screenshot', blob, width: 1600, height: 4000, provenance: { captureMethod: 'popup-full-page' } }),
+      region: await add({ type: 'screenshot', blob, width: 1600, height: 4000, provenance: { captureMethod: 'popup-region' } }),
+      post: await add({ type: 'highlight', cloudType: 'tweet', sourceTitle: 'Ada Kowalski (@adak) on X', selectionText: 'Spaced repetition is not a study hack.', socialContext: { version: 1, images: ['https://pbs.twimg.com/media/abc.jpg', 'https://evil.example/x.jpg'], links: [], articleText: '' }, provenance: { captureMethod: 'twitter-action' } }),
+      highlight: await add({ type: 'highlight', selectionText: 'Memory is built to discard.', provenance: { captureMethod: 'popup-highlight' } }),
+      page: await add({ type: 'bookmark', provenance: { captureMethod: 'popup-save-page', siteName: 'The Margin', description: 'Most of what we read is gone within a week.', leadImageUrl: 'https://www.example.com/cover.jpg' } }),
+      note: await add({ type: 'note', noteText: 'Call notes' }),
+    };
+    const out = {};
+    for (const [name, id] of Object.entries(ids)) {
+      const { preview, sync } = await readCaptureDetails(typeof id === 'object' ? id.id : id);
+      out[name] = { ...preview, image: preview.image?.startsWith('data:') ? { dataUrl: preview.image.slice(0, 22), length: preview.image.length } : preview.image, sync: sync.state };
+    }
+    return out;
+  });
+  assert.equal(previews.fullpage.kind, 'fullpage'); assert.equal(previews.region.kind, 'region');
+  assert.equal(previews.fullpage.image.dataUrl, 'data:image/webp;base64');
+  assert.ok(previews.region.image.length < 200000, 'a small preview, not the 1600×4000 capture: ' + previews.region.image.length);
+  assert.deepEqual([previews.fullpage.width, previews.fullpage.height, previews.fullpage.site], [1600, 4000, 'example.com']);
+  assert.deepEqual({ kind: previews.post.kind, author: previews.post.author, handle: previews.post.handle, image: previews.post.image }, { kind: 'post', author: 'Ada Kowalski', handle: '@adak', image: 'https://pbs.twimg.com/media/abc.jpg' });
+  assert.deepEqual({ kind: previews.highlight.kind, text: previews.highlight.text }, { kind: 'highlight', text: 'Memory is built to discard.' });
+  assert.deepEqual({ kind: previews.page.kind, site: previews.page.site, image: previews.page.image }, { kind: 'page', site: 'The Margin', image: 'https://www.example.com/cover.jpg' });
+  assert.equal(previews.note.kind, 'note');
 });
 
 test('details: an edit made while the upload is in flight is sent once the upload lands', { timeout: 40000 }, async t => {

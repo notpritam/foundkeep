@@ -177,3 +177,55 @@ textarea.fk-field--inline { min-height: calc(1.5em + 8px); max-height: 9.5em; }
 @media (prefers-reduced-motion: reduce) {
   .fk-button, .fk-select, .fk-field, .fk-listbox--popover, [data-tooltip]::after { transition: none; animation: none; }
 }
+
+/* Save preview — what was saved, framed: a screenshot or image (cropped from
+   the top; a full page fades out), a post, a highlight as a quote, or a page
+   (its cover image, or its site and description). A label names the kind.
+   kinds: --region · --fullpage · --image · --post · --highlight · --page */
+.fk-preview {
+  position: relative; box-sizing: border-box; margin: 0; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--fk-radius-md); background: var(--card);
+}
+.fk-preview--media { height: 132px; background: var(--panel); }
+.fk-preview--media > .fk-preview__image { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.fk-preview--fullpage::after { content: ''; position: absolute; inset: auto 0 0; height: 45%; background: linear-gradient(transparent, var(--card)); pointer-events: none; z-index: 1; }
+.fk-preview--page.fk-preview--media > .fk-preview__image { object-position: top left; }
+.fk-preview__label {
+  position: absolute; left: 8px; bottom: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px;
+  border-radius: var(--fk-radius-full); background: rgba(15, 16, 17, .72); color: #f7f8f8; font: var(--fk-text-micro); white-space: nowrap; backdrop-filter: blur(6px);
+}
+.fk-preview__post { padding: 12px; }
+.fk-preview__byline { display: flex; align-items: center; gap: 8px; font: var(--fk-text-caption); color: var(--muted); }
+.fk-preview__byline strong { color: var(--ink); font-weight: 600; }
+.fk-preview__avatar { display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: #2b2f36; color: #fff; font: 600 12px/1 var(--font); }
+.fk-preview__post p, .fk-preview__quote p, .fk-preview__page p { margin: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; }
+.fk-preview__post p { margin-top: 8px; font: var(--fk-text-body); -webkit-line-clamp: 3; }
+.fk-preview__post .fk-preview__image { display: block; width: 100%; height: 96px; margin-top: 10px; object-fit: cover; border-radius: var(--fk-radius-sm); border: 1px solid var(--line); }
+.fk-preview__quote { margin: 10px 12px; padding: 0 0 0 12px; border-left: 2px solid var(--accent); }
+.fk-preview__quote p { font: 400 14.5px/1.5 var(--font); color: var(--ink); -webkit-line-clamp: 4; }
+.fk-preview__quote p::before { content: '“'; }
+.fk-preview__quote p::after { content: '”'; }
+.fk-preview__quote cite { display: block; margin-top: 4px; font: var(--fk-text-caption); font-style: normal; color: var(--muted); }
+.fk-preview__page { display: grid; gap: 4px; padding: 12px; }
+.fk-preview__site { display: inline-flex; align-items: center; gap: 6px; font: var(--fk-text-label); color: var(--muted); }
+.fk-preview__page p { font: var(--fk-text-caption); color: var(--muted); -webkit-line-clamp: 2; }
+
+/* Sync status — whether a save has reached the library. An icon button; its
+   tooltip names the state and, when there is a fix, clicking runs it.
+   states: --queued (turning) · --failed (retry) · --local (sign in) · --synced
+   --overlay sits in the corner of a Save preview */
+.fk-sync { transition: opacity .3s var(--fk-ease), background-color .12s, color .12s; }
+.fk-sync--queued { color: var(--muted); cursor: default; }
+.fk-sync--queued .fk-icon { animation: fk-spin 1.6s linear infinite; }
+.fk-sync--failed { color: var(--bad); }
+.fk-sync--local, .fk-sync--synced { color: var(--accent); }
+.fk-sync--synced { cursor: default; }
+.fk-sync--leaving { opacity: 0; pointer-events: none; }
+.fk-sync--overlay { position: absolute; top: 8px; right: 8px; z-index: 3; background: rgba(15, 16, 17, .72) !important; color: #f7f8f8; backdrop-filter: blur(6px); }
+.fk-sync--overlay.fk-sync--failed { color: #ffb5a8; }
+.fk-sync--overlay.fk-sync--local, .fk-sync--overlay.fk-sync--synced { color: #4cc38a; }
+.fk-sync--overlay[data-tooltip]::after { left: auto; right: 0; transform: translate(0, 2px); }
+.fk-sync--overlay[data-tooltip]:hover::after { transform: translate(0, 0); }
+.fk-sync--overlay[data-tooltip]::after { bottom: auto; top: calc(100% + 6px); }
+@keyframes fk-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fk-sync--queued .fk-icon { animation: none; } }

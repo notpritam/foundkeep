@@ -16,6 +16,7 @@
   "src/review.css",
   "src/card-icons.js",
   "src/listbox.js",
+  "src/save-preview.js",
   "src/note.html",
   "src/note.js",
   "src/note.css",

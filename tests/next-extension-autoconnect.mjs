@@ -94,12 +94,15 @@ async function pick(card,trigger,value){for(let i=0;i<20;i++){await card.locator
  card=await addDetails();
  await card.locator('#detailsNote').fill(privateText+' — extra private context');
  await addTags(card,['Private research']);
+  // A note has no title of its own, and the private note never stands in for
+  // one: the card asks for a title before it shares.
+  await card.locator('#detailsTitle').fill('A chosen quote');
   await pick(card,'#detailsCollection',collection.id);
   await card.locator('#sharedBody').fill(sharedText);
   await card.locator('#detailsSave').click();
  await waitFor(async()=> (await (await context.request.get(base+'/api/collections/'+collection.id)).json()).entries.some(entry=>entry.body===sharedText));
  const entries=(await(await context.request.get(base+'/api/collections/'+collection.id)).json()).entries;assert.ok(!JSON.stringify(entries).includes(privateText));
- assert.ok(!JSON.stringify(entries).includes('Private research'));assert.deepEqual(entries.find(entry=>entry.body===sharedText).tags,[],'the card shares no collection tags');
+ assert.ok(!JSON.stringify(entries).includes('Private research'));assert.deepEqual(entries.find(entry=>entry.body===sharedText).tags,[],'the card shares no collection tags');assert.equal(entries.find(entry=>entry.body===sharedText).title,'A chosen quote');
  await waitFor(async()=> (await (await context.request.get(base+'/api/captures')).json()).captures.some(c=>c.noteText===privateText+' — extra private context'));
  const privateCopy=(await(await context.request.get(base+'/api/captures')).json()).captures.find(c=>c.noteText===privateText+' — extra private context');assert.ok(privateCopy);assert.deepEqual(privateCopy.userTags,['Private research']);
  await page.evaluate(()=>document.querySelectorAll('iframe[id^="details"]').forEach(frame=>frame.remove()));
