@@ -8,21 +8,12 @@ const withTheme = (story, { globals }) => {
   document.documentElement.dataset.theme = globals.theme || 'light';
   return story();
 };
-// Controls that live on the Add details card are shown on its surface.
-const withSurface = (story, { parameters }) => {
-  const out = story();
-  if (!parameters.surface) return out;
-  const surface = document.createElement('div');
-  surface.className = 'fk-surface' + (parameters.surface === 'wide' ? ' wide' : '');
-  if (typeof out === 'string') surface.innerHTML = out; else surface.append(out);
-  return surface;
-};
 
 const viewport = (name, width, height) => ({ name, styles: { width: `${width}px`, height: `${height}px` }, type: width < 600 ? 'mobile' : width < 1100 ? 'tablet' : 'desktop' });
 
 export default {
   tags: ['autodocs'],
-  decorators: [withSurface, withTheme],
+  decorators: [withTheme],
   globalTypes: {
     theme: {
       description: 'Light or dark (theme.css)',
@@ -43,6 +34,6 @@ export default {
         desktop: viewport('Desktop (1600)', 1600, 1000),
       },
     },
-    options: { storySort: { order: ['Welcome', 'Foundations', ['Colors', 'Typography', 'Shape', 'Icons'], 'Extension', ['Add details card', 'Card controls'], 'Proposals', ['Refined card', ['Chosen*', '*'], 'Add details card'], '*'] } },
+    options: { storySort: { order: ['Welcome', 'Foundations', ['Colors', 'Typography', 'Shape', 'Icons'], 'Extension', ['Add details card', 'Card controls', ['Pill', 'Tag chip', 'Title and note', 'Buttons', 'List picker']], '*'] } },
   },
 };

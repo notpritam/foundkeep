@@ -1,163 +1,108 @@
-// The extension's "Add details" card, built from its own source: the form is
-// cloned from review.html, the tag controls are rendered by the real
-// bindSaveTags() (save-details.js), and states are applied the way review.js
-// applies them. Single controls are cut from the same clone, so a change to
-// review.html shows up here without touching a story.
+// The extension's "Add details" card, built from its own source: the markup
+// is cloned from review.html, the styles are review.css + theme.css, the
+// icons come from card-icons.js and every list is the real picker.js. The
+// card's behaviour (loading, saving, sharing rules) lives in review.js, which
+// needs the extension's runtime; this mirrors only what it renders, so the
+// stories stay live — pick a folder, add and remove tags, share — without it.
 import reviewHtml from '../../apps/extension/src/review.html?raw';
-import { bindSaveTags } from '../../apps/extension/src/save-details.js';
+import { icon } from '../../apps/extension/src/card-icons.js';
+import { openPicker, closePicker } from '../../apps/extension/src/picker.js';
+import { normalizeSaveTags, STARTER_TAGS } from '../../apps/extension/src/save-details.js';
 
 const template = new DOMParser().parseFromString(reviewHtml, 'text/html').querySelector('#detailsForm');
 
-export const TITLE = 'The half-life of a good idea — The Margin';
+export const TITLE = 'The half-life of a good idea';
 export const NOTE = 'Worth rereading before the Q4 planning doc: the part about spacing reviews.';
-export const FOLDERS = ['Reading list', 'Research'];
-export const COLLECTIONS = [{ title: 'Design that works', visibility: 'public', requireApproval: true }];
-
-const option = (value, label = value) => Object.assign(document.createElement('option'), { value, textContent: label });
-const tone = (el, text, value = '') => { el.textContent = text; el.dataset.tone = value; };
+export const FOLDERS = [{ id: 'f-reading', name: 'Reading list' }, { id: 'f-research', name: 'Research' }, { id: 'f-essays', name: 'Essays' }];
+export const COLLECTIONS = [
+  { id: 'col-design', title: 'Design that works', visibility: 'public', requireApproval: true, canModerate: false },
+  { id: 'col-team', title: 'Team research', visibility: 'private', requireApproval: false },
+];
+const LIBRARY_TAGS = ['Memory', 'Reading', 'Learning'];
+const esc = value => { const span = document.createElement('span'); span.textContent = value; return span.innerHTML; };
+const visibilityIcon = c => c?.visibility === 'public' ? 'globe' : 'lock';
 
 /**
- * The whole card, 380px wide like the framed card.
- * state: 'prefilled' | 'empty' | 'new-folder' | 'sharing' | 'loading' | 'error'
+ * state: 'ready' | 'loading' | 'error' | 'saving' | 'unavailable' (details could not load)
+ * type: 'save' | 'note'; shared: an existing share ({ title, status }) or null
+ * open: 'folder' | 'tags' | 'collection' — a list open on first render
  */
-export function card({ state = 'prefilled', tags = ['Memory'], title = TITLE, note = NOTE, fullHeight = true } = {}) {
+export function card({ state = 'ready', type = 'save', title = TITLE, note = NOTE, folderId = 'f-reading', tags = ['Memory'], collectionId = '', caption = '', shared = null, open = null } = {}) {
   const form = template.cloneNode(true);
   const $ = id => form.querySelector('#' + id);
-  const empty = state === 'empty';
+  const s = { folderId, tags: [...tags], collectionId };
+  const loaded = state !== 'loading' && state !== 'unavailable';
+  const folders = loaded ? FOLDERS : [];
+  const collections = loaded && !shared ? COLLECTIONS : [];
+
+  $('detailsTitle').value = title;
+  $('detailsNote').value = note;
+  $('detailsNote').placeholder = type === 'note' ? 'Write your note' : 'Add a note';
+  $('sharedBody').value = caption;
+  $('detailsCancel').innerHTML = icon('close', 16);
+  $('detailsAddTag').innerHTML = `${icon('plus', 14)}<span>Tag</span>`;
+  $('detailsLibrary').innerHTML = `${icon('library', 15)}<span>My library</span>`;
   form.dataset.ready = String(state !== 'loading');
-  $('detailsEyebrow').textContent = 'Saved to My library';
-  $('detailsHeading').textContent = empty ? 'Your save' : title;
-  $('detailsTitle').value = empty ? '' : title;
-  $('detailsNote').value = empty ? '' : note;
-  $('detailsFolder').replaceChildren(option('', 'No folder'), ...FOLDERS.map(name => option(name)));
-  $('detailsCollection').replaceChildren(option('', 'Don’t share'), ...COLLECTIONS.map(c => option(c.title)));
-  bindSaveTags($('detailsTags'), () => {}).set(empty ? [] : tags);
-  $('detailsFields').disabled = state === 'loading';
-  $('detailsSave').disabled = state === 'loading' || state === 'error' || empty;
-  if (state === 'new-folder') {
-    $('detailsNewFolder').hidden = false;
-    $('detailsNewFolderToggle').setAttribute('aria-expanded', 'true');
-    $('detailsFolderName').value = 'Essays';
-  }
-  if (state === 'sharing') {
-    const collection = COLLECTIONS[0];
-    $('detailsCollection').value = collection.title;
-    $('detailsShare').hidden = false;
-    $('shareImageLabel').hidden = false;
-    $('sharedTitle').value = title;
-    $('sharedUrl').value = 'https://themargin.example/half-life-of-a-good-idea';
-    $('sharedBody').value = 'Most of what we read is gone within a week. A small practice of keeping changes what stays.';
-    bindSaveTags($('sharedTags'), () => {}).set(['Learning']);
-    $('detailsRules').textContent = 'Public collection: anyone can read approved entries. Your submission needs approval.';
-    $('detailsSave').textContent = 'Save and submit for approval';
-  }
-  if (state === 'loading') tone($('detailsFeedback'), 'Loading folders and collections…');
-  if (state === 'error') {
-    tone($('detailsFeedback'), 'Some folders or collections could not load. Retry, or save without them.', 'error');
-    $('detailsReload').hidden = false;
-  }
-  // The extension frames the card at most 600px tall and scrolls its fields;
-  // here it shows whole unless fullHeight is off.
-  form.style.maxHeight = fullHeight ? 'none' : '600px';
+
+  const chosen = () => collections.find(c => c.id === s.collectionId) || null;
+  const render = () => {
+    const folder = folders.find(f => f.id === s.folderId);
+    const folderLabel = !s.folderId ? 'No folder' : folder ? folder.name : 'Unavailable folder';
+    $('detailsFolder').innerHTML = `${icon('folder', 15)}<span>${esc(folderLabel)}</span>${icon('chevron', 14)}`;
+    $('detailsFolder').classList.toggle('unavailable', !!s.folderId && !folder && folders.length > 0);
+    $('detailsTags').innerHTML = s.tags.map(t => `<button type="button" class="chip" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}"><span>${esc(t)}</span>${icon('close', 12)}</button>`).join('');
+    const c = chosen();
+    if (shared) {
+      $('detailsCollection').innerHTML = `${icon('collection', 15)}<span>${esc(shared.title)}</span>`;
+      $('detailsCollection').classList.remove('ghost');
+      $('detailsCollection').dataset.tip = shared.status === 'pending' ? 'Waiting to sync or for approval' : 'Shared';
+    } else {
+      $('detailsCollection').innerHTML = `${icon(c ? visibilityIcon(c) : 'collection', 15)}<span>${esc(c ? c.title : 'Share')}</span>`;
+      $('detailsCollection').classList.toggle('ghost', !c);
+    }
+    $('detailsShare').hidden = !c;
+    if (c) $('detailsShareIcon').innerHTML = icon(visibilityIcon(c), 15);
+    const locked = state === 'loading' || state === 'saving';
+    for (const id of ['detailsTitle', 'detailsNote', 'detailsFolder', 'detailsAddTag', 'sharedBody', 'detailsSave']) $(id).disabled = locked;
+    $('detailsCollection').disabled = locked || !!shared;
+    $('detailsSave').textContent = state === 'saving' ? 'Saving…' : c ? 'Save' : 'Save details';
+  };
+
+  const feedback = { loading: ['Loading folders and collections…', ''], error: ['Some folders or collections could not load. Retry, or save without them.', 'error'], saving: ['Saving…', ''], unavailable: ['This save is no longer available.', 'error'] }[state];
+  if (feedback) { $('detailsFeedback').textContent = feedback[0]; $('detailsFeedback').dataset.tone = feedback[1]; }
+  $('detailsReload').hidden = state !== 'error';
+  if (state === 'unavailable') for (const el of form.querySelectorAll('.pills, .foot > :not(#detailsReload), #detailsNote')) el.hidden = true;
+
+  const lists = {
+    folder: () => openPicker({
+      trigger: $('detailsFolder'), host: form, label: 'Folder', placeholder: 'Find a folder',
+      options: () => [{ value: '', label: 'No folder', selected: !s.folderId }, ...folders.map(f => ({ value: f.id, label: f.name, selected: f.id === s.folderId }))],
+      onPick: o => { s.folderId = o.value; render(); },
+      create: { label: (q, exact) => q ? (exact ? '' : `New folder “${q}”`) : 'New folder', run: (q, input) => { if (!q) { input.placeholder = 'Name the new folder'; return; } const id = `f-${Date.now()}`; folders.push({ id, name: q }); s.folderId = id; closePicker({ focusTrigger: true }); render(); } },
+    }),
+    tags: () => openPicker({
+      trigger: $('detailsAddTag'), host: form, label: 'Personal tags', placeholder: 'Find or create a tag',
+      options: () => [...new Set([...s.tags, ...LIBRARY_TAGS, ...STARTER_TAGS])].map(t => ({ value: t, label: t, selected: s.tags.includes(t) })),
+      onPick: o => { s.tags = normalizeSaveTags(s.tags.includes(o.value) ? s.tags.filter(t => t !== o.value) : [...s.tags, o.value]); render(); return true; },
+      create: { label: (q, exact) => q && !exact ? `Create “${q.replace(/^#/, '')}”` : '', run: q => { s.tags = normalizeSaveTags([...s.tags, q]); render(); } },
+    }),
+    collection: () => openPicker({
+      trigger: $('detailsCollection'), host: form, label: 'Share to a collection', placeholder: 'Find a collection',
+      options: () => [{ value: '', label: 'Don’t share', selected: !s.collectionId }, ...collections.map(c => ({ value: c.id, label: c.title, icon: visibilityIcon(c), selected: c.id === s.collectionId, meta: `${c.visibility === 'public' ? 'Public' : 'Private'}${c.requireApproval && !c.canModerate ? ', needs approval' : ''}` }))],
+      onPick: o => { s.collectionId = o.value; render(); },
+    }),
+  };
+  $('detailsFolder').onclick = () => $('detailsFolder').getAttribute('aria-expanded') === 'true' ? closePicker() : lists.folder();
+  $('detailsAddTag').onclick = () => $('detailsAddTag').getAttribute('aria-expanded') === 'true' ? closePicker() : lists.tags();
+  $('detailsCollection').onclick = () => $('detailsCollection').getAttribute('aria-expanded') === 'true' ? closePicker() : lists.collection();
+  $('detailsTags').onclick = event => { const chip = event.target.closest('.chip'); if (chip) { s.tags = s.tags.filter(t => t !== chip.dataset.tag); render(); } };
+  form.onsubmit = event => event.preventDefault();
+  render();
+
+  // The extension frames the card 380px wide.
   const frame = document.createElement('div');
   frame.style.cssText = 'width:380px;max-width:100%';
   frame.append(form);
+  if (open) { const go = () => form.isConnected ? lists[open]() : requestAnimationFrame(go); requestAnimationFrame(go); }
   return frame;
-}
-
-// --- Single controls, cut from a clone of the same form ----------------------
-// Ids are dropped so a docs page can hold many copies; review.css rules keyed
-// to ids are kept by wrapping the control in the ids' context.
-function strip(node) { node.removeAttribute?.('id'); node.querySelectorAll?.('[id]').forEach(el => el.removeAttribute('id')); node.querySelectorAll?.('[for]').forEach(el => el.removeAttribute('for')); return node; }
-/** Wrap controls as they sit in the card body (review.css keys off #detailsContent). */
-export function inBody(...nodes) {
-  const body = document.createElement('fieldset'); body.className = 'review-body'; body.style.cssText = 'padding:0;overflow:visible';
-  const content = document.createElement('div'); content.id = 'detailsContent'; content.append(...nodes);
-  body.append(content); return body;
-}
-const labelOf = input => input.closest('label');
-
-export function textField({ label = 'Title', value = TITLE, placeholder = 'Give this save a useful name', disabled = false } = {}) {
-  const field = labelOf(template.querySelector('#detailsTitle')).cloneNode(true); strip(field);
-  field.firstChild.textContent = label;
-  const input = field.querySelector('input'); input.placeholder = placeholder; input.value = value; input.disabled = disabled;
-  return inBody(field);
-}
-export function textArea({ label = 'Personal note', value = NOTE, placeholder = 'Why are you saving this?', rows = 3, disabled = false } = {}) {
-  const field = labelOf(template.querySelector('#detailsNote')).cloneNode(true); strip(field);
-  field.querySelector('span').textContent = label;
-  const area = field.querySelector('textarea'); area.placeholder = placeholder; area.value = value; area.rows = rows; area.disabled = disabled;
-  return inBody(field);
-}
-export function dropdown({ kind = 'folder', value = '', disabled = false, unavailable = false } = {}) {
-  if (kind === 'collection') {
-    const field = labelOf(template.querySelector('#detailsCollection')).cloneNode(true); strip(field);
-    const select = field.querySelector('select');
-    select.replaceChildren(option('', 'Don’t share'), ...COLLECTIONS.map(c => option(c.title)));
-    select.value = value; select.disabled = disabled;
-    return inBody(field);
-  }
-  const field = labelOf(template.querySelector('#detailsFolder')).cloneNode(true); strip(field);
-  const select = field.querySelector('select');
-  select.replaceChildren(...(unavailable ? [option('gone', 'Unavailable folder — choose another')] : []), option('', 'No folder'), ...FOLDERS.map(name => option(name)));
-  select.value = unavailable ? 'gone' : value; select.disabled = disabled;
-  return inBody(field);
-}
-export function folderRow({ newFolder = false, status = '' } = {}) {
-  const head = strip(template.querySelector('.destination-folder-head').cloneNode(true));
-  head.querySelector('button').setAttribute('aria-expanded', String(newFolder));
-  const select = dropdown().querySelector('label');
-  const nodes = [head, select];
-  if (newFolder) {
-    const form = template.querySelector('#detailsNewFolder').cloneNode(true); strip(form);
-    form.hidden = false; form.id = 'detailsNewFolder'; // review.css styles it by id
-    form.querySelector('input').value = 'Essays';
-    tone(form.querySelector('.statusline'), status);
-    nodes.push(form);
-  }
-  return inBody(...nodes);
-}
-export function button({ kind = 'primary', label = 'Save details', disabled = false } = {}) {
-  const b = document.createElement('button'); b.type = 'button'; b.className = `btn ${kind}`; b.textContent = label; b.disabled = disabled;
-  return b;
-}
-export function actionBar({ state = 'ready', saveLabel = 'Save details' } = {}) {
-  const foot = strip(template.querySelector('.review-foot').cloneNode(true));
-  const [feedback] = foot.querySelectorAll('.statusline');
-  const [reload, cancel, save] = foot.querySelectorAll('button');
-  save.textContent = saveLabel;
-  save.disabled = state !== 'ready';
-  if (state === 'error') { tone(feedback, 'Some folders or collections could not load. Retry, or save without them.', 'error'); reload.hidden = false; }
-  if (state === 'saving') { tone(feedback, 'Saving…'); cancel.disabled = true; save.textContent = 'Saving…'; }
-  const frame = document.createElement('div'); frame.style.cssText = 'width:380px;max-width:100%'; frame.append(foot);
-  return frame;
-}
-export function tagChip({ name = 'Read later', chosen = false } = {}) {
-  const chip = document.createElement('button'); chip.type = 'button';
-  chip.className = 'save-tag-chip' + (chosen ? ' selected' : '');
-  chip.textContent = chosen ? `${name} ×` : `+ ${name}`;
-  chip.setAttribute('aria-label', (chosen ? 'Remove tag ' : 'Add tag ') + name);
-  return chip;
-}
-/** The live tag control: bindSaveTags() renders it and handles typing, Enter, chips and errors. */
-export function tagEntry({ legend = 'Personal tags', tags = [], typed = '', error = false } = {}) {
-  const field = strip(template.querySelector('#detailsTags').closest('fieldset').cloneNode(true));
-  field.querySelector('legend').textContent = legend;
-  const control = bindSaveTags(field.querySelector('div'), () => {});
-  control.set(tags, typed);
-  if (typed) field.querySelector('input').dispatchEvent(new Event('input'));
-  if (error) control.flush(); // runs the real validation, which shows its own message
-  return inBody(field);
-}
-export function checkbox({ label = 'Include the saved image', checked = false, disabled = false } = {}) {
-  const field = strip(template.querySelector('#shareImageLabel').cloneNode(true));
-  field.hidden = false; field.lastChild.textContent = label;
-  const box = field.querySelector('input'); box.checked = checked; box.disabled = disabled;
-  return inBody(field);
-}
-export function disclosure({ open = false, excerpt = 'In 1885 Hermann Ebbinghaus sat alone in a room memorising nonsense syllables and testing himself at intervals. What he found has been rediscovered by every student since.' } = {}) {
-  const details = template.querySelector('#detailsOriginal').cloneNode(true); // review.css styles it by id
-  details.hidden = false; details.open = open;
-  details.querySelector('#detailsExcerpt').textContent = excerpt;
-  return inBody(details);
 }

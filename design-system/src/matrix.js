@@ -26,7 +26,7 @@ export function matrix(columns, { width = 300 } = {}) {
     const pair = document.createElement('div'); pair.className = 'fk-pair';
     for (const theme of ['light', 'dark']) {
       const cell = document.createElement('div');
-      cell.className = 'fk-cell' + (column.state ? ` is-${column.state}` : '');
+      cell.className = 'fk-cell card' + (column.state ? ` is-${column.state}` : '');
       cell.dataset.theme = theme;
       cell.style.cssText = tokens(theme);
       cell.append(column.make());

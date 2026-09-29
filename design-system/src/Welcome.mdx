@@ -4,22 +4,19 @@ import { Meta } from '@storybook/addon-docs/blocks';
 
 # FoundKeep design system
 
-Everything here is **live**: stories render the product's own stylesheets and
-markup — `theme.css`, `review.css`, `review.html`, the real `bindSaveTags()` and
-the icons in `dock.js` — so what you see is what ships, and nothing is a
+The approved design, live. Every story renders the product's own source —
+`theme.css`, `review.css`, `review.html`, `picker.js`, `card-icons.js`, the
+icons in `dock.js` — so what you see is what ships, and nothing is a
 screenshot.
 
-- **Sidebar** — Foundations (colours, type, shape, icons), then each surface:
-  the Add details card and every control inside it. Each control has one story
-  per state plus **All states · light & dark**.
-- **Controls** (bottom panel) — change a story's label, value, variant or
-  disabled state.
-- **Toolbar** — *Theme* switches light / dark the way the extension's
-  appearance setting does; *Viewport* sizes the canvas (Extension card 380,
-  phone, tablet, laptop, desktop — or leave it responsive); the pseudo-state
-  button forces hover / focus / active on any story.
-- **Docs** tab on each component shows every story on one page.
+- **Foundations** — colours (light and dark tokens), type, corner radii and
+  the icon family, measured from the real components.
+- **Extension / Add details card** — the card that opens from the dock after a
+  save, in each of its states: pick a folder, add and remove tags, share to a
+  collection.
+- **Extension / Card controls** — its pills, tag chips, title and note,
+  buttons and the list picker, each with an *All states · light & dark* view.
 
-Feedback: name the story (for example *Card controls / Dropdown / Focus*) and
-what should change. Redesigns land here as new stories next to the current ones
-before they ship.
+The toolbar's **Theme** switches light and dark as the extension's appearance
+setting does, **Viewport** sizes the canvas (the 380px card width to desktop),
+and the pseudo-state button forces hover, focus or pressed on any story.
