@@ -4,7 +4,7 @@
 
 **Goal:** Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.
 
-**Launch readiness: 13%** — 10 of 75 launch items done · 19 waiting on Pritam · updated 2026-09-28
+**Launch readiness: 13%** — 10 of 78 launch items done · 19 waiting on Pritam · updated 2026-09-29
 
 **Production (2026-09-27 04:13 UTC):** 21 accounts (0 new in 7d) · 2 active in 7d · 146 saves (47 in 7d) · 0 paying · 0 open tickets
 
@@ -17,7 +17,7 @@
 | P2 Open signups safely | 0% | 0 | 0 | 9 | 0 |
 | P3 Accounts, email & legal | 0% | 0 | 0 | 9 | 0 |
 | P4 Monetization | 0% | 0 | 0 | 8 | 0 |
-| P5 Product gaps | 0% | 0 | 2 | 14 | 0 |
+| P5 Product gaps | 0% | 0 | 3 | 16 | 0 |
 | P6 Store launch | 0% | 0 | 0 | 9 | 0 |
 | P7 Launch | 0% | 0 | 1 | 5 | 0 |
 | L Later (asked) _(post-launch)_ | 0% | 0 | 0 | 18 | 1 |
@@ -134,7 +134,10 @@ _Exit criteria:_ Every ★ item marked for launch is live in prod and in the shi
 | ○ To do | ★ Admin console: real uptime, actual spend, social-session status | admin | agent |  |
 | ○ To do | ★ Publish launch public collections so Explore isn't empty | collections | **Pritam** | Prod has 0 public collections. |
 | ○ To do | ★ Update public copy: versions, 'private beta' wording, beta page build number | site | agent |  |
-| ◐ In progress | ★ Extension: floating dock replaces the side panel | extension | agent | Merged to main 2026-09-28 (PR #2, c6bdf56): dock, review card, always-on, import page, account-only saves, 1.7.x side-panel save recovery; extension 1.8.0. Dev build on Pritam's Mac for testing. Before friends: keep review mode after "Hide on this site" mid-review, verify a real 1.7.12 → 1.8.0 upgrade, then publish ext-v1.8.0. |
+| ◐ In progress | ★ Extension: floating dock replaces the side panel | extension | agent | 1.8.0 merged 2026-09-28 (PR #2). 1.8.1 merged 2026-09-29: saves happen at once (no review first), Add details edits a save after it happens, the corner screenshot toolbar, the dock as a bookmark tab tucked into the edge (draggable anywhere, no grip), an icon-only toolbar with tooltips, one rounded icon set, and the approved Add details card with FoundKeep list pickers instead of native dropdowns. Dev build on Pritam's Mac. Before friends: verify a real 1.7.12 → 1.8.1 upgrade, then publish ext-v1.8.1. |
+| ◐ In progress | ★ Design system: extension components on shared tokens, in Storybook | design | agent | Storybook in design-system/ (omni :8814, bb Connect) renders the product's own CSS and markup. Next: name components as a design system (Button, Tag, Select, Listbox, Badge, Text field, Tooltip…) with variants and sizes, move their CSS to one shared stylesheet the extension pages use, and tidy the previews. |
+| ○ To do | ★ Design system: bring the mobile app onto it | design | agent | After the extension. Same tokens and component names in the Expo app (replaces the azure palette item P5.7 when done). |
+| ○ To do | ★ Design system: bring the website and dashboard onto it | design | agent | After the app. The Next.js site and dashboard adopt the same tokens and components; Storybook grows a Web section. |
 
 ## P6 · Store launch
 
