@@ -18,6 +18,9 @@ const config: StorybookConfig = {
     const aliases = shared.map(name => ({ find: new RegExp(`^${name}(?=$|/)`), replacement: path.join(root, 'node_modules', name) }));
     // Screens render outside a navigator: expo-router is replaced by mocks/expo-router.tsx.
     aliases.push({ find: /^expo-router$/, replacement: path.resolve(import.meta.dirname, '../mocks/expo-router.tsx') });
+    // Dynamic Type on the web: the app's text wrappers scale by the simulator's text size.
+    aliases.push({ find: /^(.*\/)?AdaptiveText\.tsx$/, replacement: path.resolve(import.meta.dirname, '../mocks/AdaptiveText.tsx') });
+    aliases.push({ find: /^(.*\/)?AdaptiveTextInput\.tsx$/, replacement: path.resolve(import.meta.dirname, '../mocks/AdaptiveTextInput.tsx') });
     config.resolve = { ...config.resolve, dedupe: [...(config.resolve?.dedupe || []), ...shared],
       alias: [...aliases, ...(Array.isArray(config.resolve?.alias) ? config.resolve.alias : Object.entries(config.resolve?.alias || {}).map(([find, replacement]) => ({ find, replacement: replacement as string })))] };
     config.server = { ...config.server, fs: { ...config.server?.fs, allow: [root, path.resolve(root, '../foundkeep-scenic-landing/node_modules')] } };
