@@ -76,6 +76,7 @@ export const dashboardHandlers = [
   http.get('*/api/preferences', () => HttpResponse.json(preferences)),
   http.put('*/api/preferences', async ({ request }) => HttpResponse.json({ ...preferences, preferences: (await request.json() as { preferences?: object }).preferences || preferences.preferences, revision: preferences.revision + 1 })),
   http.get('*/api/captures', ({ request }) => { const captures = listFor(new URL(request.url)); return HttpResponse.json({ captures, nextCursor: null, total: captures.length }); }),
+  http.get('*/api/captures/:id/related', () => HttpResponse.json({ items: world.related.map(r => ({ ...r, capture: toWeb(r.capture) })) })),
   http.get('*/api/captures/:id/preservation', () => HttpResponse.json({ preservation: null })),
   http.get('*/api/captures/:id/processing', () => HttpResponse.json({ job: null, processing: null })),
   http.get('*/api/captures/:id/:kind', ({ params }) => {
