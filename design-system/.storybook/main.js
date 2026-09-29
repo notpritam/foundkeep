@@ -6,7 +6,8 @@ export default {
   stories: ['../src/**/*.mdx', '../src/**/*.stories.js'],
   addons: ['@storybook/addon-docs', 'storybook-addon-pseudo-states'],
   core: { disableTelemetry: true },
-  staticDirs: ['../public'],
+  // downloads/ holds the latest dev extension (scripts/dev-extension.mjs).
+  staticDirs: ['../public', { from: '../downloads', to: '/downloads' }],
   docs: { defaultName: 'Docs' },
   // The stories import from ../apps; bb Connect serves this under another host.
   viteFinal: config => ({ ...config, server: { ...config.server, allowedHosts: true, fs: { ...config.server?.fs, allow: ['../..'] } } }),
