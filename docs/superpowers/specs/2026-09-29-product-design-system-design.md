@@ -123,7 +123,7 @@ simulator on the Mac.
   the real dashboard inside the frames, clickable, against one throwaway demo
   backend.
   - The seed script creates the demo account and the fixture world. Rerunning it resets the data.
-  - Ports: **8817** demo backend (loopback), **8818** demo gateway (public, via bb Connect), **8819** demo Next server (loopback). They run as user services and are registered in `~/personal/CLAUDE.md`.
+  - Ports: **8817** demo backend (loopback), **8818** demo gateway (public, via bb Connect), **8820** demo Next server (loopback). They run as user services and are registered in `~/personal/CLAUDE.md`.
   - The gateway serves the app's web export under `/app/` and proxies everything else to the demo dashboard. The app then calls the API on its own origin, with no cross-origin setup.
   - Only the demo gateway allows framing, and only by the Storybook origin.
 - **Honest limit.** The web version of the phone app is close to iOS but not

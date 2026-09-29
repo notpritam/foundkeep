@@ -4,6 +4,7 @@ import '../../../apps/site/app/appearance.css';
 import '../../../apps/site/app/interface.css';
 import '../../../apps/site/app/customer.css';
 import { initialize, mswLoader } from 'msw-storybook-addon';
+import { ThemeProvider } from '../../../apps/site/components/appearance/theme';
 import { DEVICES, WEB_DEVICES, simulatorGlobals } from '../../simulator/devices.ts';
 import { dashboardHandlers } from '../src/handlers.ts';
 import { BrowserFrame, innerUrl, isInner, listenForInnerErrors, relayErrorsToParent } from '../../simulator/Frame.tsx';
@@ -16,13 +17,16 @@ if (isInner()) document.head.insertAdjacentHTML('beforeend', '<style>html,body,#
 
 /** Pages (parameters.simulator) render in a browser window of the chosen size; components render as they are. */
 const simulator: Decorator = (Story, { id, globals, parameters }) => {
-  const dark = globals.theme === 'dark';
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const dark = globals.theme === 'dark', theme = dark ? 'dark' : 'light';
+  document.documentElement.dataset.theme = theme;
+  // The dashboard's ThemeProvider reads the stored preference, so components
+  // that ask useTheme() (Settings, the mind map, the header toggle) agree.
+  try { localStorage.setItem('foundkeep.appearance', theme); } catch { /* storage unavailable */ }
   if (parameters.simulator && !isInner()) {
     const device = DEVICES[globals.device] || DEVICES.desktop;
     return <BrowserFrame device={device} src={innerUrl(id, globals)} dark={dark} url={parameters.url || 'foundkeep.app/dashboard'} />;
   }
-  return <Story />;
+  return <ThemeProvider key={theme}><Story /></ThemeProvider>;
 };
 
 const preview: Preview = {

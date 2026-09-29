@@ -23,20 +23,26 @@ async function call(pathname, { method = 'GET', body, cookie, token } = {}) {
   return { data, cookie: response.headers.get('set-cookie')?.split(';')[0] };
 }
 
-// 1. The one demo account: create it once, then sign in with the stored password.
-let state = await readFile(STATE, 'utf8').then(JSON.parse).catch(() => null);
-if (!state) {
-  // A known password on purpose: this instance only holds the sample world and is
-  // reachable only through the owner's bb Connect session; Storybook's Live page shows it.
-  state = { email: DEMO_EMAIL, password: DEMO_PASSWORD, name: world.account.name };
-  await writeFile(STATE, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 });
-  await call('/api/auth/register', { method: 'POST', body: state }).catch(error => { if (error.status !== 409) throw error; });
-}
-await chmod(STATE, 0o600);
-// Reuse the stored sessions while they work: sign-ins are rate limited (10 per
-// email and 20 per address every 15 minutes).
+// 1. The one demo account. Sign in; if the backend has no such account (first
+// run, wiped data, or deleted from the live dashboard) create it. The state
+// file is written only once a session exists.
+const stored = await readFile(STATE, 'utf8').then(JSON.parse).catch(() => null);
+const state = { ...stored, email: DEMO_EMAIL, password: DEMO_PASSWORD, name: world.account.name };
+const account = { email: state.email, password: state.password };
 const works = async (pathname, auth) => call(pathname, auth).then(() => true, () => false);
-let cookie = state.cookie && await works('/api/me', { cookie: state.cookie }) ? state.cookie : (await call('/api/auth/login', { method: 'POST', body: { email: state.email, password: state.password } })).cookie;
+async function webSession() {
+  if (state.cookie && await works('/api/me', { cookie: state.cookie })) return state.cookie;
+  try { return (await call('/api/auth/login', { method: 'POST', body: account })).cookie; }
+  catch (error) {
+    if (error.status !== 401) throw error;
+    return (await call('/api/auth/register', { method: 'POST', body: { ...account, name: state.name } })).cookie
+      || (await call('/api/auth/login', { method: 'POST', body: account })).cookie;
+  }
+}
+const cookie = await webSession();
+await writeFile(STATE, JSON.stringify({ email: state.email, password: state.password, name: state.name, cookie }, null, 2) + '\n', { mode: 0o600 });
+await chmod(STATE, 0o600);
+
 // Every app sign-in adds a connected device and the account has a limit, so the
 // reset disconnects them all (the gateway signs in again on its next image).
 for (const c of (await call('/api/me', { cookie })).data.connections || []) await call(`/api/connections/${c.id}`, { method: 'DELETE', cookie }).catch(() => {});
