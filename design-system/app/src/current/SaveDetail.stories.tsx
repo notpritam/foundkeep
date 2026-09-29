@@ -1,0 +1,22 @@
+import type { Meta, StoryObj } from '@storybook/react-native-web-vite';
+import CaptureDetail from '../../../../apps/mobile/src/app/(app)/capture/[id].tsx';
+import SavedTogether from '../../../../apps/mobile/src/app/(app)/batch/[id].tsx';
+import { saves } from '../../../fixtures/world.ts';
+
+const meta: Meta = { title: 'Current/Save detail', parameters: { simulator: true, layout: 'fullscreen' }, render: () => <CaptureDetail /> };
+export default meta;
+type Story = StoryObj;
+const detail = (id: string, name: string): Story => ({ name, parameters: { route: { pathname: '/capture/' + id, params: { id }, header: 'Saved item' } } });
+export const Bookmark = detail(saves.bookmark.id, 'A saved page');
+export const RegionScreenshot = detail(saves.region.id, 'A region screenshot');
+export const FullPage = detail(saves.fullpage.id, 'A full-page screenshot');
+export const Image = detail(saves.image.id, 'An image');
+export const PostOnX = detail(saves.post.id, 'A post on X');
+export const Highlight = detail(saves.highlight.id, 'A highlight');
+export const Note = detail(saves.note.id, 'A note');
+export const Document = detail(saves.document.id, 'A document');
+export const Audio = detail(saves.audio.id, 'Audio');
+export const Video = detail(saves.video.id, 'A video');
+export const Processing = detail(saves.processing.id, 'Still preparing');
+export const Failed = detail(saves.failed.id, 'Could not be read');
+export const Batch: Story = { name: 'Saved together', render: () => <SavedTogether />, parameters: { route: { pathname: '/batch/batch-kitchen', params: { id: 'batch-kitchen' }, header: 'Saved together' } } };

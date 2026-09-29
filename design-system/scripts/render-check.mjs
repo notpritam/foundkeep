@@ -32,7 +32,9 @@ async function check(story) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text().slice(0, 300)); });
-  page.on('response', r => { if (r.status() >= 400) errors.push(`HTTP ${r.status()} ${r.url()}`); });
+  // Stories tagged expected-http-errors fail a request on purpose (an error state).
+  const httpOk = (story.tags || []).includes('expected-http-errors');
+  page.on('response', r => { if (r.status() >= 400 && !httpOk) errors.push(`HTTP ${r.status()} ${r.url()}`); });
   page.on('pageerror', e => errors.push(String(e.message || e).slice(0, 300)));
   const url = `${base}/iframe.html?id=${story.id}&viewMode=story${globals ? '&globals=' + encodeURIComponent(globals) : ''}`;
   let a11y = [];

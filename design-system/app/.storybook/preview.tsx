@@ -6,6 +6,7 @@ import { MaterialProvider } from '../../../apps/mobile/src/components/ScenicSurf
 import { palettes } from '../../../apps/mobile/src/theme.ts';
 import { StoryRoute } from '../mocks/expo-router.tsx';
 import { StorySession } from '../src/StoryApp.tsx';
+import { BillingProvider } from '../../../apps/mobile/src/billing/BillingProvider.tsx';
 import { appHandlers } from '../src/handlers.ts';
 import { APP_DEVICES, DEVICES, accessibilityGlobals, simulatorGlobals, textSizeGlobal } from '../../simulator/devices.ts';
 import { PhoneFrame, innerUrl, isInner, listenForInnerErrors, relayErrorsToParent } from '../../simulator/Frame.tsx';
@@ -19,7 +20,9 @@ listenForInnerErrors();
 if (isInner()) document.head.insertAdjacentHTML('beforeend', '<style>html,body,#storybook-root{height:100%;margin:0}body{padding:0!important;display:block!important}#storybook-root{display:flex;flex-direction:column}</style>');
 
 const none = { top: 0, bottom: 0, left: 0, right: 0 };
-/** Screens (parameters.simulator) render inside the device; components render as they are. */
+/** Screens (parameters.simulator) render inside the device; components render as they are.
+ * parameters.route = { pathname, params, header } is the route a screen sees; parameters.session
+ * picks the sample session; parameters.msw.handlers.story overrides the sample world. */
 const simulator: Decorator = (Story, { id, globals, parameters }) => {
   const device = DEVICES[globals.device] || DEVICES['iphone-17-pro'];
   const scheme = globals.theme === 'dark' ? 'dark' : 'light';
@@ -31,7 +34,7 @@ const simulator: Decorator = (Story, { id, globals, parameters }) => {
   return <SafeAreaInsetsContext.Provider value={insets}><SafeAreaFrameContext.Provider value={{ x: 0, y: 0, width: device.width, height: device.height }}>
     <AppearanceContext.Provider value={{ preference: scheme, scheme, setPreference: async () => {} }}>
       <TextScale.Provider value={Number(globals.textSize) || 1}>
-        <MaterialProvider key={`${globals.transparency}-${globals.motion}`}><StorySession>{story}</StorySession></MaterialProvider>
+        <MaterialProvider key={`${globals.transparency}-${globals.motion}`}><StorySession mode={parameters.session}>{parameters.session === 'signed-out' ? story : <BillingProvider>{story}</BillingProvider>}</StorySession></MaterialProvider>
       </TextScale.Provider>
     </AppearanceContext.Provider>
   </SafeAreaFrameContext.Provider></SafeAreaInsetsContext.Provider>;
@@ -42,6 +45,6 @@ const preview: Preview = {
   decorators: [simulator],
   globalTypes: simulatorGlobals(APP_DEVICES, { ...textSizeGlobal, ...accessibilityGlobals }),
   initialGlobals: { device: 'iphone-17-pro', theme: 'light', textSize: '1', motion: 'full', transparency: 'full' },
-  parameters: { options: { storySort: { order: ['Start here', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', msw: { handlers: appHandlers } },
+  parameters: { options: { storySort: { order: ['Start here', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', msw: { handlers: { story: [], world: appHandlers } } },
 };
 export default preview;
