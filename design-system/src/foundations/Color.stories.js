@@ -33,7 +33,7 @@ function table() {
   return wrap;
 }
 export default {
-  title: 'Foundations/Colors',
+  title: 'Foundations/Color',
   render: table,
   parameters: { layout: 'padded', docs: { description: { component: 'The colour tokens every extension surface consumes (apps/extension/src/theme.css), light and dark, read live from the stylesheet — plus the colours the dock hard-codes today.' } } },
 };

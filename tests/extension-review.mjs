@@ -85,31 +85,31 @@ async function feedbackMatches(frame, pattern, timeout = 5000) {
   }
   throw new Error(`feedback never matched ${pattern}: ${JSON.stringify(text)}`);
 }
-// The card's controls are FoundKeep list pickers (picker.js), not <select>s.
+// The card's Selects open FoundKeep Listboxes (listbox.js), not native <select>s.
 async function addTag(card, value) {
   await card.click('#detailsAddTag');
-  await card.fill('.picker input', value);
-  await card.press('.picker input', 'Enter');
-  await card.waitForSelector(`#detailsTags .chip[data-tag="${value}"]`, { state: 'attached' });
-  await card.press('.picker input', 'Escape');
-  await card.waitForSelector('.picker', { state: 'detached' });
+  await card.fill('.fk-listbox__input', value);
+  await card.press('.fk-listbox__input', 'Enter');
+  await card.waitForSelector(`#detailsTags .fk-tag[data-tag="${value}"]`, { state: 'attached' });
+  await card.press('.fk-listbox__input', 'Escape');
+  await card.waitForSelector('.fk-listbox', { state: 'detached' });
 }
-/** Open a picker, wait for the option (folders and collections load after the card), pick it. */
+/** Open a Select's Listbox, wait for the option (folders and collections load after the card), pick it. */
 async function pick(card, trigger, value) {
   const deadline = Date.now() + 8000;
   for (;;) {
     await card.click(trigger);
-    if (await card.waitForSelector(`.picker-option[data-value="${value}"]`, { timeout: 1000 }).then(() => true, () => false)) break;
-    await card.press('.picker input', 'Escape');
+    if (await card.waitForSelector(`.fk-listbox__option[data-value="${value}"]`, { timeout: 1000 }).then(() => true, () => false)) break;
+    await card.press('.fk-listbox__input', 'Escape');
     if (Date.now() > deadline) throw new Error(`No ${value} in ${trigger}`);
   }
-  await card.click(`.picker-option[data-value="${value}"]`);
-  await card.waitForSelector('.picker', { state: 'detached' });
+  await card.click(`.fk-listbox__option[data-value="${value}"]`);
+  await card.waitForSelector('.fk-listbox', { state: 'detached' });
 }
-async function pickerValues(card, trigger) {
+async function listboxValues(card, trigger) {
   await card.click(trigger);
-  const values = await card.$$eval('.picker-option[data-value]', options => options.map(o => o.dataset.value));
-  await card.press('.picker input', 'Escape');
+  const values = await card.$$eval('.fk-listbox__option[data-value]', options => options.map(o => o.dataset.value));
+  await card.press('.fk-listbox__input', 'Escape');
   return values;
 }
 
@@ -119,12 +119,12 @@ test('details: Add details opens the edit card pre-filled from the save, and bef
   await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures()).some(c => c.cloudStatus === 'queued' && c.cloudAttempts > 0), null);
   const card = await openDetails(web, dock);
   assert.match(card.url(), /^chrome-extension:\/\/[^/]+\/src\/review\.html\?tab=\d+&grant=[\w-]+$/);
-  assert.equal(await card.$eval('#detailsForm', form => form.firstElementChild.className), 'title-row', 'nothing above the title');
+  assert.equal(await card.$eval('#detailsForm', form => form.firstElementChild.className), 'details__title-row', 'nothing above the title');
   assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture', 'pre-filled from the saved capture');
   assert.equal(await card.inputValue('#detailsNote'), '');
   await card.waitForSelector('#detailsFeedback:empty', { state: 'attached' }); // folders and collections loaded
-  assert.deepEqual(await pickerValues(card, '#detailsFolder'), ['', 'folder-a']);
-  assert.deepEqual(await pickerValues(card, '#detailsCollection'), ['']);
+  assert.deepEqual(await listboxValues(card, '#detailsFolder'), ['', 'folder-a']);
+  assert.deepEqual(await listboxValues(card, '#detailsCollection'), ['']);
 
   await card.fill('#detailsTitle', 'Edited before upload');
   await card.fill('#detailsNote', 'Why this matters');

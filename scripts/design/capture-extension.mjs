@@ -265,24 +265,24 @@ async function main() {
     await web.mouse.move(120, 400);
     await capture(web, { kind: 'component', area: 'Add details card', state: 'Pre-filled', description: 'Ready: the title and note edited in place, the folder and tags as pills, and My library, Share and Save details on one line. Nothing above the title.', clip: await cardClip() });
     await screen('Add details open', 'Desktop view: the Add details card open over the article, pre-filled.', 'add-details-open');
-    // The pickers replace the old native <select>s (picker.js).
+    // Listboxes replace the old native <select>s (listbox.js).
     await card.click('#detailsFolder');
-    await card.waitForSelector('.picker'); await sleep(200); // its fade-in
+    await card.waitForSelector('.fk-listbox'); await sleep(200); // its fade-in
     await web.mouse.move(120, 400);
     await capture(web, { kind: 'component', area: 'Add details card', state: 'New folder', description: 'The folder list: search, a check on the current folder, and New folder at the end (type a name and press Enter).', clip: await cardClip() });
-    await card.press('.picker input', 'Escape');
+    await card.press('.fk-listbox__input', 'Escape');
     await card.click('#detailsAddTag');
-    await card.waitForSelector('.picker'); await sleep(200); // its fade-in
-    await card.fill('.picker input', 'Deep work');
+    await card.waitForSelector('.fk-listbox'); await sleep(200); // its fade-in
+    await card.fill('.fk-listbox__input', 'Deep work');
     await web.mouse.move(120, 400);
     await capture(web, { kind: 'component', area: 'Add details card', state: 'Adding a tag', description: 'The tag list: pick several, or type a new one and press Enter to create it.', clip: await cardClip() });
-    await card.press('.picker input', 'Enter');
-    await card.press('.picker input', 'Escape');
+    await card.press('.fk-listbox__input', 'Enter');
+    await card.press('.fk-listbox__input', 'Escape');
     await card.click('#detailsCollection');
-    await card.waitForSelector('.picker-option[data-value="col-design"]'); await sleep(200);
+    await card.waitForSelector('.fk-listbox__option[data-value="col-design"]'); await sleep(200);
     await web.mouse.move(120, 400);
     await capture(web, { kind: 'component', area: 'Add details card', state: 'Picking a collection', description: 'Share: Don’t share, or a collection with whether it is public or private and needs approval.', clip: await cardClip() });
-    await card.click('.picker-option[data-value="col-design"]');
+    await card.click('.fk-listbox__option[data-value="col-design"]');
     await card.waitForSelector('#detailsShare:not([hidden])');
     await web.mouse.move(120, 400);
     await capture(web, { kind: 'component', area: 'Add details card', state: 'Collection share', description: 'Shared: the Share pill names the collection, one caption line appears, and the button is just Save.', clip: await cardClip() });

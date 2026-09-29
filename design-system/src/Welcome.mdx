@@ -4,19 +4,30 @@ import { Meta } from '@storybook/addon-docs/blocks';
 
 # FoundKeep design system
 
-The approved design, live. Every story renders the product's own source —
-`theme.css`, `review.css`, `review.html`, `picker.js`, `card-icons.js`, the
-icons in `dock.js` — so what you see is what ships, and nothing is a
-screenshot.
+One set of tokens and components for every FoundKeep surface — live, rendered
+from the product's own source (`theme.css`, `components.css`, `listbox.js`,
+`card-icons.js`, `review.html`, the icons in `dock.js`), never screenshots.
 
-- **Foundations** — colours (light and dark tokens), type, corner radii and
-  the icon family, measured from the real components.
-- **Extension / Add details card** — the card that opens from the dock after a
-  save, in each of its states: pick a folder, add and remove tags, share to a
-  collection.
-- **Extension / Card controls** — its pills, tag chips, title and note,
-  buttons and the list picker, each with an *All states · light & dark* view.
+**Try the extension:** [download the dev build](/downloads/foundkeep-extension-dev.zip)
+(FoundKeep Dev, syncs to dev.foundkeep.app), or reload the copy kept up to date
+in `~/Downloads/foundkeep-extension-dev` on the MacBook.
 
-The toolbar's **Theme** switches light and dark as the extension's appearance
-setting does, **Viewport** sizes the canvas (the 380px card width to desktop),
-and the pseudo-state button forces hover, focus or pressed on any story.
+## How it is organised
+
+- **Foundations** — color, typography, spacing, radius, elevation and
+  iconography: the `--fk-*` tokens every component uses.
+- **Components** — the building blocks, named by what they are: Badge, Button,
+  Card, Listbox, Select, Status message, Tag, Text field, Tooltip. Each has a
+  *Playground* (change variant, size and state in Controls), a *Variants*
+  overview, *In the extension* where it helps, and *States · light & dark*.
+- **Extension** — surfaces built from those components: the Add details card.
+
+The toolbar's **Theme** switches light and dark; **Viewport** sizes the canvas;
+the pseudo-state button forces hover, focus or pressed.
+
+## Where it goes next
+
+1. **Extension** — now: every extension surface on these components.
+2. **App** — the Expo app adopts the same tokens and component names.
+3. **Website and dashboard** — the Next.js site follows, and this Storybook
+   grows an App and a Web section.

@@ -1,34 +1,24 @@
-import { card } from '../card.js';
-
-// Each specimen is a real element of the rendered card; the metrics are its computed style.
-const SPECIMENS = [
-  ['Title', '.title'], ['Note', '.note'], ['Pill', '.pill'], ['Tag chip', '.chip'],
-  ['Primary button', '.primary'], ['Status line', '.statusline'], ['Caption line', '#sharedBody'],
+// The type scale: theme.css's --fk-text-* tokens, shown with the computed
+// values the browser resolves (Inter from theme.css).
+const SCALE = [
+  ['--fk-text-title', 'Title', 'The half-life of a good idea', 'Card and page titles; the inline title field.'],
+  ['--fk-text-body', 'Body', 'Worth rereading before the Q4 planning doc.', 'Text fields, notes, list options.'],
+  ['--fk-text-label', 'Label', 'Reading list', 'Buttons (sm), Selects, Tags, Badges.'],
+  ['--fk-text-caption', 'Caption', 'Some folders could not load. Retry, or save without them.', 'Status messages, secondary lines.'],
+  ['--fk-text-micro', 'Micro', 'Needs approval', 'Tooltips, list meta, small badges.'],
 ];
 function render() {
-  const source = card({ collectionId: 'col-design', caption: 'The clearest case for spaced review.', state: 'error' });
-  const holder = document.createElement('div'); holder.style.cssText = 'position:absolute;left:-9999px;top:0'; holder.append(source);
-  const wrap = document.createElement('div'); wrap.append(holder);
-  const table = document.createElement('div'); table.className = 'fk-type-grid';
-  table.innerHTML = '<span class="fk-head">Role</span><span class="fk-head">Specimen</span><span class="fk-head">Size / line / weight</span><span class="fk-head">Colour</span>';
-  wrap.append(table);
-  requestAnimationFrame(() => {
-    for (const [role, selector] of SPECIMENS) {
-      const el = source.querySelector(selector); if (!el) continue;
-      const s = getComputedStyle(el);
-      const sample = document.createElement('div');
-      sample.textContent = (el.value || el.textContent).trim().slice(0, 48);
-      for (const p of ['font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'color']) sample.style.setProperty(p, s.getPropertyValue(p));
-      table.append(Object.assign(document.createElement('span'), { textContent: role }), sample,
-        Object.assign(document.createElement('code'), { textContent: `${s.fontSize} / ${s.lineHeight} / ${s.fontWeight}` }),
-        Object.assign(document.createElement('code'), { textContent: s.color }));
-    }
-  });
+  const wrap = document.createElement('div'); wrap.className = 'fk-scale';
+  for (const [token, name, sample, use] of SCALE) {
+    const row = document.createElement('div'); row.className = 'fk-scale-row';
+    const specimen = document.createElement('div'); specimen.style.font = `var(${token})`; specimen.textContent = sample;
+    row.innerHTML = `<div><strong>${name}</strong><code>${token}</code></div>`;
+    row.append(specimen);
+    const meta = document.createElement('div'); meta.className = 'fk-scale-meta'; row.append(meta);
+    requestAnimationFrame(() => { const s = getComputedStyle(specimen); meta.innerHTML = `<code>${s.fontSize} / ${s.lineHeight} / ${s.fontWeight}</code><span>${use}</span>`; });
+    wrap.append(row);
+  }
   return wrap;
 }
-export default {
-  title: 'Foundations/Typography',
-  render,
-  parameters: { docs: { description: { component: 'Every text style in the Add details card, measured from the real rendered card (Inter, from theme.css). Switch Theme in the toolbar to see the dark colours.' } } },
-};
-export const TextStyles = { name: 'Text styles' };
+export default { title: 'Foundations/Typography', render, parameters: { docs: { description: { component: 'One family (Inter) and five sizes, as `--fk-text-*` tokens in theme.css. Sentence case everywhere; no uppercase labels.' } } } };
+export const TypeScale = { name: 'Type scale' };

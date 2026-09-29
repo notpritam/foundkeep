@@ -73,9 +73,9 @@ test('installed extension auto-connects from the library, stays paired across ro
   await page.evaluate(({id,url})=>{const frame=document.createElement('iframe');frame.id=id;frame.src=url;frame.style.cssText='position:fixed;right:0;bottom:0;width:380px;height:600px;z-index:99999';document.body.append(frame);},{id,url});
   const card=page.frameLocator('#'+id);await card.locator('#detailsForm[data-ready="true"]').waitFor();return card;
  }
- // The card's controls are FoundKeep list pickers (picker.js), not <select>s.
-async function addTags(card,tags){for(const tag of tags){await card.locator('#detailsAddTag').click();await card.locator('.picker input').fill(tag);await card.locator('.picker input').press('Enter');await card.locator(`#detailsTags .chip[data-tag="${tag}"]`).waitFor({state:'attached'});await card.locator('.picker input').press('Escape');}}
-async function pick(card,trigger,value){for(let i=0;i<20;i++){await card.locator(trigger).click();if(await card.locator(`.picker-option[data-value="${value}"]`).waitFor({timeout:1000}).then(()=>true,()=>false))break;await card.locator('.picker input').press('Escape');}await card.locator(`.picker-option[data-value="${value}"]`).click();}
+ // The card's Selects open FoundKeep Listboxes (listbox.js), not native <select>s.
+async function addTags(card,tags){for(const tag of tags){await card.locator('#detailsAddTag').click();await card.locator('.fk-listbox__input').fill(tag);await card.locator('.fk-listbox__input').press('Enter');await card.locator(`#detailsTags .fk-tag[data-tag="${tag}"]`).waitFor({state:'attached'});await card.locator('.fk-listbox__input').press('Escape');}}
+async function pick(card,trigger,value){for(let i=0;i<20;i++){await card.locator(trigger).click();if(await card.locator(`.fk-listbox__option[data-value="${value}"]`).waitFor({timeout:1000}).then(()=>true,()=>false))break;await card.locator('.fk-listbox__input').press('Escape');}await card.locator(`.fk-listbox__option[data-value="${value}"]`).click();}
  const note='Automatic dev sync check '+crypto.randomUUID();
  const titledSave=await saveNote(note);
  assert.equal(titledSave.ok,true,JSON.stringify(titledSave));
