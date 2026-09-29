@@ -28,15 +28,19 @@
   const svg = name => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
   const FONT = 'font:500 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif';
   // Collapsed, the dock is a bookmark tab tucked into the bottom edge (it
-  // rests 5px below the edge and rises on hover); open, an icon-only
-  // toolbar 16px above it. It is anchored bottom-right by CSS alone.
+  // rests 5px below the edge and rises on hover), or a small floating
+  // bookmark wherever it was dragged; open, an icon-only toolbar in the same
+  // place (16px above the edge when tucked). Drag either by any part of it.
   const CSS = `
     :host{all:initial}
-    .dock{position:fixed;right:16px;bottom:16px;box-sizing:border-box;max-width:calc(100vw - 32px);display:flex;align-items:center;gap:2px;padding:4px;background:#0f1011;color:#d6d8db;
+    .dock{position:fixed;box-sizing:border-box;touch-action:none;user-select:none;-webkit-user-select:none;max-width:calc(100vw - 32px);display:flex;align-items:center;gap:2px;padding:4px;background:#0f1011;color:#d6d8db;
       border:1px solid #1d1f22;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.35);${FONT};animation:fk-open .16s ease-out}
-    .dock[data-mode="collapsed"]{bottom:0;padding:0;border-bottom:0;border-radius:12px 12px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.2);
+    .dock[data-mode="collapsed"]{padding:0;border-radius:12px;animation:fk-pop .16s ease-out}
+    .tucked[data-mode="collapsed"]{border-bottom:0;border-radius:12px 12px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.2);
       transform:translateY(5px);transition:transform .15s ease;animation:fk-tab .2s ease-out}
-    .dock[data-mode="collapsed"]:hover,.dock[data-mode="collapsed"]:focus-within{transform:none}
+    .tucked[data-mode="collapsed"]:hover,.tucked[data-mode="collapsed"]:focus-within{transform:none}
+    .dock.dragging{transition:none;cursor:grabbing}
+    .dock.dragging button{cursor:grabbing}
     .dock[hidden],[hidden]{display:none!important}
     button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;min-width:36px;padding:0 12px;border-radius:10px;
       cursor:pointer;color:inherit;white-space:nowrap;transition:background-color .12s ease,color .12s ease}
@@ -44,7 +48,8 @@
     button:focus-visible{outline:2px solid #4cc38a;outline-offset:1px}
     button[aria-pressed="true"]{background:#163426;color:#4cc38a}
     .actions button[aria-expanded="true"]{background:#1a1b1e;color:#f7f8f8}
-    .pill{width:44px;height:32px;padding:0 0 5px;border-radius:12px 12px 0 0}
+    .pill{width:44px;height:36px;padding:0;border-radius:11px}
+    .tucked .pill{height:32px;padding:0 0 5px;border-radius:12px 12px 0 0}
     .actions{display:flex;align-items:center;gap:2px}
     .actions button{width:36px;padding:0}
     .status{padding:0 10px;color:#8a8f98;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -54,6 +59,8 @@
     .waiting{padding:8px 10px 2px;color:#8a8f98;max-width:260px;white-space:normal;line-height:1.35}
     .menu{position:absolute;bottom:48px;right:0;display:flex;flex-direction:column;min-width:220px;padding:4px;background:#0f1011;border:1px solid #1d1f22;border-radius:14px;
       box-shadow:0 8px 28px rgba(0,0,0,.35)}
+    .menu.below{bottom:auto;top:48px}
+    .menu.start{right:auto;left:0}
     .menu button{width:100%;justify-content:flex-start}
     .tip{position:fixed;padding:6px 9px;background:#1c1d21;color:#f7f8f8;border:1px solid #2a2c31;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.3);
       font:500 12px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;white-space:nowrap;pointer-events:none;animation:fk-tip .12s ease-out}
@@ -68,6 +75,7 @@
     @keyframes foundkeep-flash{0%,35%{opacity:1}100%{opacity:0}}
     @keyframes fk-open{from{opacity:0;transform:translateY(6px)}}
     @keyframes fk-tab{from{transform:translateY(100%)}}
+    @keyframes fk-pop{from{opacity:0;transform:scale(.9)}}
     @keyframes fk-tip{from{opacity:0;transform:translateY(2px)}}
     .card{position:fixed;width:380px;border:0;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.4);background:transparent;color-scheme:normal}
     @media (prefers-reduced-motion:reduce){.dock,.toast,.tip,button{transition:none;animation:none}.flash{animation:none;opacity:.8}}`;
@@ -108,6 +116,12 @@
   let mode = 'hidden', dockState = null, frame = null, readyTimer = 0, dockReady = null, hello = 'pending';
   let highlighting = false, lastHighlight = null, flashCount = 0, toastTimer = 0, capturing = false, noteFrame = null, noteTimer = 0;
   let tipTimer = 0, tipFor = null, tipWarmUntil = 0;
+  // Where the dock sits: null (the default, tucked into the bottom edge 16px
+  // from the right) or { side, dx, tucked, fy } — the near edge ('left' or
+  // 'right') and the gap to it as a fraction of the width, and either tucked
+  // into the bottom edge or centred at fy of the height. Kept by the
+  // background (dock-position), never in this page.
+  let anchor = null, drag = null, suppressClick = false;
 
   const send = message => chrome.runtime.sendMessage(message).catch(() => null);
 
@@ -148,9 +162,29 @@
     const el = $('.dock > .status'); el.hidden = !text; el.textContent = text; el.dataset.tone = tone;
     place(); // the dock's width changed: move what sits next to it
   }
-  // The dock anchors itself (CSS); this only places what opens next to it.
+  const EDGE = 16, SNAP = 32;
+  const where = () => anchor || { side: 'right', dx: EDGE / innerWidth, tucked: true, fy: null };
   function place() {
     if (dockEl.hidden) { toastEl.hidden = true; return; }
+    if (!drag?.moving) {
+      // Layout size (offset*), not the box: an animation may be scaling it.
+      const a = where(); dockEl.classList.toggle('tucked', a.tucked);
+      const w = dockEl.offsetWidth, h = dockEl.offsetHeight, gap = a.dx * innerWidth;
+      const left = Math.min(Math.max(0, a.side === 'right' ? innerWidth - gap - w : gap), Math.max(0, innerWidth - w));
+      dockEl.style.left = left + 'px';
+      if (a.tucked && mode === 'collapsed') { dockEl.style.top = 'auto'; dockEl.style.bottom = '0'; }
+      else {
+        const top = a.tucked ? innerHeight - EDGE - h : a.fy * innerHeight - h / 2;
+        dockEl.style.bottom = 'auto'; dockEl.style.top = Math.min(Math.max(0, top), Math.max(0, innerHeight - h)) + 'px';
+      }
+      // The ⋯ menu opens away from the nearest edges.
+      const d = dockBox();
+      for (const menu of root.querySelectorAll('.menu')) { menu.classList.toggle('below', d.top < 220); menu.classList.toggle('start', a.side === 'left'); }
+    }
+    placeAttached();
+  }
+  // What opens next to the dock follows it, even mid-drag.
+  function placeAttached() {
     if (frame) placeCard();
     if (noteFrame) placeNote();
     if (!toastEl.hidden) placeToast();
@@ -158,9 +192,30 @@
   const shown = el => !!el && el.getClientRects().length > 0;
   // The dock's vertical slide (appearing, or the tab's hover lift) right now.
   const shift = () => new DOMMatrixReadOnly(getComputedStyle(dockEl).transform).m42 || 0;
-  // Where the dock rests: what opens next to it is placed against this, so a
-  // toast placed mid-slide never ends up over the tab.
-  function dockBox() { const r = dockEl.getBoundingClientRect(), dy = shift(); return { left: r.left, right: r.right, top: r.top - dy, bottom: r.bottom - dy }; }
+  // Where the dock rests, from the position it was given and its layout size
+  // — never mid-animation — so a toast placed while it slides or pops in
+  // never ends up over it.
+  function dockBox() {
+    const w = dockEl.offsetWidth, h = dockEl.offsetHeight, left = parseFloat(dockEl.style.left) || 0;
+    const top = dockEl.style.top === 'auto' ? innerHeight - h : parseFloat(dockEl.style.top) || 0;
+    return { left, right: left + w, top, bottom: top + h };
+  }
+  // Cards, the note field and the toast line up with the dock's outer side.
+  const alignX = (d, width) => Math.min(Math.max(8, where().side === 'left' ? d.left : d.right - width), innerWidth - width - 8);
+  // Where a dock box of this size and position should stay: its nearer side,
+  // and tucked if its bottom is within `snap` of the bottom edge.
+  function anchorFor(box, snap) {
+    const side = box.left + box.width / 2 > innerWidth / 2 ? 'right' : 'left';
+    const dx = Math.max(0, side === 'right' ? innerWidth - box.left - box.width : box.left) / innerWidth;
+    const tucked = box.top + box.height >= innerHeight - snap;
+    return { side, dx, tucked, fy: tucked ? null : Math.min(Math.max(0, (box.top + box.height / 2) / innerHeight), 1) };
+  }
+  function setAnchor(next) {
+    anchor = next; place();
+    // The dock cannot touch chrome.storage (it would sit next to account
+    // credentials); the background keeps where it sits.
+    void send(next ? { kind: 'dock-position', anchor: next } : { kind: 'dock-position', reset: true });
+  }
   // Keyboard focus lands on the tab when collapsed, else the first control.
   function focusHome() {
     const target = [$('.pill'), ...root.querySelectorAll('.actions > button, .signin > button')].find(shown);
@@ -255,7 +310,7 @@
   function placeNote() {
     const d = dockBox(), h = Math.min(Number(noteFrame.dataset.height || 132), innerHeight - 24);
     noteFrame.style.height = h + 'px';
-    noteFrame.style.left = Math.min(Math.max(8, d.right - 320), innerWidth - 328) + 'px';
+    noteFrame.style.left = alignX(d, 320) + 'px';
     const above = d.top - h - 8;
     noteFrame.style.top = (above >= 8 ? above : Math.min(d.bottom + 8, innerHeight - h - 8)) + 'px';
   }
@@ -292,7 +347,7 @@
   function placeToast() {
     const d = dockBox(), t = toastEl.getBoundingClientRect();
     const above = d.top - t.height - 8;
-    toastEl.style.left = Math.max(8, d.right - t.width) + 'px';
+    toastEl.style.left = alignX(d, t.width) + 'px';
     toastEl.style.top = (above >= 8 ? above : Math.min(d.bottom + 8, innerHeight - t.height - 8)) + 'px';
   }
   function showToast() {
@@ -325,7 +380,7 @@
   function placeCard() {
     const d = dockBox(), h = Number(frame.dataset.height || 420);
     const height = Math.min(h, innerHeight - 24);
-    const left = Math.min(Math.max(8, d.right - 380), innerWidth - 388);
+    const left = alignX(d, 380);
     const above = d.top - height - 8;
     frame.style.left = left + 'px'; frame.style.height = height + 'px';
     frame.style.top = (above >= 8 ? above : Math.min(d.bottom + 8, innerHeight - height - 8)) + 'px';
@@ -366,6 +421,7 @@
   root.addEventListener('click', event => {
     if (!event.isTrusted) return;
     hideTip();
+    if (suppressClick) { suppressClick = false; return; } // the end of a drag, not a click
     const button = event.target.closest?.('button[data-action]'); if (!button) return;
     const action = button.dataset.action;
     if (action === 'expand') return void setMode(mode === 'collapsed' ? 'expanded' : mode === 'details' ? 'details' : 'collapsed');
@@ -406,7 +462,7 @@
       tipEl.textContent = tipText(button); tipEl.hidden = false;
       const b = button.getBoundingClientRect(), t = tipEl.getBoundingClientRect(), top = b.top - shift();
       tipEl.style.left = Math.min(Math.max(8, b.left + b.width / 2 - t.width / 2), innerWidth - t.width - 8) + 'px';
-      tipEl.style.top = Math.max(8, top - t.height - 8) + 'px';
+      tipEl.style.top = (top - t.height - 8 >= 8 ? top - t.height - 8 : b.bottom + 8) + 'px';
     };
     if (now || Date.now() < tipWarmUntil) open(); else tipTimer = setTimeout(open, TIP_DELAY);
   }
@@ -428,6 +484,60 @@
     if (button?.matches(':focus-visible')) showTip(button, true); else hideTip();
   });
   root.addEventListener('focusout', hideTip);
+  // Drag: press anywhere on the dock and move past a small threshold; a press
+  // that doesn't move is still a click. Dropped within SNAP of the bottom
+  // edge it tucks back in; anywhere else it floats there.
+  // A press is followed on the window (the pointer leaves a 44px tab at
+  // once); capturing it on the dock right away would retarget the click.
+  dockEl.addEventListener('pointerdown', event => {
+    suppressClick = false;
+    if (!event.isTrusted || event.button !== 0 || drag || event.target.closest?.('.menu')) return;
+    const d = dockBox();
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: event.clientX - d.left, dy: event.clientY - d.top, moving: false };
+    addEventListener('pointermove', dragMove, true);
+    addEventListener('pointerup', endDrag, true);
+    addEventListener('pointercancel', endDrag, true);
+  });
+  function dragMove(event) {
+    if (!drag || !event.isTrusted || event.pointerId !== drag.id) return;
+    if (!drag.moving) {
+      if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 4) return;
+      drag.moving = true; dockEl.setPointerCapture(drag.id);
+      hideTip(); closeMenus(); dockEl.classList.add('dragging'); dockEl.classList.remove('tucked');
+    }
+    const w = dockEl.offsetWidth, h = dockEl.offsetHeight;
+    const left = Math.min(Math.max(0, event.clientX - drag.dx), Math.max(0, innerWidth - w));
+    const top = Math.min(Math.max(0, event.clientY - drag.dy), Math.max(0, innerHeight - h));
+    dockEl.style.bottom = 'auto'; dockEl.style.left = left + 'px'; dockEl.style.top = top + 'px';
+    placeAttached();
+  }
+  function endDrag(event) {
+    if (!drag || event.pointerId !== drag.id) return;
+    removeEventListener('pointermove', dragMove, true);
+    removeEventListener('pointerup', endDrag, true);
+    removeEventListener('pointercancel', endDrag, true);
+    const moved = drag.moving; drag = null;
+    if (!moved) return;
+    dockEl.classList.remove('dragging');
+    if (dockEl.hasPointerCapture(event.pointerId)) dockEl.releasePointerCapture(event.pointerId);
+    const d = dockBox();
+    setAnchor(anchorFor({ left: d.left, top: d.top, width: d.right - d.left, height: d.bottom - d.top }, SNAP));
+    // The click that follows this pointerup belongs to the drag.
+    suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+  }
+  // Keyboard: with the tab focused, arrows move it 16px (Shift: 64px) and
+  // Home puts it back in its corner.
+  $('.pill').addEventListener('keydown', event => {
+    if (!event.isTrusted) return;
+    if (event.key === 'Home') { event.preventDefault(); return void setAnchor(null); }
+    const step = event.shiftKey ? 64 : 16;
+    const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    const d = dockBox(), width = d.right - d.left, height = d.bottom - d.top;
+    const left = Math.min(Math.max(0, d.left + delta[0]), innerWidth - width), top = Math.min(Math.max(0, d.top + delta[1]), innerHeight - height);
+    setAnchor(anchorFor({ left, top, width, height }, 1));
+  });
   // Esc closes the innermost thing first: the note field, then highlighter
   // mode, then the expanded dock.
   document.addEventListener('keydown', event => {
@@ -532,6 +642,8 @@
   // ---------------------------------------------------------------------------
   window.__foundkeepDock = {
     state: () => mode,
+    position: () => { const r = dockBox(); return { left: Math.round(r.left), top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom) }; },
+    anchor: () => anchor,
     rect: selector => { const r = root.querySelector(selector)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : { x: 0, y: 0, width: 0, height: 0 }; },
     focused: () => root.activeElement?.className || root.activeElement?.dataset?.action || null,
     visible: () => host.style.visibility !== 'hidden' && host.style.display !== 'none',
@@ -572,6 +684,7 @@
   document.documentElement.append(host);
   // helloRequest keeps its own .then so a reply that arrives after
   // dockReady's 2s bound still updates dockState and re-renders.
+  void send({ kind: 'dock-position' }).then(stored => { anchor = stored || null; place(); });
   const helloRequest = send({ kind: 'dock-hello' });
   helloRequest.then(state => {
     if (!state) { hello = 'failed'; return; }

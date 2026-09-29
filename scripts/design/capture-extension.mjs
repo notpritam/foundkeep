@@ -125,6 +125,32 @@ async function main() {
     await sleep(160);
     await dockShot('Focus ring', 'Keyboard focus: the emerald focus ring (2 px, 1 px offset) with the tooltip shown at once.');
 
+    // --- Dragged: floating wherever it is dropped -------------------------------
+    // Collapse with a click on the page (a mouse user sees no focus ring).
+    await web.mouse.click(200, 180);
+    await dock.until(`__foundkeepDock.state() === 'collapsed'`);
+    await away(); // let the tab finish sliding in before grabbing it
+    const tabAt = center(await rect('.pill'));
+    await web.mouse.move(tabAt.x, tabAt.y); await web.mouse.down();
+    await web.mouse.move(460, 330, { steps: 12 }); await web.mouse.up();
+    await dock.until(`__foundkeepDock.anchor()?.tucked === false`);
+    await away();
+    await dockShot('Floating tab', 'Dragged off the edge: a small rounded bookmark wherever it is dropped (press anywhere on the dock and move; a press that does not move is still a click). The spot is remembered across pages; drop it near the bottom edge to tuck it back in, or press Home on the focused tab.', ['.dock']);
+    await dock.click('.pill');
+    await dock.until(`__foundkeepDock.state() === 'expanded'`);
+    await away();
+    await dockShot('Floating toolbar', 'Opened from a floating tab: the toolbar grows from the tab\'s outer side at its height; menus, the note field and the details card open from that side too.', ['.dock']);
+    await screen('Dock floating', 'Desktop view: the dock dragged over the article and opened there.', 'dock-floating');
+    await web.keyboard.press('Escape');
+    await dock.until(`__foundkeepDock.state() === 'collapsed'`);
+    await dock.click('.pill'); await web.keyboard.press('Escape');
+    await dock.until(`__foundkeepDock.state() === 'collapsed' && __foundkeepDock.focused() === 'pill'`);
+    await web.keyboard.press('Home');
+    await dock.until(`__foundkeepDock.anchor() === null`);
+    await dock.click('.pill');
+    await dock.until(`__foundkeepDock.state() === 'expanded'`);
+    await away();
+
     // --- Highlighter mode + flash ---------------------------------------------
     await dock.click('[data-action="highlight"]');
     await dock.until('__foundkeepDock.highlighting() === true');

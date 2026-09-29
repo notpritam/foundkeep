@@ -8,10 +8,16 @@ Replaces: the Chrome side panel as the extension's surface (`side_panel` → `sr
 > tucked into the bottom edge, 16px from the right (it slides up, rests 5px below
 > the edge, lifts on hover). Expanded is icon-only — Save this page · Highlight ·
 > Screenshot · Note · Library · ⋯ — with a tooltip on hover or keyboard focus, and
-> no mark beside Save page. No drag grip: the dock is anchored and no longer
-> moves, so **Movement** below is superseded and `foundkeep-dock-position` is
-> cleared on update. Icons are one rounded 24px set (1.75 stroke, round caps and
-> joins, no sharp corners).
+> no mark beside Save page. No drag grip. Icons are one rounded 24px set (1.75
+> stroke, round caps and joins, no sharp corners).
+>
+> **Movement, revised the same day:** press anywhere on the tab or toolbar and
+> drag (4px threshold; a press that doesn't move is still a click). Dropped
+> within 32px of the bottom edge it tucks back in; anywhere else it floats as a
+> small rounded bookmark, and the toolbar, menus, note field and details card
+> open from its outer side. The background stores `foundkeep-dock-anchor`
+> ({side, dx, tucked, fy}; 1.8.0's `foundkeep-dock-position` is cleared on
+> update). Arrows on the focused tab move it 16px (Shift 64px); Home resets.
 
 ## Goal
 
@@ -55,7 +61,7 @@ Collapse happens on Escape, on a click outside the dock and card, and ~4 seconds
 after a successful save (the dock first shows a "Saved" confirmation). Collapse
 is not forced while a review is open.
 
-### Movement (superseded 2026-09-29 — the dock no longer moves)
+### Movement (superseded 2026-09-29 — see the revision note above)
 
 - Drag by the grip in the collapsed and expanded states (pointer events). The
   dock is clamped inside the viewport and re-clamped on resize.
