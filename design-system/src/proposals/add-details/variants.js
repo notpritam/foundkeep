@@ -211,36 +211,68 @@ const compact = {
 
 export const VARIANTS = [quiet, properties, quick, tabs, compact];
 
-// --- 6. Quiet sheet, refined (Pritam's pick: 1 with 2's note) -------------------------------
-// Nothing above the title. Where the save lives sits in the row with the
-// folder and tags (opts.destination: 'inline' — a "My library" pill and
-// "Share to a collection" — | 'merged' — one "My library" pill whose list also
-// offers the collections — | 'none').
-// opts.noteIcon puts the note icon beside the boxless note, like 2's property
-// rows; opts.siteIcon puts the page's icon beside the title.
+// --- 6. Refined Quiet sheet and five more takes on it --------------------------------------
+// Pritam's pick: Quiet sheet with Properties' boxless note, nothing above the
+// title, and "My library" / Share to a collection in the row with the folder
+// and tags. Options shared by every take:
+//   destination: 'inline' (My library pill + Share) | 'merged' (one My library
+//                pill whose list also offers the collections) | 'none'
+//   editHint:    'note' | 'both' | 'none' — a faint pencil at the top right of
+//                the note (and title) that says "you can edit this"; it
+//                strengthens on hover and steps aside while you type
+//   siteIcon:    the page's icon beside the title
 const libraryPill = '<span class="fkp-pill static" data-tip="Saved to My library">' + icon('library', 15) + 'My library</span>';
-const sharePill = s => `<button type="button" class="fkp-pill${s.collection ? "" : " ghost"}" data-pick="collection" aria-haspopup="listbox">${icon(s.collection ? (collectionOf(s.collection).visibility === 'public' ? 'globe' : 'lock') : 'collection', 15)}${esc(s.collection || 'Share to a collection')}${icon('chevron', 14)}</button>`;
+const collectionIcon = s => s.collection ? (collectionOf(s.collection).visibility === 'public' ? 'globe' : 'lock') : 'collection';
+const sharePill = s => `<button type="button" class="fkp-pill${s.collection ? '' : ' ghost'}" data-pick="collection" aria-haspopup="listbox">${icon(collectionIcon(s), 15)}${esc(s.collection || 'Share to a collection')}${icon('chevron', 14)}</button>`;
 const destinationPill = s => `<button type="button" class="fkp-pill" data-pick="destination" aria-haspopup="listbox">${icon('library', 15)}My library${s.collection ? `<span class="fkp-plus">+ ${esc(s.collection)}</span>` : ''}${icon('chevron', 14)}</button>`;
-const refined = {
-  id: 'v6', name: 'Quiet sheet, refined',
-  about: 'Quiet sheet with Properties\' boxless note (and its icon), and no "Saved to My library" line: where the save lives is a pill, like Share to a collection.',
-  html: s => {
-    const o = s.opts || {};
-    const dest = o.destination || 'inline';
-    return `
-    <div class="fkp-titlerow">${o.siteIcon ? '<span class="fkp-fav small" aria-hidden="true">M</span>' : ''}${title(s)}${closeButton}</div>
-    <div class="fkp-noterow ${o.noteIcon ? 'with-icon' : ''}">${o.noteIcon ? icon('note', 16) : ''}${note(s, 'bare', 2)}</div>
+const folderPill = (s, chevron = true) => `<button type="button" class="fkp-pill" data-pick="folder" aria-haspopup="listbox">${icon('folder', 15)}${esc(s.folder || 'No folder')}${chevron ? icon('chevron', 14) : ''}</button>`;
+const addTagPill = '<button type="button" class="fkp-pill ghost" data-pick="tags" aria-haspopup="listbox">' + icon('plus', 14) + 'Tag</button>';
+const editable = (inner, hint) => `<div class="fkp-editable${hint ? ' hinted' : ''}">${inner}${hint ? `<span class="fkp-edit-hint" aria-hidden="true">${icon('pencil', 14)}</span>` : ''}</div>`;
+const titleRow = (s, o, close = true) => `<div class="fkp-titlerow">${o.siteIcon ? '<span class="fkp-fav small" aria-hidden="true">M</span>' : ''}${editable(title(s), o.editHint === 'both')}${close ? closeButton : ''}</div>`;
+const noteRow = (s, o) => `<div class="fkp-noterow">${editable(note(s, 'bare', 2), o.editHint !== 'none')}</div>`;
+/** The row with where the save lives, the folder and the tags. */
+const pillRow = (s, o, { folder = folderPill(s), addTag = addTagPill, share = sharePill(s), library = libraryPill, end = '' } = {}) => `
     <div class="fkp-pills">
-      ${dest === 'inline' ? libraryPill : dest === 'merged' ? destinationPill(s) : ''}
-      <button type="button" class="fkp-pill" data-pick="folder" aria-haspopup="listbox">${icon('folder', 15)}${esc(s.folder || 'No folder')}${icon('chevron', 14)}</button>
-      ${s.tags.map(tagChip).join('')}
-      <button type="button" class="fkp-pill ghost" data-pick="tags" aria-haspopup="listbox">${icon('plus', 14)}Tag</button>
-      ${dest === 'merged' ? '' : sharePill(s)}
+      ${o.destination === 'merged' ? destinationPill(s) : o.destination === 'none' ? '' : library}
+      ${folder}${s.tags.map(tagChip).join('')}${addTag}
+      ${o.destination === 'merged' ? '' : share}${end}
+    </div>`;
+const footer = s => `<footer class="fkp-foot">${primary(submitLabel(s))}</footer>`;
+
+const REFINED = [
+  { id: 'v6', name: 'Refined', about: 'Outline pills, the title and note edited in place, Save on its own line.',
+    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o)}${shareFields(s)}${footer(s)}` },
+  { id: 'v6a', name: 'A. Soft pills', about: 'The same card with filled, borderless pills: quieter, and the row reads as one group. My library is tinted to show where the save lives.',
+    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o)}${shareFields(s)}${footer(s)}` },
+  { id: 'v6b', name: 'B. Icon pills', about: 'Only what holds a value gets words: My library, the folder and your tags. Adding a tag and sharing are icon buttons with tooltips until they are used — the row usually fits on one line.',
+    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o, {
+      folder: folderPill(s, false),
+      addTag: `<button type="button" class="fkp-pill icon-only" data-pick="tags" data-tip="Add a tag" aria-label="Add a tag" aria-haspopup="listbox">${icon('tag', 15)}</button>`,
+      share: s.collection ? sharePill(s) : `<button type="button" class="fkp-pill icon-only" data-pick="collection" data-tip="Share to a collection" aria-label="Share to a collection" aria-haspopup="listbox">${icon('collection', 15)}</button>`,
+    })}${shareFields(s)}${footer(s)}` },
+  { id: 'v6c', name: 'C. Sections', about: 'A hairline separates writing (title and note) from organising (the pills). Cancel returns to the footer next to Save, so there is no close button on the title line.',
+    html: (s, o) => `${titleRow(s, o, false)}${noteRow(s, o)}<div class="fkp-rule"></div>${pillRow(s, o)}${shareFields(s)}
+      <footer class="fkp-foot spread"><button type="button" class="fkp-quiet">Cancel</button>${primary(submitLabel(s))}</footer>` },
+  { id: 'v6d', name: 'D. Inline save', about: 'The shortest card: Save joins the end of the pill row instead of taking a footer line of its own.',
+    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o, { end: `<span class="fkp-spacer"></span>${primary(s.collection ? 'Save and share' : 'Save', 'small')}` })}${shareFields(s)}` },
+  { id: 'v6e', name: 'E. Text line', about: 'No pill chrome at all: where the save lives reads as a path (My library › Reading list), tags as #words, and Add tag / Share as quiet text buttons.',
+    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}
+    <div class="fkp-textline">
+      ${o.destination === 'merged' ? `<button type="button" class="fkp-link" data-pick="destination" aria-haspopup="listbox">${icon('library', 15)}My library${s.collection ? ` + ${esc(s.collection)}` : ''}</button>` : o.destination === 'none' ? '' : `<span class="fkp-link static">${icon('library', 15)}My library</span>`}
+      ${o.destination === 'none' ? '' : '<span class="fkp-crumb" aria-hidden="true">›</span>'}
+      <button type="button" class="fkp-link" data-pick="folder" aria-haspopup="listbox">${o.destination === 'none' ? icon('folder', 15) : ''}${esc(s.folder || 'No folder')}${icon('chevron', 13)}</button>
     </div>
-    ${shareFields(s)}
-    <footer class="fkp-foot">${primary(submitLabel(s))}</footer>`;
-  },
+    <div class="fkp-textline">
+      ${s.tags.map(t => `<button type="button" class="fkp-hash" data-remove="${esc(t)}" aria-label="Remove tag ${esc(t)}">#${esc(t)}</button>`).join('')}
+      <button type="button" class="fkp-link muted" data-pick="tags" aria-haspopup="listbox">${icon('plus', 13)}Tag</button>
+      ${o.destination === 'merged' ? '' : `<span class="fkp-spacer"></span><button type="button" class="fkp-link muted" data-pick="collection" aria-haspopup="listbox">${icon(collectionIcon(s), 15)}${esc(s.collection || 'Share')}</button>`}
+    </div>${shareFields(s)}${footer(s)}` },
+];
+export const REFINED_TAKES = REFINED.map(({ id, name, about }) => ({ id, name, about }));
+/** take: 'v6' | 'v6a' … 'v6e' */
+export const refinedProposal = ({ take = 'v6', destination = 'inline', editHint = 'note', siteIcon = false, open = null, collection = null } = {}) => {
+  const variant = REFINED.find(v => v.id === take);
+  const opts = { destination, editHint, siteIcon };
+  return mount({ id: `v6 fkp-${take}`, html: s => variant.html(s, opts) }, initialState({ collection }), { open });
 };
-export const refinedProposal = ({ destination = 'inline', noteIcon = true, siteIcon = false, open = null, collection = null } = {}) =>
-  mount(refined, initialState({ collection, opts: { destination, noteIcon, siteIcon } }), { open });
 export const proposal = (index, { state = {}, open = null } = {}) => mount(VARIANTS[index], initialState(state), { open });

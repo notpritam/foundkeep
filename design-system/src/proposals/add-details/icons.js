@@ -13,6 +13,7 @@ const P = {
   globe: '<circle cx="12" cy="12" r="8"/><path d="M4 12h16"/><path d="M12 4c2.2 2.3 3.2 5 3.2 8s-1 5.7-3.2 8c-2.2-2.3-3.2-5-3.2-8s1-5.7 3.2-8z"/>',
   // The dock's Library notebook (and the web sidebar's My library).
   library: '<rect x="4.5" y="3.5" width="15" height="17" rx="3"/><path d="M8.5 3.5v17M12 8.5h4M12 12h4"/>',
+  pencil: '<path d="M15.2 5.3a2.1 2.1 0 0 1 3 3L9 17.5a2 2 0 0 1-.93.52l-2.9.73a.5.5 0 0 1-.6-.6l.73-2.9A2 2 0 0 1 5.8 14.3z"/><path d="m13.4 7.1 3.5 3.5"/>',
   lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
 };
 export const icon = (name, size = 16) => `<svg class="fkp-i" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name]}</svg>`;

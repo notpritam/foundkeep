@@ -195,3 +195,48 @@
 .fkp-dest:first-child .fkp-pill.ghost { flex: 0 1 auto; overflow: hidden; white-space: nowrap; }
 .fkp-dest:first-child > .fkp-icon { flex: none; width: 28px; height: 28px; }
 .fkp-dest:first-child .fkp-spacer { flex: 1 0 0; }
+
+/* 6 and its takes: the editable hint — a faint pencil at the top right of the
+   text. Stronger on hover, gone while typing. */
+.fkp-titlerow .fkp-editable { flex: 1; min-width: 0; }
+.fkp-editable { position: relative; }
+.fkp-editable .fkp-title { margin: 0 0 0 -8px; width: calc(100% + 8px); }
+.fkp-noterow .fkp-editable { flex: 1; min-width: 0; }
+.fkp-noterow .fkp-editable .fkp-note.bare { margin: 0 0 0 -8px; width: calc(100% + 8px); }
+.fkp-editable.hinted .fkp-title, .fkp-editable.hinted .fkp-note { padding-right: 30px; }
+.fkp-edit-hint { position: absolute; top: 7px; right: 8px; display: grid; color: var(--muted); opacity: .4; pointer-events: none; transition: opacity .15s var(--ease); }
+.fkp-titlerow .fkp-edit-hint { top: 8px; }
+.fkp-editable:hover .fkp-edit-hint { opacity: .85; }
+.fkp-editable:focus-within .fkp-edit-hint { opacity: 0; }
+.fkp-pills .fkp-spacer { flex: 1 0 8px; }
+
+/* A · Soft pills */
+.fkp-v6a .fkp-pill { border-color: transparent !important; background: var(--panel); }
+.fkp-v6a .fkp-pill:hover, .fkp-v6a .fkp-pill[aria-expanded="true"] { background: var(--hover); }
+.fkp-v6a .fkp-pill.ghost { background: transparent; color: var(--muted); }
+.fkp-v6a .fkp-pill.ghost:hover { background: var(--panel); color: var(--ink); }
+.fkp-v6a .fkp-pill.static { background: var(--accent-bg); color: var(--accent); }
+
+/* B · Icon pills */
+.fkp-pill.icon-only { width: 30px; padding: 0; justify-content: center; color: var(--muted); }
+.fkp-pill.icon-only:hover { color: var(--ink); }
+
+/* C · Sections */
+.fkp-rule { height: 1px; margin: 2px 0; background: var(--line); }
+.fkp-foot.spread { justify-content: space-between; align-items: center; }
+.fkp .fkp-quiet { height: 36px; padding: 0 12px; border-radius: var(--r-field); color: var(--muted); font-size: 13px !important; font-weight: 550 !important; }
+.fkp .fkp-quiet:hover { background: var(--panel); color: var(--ink); }
+
+/* E · Text line */
+.fkp-textline { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-height: 30px; }
+.fkp-textline + .fkp-textline { margin-top: -8px; }
+.fkp-textline .fkp-spacer { flex: 1; }
+.fkp-link { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px; margin: 0 -6px; border-radius: var(--r-item); font-size: 13px !important; font-weight: 500 !important; }
+.fkp-link:hover, .fkp-link[aria-expanded="true"] { background: var(--panel); }
+.fkp-link .fkp-i { color: var(--muted); }
+.fkp-link.static { cursor: default; background: none; }
+.fkp-link.static .fkp-i { color: var(--accent); }
+.fkp-link.muted { color: var(--muted); }
+.fkp-crumb { color: var(--muted); margin: 0 -4px; }
+.fkp .fkp-hash { height: 26px; padding: 0 2px; border-radius: 6px; color: var(--accent); font-size: 13px !important; font-weight: 500 !important; }
+.fkp-hash:hover { text-decoration: line-through; text-decoration-thickness: 1.5px; }
