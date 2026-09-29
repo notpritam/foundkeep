@@ -85,10 +85,32 @@ async function feedbackMatches(frame, pattern, timeout = 5000) {
   }
   throw new Error(`feedback never matched ${pattern}: ${JSON.stringify(text)}`);
 }
-async function addTag(card, root, value) {
-  await card.fill(`${root} input`, value);
-  await card.press(`${root} input`, 'Enter');
-  await card.waitForSelector(`${root} .selected`, { state: 'attached' });
+// The card's controls are FoundKeep list pickers (picker.js), not <select>s.
+async function addTag(card, value) {
+  await card.click('#detailsAddTag');
+  await card.fill('.picker input', value);
+  await card.press('.picker input', 'Enter');
+  await card.waitForSelector(`#detailsTags .chip[data-tag="${value}"]`, { state: 'attached' });
+  await card.press('.picker input', 'Escape');
+  await card.waitForSelector('.picker', { state: 'detached' });
+}
+/** Open a picker, wait for the option (folders and collections load after the card), pick it. */
+async function pick(card, trigger, value) {
+  const deadline = Date.now() + 8000;
+  for (;;) {
+    await card.click(trigger);
+    if (await card.waitForSelector(`.picker-option[data-value="${value}"]`, { timeout: 1000 }).then(() => true, () => false)) break;
+    await card.press('.picker input', 'Escape');
+    if (Date.now() > deadline) throw new Error(`No ${value} in ${trigger}`);
+  }
+  await card.click(`.picker-option[data-value="${value}"]`);
+  await card.waitForSelector('.picker', { state: 'detached' });
+}
+async function pickerValues(card, trigger) {
+  await card.click(trigger);
+  const values = await card.$$eval('.picker-option[data-value]', options => options.map(o => o.dataset.value));
+  await card.press('.picker input', 'Escape');
+  return values;
 }
 
 test('details: Add details opens the edit card pre-filled from the save, and before upload the local record carries the edits into the upload', { timeout: 40000 }, async t => {
@@ -97,16 +119,18 @@ test('details: Add details opens the edit card pre-filled from the save, and bef
   await pollUntil(ext, async () => (await (await import('./db.js')).listCaptures()).some(c => c.cloudStatus === 'queued' && c.cloudAttempts > 0), null);
   const card = await openDetails(web, dock);
   assert.match(card.url(), /^chrome-extension:\/\/[^/]+\/src\/review\.html\?tab=\d+&grant=[\w-]+$/);
-  assert.equal(await card.textContent('#detailsEyebrow'), 'Saved to My library');
+  assert.equal(await card.$eval('#detailsForm', form => form.firstElementChild.className), 'title-row', 'nothing above the title');
   assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture', 'pre-filled from the saved capture');
   assert.equal(await card.inputValue('#detailsNote'), '');
-  await card.waitForSelector('#detailsFolder option[value="folder-a"]', { state: 'attached' });
-  assert.deepEqual(await card.$$eval('#detailsCollection option', options => options.map(o => o.value)), ['']);
+  await card.waitForSelector('#detailsFeedback:empty', { state: 'attached' }); // folders and collections loaded
+  assert.deepEqual(await pickerValues(card, '#detailsFolder'), ['', 'folder-a']);
+  assert.deepEqual(await pickerValues(card, '#detailsCollection'), ['']);
 
   await card.fill('#detailsTitle', 'Edited before upload');
   await card.fill('#detailsNote', 'Why this matters');
-  await addTag(card, '#detailsTags', 'Research');
-  await card.selectOption('#detailsFolder', 'folder-a');
+  await addTag(card, 'Research');
+  await pick(card, '#detailsFolder', 'folder-a');
+  assert.match(await card.textContent('#detailsFolder'), /Reading/);
   await card.click('#detailsSave');
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
@@ -131,12 +155,10 @@ test('details: after upload, Add details sends PUT with the remote id, shares to
   const card = await openDetails(web, dock);
   await card.fill('#detailsTitle', 'Edited after upload');
   await card.fill('#detailsNote', 'A private note');
-  await addTag(card, '#detailsTags', 'Keep');
-  await card.waitForSelector('#detailsCollection option[value="col_1"]', { state: 'attached' });
-  await card.selectOption('#detailsCollection', 'col_1');
+  await addTag(card, 'Keep');
+  await pick(card, '#detailsCollection', 'col_1');
   await card.waitForSelector('#detailsShare:not([hidden])');
-  assert.equal(await card.inputValue('#sharedTitle'), 'Edited after upload');
-  assert.match(await card.inputValue('#sharedUrl'), /\/__after$/);
+  assert.equal(await card.textContent('#detailsSave'), 'Save', 'a shared save says just Save');
   await card.fill('#sharedBody', 'Worth a look');
   await card.click('#detailsSave');
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
@@ -149,6 +171,7 @@ test('details: after upload, Add details sends PUT with the remote id, shares to
   assert.equal(entries[0].body.captureId, 'remote-1');
   assert.equal(entries[0].body.title, 'Edited after upload');
   assert.equal(entries[0].body.body, 'Worth a look');
+  assert.match(entries[0].body.url, /\/__after$/, 'the collection gets the page link');
   assert.equal(entries[0].body.noteText, undefined, 'the private note is never shared');
   const [local] = await localCaptures(ext);
   assert.deepEqual({ title: local.sourceTitle, note: local.noteText, tags: local.userTags, status: local.cloudStatus, shared: local.collectionSubmission?.id },
@@ -344,7 +367,7 @@ test('details: a web edit to the title survives a tag edit from the card (pre-fi
   const card = await openDetails(web, dock);
   assert.equal(await card.inputValue('#detailsTitle'), 'Renamed on the web', 'pre-filled from the server');
   assert.equal(await card.inputValue('#detailsNote'), 'Web note');
-  await addTag(card, '#detailsTags', 'Keep');
+  await addTag(card, 'Keep');
   await card.click('#detailsSave');
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   await synced(ext);
@@ -384,7 +407,7 @@ test('details: a card that cannot load its save shows why and stays open', { tim
   await new Promise(r => setTimeout(r, 3500));
   assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'the card stays open with its message');
   assert.equal(await dock.evaluate('__foundkeepDock.status()'), '', 'no generic "could not open" message replaces it');
-  assert.equal(await card.textContent('#detailsCancel'), 'Close');
+  assert.equal(await card.getAttribute('#detailsCancel', 'aria-label'), 'Close without saving');
   await card.click('#detailsCancel');
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
 });
@@ -418,7 +441,7 @@ test('details: with a slow server read the card opens from the local copy, and t
   await new Promise(r => setTimeout(r, 1500));
   assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'the dock keeps the card open');
   assert.equal(await dock.evaluate('__foundkeepDock.status()'), '');
-  await addTag(card, '#detailsTags', 'Keep');
+  await addTag(card, 'Keep');
   await card.click('#detailsSave');
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 20000);
   await synced(ext);

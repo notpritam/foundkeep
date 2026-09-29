@@ -77,7 +77,7 @@
     @keyframes fk-tab{from{transform:translateY(100%)}}
     @keyframes fk-pop{from{opacity:0;transform:scale(.9)}}
     @keyframes fk-tip{from{opacity:0;transform:translateY(2px)}}
-    .card{position:fixed;width:380px;border:0;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.4);background:transparent;color-scheme:normal}
+    .card{position:fixed;width:380px;border:0;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.4);background:transparent;color-scheme:normal}
     @media (prefers-reduced-motion:reduce){.dock,.toast,.tip,button{transition:none;animation:none}.flash{animation:none;opacity:.8}}`;
 
   // ---------------------------------------------------------------------------

@@ -6,33 +6,33 @@
 <body>
 <!-- The details card: opened from the dock's "Saved · Add details" widget to
      edit a save that has already happened. It edits only the save the
-     background granted it (capture-details.js). -->
-<form id="detailsForm" data-ready="false">
-  <header class="review-head"><p id="detailsEyebrow" class="eyebrow">Saved to My library</p><h1 id="detailsHeading">Your save</h1></header>
-  <fieldset id="detailsFields" class="review-body" disabled><div id="detailsContent">
-    <details id="detailsOriginal" hidden><summary>View saved content</summary><p id="detailsExcerpt"></p></details>
-    <label class="field">Title<input id="detailsTitle" maxlength="1000" placeholder="Give this save a useful name"></label>
-    <label class="field"><span id="detailsNoteLabel">Personal note</span><textarea id="detailsNote" rows="3" maxlength="50000" placeholder="Why are you saving this?"></textarea></label>
-    <div class="destination-folder-head"><label for="detailsFolder" class="field">Folder</label><button id="detailsNewFolderToggle" type="button" class="btn quiet" aria-expanded="false">New folder</button></div>
-    <label class="field"><select id="detailsFolder" aria-label="Folder"></select></label>
-    <div id="detailsNewFolder" hidden><label class="field">New folder name<input id="detailsFolderName" maxlength="80"></label><button id="detailsCreateFolder" type="button" class="btn secondary">Create</button><p id="detailsFolderFeedback" class="statusline" role="status"></p></div>
-    <fieldset class="save-tags-field"><legend>Personal tags</legend><div id="detailsTags" data-label="Add a personal tag"></div></fieldset>
-    <label id="detailsCollectionLabel" class="field">Share to a collection<select id="detailsCollection"><option value="">Don’t share</option></select></label>
-    <p id="detailsShared" class="fine" hidden></p>
-    <p id="detailsRules" class="fine"></p>
-    <section id="detailsShare" hidden>
-      <h2>Shared with this collection</h2><p class="fine">Your personal note, folder and personal tags stay private.</p>
-      <label class="field">Title in collection<input id="sharedTitle" maxlength="200"></label>
-      <label class="field">Source link<input id="sharedUrl" type="url" maxlength="2048"></label>
-      <label class="field">Text in collection<textarea id="sharedBody" rows="4" maxlength="5000"></textarea></label>
-      <fieldset class="save-tags-field"><legend>Tags in collection</legend><div id="sharedTags" data-label="Add a collection tag"></div></fieldset>
-      <label id="shareImageLabel" class="attach-source" hidden><input id="shareImage" type="checkbox">Include the saved image</label>
-    </section>
-  </div></fieldset>
-  <footer class="review-foot"><p id="detailsFeedback" class="statusline" role="status"></p>
-    <button id="detailsReload" type="button" class="btn quiet" hidden>Retry</button>
-    <button id="detailsCancel" type="button" class="btn quiet">Cancel</button>
-    <button id="detailsSave" type="submit" class="btn primary" disabled>Save details</button></footer>
+     background granted it (capture-details.js). Layout (approved design,
+     design-system Storybook "Extension / Add details card"): the title, a
+     boxless note, one row of folder and tag pills, then My library, Share and
+     Save on one line. Nothing sits above the title. -->
+<form id="detailsForm" class="card" data-ready="false" novalidate>
+  <div class="title-row">
+    <input id="detailsTitle" class="title" maxlength="1000" placeholder="Add a title" aria-label="Title" disabled>
+    <button id="detailsCancel" type="button" class="icon-button" aria-label="Close without saving" data-tip="Close"></button>
+  </div>
+  <textarea id="detailsNote" class="note" rows="2" maxlength="50000" placeholder="Add a note" aria-label="Personal note" disabled></textarea>
+  <div class="pills">
+    <button id="detailsFolder" type="button" class="pill" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+    <span id="detailsTags" class="chips" aria-label="Personal tags"></span>
+    <button id="detailsAddTag" type="button" class="pill ghost" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+  </div>
+  <div id="detailsShare" class="share-line" hidden>
+    <span id="detailsShareIcon" aria-hidden="true"></span>
+    <textarea id="sharedBody" class="note" rows="1" maxlength="5000" placeholder="Add a caption for the collection" aria-label="Caption for the collection"></textarea>
+  </div>
+  <p id="detailsFeedback" class="statusline" role="status"></p>
+  <footer class="foot">
+    <span class="pill static" id="detailsLibrary" data-tip="Saved to My library"></span>
+    <button id="detailsCollection" type="button" class="pill ghost" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+    <button id="detailsReload" type="button" class="text-button" hidden>Retry</button>
+    <span class="spacer"></span>
+    <button id="detailsSave" type="submit" class="primary" disabled>Save details</button>
+  </footer>
 </form>
 <script src="review.js" type="module"></script>
 </body></html>

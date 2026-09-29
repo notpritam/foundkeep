@@ -73,16 +73,17 @@ test('installed extension auto-connects from the library, stays paired across ro
   await page.evaluate(({id,url})=>{const frame=document.createElement('iframe');frame.id=id;frame.src=url;frame.style.cssText='position:fixed;right:0;bottom:0;width:380px;height:600px;z-index:99999';document.body.append(frame);},{id,url});
   const card=page.frameLocator('#'+id);await card.locator('#detailsForm[data-ready="true"]').waitFor();return card;
  }
- async function addTags(card,root,tags){for(const tag of tags){await card.locator(root+' input').fill(tag);await card.locator(root+' input').press('Enter');}}
+ // The card's controls are FoundKeep list pickers (picker.js), not <select>s.
+async function addTags(card,tags){for(const tag of tags){await card.locator('#detailsAddTag').click();await card.locator('.picker input').fill(tag);await card.locator('.picker input').press('Enter');await card.locator(`#detailsTags .chip[data-tag="${tag}"]`).waitFor({state:'attached'});await card.locator('.picker input').press('Escape');}}
+async function pick(card,trigger,value){for(let i=0;i<20;i++){await card.locator(trigger).click();if(await card.locator(`.picker-option[data-value="${value}"]`).waitFor({timeout:1000}).then(()=>true,()=>false))break;await card.locator('.picker input').press('Escape');}await card.locator(`.picker-option[data-value="${value}"]`).click();}
  const note='Automatic dev sync check '+crypto.randomUUID();
  const titledSave=await saveNote(note);
  assert.equal(titledSave.ok,true,JSON.stringify(titledSave));
  await synced(note);
  let card=await addDetails();
- await card.locator(`#detailsFolder option[value="${folder.id}"]`).waitFor({state:'attached'});
- await card.locator('#detailsTitle').fill('A titled note');
- await card.locator('#detailsFolder').selectOption(folder.id);
- await addTags(card,'#detailsTags',['Personal','To test']);
+  await card.locator('#detailsTitle').fill('A titled note');
+ await pick(card,'#detailsFolder',folder.id);
+ await addTags(card,['Personal','To test']);
  await card.locator('#detailsSave').click();
  await waitFor(async()=> (await (await context.request.get(base+'/api/captures')).json()).captures.some(c=>c.noteText===note&&c.folderId===folder.id&&c.sourceTitle==='A titled note'));
  const titled=(await(await context.request.get(base+'/api/captures')).json()).captures.find(c=>c.noteText===note);assert.equal(titled.sourceTitle,'A titled note');assert.deepEqual(titled.userTags,['Personal','To test']);
@@ -92,16 +93,13 @@ test('installed extension auto-connects from the library, stays paired across ro
  assert.equal(collectionSave.ok,true,JSON.stringify(collectionSave));
  card=await addDetails();
  await card.locator('#detailsNote').fill(privateText+' — extra private context');
- await addTags(card,'#detailsTags',['Private research']);
- await card.locator(`#detailsCollection option[value="${collection.id}"]`).waitFor({state:'attached'});
- await card.locator('#detailsCollection').selectOption(collection.id);
- await card.locator('#sharedTitle').fill('A chosen quote');
- await card.locator('#sharedBody').fill(sharedText);
- await addTags(card,'#sharedTags',['Team references']);
- await card.locator('#detailsSave').click();
+ await addTags(card,['Private research']);
+  await pick(card,'#detailsCollection',collection.id);
+  await card.locator('#sharedBody').fill(sharedText);
+  await card.locator('#detailsSave').click();
  await waitFor(async()=> (await (await context.request.get(base+'/api/collections/'+collection.id)).json()).entries.some(entry=>entry.body===sharedText));
  const entries=(await(await context.request.get(base+'/api/collections/'+collection.id)).json()).entries;assert.ok(!JSON.stringify(entries).includes(privateText));
- assert.ok(!JSON.stringify(entries).includes('Private research'));assert.deepEqual(entries.find(entry=>entry.body===sharedText).tags,['Team references']);
+ assert.ok(!JSON.stringify(entries).includes('Private research'));assert.deepEqual(entries.find(entry=>entry.body===sharedText).tags,[],'the card shares no collection tags');
  await waitFor(async()=> (await (await context.request.get(base+'/api/captures')).json()).captures.some(c=>c.noteText===privateText+' — extra private context'));
  const privateCopy=(await(await context.request.get(base+'/api/captures')).json()).captures.find(c=>c.noteText===privateText+' — extra private context');assert.ok(privateCopy);assert.deepEqual(privateCopy.userTags,['Private research']);
  await page.evaluate(()=>document.querySelectorAll('iframe[id^="details"]').forEach(frame=>frame.remove()));

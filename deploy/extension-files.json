@@ -13,6 +13,8 @@
   "src/review.html",
   "src/review.js",
   "src/review.css",
+  "src/card-icons.js",
+  "src/picker.js",
   "src/note.html",
   "src/note.js",
   "src/note.css",

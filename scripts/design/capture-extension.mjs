@@ -261,20 +261,31 @@ async function main() {
     const cardClip = async () => union([await rect('.card'), await rect('.dock')], PAD, viewport);
     await capture(web, { kind: 'component', area: 'Add details card', state: 'Loading', description: 'Opened from "Add details": the save’s own fields are in; folders and collections are still loading from the server.', clip: await cardClip() });
     releaseOrganization();
-    await card.waitForSelector('#detailsFolder option[value="f-reading"]', { state: 'attached' });
     await card.waitForFunction(() => document.getElementById('detailsFeedback').textContent === '');
     await web.mouse.move(120, 400);
-    await capture(web, { kind: 'component', area: 'Add details card', state: 'Pre-filled', description: 'Ready: "Saved to My library", the title pre-filled from the page, keyboard focus on Title, starter and library tag suggestions.', clip: await cardClip() });
+    await capture(web, { kind: 'component', area: 'Add details card', state: 'Pre-filled', description: 'Ready: the title and note edited in place, the folder and tags as pills, and My library, Share and Save details on one line. Nothing above the title.', clip: await cardClip() });
     await screen('Add details open', 'Desktop view: the Add details card open over the article, pre-filled.', 'add-details-open');
-    await card.click('#detailsNewFolderToggle');
-    await card.waitForSelector('#detailsNewFolder:not([hidden])');
+    // The pickers replace the old native <select>s (picker.js).
+    await card.click('#detailsFolder');
+    await card.waitForSelector('.picker'); await sleep(200); // its fade-in
     await web.mouse.move(120, 400);
-    await capture(web, { kind: 'component', area: 'Add details card', state: 'New folder', description: '"New folder" reveals an inline name field and Create button; focus moves into the name.', clip: await cardClip() });
-    await card.click('#detailsNewFolderToggle');
-    await card.selectOption('#detailsCollection', 'col-design');
+    await capture(web, { kind: 'component', area: 'Add details card', state: 'New folder', description: 'The folder list: search, a check on the current folder, and New folder at the end (type a name and press Enter).', clip: await cardClip() });
+    await card.press('.picker input', 'Escape');
+    await card.click('#detailsAddTag');
+    await card.waitForSelector('.picker'); await sleep(200); // its fade-in
+    await card.fill('.picker input', 'Deep work');
+    await web.mouse.move(120, 400);
+    await capture(web, { kind: 'component', area: 'Add details card', state: 'Adding a tag', description: 'The tag list: pick several, or type a new one and press Enter to create it.', clip: await cardClip() });
+    await card.press('.picker input', 'Enter');
+    await card.press('.picker input', 'Escape');
+    await card.click('#detailsCollection');
+    await card.waitForSelector('.picker-option[data-value="col-design"]'); await sleep(200);
+    await web.mouse.move(120, 400);
+    await capture(web, { kind: 'component', area: 'Add details card', state: 'Picking a collection', description: 'Share: Don’t share, or a collection with whether it is public or private and needs approval.', clip: await cardClip() });
+    await card.click('.picker-option[data-value="col-design"]');
     await card.waitForSelector('#detailsShare:not([hidden])');
     await web.mouse.move(120, 400);
-    await capture(web, { kind: 'component', area: 'Add details card', state: 'Collection share', description: 'Choosing a collection adds what is shared (title, link, text, tags) and its rules; the button becomes "Save and share". The card is capped at 600 px, so its body scrolls.', clip: await cardClip() });
+    await capture(web, { kind: 'component', area: 'Add details card', state: 'Collection share', description: 'Shared: the Share pill names the collection, one caption line appears, and the button is just Save.', clip: await cardClip() });
     await card.click('#detailsSave');
     await dock.until(`__foundkeepDock.status() === 'Details saved'`);
     await away();

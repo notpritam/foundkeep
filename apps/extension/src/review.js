@@ -2,10 +2,14 @@
 // it after a save; it reads and edits exactly the save the background granted
 // it for this tab (capture-details.js) and never anything else.
 import { $, message } from './ui.js';
-import { bindSaveTags } from './save-details.js';
+import { normalizeSaveTags, STARTER_TAGS } from './save-details.js';
+import { icon } from './card-icons.js';
+import { openPicker, closePicker, pickerOpen } from './picker.js';
 
 const tabId = Number(new URLSearchParams(location.search).get('tab'));
-let details = null, initial = null, collections = [], folders = [], busy = false, creating = false, finished = false, epoch = 0, sharedTouched = false;
+let details = null, initial = null, collections = [], folders = [], busy = false, creating = false, finished = false, epoch = 0;
+// What the pills show; the form sends only what differs from `initial`.
+let folderId = '', tags = [], collectionId = '', tagNames = [];
 
 // C1 / R16: never window.parent.postMessage — the parent is the web page, and
 // its own script would receive every message with event.source set to this
@@ -25,36 +29,56 @@ const request = async (kind, values = {}) => {
   return result;
 };
 const api = async (operation, args = {}) => (await request('library-request', { operation, args, accountId: details?.accountId })).data;
-const tags = bindSaveTags($('detailsTags'), () => {});
-const sharedTags = bindSaveTags($('sharedTags'), () => {}, { maxTags: 10 });
 
-const chosenCollection = () => collections.find(item => item.id === $('detailsCollection').value) || null;
-function update() {
+// --- Rendering ------------------------------------------------------------------
+const chosenCollection = () => collections.find(item => item.id === collectionId) || null;
+const needsApproval = collection => !!collection?.requireApproval && !collection?.canModerate;
+const visibilityIcon = collection => collection?.visibility === 'public' ? 'globe' : 'lock';
+const html = (el, markup) => { el.innerHTML = markup; };
+const esc = value => { const span = document.createElement('span'); span.textContent = value; return span.innerHTML; };
+
+function renderFolder() {
+  const folder = folders.find(item => item.id === folderId);
+  const label = !folderId ? 'No folder' : folder ? (folder.displayName || folder.name) : 'Unavailable folder';
+  html($('detailsFolder'), `${icon('folder', 15)}<span>${esc(label)}</span>${icon('chevron', 14)}`);
+  $('detailsFolder').classList.toggle('unavailable', !!folderId && !folder && folders.length > 0);
+}
+function renderTags() {
+  $('detailsTags').replaceChildren(...tags.map(name => {
+    const chip = document.createElement('button');
+    chip.type = 'button'; chip.className = 'chip'; chip.dataset.tag = name;
+    chip.setAttribute('aria-label', `Remove tag ${name}`);
+    chip.innerHTML = `<span>${esc(name)}</span>${icon('close', 12)}`;
+    chip.disabled = $('detailsAddTag').disabled;
+    return chip;
+  }));
+}
+function renderShare() {
   const collection = chosenCollection();
-  $('detailsFields').disabled = busy || creating || !details;
-  $('detailsSave').disabled = busy || creating || !details;
-  $('detailsCancel').disabled = busy;
+  if (details?.shared) {
+    // Already shared: the pill says where, and cannot be changed here.
+    html($('detailsCollection'), `${icon('collection', 15)}<span>${esc(details.shared.title)}</span>`);
+    $('detailsCollection').classList.remove('ghost');
+    $('detailsCollection').dataset.tip = details.shared.status === 'pending' ? 'Waiting to sync or for approval' : 'Shared';
+  } else {
+    html($('detailsCollection'), `${icon(collection ? visibilityIcon(collection) : 'collection', 15)}<span>${esc(collection ? collection.title : 'Share')}</span>`);
+    $('detailsCollection').classList.toggle('ghost', !collection);
+    delete $('detailsCollection').dataset.tip;
+  }
   $('detailsShare').hidden = !collection;
-  $('sharedTitle').required = !!collection;
-  $('shareImageLabel').hidden = !collection || !details?.canShareImage;
-  const approval = collection?.requireApproval && !collection?.canModerate;
-  $('detailsRules').textContent = collection
-    ? `${collection.visibility === 'public' ? 'Public collection: anyone can read approved entries.' : 'Private collection: accepted members can read.'} ${approval ? 'Your submission needs approval.' : 'Your entry appears immediately.'}${collection.rules ? ' Rules: ' + collection.rules : ''}`
-    : '';
-  $('detailsSave').textContent = creating ? 'Creating folder…' : busy ? 'Saving…' : collection ? (approval ? 'Save and submit for approval' : 'Save and share') : 'Save details';
+  if (collection) html($('detailsShareIcon'), icon(visibilityIcon(collection), 15));
 }
-function renderFolders(selected = $('detailsFolder').value) {
-  $('detailsFolder').replaceChildren(new Option('No folder', ''));
-  for (const folder of folders) $('detailsFolder').add(new Option(folder.displayName || folder.name, folder.id));
-  if (selected && !folders.some(folder => folder.id === selected)) $('detailsFolder').add(new Option('Unavailable folder — choose another', selected));
-  $('detailsFolder').value = selected;
+function update() {
+  const locked = busy || creating || !details;
+  for (const id of ['detailsTitle', 'detailsNote', 'detailsFolder', 'detailsAddTag', 'sharedBody', 'detailsSave']) $(id).disabled = locked;
+  $('detailsCollection').disabled = locked || !!details?.shared;
+  for (const chip of $('detailsTags').children) chip.disabled = locked;
+  $('detailsCancel').disabled = busy;
+  $('detailsSave').textContent = creating ? 'Creating folder…' : busy ? 'Saving…' : chosenCollection() ? 'Save' : 'Save details';
+  renderFolder(); renderShare();
 }
-function renderCollections() {
-  const selected = $('detailsCollection').value;
-  $('detailsCollection').replaceChildren(new Option('Don’t share', ''));
-  for (const collection of collections) $('detailsCollection').add(new Option(`${collection.title} · ${collection.visibility === 'public' ? 'Public' : 'Private'}`, collection.id));
-  $('detailsCollection').value = collections.some(item => item.id === selected) ? selected : '';
-}
+
+// --- Loading ----------------------------------------------------------------------
 async function loadOptions() {
   const revision = ++epoch;
   $('detailsReload').hidden = true;
@@ -62,11 +86,13 @@ async function loadOptions() {
   const results = await Promise.allSettled([api('organization'), details.shared ? Promise.resolve({ collections: [] }) : api('collections')]);
   if (revision !== epoch) return;
   if (results[0].status === 'fulfilled') {
-    folders = results[0].value.folders || []; renderFolders();
-    const names = [...(results[0].value.tags || []).map(tag => tag.name), ...(results[0].value.suggestedTags || [])];
-    tags.suggest(names); sharedTags.suggest(names);
+    folders = results[0].value.folders || [];
+    tagNames = [...(results[0].value.tags || []).map(tag => tag.name), ...(results[0].value.suggestedTags || [])];
   }
-  if (results[1].status === 'fulfilled') { collections = (results[1].value.collections || []).filter(item => item.canSubmit); renderCollections(); }
+  if (results[1].status === 'fulfilled') {
+    collections = (results[1].value.collections || []).filter(item => item.canSubmit);
+    if (!chosenCollection()) collectionId = '';
+  }
   update();
   const failed = results.some(result => result.status === 'rejected');
   message($('detailsFeedback'), failed ? 'Some folders or collections could not load. Retry, or save without them.' : '', failed ? 'error' : '');
@@ -85,72 +111,102 @@ async function load() {
     // replace it with a generic "could not open" after 3 s). Only a card
     // that belongs to this tab can reach the dock at all.
     message($('detailsFeedback'), error.message, 'error');
-    $('detailsFields').hidden = true; $('detailsSave').hidden = true;
-    $('detailsCancel').textContent = 'Close';
+    for (const el of document.querySelectorAll('.pills, .foot > :not(#detailsReload), #detailsNote')) el.hidden = true;
+    $('detailsTitle').placeholder = 'Details unavailable';
     post({ type: 'ready' });
     return;
   }
   const note = details.type === 'note';
-  $('detailsHeading').textContent = details.title || (note ? 'Your note' : 'Your save');
   $('detailsTitle').value = details.title;
   $('detailsNote').value = details.note;
-  $('detailsNote').required = note;
-  $('detailsNoteLabel').textContent = note ? 'Note' : 'Personal note';
-  $('detailsOriginal').hidden = !details.excerpt;
-  $('detailsExcerpt').textContent = details.excerpt;
-  tags.set(details.tags);
-  renderFolders(details.folderId);
-  $('detailsCollectionLabel').hidden = !!details.shared;
-  $('detailsShared').hidden = !details.shared;
-  if (details.shared) $('detailsShared').textContent = `Shared with ${details.shared.title}${details.shared.status === 'pending' ? ' (waiting to sync or for approval)' : ''}.`;
-  $('sharedUrl').value = details.sourceUrl;
-  $('sharedBody').value = details.excerpt.slice(0, 5000);
+  $('detailsNote').placeholder = note ? 'Write your note' : 'Add a note';
+  $('detailsNote').setAttribute('aria-label', note ? 'Note' : 'Personal note');
+  folderId = details.folderId || '';
+  tags = [...details.tags];
   // What the card showed; only fields that differ from it are sent, so an
   // untouched field never overwrites the server's copy.
-  initial = { title: details.title, note: details.note, folderId: details.folderId || '', tags: [...details.tags] };
+  initial = { title: details.title, note: details.note, folderId, tags: [...details.tags] };
   $('detailsForm').dataset.ready = 'true';
-  update(); focusFirstField(); post({ type: 'ready' });
+  update(); renderTags(); focusFirstField(); post({ type: 'ready' });
   void loadOptions();
 }
 
-$('detailsCollection').onchange = () => {
-  if (chosenCollection() && !sharedTouched) $('sharedTitle').value = ($('detailsTitle').value || details?.title || '').slice(0, 200);
-  update();
+// --- Pickers ------------------------------------------------------------------------
+const card = $('detailsForm');
+$('detailsFolder').onclick = () => {
+  if ($('detailsFolder').getAttribute('aria-expanded') === 'true') return closePicker();
+  openPicker({
+    trigger: $('detailsFolder'), host: card, label: 'Folder', placeholder: 'Find a folder',
+    options: () => [{ value: '', label: 'No folder', selected: !folderId }, ...folders.map(f => ({ value: f.id, label: f.displayName || f.name, selected: f.id === folderId }))],
+    onPick: option => { folderId = option.value; update(); },
+    create: {
+      label: (query, exact) => query ? (exact ? '' : `New folder “${query}”`) : 'New folder',
+      run: async (query, input) => {
+        if (!query) { input.placeholder = 'Name the new folder'; input.focus(); return; }
+        if (creating || !details) return;
+        creating = true; update(); message($('detailsFeedback'), 'Creating folder…');
+        try {
+          const { folder } = await api('create-folder', { name: query });
+          folders = [...folders.filter(item => item.id !== folder.id), folder]; folderId = folder.id;
+          message($('detailsFeedback'), '');
+          closePicker({ focusTrigger: true });
+        } catch (error) { message($('detailsFeedback'), error.message, 'error'); }
+        finally { creating = false; update(); }
+      },
+    },
+  });
 };
-$('sharedTitle').addEventListener('input', () => { sharedTouched = true; });
+function setTags(next) {
+  try { tags = normalizeSaveTags(next); message($('detailsFeedback'), ''); renderTags(); return true; }
+  catch (error) { message($('detailsFeedback'), error.message, 'error'); return false; }
+}
+$('detailsAddTag').onclick = () => {
+  if ($('detailsAddTag').getAttribute('aria-expanded') === 'true') return closePicker();
+  openPicker({
+    trigger: $('detailsAddTag'), host: card, label: 'Personal tags', placeholder: 'Find or create a tag',
+    options: () => [...new Set([...tags, ...tagNames, ...STARTER_TAGS])].map(name => ({ value: name, label: name, selected: tags.includes(name) })),
+    onPick: option => { setTags(tags.includes(option.value) ? tags.filter(t => t !== option.value) : [...tags, option.value]); return true; },
+    create: { label: (query, exact) => query && !exact ? `Create “${query.replace(/^#/, '')}”` : '', run: query => { setTags([...tags, query]); } },
+  });
+};
+$('detailsTags').onclick = event => {
+  const chip = event.target.closest('.chip');
+  if (chip && !chip.disabled) setTags(tags.filter(t => t !== chip.dataset.tag));
+};
+$('detailsCollection').onclick = () => {
+  if ($('detailsCollection').getAttribute('aria-expanded') === 'true') return closePicker();
+  openPicker({
+    trigger: $('detailsCollection'), host: card, label: 'Share to a collection', placeholder: 'Find a collection',
+    options: () => [{ value: '', label: 'Don’t share', selected: !collectionId },
+      ...collections.map(c => ({ value: c.id, label: c.title, icon: visibilityIcon(c), selected: c.id === collectionId,
+        meta: `${c.visibility === 'public' ? 'Public' : 'Private'}${needsApproval(c) ? ', needs approval' : ''}` }))],
+    onPick: option => { collectionId = option.value; update(); if (collectionId) queueMicrotask(() => $('sharedBody').focus()); },
+  });
+};
+
+// --- Actions --------------------------------------------------------------------------
+html($('detailsCancel'), icon('close', 16));
+html($('detailsAddTag'), `${icon('plus', 14)}<span>Tag</span>`);
+html($('detailsLibrary'), `${icon('library', 15)}<span>My library</span>`);
 $('detailsReload').onclick = () => void loadOptions();
-$('detailsNewFolderToggle').onclick = () => {
-  const open = $('detailsNewFolder').hidden; $('detailsNewFolder').hidden = !open;
-  $('detailsNewFolderToggle').setAttribute('aria-expanded', String(open)); if (open) $('detailsFolderName').focus();
-};
-$('detailsFolderName').onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); $('detailsCreateFolder').click(); } };
-$('detailsCreateFolder').onclick = async () => {
-  const name = $('detailsFolderName').value.trim();
-  if (!name || !details || busy || creating) return;
-  creating = true; update(); message($('detailsFolderFeedback'), 'Creating folder…');
-  try {
-    const { folder } = await api('create-folder', { name });
-    folders = [...folders.filter(item => item.id !== folder.id), folder]; renderFolders(folder.id);
-    $('detailsFolderName').value = ''; $('detailsNewFolder').hidden = true; $('detailsNewFolderToggle').setAttribute('aria-expanded', 'false');
-    message($('detailsFolderFeedback'), '');
-  } catch (error) { message($('detailsFolderFeedback'), error.message, 'error'); }
-  finally { creating = false; update(); }
-};
 $('detailsCancel').onclick = () => { if (!busy) finish(false); };
 $('detailsForm').onsubmit = async event => {
   event.preventDefault();
   if (busy || creating || !details) return;
+  closePicker();
   const collection = chosenCollection();
-  if (!tags.flush() || (collection && !sharedTags.flush())) return;
   if (details.type === 'note' && !$('detailsNote').value.trim()) { message($('detailsFeedback'), 'A note needs some text.', 'error'); $('detailsNote').focus(); return; }
-  if (collection && !$('sharedTitle').value.trim()) { message($('detailsFeedback'), 'Add a title for the collection.', 'error'); $('sharedTitle').focus(); return; }
+  const title = $('detailsTitle').value.trim() || details.title || '';
+  if (collection && !title) { message($('detailsFeedback'), 'Add a title before sharing.', 'error'); $('detailsTitle').focus(); return; }
   const form = {};
   if ($('detailsTitle').value !== initial.title) form.title = $('detailsTitle').value;
   if ($('detailsNote').value !== initial.note) form.note = $('detailsNote').value;
-  if ($('detailsFolder').value !== initial.folderId) form.folderId = $('detailsFolder').value || null;
-  if (JSON.stringify(tags.get()) !== JSON.stringify(initial.tags)) form.tags = tags.get();
-  if (collection) form.share = { collectionId: collection.id, title: $('sharedTitle').value, url: $('sharedUrl').value, body: $('sharedBody').value,
-    tags: sharedTags.get(), shareImage: !$('shareImageLabel').hidden && $('shareImage').checked };
+  if (folderId !== initial.folderId) form.folderId = folderId || null;
+  if (JSON.stringify(tags) !== JSON.stringify(initial.tags)) form.tags = tags;
+  // The collection shows the save's title and link, and the caption — or,
+  // with no caption, the saved excerpt (what the card used to pre-fill).
+  if (collection) form.share = { collectionId: collection.id, title: title.slice(0, 200), url: details.sourceUrl,
+    body: ($('sharedBody').value.trim() || details.excerpt || '').slice(0, 5000), tags: [], shareImage: false };
   if (!Object.keys(form).length) { finish(false); return; }
   busy = true; update(); message($('detailsFeedback'), 'Saving…');
   try {
@@ -161,21 +217,17 @@ $('detailsForm').onsubmit = async event => {
   finally { busy = false; update(); }
 };
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') { event.preventDefault(); if (!busy) finish(false); return; }
+  if (event.key === 'Escape') { event.preventDefault(); if (pickerOpen()) closePicker({ focusTrigger: true }); else if (!busy) finish(false); return; }
   if (event.key !== 'Tab') return;
-  const focusable = [...$('detailsForm').querySelectorAll('button, input, textarea, select, a[href], summary')].filter(el => !el.disabled && el.offsetParent !== null);
+  const focusable = [...card.querySelectorAll('button, input, textarea, a[href]')].filter(el => !el.disabled && el.offsetParent !== null);
   if (!focusable.length) return;
   const first = focusable[0], last = focusable[focusable.length - 1];
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
 });
-// Report the card's natural height (header + all fields + footer), not the
-// frame-constrained body height, so the dock can grow the frame to fit.
-const reportSize = () => {
-  const body = $('detailsFields'), padding = parseFloat(getComputedStyle(body).paddingTop) + parseFloat(getComputedStyle(body).paddingBottom);
-  post({ type: 'resize', height: Math.ceil(document.querySelector('.review-head').offsetHeight + $('detailsContent').offsetHeight + padding + document.querySelector('.review-foot').offsetHeight + 2) });
-};
-const sizes = new ResizeObserver(reportSize);
-for (const el of [document.body, $('detailsContent'), document.querySelector('.review-foot')]) sizes.observe(el);
+// Report the card's natural height so the dock sizes the frame to fit it.
+const reportSize = () => post({ type: 'resize', height: Math.ceil(card.getBoundingClientRect().height) });
+new ResizeObserver(reportSize).observe(card);
 window.addEventListener('focus', focusFirstField);
+update();
 void load();
