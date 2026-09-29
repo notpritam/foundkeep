@@ -25,6 +25,6 @@ const preview: Preview = {
   decorators: [simulator],
   globalTypes: simulatorGlobals(WEB_DEVICES),
   initialGlobals: { device: 'desktop', theme: 'light' },
-  parameters: { layout: 'centered', nextjs: { appDirectory: true } },
+  parameters: { options: { storySort: { order: ['Start here', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', nextjs: { appDirectory: true } },
 };
 export default preview;
