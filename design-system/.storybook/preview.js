@@ -43,6 +43,6 @@ export default {
         desktop: viewport('Desktop (1600)', 1600, 1000),
       },
     },
-    options: { storySort: { order: ['Welcome', 'Foundations', ['Colors', 'Typography', 'Shape', 'Icons'], 'Extension', ['Add details card', 'Card controls'], 'Proposals', ['Refined card', 'Add details card'], '*'] } },
+    options: { storySort: { order: ['Welcome', 'Foundations', ['Colors', 'Typography', 'Shape', 'Icons'], 'Extension', ['Add details card', 'Card controls'], 'Proposals', ['Refined card', ['Chosen*', '*'], 'Add details card'], '*'] } },
   },
 };

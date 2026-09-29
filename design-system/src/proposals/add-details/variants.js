@@ -106,7 +106,7 @@ const primary = (label = 'Save details', cls = '') => `<button type="button" cla
 const shareFields = s => {
   const c = collectionOf(s.collection); if (!c) return '';
   return `<section class="fkp-share">
-    <p class="fkp-caption">${icon(c.visibility === 'public' ? 'globe' : 'lock', 14)}${esc(c.note)}. Your note, folder and tags stay private.</p>
+    <p class="fkp-caption">${icon(c.visibility === 'public' ? 'globe' : 'lock', 14)}<span>${s.opts?.destination === 'footer' ? `Sharing to <strong>${esc(c.title)}</strong>: ${esc(c.note.toLowerCase())}. ` : `${esc(c.note)}. `}Your note, folder and tags stay private.</span></p>
     <input class="fkp-field" value="${esc(s.title)}" aria-label="Title in collection" placeholder="Title in collection">
     <textarea class="fkp-field" rows="2" aria-label="Text in collection" placeholder="What should the collection see?"></textarea>
   </section>`;
@@ -216,7 +216,8 @@ export const VARIANTS = [quiet, properties, quick, tabs, compact];
 // title, and "My library" / Share to a collection in the row with the folder
 // and tags. Options shared by every take:
 //   destination: 'inline' (My library pill + Share) | 'merged' (one My library
-//                pill whose list also offers the collections) | 'none'
+//                pill whose list also offers the collections) | 'footer' (a
+//                compact My library + Share on the Save details line) | 'none'
 //   editHint:    'note' | 'both' | 'none' — a faint pencil at the top right of
 //                the note (and title) that says "you can edit this"; it
 //                strengthens on hover and steps aside while you type
@@ -233,15 +234,19 @@ const noteRow = (s, o) => `<div class="fkp-noterow">${editable(note(s, 'bare', 2
 /** The row with where the save lives, the folder and the tags. */
 const pillRow = (s, o, { folder = folderPill(s), addTag = addTagPill, share = sharePill(s), library = libraryPill, end = '' } = {}) => `
     <div class="fkp-pills">
-      ${o.destination === 'merged' ? destinationPill(s) : o.destination === 'none' ? '' : library}
+      ${o.destination === 'merged' ? destinationPill(s) : ['none', 'footer'].includes(o.destination) ? '' : library}
       ${folder}${s.tags.map(tagChip).join('')}${addTag}
-      ${o.destination === 'merged' ? '' : share}${end}
+      ${['merged', 'footer'].includes(o.destination) ? '' : share}${end}
     </div>`;
-const footer = s => `<footer class="fkp-foot">${primary(submitLabel(s))}</footer>`;
+/** 'footer': where the save lives shares the Save details line, compactly. */
+const footerShare = s => `<button type="button" class="fkp-pill${s.collection ? '' : ' ghost'}" data-pick="collection" aria-haspopup="listbox"${s.collection ? ` data-tip="Shared to ${esc(s.collection)}"` : ''}>${icon(collectionIcon(s), 15)}${s.collection ? 'Shared' : 'Share'}</button>`;
+const footer = (s, o = {}) => o.destination === 'footer'
+  ? `<footer class="fkp-foot with-destination">${libraryPill}${footerShare(s)}<span class="fkp-spacer"></span>${primary(submitLabel(s))}</footer>`
+  : `<footer class="fkp-foot">${primary(submitLabel(s))}</footer>`;
 
 const REFINED = [
   { id: 'v6', name: 'Refined', about: 'Outline pills, the title and note edited in place, Save on its own line.',
-    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o)}${shareFields(s)}${footer(s)}` },
+    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o)}${shareFields(s)}${footer(s, o)}` },
   { id: 'v6a', name: 'A. Soft pills', about: 'The same card with filled, borderless pills: quieter, and the row reads as one group. My library is tinted to show where the save lives.',
     html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o)}${shareFields(s)}${footer(s)}` },
   { id: 'v6b', name: 'B. Icon pills', about: 'Only what holds a value gets words: My library, the folder and your tags. Adding a tag and sharing are icon buttons with tooltips until they are used — the row usually fits on one line.',
@@ -273,6 +278,6 @@ export const REFINED_TAKES = REFINED.map(({ id, name, about }) => ({ id, name, a
 export const refinedProposal = ({ take = 'v6', destination = 'inline', editHint = 'note', siteIcon = false, open = null, collection = null } = {}) => {
   const variant = REFINED.find(v => v.id === take);
   const opts = { destination, editHint, siteIcon };
-  return mount({ id: `v6 fkp-${take}`, html: s => variant.html(s, opts) }, initialState({ collection }), { open });
+  return mount({ id: `v6 fkp-${take}`, html: s => variant.html(s, opts) }, initialState({ collection, opts }), { open });
 };
 export const proposal = (index, { state = {}, open = null } = {}) => mount(VARIANTS[index], initialState(state), { open });

@@ -209,6 +209,11 @@
 .fkp-editable:hover .fkp-edit-hint { opacity: .85; }
 .fkp-editable:focus-within .fkp-edit-hint { opacity: 0; }
 .fkp-pills .fkp-spacer { flex: 1 0 8px; }
+/* Where the save lives, on the Save details line */
+.fkp-foot.with-destination { flex-wrap: wrap; align-items: center; gap: 6px; }
+.fkp-foot.with-destination > * { flex: none; white-space: nowrap; }
+.fkp-foot.with-destination .fkp-spacer { flex: 1 0 4px; }
+.fkp-caption strong { color: var(--ink); font-weight: 550; }
 
 /* A · Soft pills */
 .fkp-v6a .fkp-pill { border-color: transparent !important; background: var(--panel); }
@@ -240,3 +245,8 @@
 .fkp-crumb { color: var(--muted); margin: 0 -4px; }
 .fkp .fkp-hash { height: 26px; padding: 0 2px; border-radius: 6px; color: var(--accent); font-size: 13px !important; font-weight: 500 !important; }
 .fkp-hash:hover { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+/* A little tighter on the Save line so "Save and submit" still fits beside
+   My library and Shared at 380px. */
+.fkp-foot.with-destination { gap: 4px; }
+.fkp-foot.with-destination .fkp-pill { padding: 0 10px; gap: 5px; }
+.fkp-foot.with-destination .fkp-primary { padding: 0 14px; }
