@@ -17,7 +17,7 @@
 | P2 Open signups safely | 0% | 0 | 0 | 9 | 0 |
 | P3 Accounts, email & legal | 0% | 0 | 0 | 9 | 0 |
 | P4 Monetization | 0% | 0 | 0 | 8 | 0 |
-| P5 Product gaps | 0% | 0 | 3 | 16 | 0 |
+| P5 Product gaps | 0% | 0 | 4 | 15 | 0 |
 | P6 Store launch | 0% | 0 | 0 | 9 | 0 |
 | P7 Launch | 0% | 0 | 1 | 5 | 0 |
 | L Later (asked) _(post-launch)_ | 0% | 0 | 0 | 18 | 1 |
@@ -136,8 +136,8 @@ _Exit criteria:_ Every ★ item marked for launch is live in prod and in the shi
 | ○ To do | ★ Update public copy: versions, 'private beta' wording, beta page build number | site | agent |  |
 | ◐ In progress | ★ Extension: floating dock replaces the side panel | extension | agent | 1.8.0 merged 2026-09-28 (PR #2). 1.8.1 merged 2026-09-29: saves happen at once (no review first), Add details edits a save after it happens, the corner screenshot toolbar, the dock as a bookmark tab tucked into the edge (draggable anywhere, no grip), an icon-only toolbar with tooltips, one rounded icon set, and the approved Add details card with FoundKeep list pickers instead of native dropdowns. Dev build on Pritam's Mac. Before friends: verify a real 1.7.12 → 1.8.1 upgrade, then publish ext-v1.8.1. |
 | ◐ In progress | ★ Design system: extension components on shared tokens, in Storybook | design | agent | Storybook in design-system/ (omni :8814, bb Connect) renders the product's own CSS and markup. Next: name components as a design system (Button, Tag, Select, Listbox, Badge, Text field, Tooltip…) with variants and sizes, move their CSS to one shared stylesheet the extension pages use, and tidy the previews. 2026-09-29: components shipped in the extension; the dock shows a quiet count of unsynced saves. The Add details card now opens with a preview of what was saved (screenshot, full page, image, post, highlight or page; a small copy, never the capture itself), and a save that has not reached the library shows one status icon in the preview's corner that retries or signs in. Proposals closed; Storybook shows only approved designs. |
-| ○ To do | ★ Design system: bring the mobile app onto it | design | agent | After the extension. Same tokens and component names in the Expo app (replaces the azure palette item P5.7 when done). |
-| ○ To do | ★ Design system: bring the website and dashboard onto it | design | agent | After the app. The Next.js site and dashboard adopt the same tokens and components; Storybook grows a Web section. Includes the chosen drafts banner above the library ("3 saves are still in your extension · Sync now", Storybook Web / Planned / Drafts banner), which needs the site to ask the extension for its unsynced saves. |
+| ◐ In progress | ★ Design system: bring the mobile app onto it | design | agent | After the extension. Same tokens and component names in the Expo app (replaces the azure palette item P5.7 when done). 2026-09-29: foundation done — Storybook App section renders the real app (React Native Web) on a sample world, every screen as it is today in a device simulator (iPhone 17 Pro/SE, Pixel 9, iPad; light/dark; text size 100–200%; reduced motion/transparency), a flow map, and the Live app on a throwaway demo (deploy/demo, omni--8818). One token source (design-system/tokens.json). Next: proposals flow by flow, shell and library first. |
+| ○ To do | ★ Design system: bring the website and dashboard onto it | design | agent | After the app. The Next.js site and dashboard adopt the same tokens and components; Storybook grows a Web section. Includes the chosen drafts banner above the library ("3 saves are still in your extension · Sync now", Storybook Web / Planned / Drafts banner), which needs the site to ask the extension for its unsynced saves. 2026-09-29: foundation done alongside the app — Storybook Dashboard section with every page as it is today (desktop/laptop/iPad/iPhone frames), a flow map and the Live dashboard on the same demo. |
 
 ## P6 · Store launch
 
