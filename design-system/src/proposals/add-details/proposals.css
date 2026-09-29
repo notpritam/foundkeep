@@ -215,6 +215,27 @@
 .fkp-foot.with-destination .fkp-spacer { flex: 1 0 4px; }
 .fkp-caption strong { color: var(--ink); font-weight: 550; }
 
+/* The chosen card's sharing part */
+.fkp-sline { display: flex; align-items: flex-start; gap: 8px; margin-top: -4px; }
+.fkp-sline > .fkp-i { flex: none; margin-top: 6px; color: var(--accent); }
+.fkp-sline .fkp-note.bare { flex: 1; width: auto; margin: 0 0 0 -6px; }
+.fkp-sblock { display: grid; gap: 4px; padding: 8px 10px 6px; border-radius: var(--r-field); background: var(--panel); }
+.fkp-sblock-head { display: flex; align-items: center; gap: 7px; min-height: 26px; font-size: 13px; }
+.fkp-sblock-head > .fkp-i { color: var(--accent); }
+.fkp-sblock-head strong { font-weight: 550; }
+.fkp-sblock .fkp-spacer { flex: 1; }
+.fkp-sblock .fkp-note.bare { margin: 0 -4px; width: calc(100% + 8px); padding: 4px; }
+.fkp-sblock .fkp-note.bare:hover, .fkp-sblock .fkp-note.bare:focus { background: var(--card); }
+.fkp-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 999px; background: var(--card); color: var(--muted); font-size: 11px; font-weight: 500; }
+.fkp-icon.small { width: 26px; height: 26px; margin-right: -4px; }
+.fkp-squote { display: grid; gap: 2px; padding-left: 12px; border-left: 2px solid var(--accent); }
+.fkp-squote p { display: flex; align-items: center; gap: 6px; margin: 0 0 2px; color: var(--accent); font-size: 12px; font-weight: 550; }
+.fkp-squote .fkp-title.bare { margin: 0 0 0 -8px; width: calc(100% + 8px); font-size: 14px; }
+.fkp-squote .fkp-note.bare { margin: 0 0 0 -8px; width: calc(100% + 8px); }
+.fkp-list-field { display: grid; gap: 6px; padding: 4px 6px 4px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.fkp-list-field textarea { width: 100%; resize: none; padding: 8px 10px; border: 0; border-radius: var(--r-item); background: var(--panel); color: var(--ink); font: 13px/1.45 var(--font); }
+.fkp .fkp-list-field textarea:focus, .fkp .fkp-list-field textarea:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
+
 /* A · Soft pills */
 .fkp-v6a .fkp-pill { border-color: transparent !important; background: var(--panel); }
 .fkp-v6a .fkp-pill:hover, .fkp-v6a .fkp-pill[aria-expanded="true"] { background: var(--hover); }

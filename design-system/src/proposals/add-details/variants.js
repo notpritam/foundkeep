@@ -51,8 +51,13 @@ function picker(kind, state, onChange) {
     }
     const o = options[Number(b.dataset.i)];
     if (multi) { state.tags = selected(o.value) ? state.tags.filter(t => t !== o.value) : [...state.tags, o.value]; onChange(false); draw(); }
+    else if (kind === 'collection' && state.opts?.sharing === 'popover' && o.value) { state[key] = o.value; onChange(false); }
     else { state[key] = o.value; onChange(true); }
   });
+  // E. In the list: the chosen collection's caption lives under the choices.
+  if (kind === 'collection' && state.opts?.sharing === 'popover' && state.collection) {
+    list.insertAdjacentHTML('beforeend', `<div class="fkp-sep"></div><label class="fkp-list-field"><span>Caption for ${esc(state.collection)}</span><textarea data-bind="caption" rows="2" placeholder="Optional">${esc(state.caption || '')}</textarea></label>`);
+  }
   input.addEventListener('input', draw);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); box.querySelector('button')?.click(); } });
   draw();
@@ -239,14 +244,40 @@ const pillRow = (s, o, { folder = folderPill(s), addTag = addTagPill, share = sh
       ${['merged', 'footer'].includes(o.destination) ? '' : share}${end}
     </div>`;
 /** 'footer': where the save lives shares the Save details line, compactly. */
-const footerShare = s => `<button type="button" class="fkp-pill${s.collection ? '' : ' ghost'}" data-pick="collection" aria-haspopup="listbox"${s.collection ? ` data-tip="Shared to ${esc(s.collection)}"` : ''}>${icon(collectionIcon(s), 15)}${s.collection ? 'Shared' : 'Share'}</button>`;
+// Where the collection shows when the card has no sharing section of its own.
+const namesCollection = o => ['pill', 'popover', 'final'].includes(o.sharing);
+const footerShare = (s, o = {}) => `<button type="button" class="fkp-pill${s.collection ? '' : ' ghost'}" data-pick="collection" aria-haspopup="listbox"${s.collection && !namesCollection(o) ? ` data-tip="Shared to ${esc(s.collection)}"` : ''}>${icon(collectionIcon(s), 15)}${s.collection ? (namesCollection(o) ? esc(s.collection) : 'Shared') : 'Share'}</button>`;
 const footer = (s, o = {}) => o.destination === 'footer'
-  ? `<footer class="fkp-foot with-destination">${libraryPill}${footerShare(s)}<span class="fkp-spacer"></span>${primary(submitLabel(s))}</footer>`
+  ? `<footer class="fkp-foot with-destination">${libraryPill}${footerShare(s, o)}<span class="fkp-spacer"></span>${primary(s.collection && namesCollection(o) ? 'Save' : submitLabel(s))}</footer>`
   : `<footer class="fkp-foot">${primary(submitLabel(s))}</footer>`;
+
+/**
+ * The sharing part of the chosen card, once a collection is picked. No
+ * explanations — the list picker already says public / private / approval.
+ *   pill:    nothing here; the Share pill names the collection
+ *   caption: one boxless caption line, with the collection's icon
+ *   block:   a small tinted block — collection, Needs approval, stop sharing — and a caption line
+ *   quote:   what the collection will show (title and caption) under a thin accent rule
+ *   popover: nothing here; the caption lives in the collection list
+ *   final:   the locked choice — the pill names the collection (A) and one
+ *            boxless caption line sits under the pills (B)
+ */
+function sharingPart(s, o) {
+  const c = collectionOf(s.collection); if (!c) return '';
+  const vis = c.visibility === 'public' ? 'globe' : 'lock';
+  const caption = (placeholder, rows = 1) => `<textarea class="fkp-note bare" data-bind="caption" rows="${rows}" aria-label="Caption for ${esc(c.title)}" placeholder="${esc(placeholder)}">${esc(s.caption || '')}</textarea>`;
+  switch (o.sharing) {
+    case 'final': return `<div class="fkp-sline">${icon(vis, 15)}${caption('Add a caption for the collection')}</div>`;
+    case 'caption': return `<div class="fkp-sline">${icon(vis, 15)}${caption(`Add a caption for ${c.title}`)}</div>`;
+    case 'block': return `<section class="fkp-sblock"><div class="fkp-sblock-head">${icon(vis, 15)}<strong>${esc(c.title)}</strong>${c.note.includes('approval') ? '<span class="fkp-badge">Needs approval</span>' : ''}<span class="fkp-spacer"></span><button type="button" class="fkp-icon small" data-collection="" data-tip="Stop sharing" aria-label="Stop sharing">${icon('close', 14)}</button></div>${caption('Add a caption', 2)}</section>`;
+    case 'quote': return `<section class="fkp-squote"><p>${icon(vis, 13)}${esc(c.title)}</p><input class="fkp-title bare" data-bind="sharedTitle" value="${esc(s.sharedTitle ?? s.title)}" aria-label="Title in ${esc(c.title)}">${caption('Add a caption', 2)}</section>`;
+    default: return '';
+  }
+}
 
 const REFINED = [
   { id: 'v6', name: 'Refined', about: 'Outline pills, the title and note edited in place, Save on its own line.',
-    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o)}${shareFields(s)}${footer(s, o)}` },
+    html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o)}${o.destination === 'footer' ? sharingPart(s, o) : shareFields(s)}${footer(s, o)}` },
   { id: 'v6a', name: 'A. Soft pills', about: 'The same card with filled, borderless pills: quieter, and the row reads as one group. My library is tinted to show where the save lives.',
     html: (s, o) => `${titleRow(s, o)}${noteRow(s, o)}${pillRow(s, o)}${shareFields(s)}${footer(s)}` },
   { id: 'v6b', name: 'B. Icon pills', about: 'Only what holds a value gets words: My library, the folder and your tags. Adding a tag and sharing are icon buttons with tooltips until they are used — the row usually fits on one line.',
@@ -275,9 +306,9 @@ const REFINED = [
 ];
 export const REFINED_TAKES = REFINED.map(({ id, name, about }) => ({ id, name, about }));
 /** take: 'v6' | 'v6a' … 'v6e' */
-export const refinedProposal = ({ take = 'v6', destination = 'inline', editHint = 'note', siteIcon = false, open = null, collection = null } = {}) => {
+export const refinedProposal = ({ take = 'v6', destination = 'inline', editHint = 'note', siteIcon = false, sharing = 'caption', open = null, collection = null } = {}) => {
   const variant = REFINED.find(v => v.id === take);
-  const opts = { destination, editHint, siteIcon };
+  const opts = { destination, editHint, siteIcon, sharing };
   return mount({ id: `v6 fkp-${take}`, html: s => variant.html(s, opts) }, initialState({ collection, opts }), { open });
 };
 export const proposal = (index, { state = {}, open = null } = {}) => mount(VARIANTS[index], initialState(state), { open });

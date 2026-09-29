@@ -8,6 +8,7 @@ const argTypes = {
   editHint: { control: 'inline-radio', options: ['note', 'both', 'none'], description: 'A faint pencil at the top right of the note (or the title and the note) that says the text is editable.' },
   destination: { control: 'inline-radio', options: ['footer', 'inline', 'merged', 'none'], description: 'On the Save details line (compact My library + Share), in the pill row, one My library pill whose list also offers the collections, or Share alone.' },
   siteIcon: { control: 'boolean', description: 'The page\'s icon beside the title.' },
+  sharing: { control: 'inline-radio', options: ['final', 'pill', 'caption', 'block', 'quote', 'popover'], description: 'Once a collection is chosen (destination footer): only the pill names it · one caption line · a small block · a preview of what the collection shows · the caption inside the collection list.' },
   open: { table: { disable: true } },
   collection: { table: { disable: true } },
 };
@@ -37,9 +38,36 @@ export default {
   parameters: { layout: 'padded', docs: { description: { component: 'Pritam\'s pick for the Add details card — Quiet sheet with Properties\' boxless note, nothing above the title, My library and Share to a collection in the row with the folder and tags — and five more takes on it. The note icon is gone; a faint pencil at the top right of the text marks it editable (try the editHint control). All live.' } } },
 };
 
-// Pritam's choice (2026-09-29): Refined, no edit hint, My library and Share on the Save details line.
-export const Chosen = { name: 'Chosen: Refined, library and share by Save', args: { editHint: 'none', destination: 'footer' }, parameters: { docs: { description: { story: 'The pick: Refined without the edit hint. My library and Share sit on the Save details line, so the pill row holds only the folder and tags. Once shared, the pill reads Shared and the sharing section names the collection.' } } } };
-export const ChosenSharing = { name: 'Chosen · sharing', args: { editHint: 'none', destination: 'footer', collection: 'Design that works' } };
+// LOCKED (2026-09-29): Refined, no edit hint, My library and Share on the Save details line;
+// once shared, the Share pill names the collection and one caption line appears.
+// This is what apps/extension/src/review.html builds.
+export const Chosen = { name: 'Chosen: Refined, library and share by Save', args: { editHint: 'none', destination: 'footer', sharing: 'final' }, parameters: { docs: { description: { story: 'The pick: Refined without the edit hint. My library and Share sit on the Save details line, so the pill row holds only the folder and tags. Once shared, the pill reads Shared and the sharing section names the collection.' } } } };
+export const ChosenSharing = { name: 'Chosen · sharing', args: { editHint: 'none', destination: 'footer', sharing: 'final', collection: 'Design that works' } };
+const SHARE = { editHint: 'none', destination: 'footer', collection: 'Design that works' };
+export const SharingPill = { name: 'Chosen · sharing A. just the pill', args: { ...SHARE, sharing: 'pill' } };
+export const SharingCaption = { name: 'Chosen · sharing B. caption line', args: { ...SHARE, sharing: 'caption' } };
+export const SharingBlock = { name: 'Chosen · sharing C. small block', args: { ...SHARE, sharing: 'block' } };
+export const SharingQuote = { name: 'Chosen · sharing D. preview', args: { ...SHARE, sharing: 'quote' } };
+export const SharingPopover = { name: 'Chosen · sharing E. in the list', args: { ...SHARE, sharing: 'popover', open: 'collection' } };
+export const SharingOverview = {
+  name: 'Chosen · sharing, all five',
+  render: () => {
+    const wrap = document.createElement('div'); wrap.className = 'fkp-overview';
+    for (const [name, sharing, about] of [
+      ['A. Just the pill', 'pill', 'No sharing section: the pill names the collection and the button is just Save.'],
+      ['B. Caption line', 'caption', 'One boxless line for the collection\'s caption, marked by its icon.'],
+      ['C. Small block', 'block', 'The collection, Needs approval and Stop sharing in one tinted line, with a caption under it.'],
+      ['D. Preview', 'quote', 'What the collection will show — its title and a caption — under a thin accent rule.'],
+      ['E. In the list', 'popover', 'The card stays as it is; the caption lives in the collection list (click the pill).'],
+    ]) {
+      const block = document.createElement('section'); block.className = 'fkp-overview-item';
+      block.innerHTML = `<h3>${name}</h3><p>${about}</p>`;
+      block.append(refinedProposal({ ...SHARE, sharing })); wrap.append(block);
+    }
+    return wrap;
+  },
+  parameters: { controls: { disable: true } },
+};
 export const ChosenPickingAFolder = { name: 'Chosen · picking a folder', args: { editHint: 'none', destination: 'footer', open: 'folder' } };
 export const ChosenSharePicker = { name: 'Chosen · picking a collection', args: { editHint: 'none', destination: 'footer', open: 'collection' } };
 export const Overview = { name: 'All six, with and without the edit hint', render: overview, parameters: { controls: { disable: true } } };
