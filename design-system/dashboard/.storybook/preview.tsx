@@ -30,6 +30,6 @@ const preview: Preview = {
   decorators: [simulator],
   globalTypes: simulatorGlobals(WEB_DEVICES),
   initialGlobals: { device: 'desktop', theme: 'light' },
-  parameters: { options: { storySort: { order: ['Start here', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', nextjs: { appDirectory: true }, msw: { handlers: { story: [], world: dashboardHandlers } } },
+  parameters: { options: { storySort: { order: ['Start here', 'Flow map', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', nextjs: { appDirectory: true }, msw: { handlers: { story: [], world: dashboardHandlers } } },
 };
 export default preview;

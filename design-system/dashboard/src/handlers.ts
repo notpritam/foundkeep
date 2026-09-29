@@ -88,6 +88,8 @@ export const dashboardHandlers = [
   http.get('*/api/plan', () => HttpResponse.json(planFree)),
   http.get('*/api/automation', () => HttpResponse.json({ available: true, enabled: false, fetchLinks: true, images: true, consentVersion: '2026-09', mode: 'manual', intervalHours: 24, monthlyLimit: 0, nextRunAt: null, usage: { cycle: '2026-09', used: 0, reserved: 0, limit: 0 }, activity: [] })),
   http.get('*/api/collections', () => HttpResponse.json({ collections, invitations: [{ id: 'inv-1', title: 'Field recordings', slug: 'field-recordings', role: 'contributor' }], canCreateGroup: true })),
+  http.get('*/api/public/collections/:slug', ({ params }) => HttpResponse.json(collectionDetail(collections.find(c => c.slug === params.slug)?.id || ''))),
+  http.get('*/api/collections/by-slug/:slug', ({ params }) => HttpResponse.json(collectionDetail(collections.find(c => c.slug === params.slug)?.id || ''))),
   http.get('*/api/collections/:id', ({ params }) => HttpResponse.json(collectionDetail(String(params.id)))),
   http.get('*/api/collections/:id/members', () => HttpResponse.json({ members: [{ id: 'm-1', name: world.account.name, email: world.account.email, role: 'owner' }, { id: 'm-2', name: 'Ada Kowalski', email: 'ada@example.com', role: 'moderator' }, { id: 'm-3', name: 'Sam Ortiz', email: 'sam@example.com', role: 'contributor' }] })),
   http.get('*/api/graph', () => HttpResponse.json(mindMap())),
