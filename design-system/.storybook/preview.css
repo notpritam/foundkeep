@@ -1,0 +1,32 @@
+/* Storybook canvas only: the page takes the theme's --bg, and a story can
+   ask to sit on the extension card's surface (parameters.surface = 'card'). */
+body { background: var(--bg); color: var(--ink); font: 14px/1.55 var(--font); }
+.fk-surface { box-sizing: border-box; width: 380px; max-width: 100%; padding: 16px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; }
+.fk-surface.wide { width: auto; }
+.fk-matrix { display: flex; flex-wrap: wrap; gap: 20px 28px; align-items: flex-start; }
+.fk-state { min-width: 0; max-width: 100%; }
+.fk-state h4 { margin: 0 0 8px; }
+.fk-pair { display: flex; flex-wrap: wrap; gap: 8px; }
+.fk-matrix .fk-cell { box-sizing: border-box; width: var(--cell); max-width: 100%; min-width: 0; padding: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; font: 14px/1.55 var(--font); }
+.fk-matrix .fk-cell::before { content: attr(data-theme); display: block; margin: -4px 0 8px; font: 600 9px/1 var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.fk-cell #detailsContent > :first-child, .fk-surface #detailsContent > :first-child { margin-top: 0; }
+.fk-cell #detailsContent > :last-child, .fk-surface #detailsContent > :last-child { margin-bottom: 0; }
+.fk-tokens h3, .fk-type h3, .fk-shapes + h3 { margin: 24px 0 10px; font: 600 13px/1 var(--font); color: var(--muted); }
+.fk-tokens h3:first-child { margin-top: 0; }
+.fk-token-grid { display: grid; grid-template-columns: 160px repeat(2, 200px); gap: 8px 16px; align-items: center; }
+.fk-head { font: 600 10px/1.2 var(--font); letter-spacing: .08em; text-transform: uppercase; color: #8a8f98; }
+.fk-swatch { display: flex; align-items: center; gap: 10px; }
+.fk-swatch i { width: 40px; height: 28px; border-radius: 6px; border: 1px solid rgba(128,128,128,.35); }
+.fk-swatch code, .fk-token-grid code, .fk-type-grid code, .fk-shape code { font: 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+.fk-dock-colors { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 16px; background: #08090a; border-radius: 12px; }
+.fk-dock-colors code { color: #a5aab2; }
+.fk-type-grid { display: grid; grid-template-columns: 140px minmax(220px, 1fr) 190px 190px; gap: 14px 20px; align-items: center; }
+.fk-shapes { display: flex; flex-wrap: wrap; gap: 16px; }
+.fk-shape { display: grid; justify-items: start; gap: 6px; width: 150px; }
+.fk-shape i { width: 120px; height: 72px; background: var(--panel); border: 1px solid var(--line); }
+.fk-shape small { color: var(--muted); }
+.fk-icons { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; border-radius: 14px; }
+.fk-icons.on-dock { background: #0f1011; color: #d6d8db; }
+.fk-icons figure { margin: 0; display: grid; justify-items: center; gap: 8px; min-width: 76px; padding: 12px 8px; border-radius: 10px; }
+.fk-icons figure:hover { background: rgba(128,128,128,.12); }
+.fk-icons figcaption { font: 11px/1 var(--font); color: #8a8f98; }

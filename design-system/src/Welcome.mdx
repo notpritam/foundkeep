@@ -1,0 +1,25 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Welcome" />
+
+# FoundKeep design system
+
+Everything here is **live**: stories render the product's own stylesheets and
+markup — `theme.css`, `review.css`, `review.html`, the real `bindSaveTags()` and
+the icons in `dock.js` — so what you see is what ships, and nothing is a
+screenshot.
+
+- **Sidebar** — Foundations (colours, type, shape, icons), then each surface:
+  the Add details card and every control inside it. Each control has one story
+  per state plus **All states · light & dark**.
+- **Controls** (bottom panel) — change a story's label, value, variant or
+  disabled state.
+- **Toolbar** — *Theme* switches light / dark the way the extension's
+  appearance setting does; *Viewport* sizes the canvas (Extension card 380,
+  phone, tablet, laptop, desktop — or leave it responsive); the pseudo-state
+  button forces hover / focus / active on any story.
+- **Docs** tab on each component shows every story on one page.
+
+Feedback: name the story (for example *Card controls / Dropdown / Focus*) and
+what should change. Redesigns land here as new stories next to the current ones
+before they ship.
