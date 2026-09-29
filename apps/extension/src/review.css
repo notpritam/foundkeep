@@ -18,3 +18,5 @@ body { margin: 0; background: transparent; }
 .details__foot > * { flex: none; }
 .details__foot .fk-select { padding: 0 10px; gap: 5px; }
 .details__spacer { flex: 1 0 var(--fk-space-1); }
+.details__preview { margin: -4px -4px 2px; }
+.details__preview[hidden] { display: none; }

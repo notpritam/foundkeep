@@ -9,9 +9,11 @@
      background granted it (capture-details.js). Built from the design
      system's components (components.css; Storybook: Extension / Add details
      card): the title and note are inline Text fields, the folder and share
-     are Selects, tags are Tags, My library is a Badge. Nothing sits above
-     the title. -->
+     are Selects, tags are Tags, My library is a Badge. The Save preview
+     (save-preview.js) shows what was saved, with its Sync status in the
+     corner; nothing else sits above the title. -->
 <form id="detailsForm" class="fk-card details" data-ready="false" novalidate>
+  <div id="detailsPreview" class="details__preview" hidden></div>
   <div class="details__title-row">
     <input id="detailsTitle" class="fk-field fk-field--inline fk-field--title details__title" maxlength="1000" placeholder="Add a title" aria-label="Title" disabled>
     <button id="detailsCancel" type="button" class="fk-button fk-button--ghost fk-button--icon details__close" aria-label="Close without saving" data-tooltip="Close"></button>

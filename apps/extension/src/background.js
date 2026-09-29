@@ -1,7 +1,7 @@
 import { PRODUCT_NAME } from "./product.js";
 import { trustedLibrarySender } from "./library-api.js";
 import { summonDock, startCapture, handleDockMessage, dashboardUrl, reconcileAlwaysOn, imageRequestOrigin, finishImageRequest } from "./dock-control.js";
-import { detailsCaptureFor, readCaptureDetails, applyCaptureDetails, forgetTab, noteGrantFor, consumeNote, releaseNote, frameMayRelay } from "./capture-details.js";
+import { detailsCaptureFor, readCaptureDetails, readCaptureSync, applyCaptureDetails, forgetTab, noteGrantFor, consumeNote, releaseNote, frameMayRelay } from "./capture-details.js";
 import { configuredFlash } from "./badge.js";
 import { publicHttpUrl } from "./capture-actions.js";
 import { startBookmarkImport, resumeBookmarkImport, cancelBookmarkImport, importProgress } from "./import-queue.js";
@@ -263,12 +263,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   // The details card reads and edits exactly the save its grant names.
-  if (msg?.kind === 'details-get' || msg?.kind === 'details-save') {
+  if (msg?.kind === 'details-get' || msg?.kind === 'details-save' || msg?.kind === 'details-sync') {
     if (!detailsCardSender(sender, msg)) { sendResponse({ ok: false, error: 'These details are no longer available. Use Add details again.' }); return; }
     void (async () => {
       const captureId = await detailsCaptureFor(sender, msg.tabId);
       if (!captureId) throw new Error('These details are no longer available. Use Add details again.');
       if (msg.kind === 'details-get') return { details: await readCaptureDetails(captureId) };
+      // The card's sync status: read it, retry a failed sync, or open sign-in.
+      if (msg.kind === 'details-sync') {
+        if (msg.action === 'retry') await retryCloudSync();
+        if (msg.action === 'sign-in') await chrome.tabs.create({ url: dashboardUrl('/login') });
+        return { sync: await readCaptureSync(captureId) };
+      }
       return { result: await applyCaptureDetails(captureId, msg.form) };
     })().then(data => sendResponse({ ok: true, ...data })).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;

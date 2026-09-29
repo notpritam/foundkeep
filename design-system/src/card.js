@@ -9,6 +9,20 @@ import reviewHtml from '../../apps/extension/src/review.html?raw';
 import { icon } from '../../apps/extension/src/card-icons.js';
 import { openListbox, closeListbox } from '../../apps/extension/src/listbox.js';
 import { normalizeSaveTags, STARTER_TAGS } from '../../apps/extension/src/save-details.js';
+import { renderPreview, renderSyncStatus } from '../../apps/extension/src/save-preview.js';
+
+// Sample previews, shaped like readCaptureDetails().preview (capture-details.js);
+// images from design-system/scripts-samples.mjs.
+export const PREVIEWS = {
+  region: { kind: 'region', site: 'themargin.example', width: 780, height: 400, image: 'samples/region.jpg' },
+  fullpage: { kind: 'fullpage', site: 'themargin.example', width: 1280, height: 1787, image: 'samples/fullpage.jpg' },
+  image: { kind: 'image', site: 'themargin.example', width: 700, height: 301, image: 'samples/image.jpg' },
+  post: { kind: 'post', site: 'x.com', author: 'Ada Kowalski', handle: '@adak', text: 'Spaced repetition is not a study hack. It is what remembering looks like when you stop pretending you will reread everything.', image: 'samples/image.jpg' },
+  highlight: { kind: 'highlight', site: 'themargin.example', text: 'Memory is built to discard; keeping everything would be its own kind of noise. The question is not how to remember more, but how to choose.' },
+  page: { kind: 'page', site: 'The Margin', description: 'Most of what we read is gone within a week. A small practice of keeping — not hoarding — changes what stays.', image: 'samples/region.jpg' },
+  'page-text': { kind: 'page', site: 'The Margin', description: 'Most of what we read is gone within a week. A small practice of keeping — not hoarding — changes what stays.', image: null },
+  note: { kind: 'note' },
+};
 
 const template = new DOMParser().parseFromString(reviewHtml, 'text/html').querySelector('#detailsForm');
 
@@ -28,7 +42,7 @@ const visibilityIcon = c => c?.visibility === 'public' ? 'globe' : 'lock';
  * type: 'save' | 'note'; shared: an existing share ({ title, status }) or null
  * open: 'folder' | 'tags' | 'collection' — a list open on first render
  */
-export function card({ state = 'ready', type = 'save', title = TITLE, note = NOTE, folderId = 'f-reading', tags = ['Memory'], collectionId = '', caption = '', shared = null, open = null, decorate = null } = {}) {
+export function card({ state = 'ready', type = 'save', title = TITLE, note = NOTE, folderId = 'f-reading', tags = ['Memory'], collectionId = '', caption = '', shared = null, open = null, decorate = null, preview = 'page', sync = 'synced' } = {}) {
   const form = template.cloneNode(true);
   const $ = id => form.querySelector('#' + id);
   const s = { folderId, tags: [...tags], collectionId };
@@ -100,7 +114,22 @@ export function card({ state = 'ready', type = 'save', title = TITLE, note = NOT
   form.onsubmit = event => event.preventDefault();
   render();
 
-  // Proposals add to the real card (e.g. a preview of the save) through decorate(form).
+  // The Save preview and its Sync status, as review.js shows them. Clicking a
+  // failed or signed-out status plays the fix: syncing, then synced.
+  const shown = renderPreview(typeof preview === 'string' ? PREVIEWS[preview] : preview);
+  $('detailsPreview').replaceChildren(...(shown ? [shown] : []));
+  $('detailsPreview').hidden = !shown;
+  if (sync !== 'synced' && state !== 'loading') {
+    const status = document.createElement('button');
+    status.dataset.overlay = String(!!shown);
+    if (shown) shown.append(status); else $('detailsCancel').before(status);
+    renderSyncStatus(sync, status);
+    status.onclick = () => {
+      if (!['failed', 'local'].includes(status.dataset.state)) return;
+      renderSyncStatus('queued', status);
+      setTimeout(() => { renderSyncStatus('synced', status); setTimeout(() => status.classList.add('fk-sync--leaving'), 1400); }, 1400);
+    };
+  }
   decorate?.(form);
 
   // The extension frames the card 380px wide.

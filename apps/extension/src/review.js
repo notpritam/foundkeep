@@ -5,6 +5,7 @@ import { $, message } from './ui.js';
 import { normalizeSaveTags, STARTER_TAGS } from './save-details.js';
 import { icon } from './card-icons.js';
 import { openListbox, closeListbox, listboxOpen } from './listbox.js';
+import { renderPreview, renderSyncStatus } from './save-preview.js';
 
 const tabId = Number(new URLSearchParams(location.search).get('tab'));
 let details = null, initial = null, collections = [], folders = [], busy = false, creating = false, finished = false, epoch = 0;
@@ -127,8 +128,45 @@ async function load() {
   // untouched field never overwrites the server's copy.
   initial = { title: details.title, note: details.note, folderId, tags: [...details.tags] };
   $('detailsForm').dataset.ready = 'true';
+  showPreview(); showSync(details.sync);
   update(); renderTags(); focusFirstField(); post({ type: 'ready' });
   void loadOptions();
+}
+
+// --- Preview and sync status -------------------------------------------------------
+// What was saved leads the card; its Sync status sits in the preview's corner
+// (beside Close when there is no preview, as for a note). While the save is
+// on its way the card asks again every 2s; a synced save shows a check, then
+// the icon leaves. Clicking runs the fix: retry, or sign in.
+let syncButton = null, syncTimer = 0, syncState = 'synced';
+function showSync(sync) {
+  clearTimeout(syncTimer);
+  const state = sync?.state || 'synced';
+  const was = syncState; syncState = state;
+  if (state === 'synced' && (!syncButton || was === 'synced')) { syncButton?.remove(); syncButton = null; return; }
+  if (!syncButton) {
+    syncButton = document.createElement('button');
+    const preview = $('detailsPreview').firstElementChild;
+    syncButton.dataset.overlay = String(!!preview);
+    if (preview) preview.append(syncButton); else $('detailsCancel').before(syncButton);
+    syncButton.onclick = () => {
+      if (syncState === 'failed') void syncAction('retry');
+      else if (syncState === 'local') void syncAction('sign-in');
+    };
+  }
+  renderSyncStatus(state, syncButton);
+  if (state === 'synced') { syncTimer = setTimeout(() => { syncButton?.classList.add('fk-sync--leaving'); syncTimer = setTimeout(() => { syncButton?.remove(); syncButton = null; }, 300); }, 1400); return; }
+  if (state === 'queued') syncTimer = setTimeout(() => void syncAction('status'), 2000);
+}
+async function syncAction(action) {
+  if (action === 'retry') renderSyncStatus('queued', syncButton);
+  try { showSync((await request('details-sync', { action })).sync); }
+  catch { if (syncState === 'queued') syncTimer = setTimeout(() => void syncAction('status'), 4000); }
+}
+function showPreview() {
+  const preview = renderPreview(details.preview);
+  $('detailsPreview').replaceChildren(...(preview ? [preview] : []));
+  $('detailsPreview').hidden = !preview;
 }
 
 // --- Pickers ------------------------------------------------------------------------

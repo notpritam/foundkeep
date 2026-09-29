@@ -133,7 +133,58 @@ async function currentValues(record, accountId) {
   for (const field of Object.values(FIELDS)) if (!pending.has(field) && field in server) values[field] = field === 'userTags' ? server.userTags || [] : server[field] ?? null;
   return values;
 }
-/** What the card shows: the save's own fields, never the capture bytes. */
+// --- The preview and sync state the card shows -------------------------------------
+const PREVIEW_WIDTH = 720; // 2× the card's 348px content width
+const hostOf = url => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
+/** A small WebP data URL of a stored image: scaled to 720px wide; a full page keeps its top. */
+async function previewImage(blob, { top = false } = {}) {
+  if (!blob || typeof createImageBitmap !== 'function' || typeof OffscreenCanvas !== 'function') return null;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, PREVIEW_WIDTH / bitmap.width);
+    const width = Math.round(bitmap.width * scale);
+    const sourceHeight = Math.min(bitmap.height, Math.round(bitmap.width * (top ? 0.75 : 1.5)));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const canvas = new OffscreenCanvas(width, height);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, bitmap.width, sourceHeight, 0, 0, width, height);
+    bitmap.close?.();
+    const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/webp', quality: 0.8 })).arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return 'data:image/webp;base64,' + btoa(binary);
+  } catch { return null; }
+}
+/**
+ * What was saved, for the card's preview — its kind and what to draw: a
+ * small image (never the capture's own bytes), a post, a highlight or a page.
+ */
+async function previewFor(record) {
+  const method = record.provenance?.captureMethod || '';
+  const site = hostOf(record.sourceUrl);
+  const dims = record.width && record.height ? { width: record.width, height: record.height } : {};
+  if (record.type === 'note') return { kind: 'note' };
+  if (record.type === 'screenshot') {
+    const fullpage = /full-page$/.test(method);
+    return { kind: fullpage ? 'fullpage' : 'region', site, ...dims, image: await previewImage(record.blob, { top: fullpage }) };
+  }
+  if (record.type === 'image') return { kind: 'image', site, ...dims, image: await previewImage(record.blob) };
+  if (record.type === 'highlight' && (record.cloudType === 'tweet' || method === 'twitter-action')) {
+    const who = String(record.sourceTitle || '').match(/^(.*) \(@([^)]+)\) on X$/);
+    const photo = (record.socialContext?.images || []).find(url => /^https:\/\/pbs\.twimg\.com\/media\//.test(url)) || null;
+    return { kind: 'post', site: 'x.com', author: who?.[1] || 'Post', handle: who ? '@' + who[2] : '', text: String(record.selectionText || '').slice(0, 600), image: photo };
+  }
+  if (record.type === 'highlight') return { kind: 'highlight', site, text: String(record.selectionText || '').slice(0, 600) };
+  const p = record.provenance || {};
+  return { kind: 'page', site: p.siteName || site, description: String(p.description || '').slice(0, 300), image: /^https:\/\//.test(p.leadImageUrl || '') ? p.leadImageUrl : null };
+}
+/** Where the save is: 'synced', 'queued' (waiting), 'failed', or 'local' (signed out). */
+const syncFor = record => ({ state: record.cloudStatus === 'synced' ? 'synced' : ['queued', 'failed', 'local'].includes(record.cloudStatus) ? record.cloudStatus : 'queued', error: record.cloudStatus === 'failed' ? record.cloudError || null : null });
+export async function readCaptureSync(captureId) {
+  const record = await db.getCapture(captureId);
+  if (!record) throw new Error('This save is no longer available.');
+  return syncFor(record);
+}
+/** What the card shows: the save's own fields, a small preview and its sync state. */
 export async function readCaptureDetails(captureId) {
   const record = await db.getCapture(captureId);
   const { cloudAccountId } = await captureBinding();
@@ -153,6 +204,8 @@ export async function readCaptureDetails(captureId) {
     excerpt: String(record.selectionText || (record.type === 'note' ? '' : record.noteText) || '').slice(0, 2000),
     canShareImage: SHAREABLE_IMAGE.includes(record.type),
     shared: submission ? { title: submission.title || 'a collection', status: record.collectionEntryStatus || 'pending' } : null,
+    preview: await previewFor(record),
+    sync: syncFor(record),
   };
 }
 
