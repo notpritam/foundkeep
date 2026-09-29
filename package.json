@@ -28,8 +28,9 @@
     "extension:build:prod": "node deploy/build-extension.mjs --environment prod",
     "dev:seed": "node scripts/seed-dev.mjs",
     "launch:dashboard": "node scripts/launch-dashboard.mjs",
-    "test:design": "node --test tests/design-tokens.mjs",
-    "design:tokens": "node design-system/scripts/tokens.mjs"
+    "test:design": "node --test tests/design-tokens.mjs tests/demo-gateway.mjs",
+    "design:tokens": "node design-system/scripts/tokens.mjs",
+    "test:design:storybook": "node --test tests/design-dashboard-theme.mjs"
   },
   "devDependencies": {
     "crx3": "^2.0.0",

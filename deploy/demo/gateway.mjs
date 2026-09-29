@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The live demo's front door (:8818, public through bb Connect). It serves the
 // app's web build under /app/ and proxies everything else to the demo
-// dashboard (:8819), which forwards /api to the demo backend (:8817). The app
+// dashboard (:8820), which forwards /api to the demo backend (:8817). The app
 // and the dashboard therefore share one origin and one throwaway backend.
 // Only this demo may be framed, and only by the design system's Storybook.
 import { createServer, request as forward } from 'node:http';
@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 
 const PORT = Number(process.env.DEMO_GATEWAY_PORT || 8818);
-const SITE = new URL(process.env.DEMO_SITE_URL || 'http://127.0.0.1:8819');
+const SITE = new URL(process.env.DEMO_SITE_URL || 'http://127.0.0.1:8820');
 const APP_DIR = path.resolve(process.env.DEMO_APP_DIR || path.join(homedir(), '.local/share/foundkeep-demo/app/current'));
 const FRAMERS = process.env.DEMO_FRAME_ANCESTORS || 'https://omni--8814.getbb.app http://127.0.0.1:8814';
 const FRAME_POLICY = `frame-ancestors ${FRAMERS}`;
@@ -60,14 +60,20 @@ async function serveApp(req, res, pathname) {
 
 // An <img> cannot send the app's bearer token, so the gateway signs private
 // image requests in as the demo account. The instance only holds sample data.
-const STATE = path.join(homedir(), '.local/share/foundkeep-demo/state.json');
+const STATE = process.env.DEMO_STATE || path.join(homedir(), '.local/share/foundkeep-demo/state.json');
 const IMAGE = /^\/api\/mobile\/captures\/[^/]+\/(blob|preview|file|assets\/[^/?]+)(\?|$)/;
-let demoToken = null;
-async function signIn() {
-  const { email, password } = JSON.parse(await readFile(STATE, 'utf8'));
-  const response = await fetch(`${SITE.origin}/api/mobile/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: `http://127.0.0.1:${PORT}` }, body: JSON.stringify({ email, password, deviceName: 'Demo gateway' }) });
-  demoToken = response.ok ? (await response.json()).token : null;
-  return demoToken;
+let demoToken = null, signingIn = null;
+/** One sign-in at a time, shared by every image waiting on it; a failed sign-in
+ * never replaces a token that still works. */
+function signIn() {
+  signingIn ||= (async () => {
+    const { email, password } = JSON.parse(await readFile(STATE, 'utf8'));
+    const response = await fetch(`${SITE.origin}/api/mobile/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: `http://127.0.0.1:${PORT}` }, body: JSON.stringify({ email, password, deviceName: 'Demo gateway' }) });
+    if (!response.ok) throw new Error(`demo sign-in failed: ${response.status}`);
+    demoToken = (await response.json()).token;
+    return demoToken;
+  })().finally(() => { signingIn = null; });
+  return signingIn;
 }
 
 function send(req, res, headers, body, onResponse) {

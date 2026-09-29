@@ -6,7 +6,7 @@ inside the simulator's frames, against a throwaway backend with the sample world
 | Port | Service | |
 |---|---|---|
 | 8817 | `foundkeep-demo-backend` | the backend (`apps/backend`), data in `~/.local/share/foundkeep-demo/data`, loopback |
-| 8819 | `foundkeep-demo-site` | the dashboard, a packaged release in `~/.local/share/foundkeep-demo/site/current`, loopback |
+| 8820 | `foundkeep-demo-site` | the dashboard, a packaged release in `~/.local/share/foundkeep-demo/site/current`, loopback |
 | 8818 | `foundkeep-demo-gateway` | `gateway.mjs`: the app's web build at `/app/`, everything else to the dashboard; public as https://omni--8818.getbb.app |
 
 The app's web build calls foundkeep.app; the gateway rewrites those requests to
