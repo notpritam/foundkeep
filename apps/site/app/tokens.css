@@ -1,0 +1,64 @@
+/* Generated from design-system/tokens.json by design-system/scripts/tokens.mjs. Edit the JSON, not this file. */
+:root {
+  --fk-color-bg: #fafafa;
+  --fk-color-sidebar: #fff;
+  --fk-color-card: #fff;
+  --fk-color-panel: #f1f3f1;
+  --fk-color-hover: #e6ece7;
+  --fk-color-line: #e4e4e4;
+  --fk-color-control: #929292;
+  --fk-color-ink: #202020;
+  --fk-color-muted: #686868;
+  --fk-color-faint: #686868;
+  --fk-color-accent: #0d7a50;
+  --fk-color-button: #0d7a50;
+  --fk-color-button-hover: #0a6242;
+  --fk-color-on-button: #fff;
+  --fk-color-accent-bg: #e6f2ea;
+  --fk-color-good: #286c56;
+  --fk-color-bad: #ad3b35;
+  --fk-space-1: 4px;
+  --fk-space-2: 8px;
+  --fk-space-3: 12px;
+  --fk-space-4: 16px;
+  --fk-space-5: 20px;
+  --fk-space-6: 24px;
+  --fk-space-8: 32px;
+  --fk-radius-sm: 8px;
+  --fk-radius-md: 10px;
+  --fk-radius-lg: 12px;
+  --fk-radius-xl: 16px;
+  --fk-radius-full: 999px;
+  --fk-control-sm: 30px;
+  --fk-control-md: 36px;
+  --fk-control-lg: 40px;
+  --fk-text-title: 600 16px/1.35 var(--fk-font-sans, Inter, system-ui, sans-serif);
+  --fk-text-body: 400 13.5px/1.5 var(--fk-font-sans, Inter, system-ui, sans-serif);
+  --fk-text-label: 500 12.5px/1 var(--fk-font-sans, Inter, system-ui, sans-serif);
+  --fk-text-caption: 400 12px/1.5 var(--fk-font-sans, Inter, system-ui, sans-serif);
+  --fk-text-micro: 500 11.5px/1.2 var(--fk-font-sans, Inter, system-ui, sans-serif);
+  --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .18), 0 2px 6px rgba(0, 0, 0, .06);
+  --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .16), 0 2px 6px rgba(0, 0, 0, .06);
+  --fk-ease: cubic-bezier(.2, .7, .2, 1);
+}
+:root[data-theme="dark"] {
+  --fk-color-bg: #08090a;
+  --fk-color-sidebar: #0f1011;
+  --fk-color-card: #0f1011;
+  --fk-color-panel: #1a1c20;
+  --fk-color-hover: #262a2e;
+  --fk-color-line: #34373d;
+  --fk-color-control: #646872;
+  --fk-color-ink: #f7f8f8;
+  --fk-color-muted: #a5aab2;
+  --fk-color-faint: #a5aab2;
+  --fk-color-accent: #4cc38a;
+  --fk-color-button: #4cc38a;
+  --fk-color-button-hover: #6bd3a1;
+  --fk-color-on-button: #05130d;
+  --fk-color-accent-bg: #163426;
+  --fk-color-good: #a7d4b1;
+  --fk-color-bad: #ffb5a8;
+  --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .55);
+  --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .6);
+}
