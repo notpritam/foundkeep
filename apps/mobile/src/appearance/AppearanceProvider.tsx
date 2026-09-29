@@ -3,7 +3,8 @@ import { Appearance, Platform, useColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { getEnvironment } from '../environment.ts';
 import { appearanceStorageKey, normalizeAppearance, resolvedAppearance, resolvedThemeStyle, type AppearancePreference } from './preferences.ts';
-const Context = createContext({preference:'system' as AppearancePreference,scheme:'light' as 'light'|'dark',setPreference:async (_value:AppearancePreference)=>{}});
+// Exported so Storybook can set the scheme a story renders in.
+export const AppearanceContext = createContext({preference:'system' as AppearancePreference,scheme:'light' as 'light'|'dark',setPreference:async (_value:AppearancePreference)=>{}});
 export function AppearanceProvider({children}:{children:ReactNode}) {
   const [preference,setValue] = useState<AppearancePreference>('system');
   const [ready,setReady] = useState(false);
@@ -19,9 +20,9 @@ export function AppearanceProvider({children}:{children:ReactNode}) {
     if(Platform.OS==='web')localStorage.setItem(key,value);else await SecureStore.setItemAsync(key,value);
     setValue(value);
   };
-  return <Context.Provider value={{preference,scheme:resolvedAppearance(preference,system),setPreference}}>{children}</Context.Provider>;
+  return <AppearanceContext.Provider value={{preference,scheme:resolvedAppearance(preference,system),setPreference}}>{children}</AppearanceContext.Provider>;
 }
-export const useAppearance=()=>useContext(Context);
+export const useAppearance=()=>useContext(AppearanceContext);
 export function useThemedStyles<T extends Record<string, unknown>>(styles: T): T {
   const { scheme } = useAppearance();
   return useMemo(() => Object.fromEntries(Object.entries(styles).map(([name, style]) => [name, resolvedThemeStyle(style, scheme)])) as T, [scheme, styles]);
