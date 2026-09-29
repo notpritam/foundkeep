@@ -35,7 +35,8 @@ const downloads = path.join(root, 'design-system/downloads');
 await mkdir(downloads, { recursive: true });
 await copyFile(zip, path.join(downloads, 'foundkeep-extension-dev.zip'));
 await writeFile(path.join(downloads, 'foundkeep-extension-dev.json'), JSON.stringify({ name: manifest.name, version: manifest.version, commit, sha, built: new Date().toISOString() }, null, 2) + '\n');
-run('/usr/bin/node', ['node_modules/.bin/storybook', 'build', '-o', 'dist', '--quiet'], { cwd: path.join(root, 'design-system'), stdio: ['pipe', 'pipe', 'pipe'] });
+// Rebuild every Storybook: the hub build empties dist/, including dist/app and dist/dashboard.
+run('/usr/bin/node', ['design-system/scripts/build-all.mjs'], { stdio: ['pipe', 'pipe', 'pipe'] });
 console.log('Download: https://omni--8814.getbb.app/downloads/foundkeep-extension-dev.zip');
 
 // 3. The Mac: replace the folder Chrome loads, in place.

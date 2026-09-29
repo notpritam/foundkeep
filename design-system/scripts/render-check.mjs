@@ -51,7 +51,7 @@ async function check(story) {
     });
   } catch (error) { errors.push(String(error.message || error).split('\n')[0]); }
   await page.close();
-  const baseline = /\/Current\//.test(story.title);
+  const baseline = /(^|\/)Current\//.test(story.title);
   results.push({ story, errors, a11y, failed: errors.length > 0 || (a11y.length > 0 && !baseline) });
 }
 const queue = [...stories];
@@ -63,7 +63,7 @@ for (const { story, errors, a11y, failed } of results) {
   if (!errors.length && !a11y.length) continue;
   console.log(`${failed ? '✖' : '·'} ${story.title} / ${story.name}`);
   for (const e of errors) console.log('    error  ' + e);
-  if (a11y.length) console.log(`    a11y   ${a11y.join(', ')}${failed && !errors.length ? '' : /\/Current\//.test(story.title) ? '  (baseline, not fatal)' : ''}`);
+  if (a11y.length) console.log(`    a11y   ${a11y.join(', ')}${failed && !errors.length ? '' : /(^|\/)Current\//.test(story.title) ? '  (baseline, not fatal)' : ''}`);
 }
 const failed = results.filter(r => r.failed).length;
 console.log(`render-check ${base}${globals ? ' [' + globals + ']' : ''}: ${results.length - failed}/${results.length} stories clean`);

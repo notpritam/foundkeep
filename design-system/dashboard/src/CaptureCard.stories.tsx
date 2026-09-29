@@ -9,7 +9,7 @@ const bookmark: Capture = { id: 'bookmark', type: 'bookmark', status: 'done', so
   userTags: ['Memory'], capturedAt: now, updatedAt: now, provenance: { siteName: 'The Margin' } as Capture['provenance'] };
 
 const meta: Meta<typeof CaptureCard> = {
-  title: 'Dashboard/Proof/Capture card',
+  title: 'Proof/Capture card',
   component: CaptureCard,
   args: { capture: bookmark, open: () => {} },
   decorators: [Story => <div style={{ width: 280 }}><Story /></div>],
