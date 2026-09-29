@@ -1,37 +1,38 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FoundKeep — Add details</title>
-<link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="review.css">
+<link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="components.css"><link rel="stylesheet" href="review.css">
 <script src="theme.js" type="module"></script></head>
 <body>
 <!-- The details card: opened from the dock's "Saved · Add details" widget to
      edit a save that has already happened. It edits only the save the
-     background granted it (capture-details.js). Layout (approved design,
-     design-system Storybook "Extension / Add details card"): the title, a
-     boxless note, one row of folder and tag pills, then My library, Share and
-     Save on one line. Nothing sits above the title. -->
-<form id="detailsForm" class="card" data-ready="false" novalidate>
-  <div class="title-row">
-    <input id="detailsTitle" class="title" maxlength="1000" placeholder="Add a title" aria-label="Title" disabled>
-    <button id="detailsCancel" type="button" class="icon-button" aria-label="Close without saving" data-tip="Close"></button>
+     background granted it (capture-details.js). Built from the design
+     system's components (components.css; Storybook: Extension / Add details
+     card): the title and note are inline Text fields, the folder and share
+     are Selects, tags are Tags, My library is a Badge. Nothing sits above
+     the title. -->
+<form id="detailsForm" class="fk-card details" data-ready="false" novalidate>
+  <div class="details__title-row">
+    <input id="detailsTitle" class="fk-field fk-field--inline fk-field--title details__title" maxlength="1000" placeholder="Add a title" aria-label="Title" disabled>
+    <button id="detailsCancel" type="button" class="fk-button fk-button--ghost fk-button--icon details__close" aria-label="Close without saving" data-tooltip="Close"></button>
   </div>
-  <textarea id="detailsNote" class="note" rows="2" maxlength="50000" placeholder="Add a note" aria-label="Personal note" disabled></textarea>
-  <div class="pills">
-    <button id="detailsFolder" type="button" class="pill" aria-haspopup="listbox" aria-expanded="false" disabled></button>
-    <span id="detailsTags" class="chips" aria-label="Personal tags"></span>
-    <button id="detailsAddTag" type="button" class="pill ghost" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+  <textarea id="detailsNote" class="fk-field fk-field--inline fk-field--muted details__note" rows="2" maxlength="50000" placeholder="Add a note" aria-label="Personal note" disabled></textarea>
+  <div class="details__row">
+    <button id="detailsFolder" type="button" class="fk-select" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+    <span id="detailsTags" class="details__tags" aria-label="Personal tags"></span>
+    <button id="detailsAddTag" type="button" class="fk-button fk-button--dashed fk-button--sm fk-button--pill" aria-haspopup="listbox" aria-expanded="false" disabled></button>
   </div>
-  <div id="detailsShare" class="share-line" hidden>
-    <span id="detailsShareIcon" aria-hidden="true"></span>
-    <textarea id="sharedBody" class="note" rows="1" maxlength="5000" placeholder="Add a caption for the collection" aria-label="Caption for the collection"></textarea>
+  <div id="detailsShare" class="details__share" hidden>
+    <span id="detailsShareIcon" class="details__share-icon" aria-hidden="true"></span>
+    <textarea id="sharedBody" class="fk-field fk-field--inline fk-field--muted" rows="1" maxlength="5000" placeholder="Add a caption for the collection" aria-label="Caption for the collection"></textarea>
   </div>
-  <p id="detailsFeedback" class="statusline" role="status"></p>
-  <footer class="foot">
-    <span class="pill static" id="detailsLibrary" data-tip="Saved to My library"></span>
-    <button id="detailsCollection" type="button" class="pill ghost" aria-haspopup="listbox" aria-expanded="false" disabled></button>
-    <button id="detailsReload" type="button" class="text-button" hidden>Retry</button>
-    <span class="spacer"></span>
-    <button id="detailsSave" type="submit" class="primary" disabled>Save details</button>
+  <p id="detailsFeedback" class="fk-status" role="status"></p>
+  <footer class="details__foot">
+    <span id="detailsLibrary" class="fk-badge" data-tooltip="Saved to My library"></span>
+    <button id="detailsCollection" type="button" class="fk-select" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+    <button id="detailsReload" type="button" class="fk-button fk-button--link fk-button--sm" hidden>Retry</button>
+    <span class="details__spacer"></span>
+    <button id="detailsSave" type="submit" class="fk-button fk-button--primary" disabled>Save details</button>
   </footer>
 </form>
 <script src="review.js" type="module"></script>

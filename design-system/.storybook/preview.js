@@ -1,4 +1,5 @@
 import '../../apps/extension/src/theme.css';
+import '../../apps/extension/src/components.css';
 import '../../apps/extension/src/review.css';
 import './preview.css';
 
@@ -34,6 +35,6 @@ export default {
         desktop: viewport('Desktop (1600)', 1600, 1000),
       },
     },
-    options: { storySort: { order: ['Welcome', 'Foundations', ['Colors', 'Typography', 'Shape', 'Icons'], 'Extension', ['Add details card', 'Card controls', ['Pill', 'Tag chip', 'Title and note', 'Buttons', 'List picker']], '*'] } },
+    options: { storySort: { order: ['Welcome', 'Foundations', ['Color', 'Typography', 'Spacing', 'Radius', 'Elevation', 'Iconography'], 'Components', 'Extension', ['Add details card'], 'Proposals', '*'] } },
   },
 };

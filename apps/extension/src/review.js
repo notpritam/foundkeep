@@ -4,7 +4,7 @@
 import { $, message } from './ui.js';
 import { normalizeSaveTags, STARTER_TAGS } from './save-details.js';
 import { icon } from './card-icons.js';
-import { openPicker, closePicker, pickerOpen } from './picker.js';
+import { openListbox, closeListbox, listboxOpen } from './listbox.js';
 
 const tabId = Number(new URLSearchParams(location.search).get('tab'));
 let details = null, initial = null, collections = [], folders = [], busy = false, creating = false, finished = false, epoch = 0;
@@ -40,15 +40,15 @@ const esc = value => { const span = document.createElement('span'); span.textCon
 function renderFolder() {
   const folder = folders.find(item => item.id === folderId);
   const label = !folderId ? 'No folder' : folder ? (folder.displayName || folder.name) : 'Unavailable folder';
-  html($('detailsFolder'), `${icon('folder', 15)}<span>${esc(label)}</span>${icon('chevron', 14)}`);
-  $('detailsFolder').classList.toggle('unavailable', !!folderId && !folder && folders.length > 0);
+  html($('detailsFolder'), `${icon('folder', 15)}<span class="fk-select__value">${esc(label)}</span>${icon('chevron', 14, 'fk-select__chevron')}`);
+  $('detailsFolder').setAttribute('aria-invalid', String(!!folderId && !folder && folders.length > 0));
 }
 function renderTags() {
   $('detailsTags').replaceChildren(...tags.map(name => {
     const chip = document.createElement('button');
-    chip.type = 'button'; chip.className = 'chip'; chip.dataset.tag = name;
+    chip.type = 'button'; chip.className = 'fk-tag'; chip.dataset.tag = name;
     chip.setAttribute('aria-label', `Remove tag ${name}`);
-    chip.innerHTML = `<span>${esc(name)}</span>${icon('close', 12)}`;
+    chip.innerHTML = `<span>${esc(name)}</span>${icon('close', 12, 'fk-tag__remove')}`;
     chip.disabled = $('detailsAddTag').disabled;
     return chip;
   }));
@@ -57,13 +57,13 @@ function renderShare() {
   const collection = chosenCollection();
   if (details?.shared) {
     // Already shared: the pill says where, and cannot be changed here.
-    html($('detailsCollection'), `${icon('collection', 15)}<span>${esc(details.shared.title)}</span>`);
-    $('detailsCollection').classList.remove('ghost');
-    $('detailsCollection').dataset.tip = details.shared.status === 'pending' ? 'Waiting to sync or for approval' : 'Shared';
+    html($('detailsCollection'), `${icon('collection', 15)}<span class="fk-select__value">${esc(details.shared.title)}</span>`);
+    $('detailsCollection').removeAttribute('data-empty');
+    $('detailsCollection').dataset.tooltip = details.shared.status === 'pending' ? 'Waiting to sync or for approval' : 'Shared';
   } else {
-    html($('detailsCollection'), `${icon(collection ? visibilityIcon(collection) : 'collection', 15)}<span>${esc(collection ? collection.title : 'Share')}</span>`);
-    $('detailsCollection').classList.toggle('ghost', !collection);
-    delete $('detailsCollection').dataset.tip;
+    html($('detailsCollection'), `${icon(collection ? visibilityIcon(collection) : 'collection', 15)}<span class="fk-select__value">${esc(collection ? collection.title : 'Share')}</span>`);
+    $('detailsCollection').toggleAttribute('data-empty', !collection);
+    delete $('detailsCollection').dataset.tooltip;
   }
   $('detailsShare').hidden = !collection;
   if (collection) html($('detailsShareIcon'), icon(visibilityIcon(collection), 15));
@@ -72,7 +72,7 @@ function update() {
   const locked = busy || creating || !details;
   for (const id of ['detailsTitle', 'detailsNote', 'detailsFolder', 'detailsAddTag', 'sharedBody', 'detailsSave']) $(id).disabled = locked;
   $('detailsCollection').disabled = locked || !!details?.shared;
-  for (const chip of $('detailsTags').children) chip.disabled = locked;
+  for (const tag of $('detailsTags').children) tag.disabled = locked;
   $('detailsCancel').disabled = busy;
   $('detailsSave').textContent = creating ? 'Creating folder…' : busy ? 'Saving…' : chosenCollection() ? 'Save' : 'Save details';
   renderFolder(); renderShare();
@@ -111,7 +111,7 @@ async function load() {
     // replace it with a generic "could not open" after 3 s). Only a card
     // that belongs to this tab can reach the dock at all.
     message($('detailsFeedback'), error.message, 'error');
-    for (const el of document.querySelectorAll('.pills, .foot > :not(#detailsReload), #detailsNote')) el.hidden = true;
+    for (const el of document.querySelectorAll('.details__row, .details__foot > :not(#detailsReload), #detailsNote')) el.hidden = true;
     $('detailsTitle').placeholder = 'Details unavailable';
     post({ type: 'ready' });
     return;
@@ -134,8 +134,8 @@ async function load() {
 // --- Pickers ------------------------------------------------------------------------
 const card = $('detailsForm');
 $('detailsFolder').onclick = () => {
-  if ($('detailsFolder').getAttribute('aria-expanded') === 'true') return closePicker();
-  openPicker({
+  if ($('detailsFolder').getAttribute('aria-expanded') === 'true') return closeListbox();
+  openListbox({
     trigger: $('detailsFolder'), host: card, label: 'Folder', placeholder: 'Find a folder',
     options: () => [{ value: '', label: 'No folder', selected: !folderId }, ...folders.map(f => ({ value: f.id, label: f.displayName || f.name, selected: f.id === folderId }))],
     onPick: option => { folderId = option.value; update(); },
@@ -149,7 +149,7 @@ $('detailsFolder').onclick = () => {
           const { folder } = await api('create-folder', { name: query });
           folders = [...folders.filter(item => item.id !== folder.id), folder]; folderId = folder.id;
           message($('detailsFeedback'), '');
-          closePicker({ focusTrigger: true });
+          closeListbox({ focusTrigger: true });
         } catch (error) { message($('detailsFeedback'), error.message, 'error'); }
         finally { creating = false; update(); }
       },
@@ -161,8 +161,8 @@ function setTags(next) {
   catch (error) { message($('detailsFeedback'), error.message, 'error'); return false; }
 }
 $('detailsAddTag').onclick = () => {
-  if ($('detailsAddTag').getAttribute('aria-expanded') === 'true') return closePicker();
-  openPicker({
+  if ($('detailsAddTag').getAttribute('aria-expanded') === 'true') return closeListbox();
+  openListbox({
     trigger: $('detailsAddTag'), host: card, label: 'Personal tags', placeholder: 'Find or create a tag',
     options: () => [...new Set([...tags, ...tagNames, ...STARTER_TAGS])].map(name => ({ value: name, label: name, selected: tags.includes(name) })),
     onPick: option => { setTags(tags.includes(option.value) ? tags.filter(t => t !== option.value) : [...tags, option.value]); return true; },
@@ -170,12 +170,12 @@ $('detailsAddTag').onclick = () => {
   });
 };
 $('detailsTags').onclick = event => {
-  const chip = event.target.closest('.chip');
+  const chip = event.target.closest('.fk-tag');
   if (chip && !chip.disabled) setTags(tags.filter(t => t !== chip.dataset.tag));
 };
 $('detailsCollection').onclick = () => {
-  if ($('detailsCollection').getAttribute('aria-expanded') === 'true') return closePicker();
-  openPicker({
+  if ($('detailsCollection').getAttribute('aria-expanded') === 'true') return closeListbox();
+  openListbox({
     trigger: $('detailsCollection'), host: card, label: 'Share to a collection', placeholder: 'Find a collection',
     options: () => [{ value: '', label: 'Don’t share', selected: !collectionId },
       ...collections.map(c => ({ value: c.id, label: c.title, icon: visibilityIcon(c), selected: c.id === collectionId,
@@ -193,7 +193,7 @@ $('detailsCancel').onclick = () => { if (!busy) finish(false); };
 $('detailsForm').onsubmit = async event => {
   event.preventDefault();
   if (busy || creating || !details) return;
-  closePicker();
+  closeListbox();
   const collection = chosenCollection();
   if (details.type === 'note' && !$('detailsNote').value.trim()) { message($('detailsFeedback'), 'A note needs some text.', 'error'); $('detailsNote').focus(); return; }
   const title = $('detailsTitle').value.trim() || details.title || '';
@@ -217,7 +217,7 @@ $('detailsForm').onsubmit = async event => {
   finally { busy = false; update(); }
 };
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') { event.preventDefault(); if (pickerOpen()) closePicker({ focusTrigger: true }); else if (!busy) finish(false); return; }
+  if (event.key === 'Escape') { event.preventDefault(); if (listboxOpen()) closeListbox({ focusTrigger: true }); else if (!busy) finish(false); return; }
   if (event.key !== 'Tab') return;
   const focusable = [...card.querySelectorAll('button, input, textarea, a[href]')].filter(el => !el.disabled && el.offsetParent !== null);
   if (!focusable.length) return;

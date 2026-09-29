@@ -22,6 +22,26 @@
   --accent: #4cc38a; --button: #4cc38a; --button-hover: #6bd3a1;
   --on-button: #05130d; --accent-bg: #163426; --good: #a7d4b1; --bad: #ffb5a8;
 }
+/* Scale tokens (both themes): the FoundKeep design system — spacing on a 4px
+   grid, one radius per role, control heights, a type scale and elevation.
+   Components (components.css) use only these and the colour tokens above. */
+:root {
+  --fk-space-1: 4px; --fk-space-2: 8px; --fk-space-3: 12px; --fk-space-4: 16px; --fk-space-5: 20px; --fk-space-6: 24px; --fk-space-8: 32px;
+  --fk-radius-sm: 8px; --fk-radius-md: 10px; --fk-radius-lg: 12px; --fk-radius-xl: 16px; --fk-radius-full: 999px;
+  --fk-control-sm: 30px; --fk-control-md: 36px; --fk-control-lg: 40px;
+  --fk-text-title: 600 16px/1.35 var(--font);
+  --fk-text-body: 400 13.5px/1.5 var(--font);
+  --fk-text-label: 500 12.5px/1 var(--font);
+  --fk-text-caption: 400 12px/1.5 var(--font);
+  --fk-text-micro: 500 11.5px/1.2 var(--font);
+  --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .18), 0 2px 6px rgba(0, 0, 0, .06);
+  --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .16), 0 2px 6px rgba(0, 0, 0, .06);
+  --fk-ease: cubic-bezier(.2, .7, .2, 1);
+}
+:root[data-theme="dark"] { --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .55); --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .6); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) { --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .55); --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .6); }
+}
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
   color-scheme: dark;

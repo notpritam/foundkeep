@@ -18,7 +18,7 @@ function render(args) {
   return wrap;
 }
 export default {
-  title: 'Foundations/Icons',
+  title: 'Foundations/Iconography',
   render,
   args: { size: 18, stroke: 1.75 },
   argTypes: { size: { control: { type: 'range', min: 12, max: 96, step: 2 } }, stroke: { control: { type: 'range', min: 1, max: 2.5, step: 0.05 } } },

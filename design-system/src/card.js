@@ -1,12 +1,13 @@
 // The extension's "Add details" card, built from its own source: the markup
-// is cloned from review.html, the styles are review.css + theme.css, the
-// icons come from card-icons.js and every list is the real picker.js. The
+// is cloned from review.html, the styles are theme.css + components.css +
+// review.css, the icons come from card-icons.js and every list is the real
+// Listbox (listbox.js). The
 // card's behaviour (loading, saving, sharing rules) lives in review.js, which
 // needs the extension's runtime; this mirrors only what it renders, so the
 // stories stay live — pick a folder, add and remove tags, share — without it.
 import reviewHtml from '../../apps/extension/src/review.html?raw';
 import { icon } from '../../apps/extension/src/card-icons.js';
-import { openPicker, closePicker } from '../../apps/extension/src/picker.js';
+import { openListbox, closeListbox } from '../../apps/extension/src/listbox.js';
 import { normalizeSaveTags, STARTER_TAGS } from '../../apps/extension/src/save-details.js';
 
 const template = new DOMParser().parseFromString(reviewHtml, 'text/html').querySelector('#detailsForm');
@@ -27,7 +28,7 @@ const visibilityIcon = c => c?.visibility === 'public' ? 'globe' : 'lock';
  * type: 'save' | 'note'; shared: an existing share ({ title, status }) or null
  * open: 'folder' | 'tags' | 'collection' — a list open on first render
  */
-export function card({ state = 'ready', type = 'save', title = TITLE, note = NOTE, folderId = 'f-reading', tags = ['Memory'], collectionId = '', caption = '', shared = null, open = null } = {}) {
+export function card({ state = 'ready', type = 'save', title = TITLE, note = NOTE, folderId = 'f-reading', tags = ['Memory'], collectionId = '', caption = '', shared = null, open = null, decorate = null } = {}) {
   const form = template.cloneNode(true);
   const $ = id => form.querySelector('#' + id);
   const s = { folderId, tags: [...tags], collectionId };
@@ -48,17 +49,17 @@ export function card({ state = 'ready', type = 'save', title = TITLE, note = NOT
   const render = () => {
     const folder = folders.find(f => f.id === s.folderId);
     const folderLabel = !s.folderId ? 'No folder' : folder ? folder.name : 'Unavailable folder';
-    $('detailsFolder').innerHTML = `${icon('folder', 15)}<span>${esc(folderLabel)}</span>${icon('chevron', 14)}`;
-    $('detailsFolder').classList.toggle('unavailable', !!s.folderId && !folder && folders.length > 0);
-    $('detailsTags').innerHTML = s.tags.map(t => `<button type="button" class="chip" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}"><span>${esc(t)}</span>${icon('close', 12)}</button>`).join('');
+    $('detailsFolder').innerHTML = `${icon('folder', 15)}<span class="fk-select__value">${esc(folderLabel)}</span>${icon('chevron', 14, 'fk-select__chevron')}`;
+    $('detailsFolder').setAttribute('aria-invalid', String(!!s.folderId && !folder && folders.length > 0));
+    $('detailsTags').innerHTML = s.tags.map(t => `<button type="button" class="fk-tag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}"><span>${esc(t)}</span>${icon('close', 12, 'fk-tag__remove')}</button>`).join('');
     const c = chosen();
     if (shared) {
-      $('detailsCollection').innerHTML = `${icon('collection', 15)}<span>${esc(shared.title)}</span>`;
-      $('detailsCollection').classList.remove('ghost');
-      $('detailsCollection').dataset.tip = shared.status === 'pending' ? 'Waiting to sync or for approval' : 'Shared';
+      $('detailsCollection').innerHTML = `${icon('collection', 15)}<span class="fk-select__value">${esc(shared.title)}</span>`;
+      $('detailsCollection').removeAttribute('data-empty');
+      $('detailsCollection').dataset.tooltip = shared.status === 'pending' ? 'Waiting to sync or for approval' : 'Shared';
     } else {
-      $('detailsCollection').innerHTML = `${icon(c ? visibilityIcon(c) : 'collection', 15)}<span>${esc(c ? c.title : 'Share')}</span>`;
-      $('detailsCollection').classList.toggle('ghost', !c);
+      $('detailsCollection').innerHTML = `${icon(c ? visibilityIcon(c) : 'collection', 15)}<span class="fk-select__value">${esc(c ? c.title : 'Share')}</span>`;
+      $('detailsCollection').toggleAttribute('data-empty', !c);
     }
     $('detailsShare').hidden = !c;
     if (c) $('detailsShareIcon').innerHTML = icon(visibilityIcon(c), 15);
@@ -71,33 +72,36 @@ export function card({ state = 'ready', type = 'save', title = TITLE, note = NOT
   const feedback = { loading: ['Loading folders and collections…', ''], error: ['Some folders or collections could not load. Retry, or save without them.', 'error'], saving: ['Saving…', ''], unavailable: ['This save is no longer available.', 'error'] }[state];
   if (feedback) { $('detailsFeedback').textContent = feedback[0]; $('detailsFeedback').dataset.tone = feedback[1]; }
   $('detailsReload').hidden = state !== 'error';
-  if (state === 'unavailable') for (const el of form.querySelectorAll('.pills, .foot > :not(#detailsReload), #detailsNote')) el.hidden = true;
+  if (state === 'unavailable') for (const el of form.querySelectorAll('.details__row, .details__foot > :not(#detailsReload), #detailsNote')) el.hidden = true;
 
   const lists = {
-    folder: () => openPicker({
+    folder: () => openListbox({
       trigger: $('detailsFolder'), host: form, label: 'Folder', placeholder: 'Find a folder',
       options: () => [{ value: '', label: 'No folder', selected: !s.folderId }, ...folders.map(f => ({ value: f.id, label: f.name, selected: f.id === s.folderId }))],
       onPick: o => { s.folderId = o.value; render(); },
-      create: { label: (q, exact) => q ? (exact ? '' : `New folder “${q}”`) : 'New folder', run: (q, input) => { if (!q) { input.placeholder = 'Name the new folder'; return; } const id = `f-${Date.now()}`; folders.push({ id, name: q }); s.folderId = id; closePicker({ focusTrigger: true }); render(); } },
+      create: { label: (q, exact) => q ? (exact ? '' : `New folder “${q}”`) : 'New folder', run: (q, input) => { if (!q) { input.placeholder = 'Name the new folder'; return; } const id = `f-${Date.now()}`; folders.push({ id, name: q }); s.folderId = id; closeListbox({ focusTrigger: true }); render(); } },
     }),
-    tags: () => openPicker({
+    tags: () => openListbox({
       trigger: $('detailsAddTag'), host: form, label: 'Personal tags', placeholder: 'Find or create a tag',
       options: () => [...new Set([...s.tags, ...LIBRARY_TAGS, ...STARTER_TAGS])].map(t => ({ value: t, label: t, selected: s.tags.includes(t) })),
       onPick: o => { s.tags = normalizeSaveTags(s.tags.includes(o.value) ? s.tags.filter(t => t !== o.value) : [...s.tags, o.value]); render(); return true; },
       create: { label: (q, exact) => q && !exact ? `Create “${q.replace(/^#/, '')}”` : '', run: q => { s.tags = normalizeSaveTags([...s.tags, q]); render(); } },
     }),
-    collection: () => openPicker({
+    collection: () => openListbox({
       trigger: $('detailsCollection'), host: form, label: 'Share to a collection', placeholder: 'Find a collection',
       options: () => [{ value: '', label: 'Don’t share', selected: !s.collectionId }, ...collections.map(c => ({ value: c.id, label: c.title, icon: visibilityIcon(c), selected: c.id === s.collectionId, meta: `${c.visibility === 'public' ? 'Public' : 'Private'}${c.requireApproval && !c.canModerate ? ', needs approval' : ''}` }))],
       onPick: o => { s.collectionId = o.value; render(); },
     }),
   };
-  $('detailsFolder').onclick = () => $('detailsFolder').getAttribute('aria-expanded') === 'true' ? closePicker() : lists.folder();
-  $('detailsAddTag').onclick = () => $('detailsAddTag').getAttribute('aria-expanded') === 'true' ? closePicker() : lists.tags();
-  $('detailsCollection').onclick = () => $('detailsCollection').getAttribute('aria-expanded') === 'true' ? closePicker() : lists.collection();
-  $('detailsTags').onclick = event => { const chip = event.target.closest('.chip'); if (chip) { s.tags = s.tags.filter(t => t !== chip.dataset.tag); render(); } };
+  $('detailsFolder').onclick = () => $('detailsFolder').getAttribute('aria-expanded') === 'true' ? closeListbox() : lists.folder();
+  $('detailsAddTag').onclick = () => $('detailsAddTag').getAttribute('aria-expanded') === 'true' ? closeListbox() : lists.tags();
+  $('detailsCollection').onclick = () => $('detailsCollection').getAttribute('aria-expanded') === 'true' ? closeListbox() : lists.collection();
+  $('detailsTags').onclick = event => { const chip = event.target.closest('.fk-tag'); if (chip) { s.tags = s.tags.filter(t => t !== chip.dataset.tag); render(); } };
   form.onsubmit = event => event.preventDefault();
   render();
+
+  // Proposals add to the real card (e.g. a preview of the save) through decorate(form).
+  decorate?.(form);
 
   // The extension frames the card 380px wide.
   const frame = document.createElement('div');
