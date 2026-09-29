@@ -10,6 +10,8 @@
   "devDependencies": {
     "@storybook/addon-docs": "^10.6.0",
     "@storybook/react-native-web-vite": "^10.6.0",
+    "msw": "^2.15.0",
+    "msw-storybook-addon": "^2.0.7",
     "storybook": "^10.6.0",
     "vite": "^8.3.1"
   }
