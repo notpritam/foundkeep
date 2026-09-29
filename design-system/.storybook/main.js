@@ -10,6 +10,9 @@ export default {
   // The dashboard's CSS asks for its fonts at the site root, so the hub serves them.
   staticDirs: ['../public', { from: '../downloads', to: '/downloads' }, { from: '../../apps/site/public/assets/fonts', to: '/assets/fonts' }],
   docs: { defaultName: 'Docs' },
+  // The App and Dashboard Storybooks are built into dist/app and dist/dashboard
+  // (scripts/build-all.mjs) and composed here, so one address shows all three.
+  refs: { app: { title: 'App', url: './app' }, dashboard: { title: 'Dashboard', url: './dashboard' } },
   // The stories import from ../apps; bb Connect serves this under another host.
   viteFinal: config => ({ ...config, server: { ...config.server, allowedHosts: true, fs: { ...config.server?.fs, allow: ['../..'] } } }),
 };

@@ -40,7 +40,7 @@ export function openListbox({ trigger, host, label, placeholder, options, onPick
         + `${o.icon ? icon(o.icon, 15) : ''}<span class="fk-listbox__label">${text(o.label)}${o.meta ? `<small class="fk-listbox__meta">${text(o.meta)}</small>` : ''}</span>${icon('check', 15, 'fk-listbox__check')}</button>`).join('');
     const exact = rows.some(o => !o.heading && o.label.toLowerCase() === q);
     const createText = create && create.label(query, exact);
-    if (createText) box.insertAdjacentHTML('beforeend', `<div class="fk-listbox__separator"></div><button type="button" class="fk-listbox__option fk-listbox__option--create" data-create>${icon('plus', 15)}<span class="fk-listbox__label">${text(createText)}</span></button>`);
+    if (createText) box.insertAdjacentHTML('beforeend', `<div class="fk-listbox__separator"></div><button type="button" class="fk-listbox__option fk-listbox__option--create" role="option" aria-selected="false" data-create>${icon('plus', 15)}<span class="fk-listbox__label">${text(createText)}</span></button>`);
     box._rows = rows;
   };
   const pick = button => {

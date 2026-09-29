@@ -1,6 +1,6 @@
 /* Storybook canvas only. The page takes the theme's --bg. */
 body { background: var(--bg); color: var(--ink); font: 14px/1.55 var(--font); }
-.fk-head { font: 600 10px/1.2 var(--font); letter-spacing: .08em; text-transform: uppercase; color: #8a8f98; }
+.fk-head { font: 600 10px/1.2 var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .fk-section { margin: 24px 0 10px; font: 600 13px/1 var(--font); color: var(--muted); }
 .fk-section:first-of-type { margin-top: 0; }
 
@@ -20,7 +20,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.55 var(--font); }
 .fk-swatch i { width: 40px; height: 28px; border-radius: 6px; border: 1px solid rgba(128,128,128,.35); }
 .fk-swatch code, .fk-token-grid code, .fk-type-grid code, .fk-shape code { font: 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
 .fk-dock-colors { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 16px; background: #08090a; border-radius: 12px; }
-.fk-dock-colors code { color: #a5aab2; }
+.fk-dock-colors code { color: #a5aab2; background: transparent; }
 .fk-type-grid { display: grid; grid-template-columns: 140px minmax(220px, 1fr) 190px 190px; gap: 14px 20px; align-items: center; }
 .fk-shapes { display: flex; flex-wrap: wrap; gap: 16px; }
 .fk-shape { display: grid; justify-items: start; gap: 6px; width: 150px; }
@@ -29,12 +29,12 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.55 var(--font); }
 .fk-icons.on-dock { background: #0f1011; color: #d6d8db; border-color: #1d1f22; }
 .fk-icons figure { margin: 0; display: grid; justify-items: center; gap: 8px; min-width: 76px; padding: 12px 8px; border-radius: 10px; }
 .fk-icons figure:hover { background: rgba(128,128,128,.12); }
-.fk-icons figcaption { font: 11px/1 var(--font); color: #8a8f98; }
+.fk-icons figcaption { font: 11px/1 var(--font); color: var(--muted); }
 
 /* Component stories: labelled examples, tight on the canvas */
 .fk-specimens { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 24px 32px; }
 .fk-specimen { margin: 0; display: grid; justify-items: start; gap: 8px; }
-.fk-specimen figcaption { font: 11.5px/1.2 var(--font); color: #8a8f98; }
+.fk-specimen figcaption { font: 11.5px/1.2 var(--font); color: var(--muted); }
 .fk-groups { display: grid; gap: 4px; }
 .fk-groups > .fk-section { margin-top: 20px; }
 .fk-groups > .fk-section:first-child { margin-top: 0; }
@@ -52,3 +52,4 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.55 var(--font); }
 .fk-shape small { color: var(--muted); font: 11.5px/1.4 var(--font); }
 .fk-elevation { display: flex; flex-wrap: wrap; gap: 32px; padding: 16px; }
 
+.fk-icons.on-dock figcaption { color: #a5aab2; }

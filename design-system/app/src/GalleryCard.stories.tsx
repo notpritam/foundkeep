@@ -11,7 +11,7 @@ const bookmark = { id: 'bookmark', clientId: 'story', batchId: null, type: 'book
   enrichError: null, provenance: { siteName: 'The Margin', captureMethod: 'extension' } } as unknown as Capture;
 
 const meta: Meta<typeof GalleryCard> = {
-  title: 'App/Proof/Gallery card',
+  title: 'Proof/Gallery card',
   component: GalleryCard,
   args: { capture: bookmark, onOpen: () => {} },
   decorators: [Story => <View style={{ width: 180 }}><Story /></View>],
