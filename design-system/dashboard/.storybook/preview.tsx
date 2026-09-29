@@ -3,9 +3,13 @@ import '../../../apps/site/app/global.css';
 import '../../../apps/site/app/appearance.css';
 import '../../../apps/site/app/interface.css';
 import '../../../apps/site/app/customer.css';
+import { initialize, mswLoader } from 'msw-storybook-addon';
 import { DEVICES, WEB_DEVICES, simulatorGlobals } from '../../simulator/devices.ts';
+import { dashboardHandlers } from '../src/handlers.ts';
 import { BrowserFrame, innerUrl, isInner, listenForInnerErrors, relayErrorsToParent } from '../../simulator/Frame.tsx';
 
+// The sample world answers every /api request and private image (src/handlers.ts).
+initialize({ onUnhandledRequest: 'bypass', quiet: true, serviceWorker: { url: './mockServiceWorker.js' } });
 relayErrorsToParent();
 listenForInnerErrors();
 if (isInner()) document.head.insertAdjacentHTML('beforeend', '<style>html,body,#storybook-root{min-height:100%;margin:0}body{padding:0!important;display:block!important}</style>');
@@ -22,9 +26,10 @@ const simulator: Decorator = (Story, { id, globals, parameters }) => {
 };
 
 const preview: Preview = {
+  loaders: [mswLoader],
   decorators: [simulator],
   globalTypes: simulatorGlobals(WEB_DEVICES),
   initialGlobals: { device: 'desktop', theme: 'light' },
-  parameters: { options: { storySort: { order: ['Start here', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', nextjs: { appDirectory: true } },
+  parameters: { options: { storySort: { order: ['Start here', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', nextjs: { appDirectory: true }, msw: { handlers: { story: [], world: dashboardHandlers } } },
 };
 export default preview;

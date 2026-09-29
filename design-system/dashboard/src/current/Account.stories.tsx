@@ -1,0 +1,25 @@
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { http, HttpResponse } from 'msw';
+import Collections from '../../../../apps/site/components/collections/manager';
+import Devices from '../../../../apps/site/components/dashboard/devices';
+import Agents from '../../../../apps/site/components/dashboard/agents';
+import MindMap from '../../../../apps/site/components/dashboard/mind-map';
+import Plans from '../../../../apps/site/components/dashboard/plans';
+import Settings from '../../../../apps/site/components/dashboard/settings';
+import { AccountSection } from '../StoryShell.tsx';
+import { planPro } from '../handlers.ts';
+
+const meta: Meta = { title: 'Current/Account pages', parameters: { simulator: true, layout: 'fullscreen' } };
+export default meta;
+type Story = StoryObj;
+const at = (path: string) => ({ url: 'foundkeep.app' + path, nextjs: { navigation: { pathname: path } } });
+export const YourCollections: Story = { name: 'Collections', render: () => <AccountSection><Collections key="list" /></AccountSection>, parameters: at('/dashboard/collections') };
+export const OneCollection: Story = { name: 'One collection', render: () => <AccountSection><Collections key="col-design" id="col-design" /></AccountSection>, parameters: at('/dashboard/collections/col-design') };
+export const MindMapPage: Story = { name: 'Mind map', render: () => <AccountSection><MindMap /></AccountSection>, parameters: at('/dashboard/mind-map') };
+export const AgentsPage: Story = { name: 'Agents', render: () => <AccountSection><Agents /></AccountSection>, parameters: at('/dashboard/agents') };
+export const AppsAndDevices: Story = { name: 'Apps & devices', render: () => <AccountSection><Devices /></AccountSection>, parameters: at('/dashboard/apps') };
+export const PlansFree: Story = { name: 'Plans (Free)', render: () => <AccountSection><Plans /></AccountSection>, parameters: at('/dashboard/plans') };
+export const PlansPro: Story = { name: 'Plans (Pro)', render: () => <AccountSection><Plans /></AccountSection>, parameters: { ...at('/dashboard/plans'), msw: { handlers: { story: [http.get('*/api/plan', () => HttpResponse.json(planPro))] } } } };
+export const AccountSettings: Story = { name: 'Settings', render: () => <AccountSection><Settings section="settings" /></AccountSection>, parameters: at('/dashboard/settings') };
+export const CaptureSettings: Story = { name: 'Settings · capture', render: () => <AccountSection><Settings section="capture" /></AccountSection>, parameters: at('/dashboard/settings/capture') };
+export const ProcessingSettings: Story = { name: 'Settings · processing', render: () => <AccountSection><Settings section="processing" /></AccountSection>, parameters: at('/dashboard/settings/processing') };
