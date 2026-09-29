@@ -511,6 +511,29 @@
     // 'pending' until this dock's own dock-hello round trip settles, then
     // 'answered' (state applied) or 'failed' (M10).
     hello: () => hello,
+    // Design review (scripts/design/dock-review.mjs): a static copy of this
+    // shadow root — its stylesheet and markup, with hover and keyboard focus
+    // marked as data-fk-* attributes (a copy cannot carry :hover or :focus),
+    // plus the viewport boxes of what is showing and of any framed card or
+    // note field. Reads nothing but this root.
+    snapshot: () => {
+      const copy = document.createElement('div');
+      for (const node of root.childNodes) copy.append(node.cloneNode(true));
+      const copies = copy.querySelectorAll('*');
+      root.querySelectorAll('*').forEach((el, i) => {
+        if (el.matches(':hover')) copies[i].setAttribute('data-fk-hover', '');
+        if (el !== root.activeElement) return;
+        copies[i].setAttribute('data-fk-focus', '');
+        if (el.matches(':focus-visible')) copies[i].setAttribute('data-fk-focus-visible', '');
+      });
+      copy.querySelector('style')?.remove();
+      const box = el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
+      return {
+        css: CSS, html: copy.innerHTML, viewport: { width: innerWidth, height: innerHeight },
+        boxes: [...root.querySelectorAll('.dock, .toast, .menu, .card, .note-card, .flash')].map(box).filter(r => r.width && r.height),
+        frames: [...root.querySelectorAll('iframe')].map(f => ({ src: f.src, ...box(f) })),
+      };
+    },
   };
   document.documentElement.append(host);
   void send({ kind: 'dock-position' }).then(stored => { pos = stored || null; place(); });

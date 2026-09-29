@@ -79,6 +79,19 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   for (let i = 0; i < 7; i++) { await web.keyboard.press('Tab'); reached.push(await dock.evaluate(`__foundkeepDock.focused()`)); }
   for (const action of ['savepage', 'highlight', 'screenshot', 'note', 'library', 'more']) assert.ok(reached.includes(action), `Tab reaches ${action}: ${reached}`);
   await web.keyboard.press('Escape'); await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);
+  // Design review (scripts/design/dock-review.mjs) copies the shadow root
+  // through the isolated-world handle — stylesheet and markup, keyboard focus
+  // marked — while the page still cannot reach the handle.
+  await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
+  await web.keyboard.press('Tab');
+  const snapshot = await dock.evaluate(`__foundkeepDock.snapshot()`);
+  assert.match(snapshot.css, /\.dock\{position:fixed/);
+  assert.match(snapshot.html, /<button data-action="savepage"[^>]*data-fk-focus-visible/);
+  assert.doesNotMatch(snapshot.html, /<style/);
+  assert.deepEqual(snapshot.viewport, { width: 1200, height: 800 });
+  assert.ok(snapshot.boxes.some(box => box.width > 200), JSON.stringify(snapshot.boxes));
+  assert.equal(await web.evaluate(() => typeof window.__foundkeepDock), 'undefined', 'the page cannot see the handle');
+  await web.keyboard.press('Escape'); await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);
   // Drag by the grip, then reload and summon again: the position is remembered.
   await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
   const grip = await dock.evaluate(`__foundkeepDock.rect('.grip')`);

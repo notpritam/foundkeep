@@ -44,6 +44,12 @@ test('screenshot: the dock button goes straight to region selection with a corne
   assert.ok(bar.width > 0 && bar.y < 40 && 1200 - (bar.x + bar.width) < 40, 'pinned to the top-right corner: ' + JSON.stringify(bar));
   assert.equal(await dock.evaluate(`window.__foundkeepCapture.text('.bar')`), 'SelectionFull page✕');
   assert.equal(await dock.evaluate(`window.__foundkeepCapture.attr('[data-choice="selection"]', 'aria-pressed')`), 'true');
+  // Design review copies the selector (stylesheet + markup) through the
+  // isolated-world handle; the page cannot see it.
+  const copy = await dock.evaluate(`window.__foundkeepCapture.snapshot()`);
+  assert.match(copy.css, /\.bar\{position:fixed/);
+  assert.match(copy.html, /data-choice="selection" aria-pressed="true"/);
+  assert.equal(await web.evaluate(() => typeof window.__foundkeepCapture), 'undefined');
 
   await web.mouse.move(50, 120); await web.mouse.down(); await web.mouse.move(250, 260, { steps: 5 }); await web.mouse.up();
   await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 15000);

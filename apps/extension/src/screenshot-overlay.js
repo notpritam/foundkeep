@@ -104,6 +104,22 @@ export function screenshotSelectInPage({ fullPage = true } = {}) {
       rect: (selector) => { const r = root.querySelector(selector)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : { x: 0, y: 0, width: 0, height: 0 }; },
       text: (selector) => root.querySelector(selector)?.textContent.replace(/\n\s*/g, "") ?? null,
       attr: (selector, name) => root.querySelector(selector)?.getAttribute(name) ?? null,
+      // Design review (scripts/design/dock-review.mjs): a static copy of the
+      // selector — stylesheet and markup, hover and focus marked as data-fk-*.
+      snapshot: () => {
+        const copy = document.createElement("div");
+        for (const node of root.childNodes) copy.append(node.cloneNode(true));
+        const copies = copy.querySelectorAll("*");
+        root.querySelectorAll("*").forEach((el, i) => {
+          if (el.matches(":hover")) copies[i].setAttribute("data-fk-hover", "");
+          if (el !== root.activeElement) return;
+          copies[i].setAttribute("data-fk-focus", "");
+          if (el.matches(":focus-visible")) copies[i].setAttribute("data-fk-focus-visible", "");
+        });
+        const style = copy.querySelector("style"), css = style?.textContent || "";
+        style?.remove();
+        return { css, html: copy.innerHTML, viewport: { width: innerWidth, height: innerHeight } };
+      },
     };
     document.documentElement.append(host);
   });
