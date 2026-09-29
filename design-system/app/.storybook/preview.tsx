@@ -42,6 +42,6 @@ const preview: Preview = {
   decorators: [simulator],
   globalTypes: simulatorGlobals(APP_DEVICES, { ...textSizeGlobal, ...accessibilityGlobals }),
   initialGlobals: { device: 'iphone-17-pro', theme: 'light', textSize: '1', motion: 'full', transparency: 'full' },
-  parameters: { layout: 'centered', msw: { handlers: appHandlers } },
+  parameters: { options: { storySort: { order: ['Start here', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', msw: { handlers: appHandlers } },
 };
 export default preview;
