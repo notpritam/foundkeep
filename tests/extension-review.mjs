@@ -106,6 +106,22 @@ async function pick(card, trigger, value) {
   await card.click(`.fk-listbox__option[data-value="${value}"]`);
   await card.waitForSelector('.fk-listbox', { state: 'detached' });
 }
+/**
+ * Click Save once the frame has caught up with the card. Adding a tag can
+ * wrap a row and make the card taller; the dock resizes its frame a message
+ * round trip later, which moves Save — a click aimed before that lands on
+ * the page.
+ */
+async function saveCard(card, dock) {
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    const form = await card.evaluate(() => Math.ceil(document.querySelector('#detailsForm').getBoundingClientRect().height));
+    const frame = await dock.evaluate(`Math.round(__foundkeepDock.rect('.card').height)`);
+    if (Math.abs(frame - Math.min(Math.max(160, form), 600)) <= 1) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  await card.click('#detailsSave');
+}
 async function listboxValues(card, trigger) {
   await card.click(trigger);
   const values = await card.$$eval('.fk-listbox__option[data-value]', options => options.map(o => o.dataset.value));
@@ -131,7 +147,7 @@ test('details: Add details opens the edit card pre-filled from the save, and bef
   await addTag(card, 'Research');
   await pick(card, '#detailsFolder', 'folder-a');
   assert.match(await card.textContent('#detailsFolder'), /Reading/);
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   assert.deepEqual(web.frames().filter(f => f !== web.mainFrame()).map(f => f.url()), [], 'the card closes');
@@ -160,7 +176,7 @@ test('details: after upload, Add details sends PUT with the remote id, shares to
   await card.waitForSelector('#detailsShare:not([hidden])');
   assert.equal(await card.textContent('#detailsSave'), 'Save', 'a shared save says just Save');
   await card.fill('#sharedBody', 'Worth a look');
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
 
   // Only what the user changed (title, note, tags); the unchanged folder is
@@ -185,7 +201,7 @@ test('details: an edit made while the upload is in flight is sent once the uploa
   assert.equal(await waitForLength(uploads, 1), 1, 'the upload is in flight');
   const card = await openDetails(web, dock);
   await card.fill('#detailsTitle', 'Edited mid-upload');
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   assert.equal(uploads[0].sourceTitle, 'Details fixture', 'the in-flight upload still has the old title');
   release();
@@ -298,7 +314,7 @@ test('details: after the account changes, the card cannot edit the earlier accou
   const card = await openDetails(web, dock);
   await worker.evaluate(() => chrome.storage.local.set({ atlasCustomer: { account: { id: 'different-account' }, connection: { id: 'different-connection' }, token: 't'.repeat(43), status: 'connected' } }));
   await card.fill('#detailsTitle', 'Should not land');
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await pollUntil(card, () => /account changed/i.test(document.querySelector('#detailsFeedback')?.textContent || ''), null);
   assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'the card stays open with the error');
   assert.equal((await localCaptures(ext))[0].sourceTitle, 'Details fixture');
@@ -347,7 +363,7 @@ test('details: an edit after a committed-but-unanswered upload is sent once the 
   assert.equal(state.server.sourceTitle, 'Details fixture', 'the server committed the first upload');
   const card = await openDetails(web, dock);
   await card.fill('#detailsTitle', 'Edited after a lost response');
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   await synced(ext);
   assert.equal(uploads.length, 2, 'the upload was retried');
@@ -368,7 +384,7 @@ test('details: a web edit to the title survives a tag edit from the card (pre-fi
   assert.equal(await card.inputValue('#detailsTitle'), 'Renamed on the web', 'pre-filled from the server');
   assert.equal(await card.inputValue('#detailsNote'), 'Web note');
   await addTag(card, 'Keep');
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   await synced(ext);
   assert.deepEqual(puts.map(p => p.body), [{ sourceTitle: 'Renamed on the web', noteText: 'Web note', userTags: ['Web', 'Keep'], expectedUpdatedAt: 150 }]);
@@ -386,7 +402,7 @@ test('details: a server change during the PUT (capture_changed) is re-read, not 
   // Someone renames the save (and files it) between our read and our write.
   let raced = false;
   state.beforePut = server => { if (raced) return; raced = true; Object.assign(server, { sourceTitle: 'Renamed meanwhile', folderId: 'folder-b', updatedAt: server.updatedAt + 5 }); };
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   await synced(ext);
   assert.equal(puts.length, 2, 'the conflicting write is retried once against the fresh copy');
@@ -420,7 +436,7 @@ test('details: the card opens framed on a strict-CSP page (frame-src none) and s
   await dock.click('[data-action="savepage"]');
   const card = await openDetails(web, dock);
   await card.fill('#detailsTitle', 'Saved despite a strict CSP');
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 8000);
   assert.equal((await localCaptures(ext))[0].sourceTitle, 'Saved despite a strict CSP');
 });
@@ -442,7 +458,7 @@ test('details: with a slow server read the card opens from the local copy, and t
   assert.equal(await dock.evaluate('__foundkeepDock.state()'), 'details', 'the dock keeps the card open');
   assert.equal(await dock.evaluate('__foundkeepDock.status()'), '');
   await addTag(card, 'Keep');
-  await card.click('#detailsSave');
+  await saveCard(card, dock);
   await dock.waitFor(`__foundkeepDock.status() === 'Details saved'`, 20000);
   await synced(ext);
   // The untouched title is the server's current one (read at update time),

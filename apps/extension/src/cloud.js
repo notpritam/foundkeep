@@ -19,7 +19,11 @@ function exclusive(action) {
   mutations = result.catch(() => {});
   return result;
 }
+// In-worker listeners for any change to what is synced (the dock's count).
+const changeListeners = new Set();
+export const onCloudChange = listener => { changeListeners.add(listener); return () => changeListeners.delete(listener); };
 function announce() {
+  for (const listener of changeListeners) { try { listener(); } catch { /* a listener must not break syncing */ } }
   try {
     chrome.runtime.sendMessage({ kind: "atlas-changed" }).catch(() => {});
   } catch {
