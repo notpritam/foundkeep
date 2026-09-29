@@ -76,7 +76,8 @@ test("Chrome Web Store package is a focused MV3 build at the configured version"
   assert.ok(manifest.web_accessible_resources[0].resources.includes('src/review.html'));
   assert.equal(manifest.web_accessible_resources[0].use_dynamic_url, true);
   const shipped = JSON.parse(await readFile('deploy/extension-files.json', 'utf8'));
-  for (const gone of ['src/library.html', 'src/sidebar-destination.js', 'src/sidebar-local.js']) assert.equal(shipped.includes(gone), false, gone);
+  for (const gone of ['src/library.html', 'src/sidebar-destination.js', 'src/sidebar-local.js', 'src/save-review.js']) assert.equal(shipped.includes(gone), false, gone);
+  for (const file of ['src/capture-actions.js', 'src/capture-details.js', 'src/screenshot-overlay.js']) assert.ok(files.includes(file), file);
   assert.deepEqual(manifest.optional_permissions, ["bookmarks"]);
   assert.ok(files.includes("src/bookmark-import.js"));
   assert.deepEqual(manifest.host_permissions, ["https://foundkeep.app/*"]);

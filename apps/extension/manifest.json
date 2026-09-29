@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FoundKeep — Save what matters",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Save readable pages, screenshots, highlights, images and notes with original source details in a private, searchable library.",
   "permissions": [
     "activeTab",
@@ -52,7 +52,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/review.html"
+        "src/review.html",
+        "src/note.html"
       ],
       "matches": [
         "http://*/*",
@@ -78,7 +79,7 @@
       "suggested_key": {
         "default": "Alt+Shift+F"
       },
-      "description": "Full-page screenshot to FoundKeep"
+      "description": "Screenshot to FoundKeep (full page or a region)"
     },
     "save-highlight": {
       "suggested_key": {

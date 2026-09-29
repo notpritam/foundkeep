@@ -4,19 +4,12 @@
 import * as db from "./db.js";
 import { captureBinding, drainCloudQueue } from "./cloud.js";
 
-/** Save a capture locally and kick off a drain attempt. */
-export async function saveCapture(input, { destination, id } = {}) {
+/** Save a capture locally, bound to the connected account (My library), and
+ *  kick off a drain attempt. Details can be added afterwards
+ *  (capture-details.js). */
+export async function saveCapture(input) {
   const binding = await captureBinding();
-  if (destination && binding.cloudAccountId !== destination.reviewAccountId)
-    throw new Error('Your connected account changed. Choose the destination again.');
-  const rec = await db.addCapture({ ...input, ...binding,
-    ...(destination ? {
-      ...destination.details,
-      cloudAccountId: destination.kind === 'local' ? null : destination.reviewAccountId,
-      folderId: destination.folderId || null,
-      collectionSubmission: destination.collection || null,
-    } : {}),
-  }, { id });
+  const rec = await db.addCapture({ ...input, ...binding });
   drainQueue().catch(() => {});
   broadcast();
   return rec;

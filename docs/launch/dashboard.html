@@ -41,11 +41,11 @@ tr.hidden,section.hidden{display:none}
 </head>
 <body>
 <main>
-<header><h1>FoundKeep — launch tracker</h1><div class="meta">Updated 2026-09-28 · generated from docs/launch/roadmap.json</div></header>
+<header><h1>FoundKeep — launch tracker</h1><div class="meta">Updated 2026-09-29 · generated from docs/launch/roadmap.json</div></header>
 <div class="hero">
   <div class="card"><div class="hero-label">Launch readiness</div><div class="hero-value">13%</div>
     <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="13" aria-label="Launch readiness"><span style="width:13%"></span></div>
-    <div class="hero-sub">10 of 75 launch items done · <b>19 need you</b></div></div>
+    <div class="hero-sub">10 of 78 launch items done · <b>19 need you</b></div></div>
   <div><p class="goal" style="margin-top:0">Take FoundKeep from friends beta to a public launch: strangers can find it in the Chrome Web Store, App Store and Google Play, sign up safely, pay $5/month on web or iOS, and we find out about failures before they do.</p>
     <div class="tiles">
       <div class="tile"><div class="tile-label">Accounts</div><div class="tile-value">21</div><div class="tile-sub">0 new in last 7 days</div></div>
@@ -80,7 +80,7 @@ tr.hidden,section.hidden{display:none}
     </a><a class="phase" href="#P5">
       <div class="phase-head"><span class="phase-id">P5</span><span class="phase-name">Product gaps</span><span class="phase-pct">0%</span></div>
       <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Product gaps progress"><span style="width:0%"></span></div>
-      <div class="phase-counts">0/16 done · 2 in progress · <b>2 need you</b></div>
+      <div class="phase-counts">0/19 done · 3 in progress · <b>2 need you</b></div>
     </a><a class="phase" href="#P6">
       <div class="phase-head"><span class="phase-id">P6</span><span class="phase-name">Store launch</span><span class="phase-pct">0%</span></div>
       <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Store launch progress"><span style="width:0%"></span></div>
@@ -422,8 +422,23 @@ tr.hidden,section.hidden{display:none}
         <td><span class="agent">agent</span></td>
       </tr><tr data-id="P5.16" data-status="doing" data-owner="agent" data-area="extension">
         <td><span class="status s-doing"><i aria-hidden="true">◐</i>In progress</span></td>
-        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Extension: floating dock replaces the side panel<div class="note">Merged to main 2026-09-28 (PR #2, c6bdf56): dock, review card, always-on, import page, account-only saves, 1.7.x side-panel save recovery; extension 1.8.0. Dev build on Pritam's Mac for testing. Before friends: keep review mode after &quot;Hide on this site&quot; mid-review, verify a real 1.7.12 → 1.8.0 upgrade, then publish ext-v1.8.0.</div></td>
+        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Extension: floating dock replaces the side panel<div class="note">1.8.0 merged 2026-09-28 (PR #2). 1.8.1 merged 2026-09-29: saves happen at once (no review first), Add details edits a save after it happens, the corner screenshot toolbar, the dock as a bookmark tab tucked into the edge (draggable anywhere, no grip), an icon-only toolbar with tooltips, one rounded icon set, and the approved Add details card with FoundKeep list pickers instead of native dropdowns. Dev build on Pritam's Mac. Before friends: verify a real 1.7.12 → 1.8.1 upgrade, then publish ext-v1.8.1.</div></td>
         <td class="area">extension</td>
+        <td><span class="agent">agent</span></td>
+      </tr><tr data-id="P5.17" data-status="doing" data-owner="agent" data-area="design">
+        <td><span class="status s-doing"><i aria-hidden="true">◐</i>In progress</span></td>
+        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Design system: extension components on shared tokens, in Storybook<div class="note">Storybook in design-system/ (omni :8814, bb Connect) renders the product's own CSS and markup. Next: name components as a design system (Button, Tag, Select, Listbox, Badge, Text field, Tooltip…) with variants and sizes, move their CSS to one shared stylesheet the extension pages use, and tidy the previews.</div></td>
+        <td class="area">design</td>
+        <td><span class="agent">agent</span></td>
+      </tr><tr data-id="P5.18" data-status="todo" data-owner="agent" data-area="design">
+        <td><span class="status s-todo"><i aria-hidden="true">○</i>To do</span></td>
+        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Design system: bring the mobile app onto it<div class="note">After the extension. Same tokens and component names in the Expo app (replaces the azure palette item P5.7 when done).</div></td>
+        <td class="area">design</td>
+        <td><span class="agent">agent</span></td>
+      </tr><tr data-id="P5.19" data-status="todo" data-owner="agent" data-area="design">
+        <td><span class="status s-todo"><i aria-hidden="true">○</i>To do</span></td>
+        <td class="title"><span class="asked" title="Asked for by Pritam">★</span>Design system: bring the website and dashboard onto it<div class="note">After the app. The Next.js site and dashboard adopt the same tokens and components; Storybook grows a Web section.</div></td>
+        <td class="area">design</td>
         <td><span class="agent">agent</span></td>
       </tr></tbody></table>
     </section><section class="phase-section" id="P6">
@@ -612,7 +627,7 @@ tr.hidden,section.hidden{display:none}
 <p class="meta">★ = asked for by Pritam in a FoundKeep thread. Statuses: ✓ Done · ◐ In progress · ○ To do · ■ Blocked.</p>
 </main>
 <script>
-const asked = new Set(["P0.9","P1.8","P3.6","P4.1","P4.2","P4.3","P4.5","P5.1","P5.2","P5.3","P5.4","P5.5","P5.6","P5.7","P5.8","P5.9","P5.10","P5.11","P5.13","P5.14","P5.15","P5.16","P6.1","P6.2","P6.3","P6.4","P6.5","P6.8","P6.9","P7.2","P7.4","P7.6","L.1","L.2","L.3","L.4","L.5","L.6","L.7","L.8","L.9","L.10","L.11","L.12","L.13","L.14","L.15","L.16","L.17","L.19"]);
+const asked = new Set(["P0.9","P1.8","P3.6","P4.1","P4.2","P4.3","P4.5","P5.1","P5.2","P5.3","P5.4","P5.5","P5.6","P5.7","P5.8","P5.9","P5.10","P5.11","P5.13","P5.14","P5.15","P5.16","P5.17","P5.18","P5.19","P6.1","P6.2","P6.3","P6.4","P6.5","P6.8","P6.9","P7.2","P7.4","P7.6","L.1","L.2","L.3","L.4","L.5","L.6","L.7","L.8","L.9","L.10","L.11","L.12","L.13","L.14","L.15","L.16","L.17","L.19"]);
 const rows = [...document.querySelectorAll('tbody tr')];
 let f = 'all';
 const area = document.querySelector('.filters select');

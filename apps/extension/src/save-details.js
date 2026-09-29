@@ -1,4 +1,4 @@
-// Shared rules for the save-review UI and its trusted background commit.
+// Shared rules for the details card (review.html) and its trusted background edit (capture-details.js).
 export const STARTER_TAGS = ['Read later', 'Inspiration', 'Work', 'Personal'];
 export function normalizeSaveTags(values, maxTags = 20) {
   if (!Array.isArray(values) || values.length > maxTags) throw new Error(`Choose up to ${maxTags} tags.`);
@@ -26,42 +26,4 @@ export function normalizeSaveDetails(value) {
     details.folderId = value.folderId;
   }
   return details;
-}
-
-export function bindSaveTags(root, changed, { maxTags = 20 } = {}) {
-  let selected = [], available = STARTER_TAGS;
-  root.innerHTML = '<div class="save-tag-selected"></div><div class="save-tag-entry"><input type="text" maxlength="820" autocomplete="off" placeholder="Add a tag…"><button class="btn secondary" type="button">Add</button></div><div class="save-tag-suggestions"></div><p class="fine save-tag-error" role="status"></p>';
-  const input = root.querySelector('input'), button = root.querySelector('button'), error = root.querySelector('.save-tag-error');
-  input.setAttribute('aria-label', root.dataset.label || 'Add a tag');
-  function render() {
-    const holder = root.querySelector('.save-tag-selected'); holder.replaceChildren();
-    for (const name of selected) {
-      const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'save-tag-chip selected';
-      chip.textContent = name + ' ×'; chip.setAttribute('aria-label', 'Remove tag ' + name);
-      chip.onclick = () => { selected = selected.filter(value => value !== name); render(); changed(); }; holder.append(chip);
-    }
-    holder.hidden = !selected.length;
-    const suggestions = root.querySelector('.save-tag-suggestions'); suggestions.replaceChildren();
-    const seen = new Set(selected.map(name => name.toLowerCase()));
-    const search = input.value.trim().replace(/^#/, '').toLowerCase();
-    for (const name of available) {
-      const key = name.toLowerCase(); if (seen.has(key) || !key.includes(search)) continue; seen.add(key);
-      const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'save-tag-chip'; chip.textContent = '+ ' + name;
-      chip.setAttribute('aria-label', 'Add tag ' + name); chip.onclick = () => add(name); suggestions.append(chip);
-      if (suggestions.children.length >= 8) break;
-    }
-  }
-  function add(value = input.value) {
-    try { selected = normalizeSaveTags([...selected, ...value.split(',').map(tag => tag.trim()).filter(Boolean)], maxTags); input.value = ''; error.textContent = ''; render(); changed(); return true; }
-    catch (value) { error.textContent = value.message; input.focus(); return false; }
-  }
-  button.onclick = () => add();
-  input.oninput = () => { error.textContent = ''; render(); changed(); };
-  input.onkeydown = event => { if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); add(); } };
-  render();
-  return {
-    get: () => selected.slice(), pending: () => input.value, flush: () => add(),
-    set(tags = [], pending = '') { selected = normalizeSaveTags(tags); input.value = pending; error.textContent = ''; render(); },
-    suggest(names) { available = [...names, ...STARTER_TAGS]; render(); },
-  };
 }

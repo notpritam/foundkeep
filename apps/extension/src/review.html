@@ -1,35 +1,38 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FoundKeep — Review your save</title>
+<title>FoundKeep — Add details</title>
 <link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="review.css">
 <script src="theme.js" type="module"></script></head>
 <body>
-<form id="reviewForm" data-ready="false">
-  <header class="review-head"><p class="eyebrow">Save to <span data-product-name>FoundKeep</span></p><h1 id="destinationSource">Your next good find</h1></header>
-  <fieldset id="destinationFields" class="review-body">
-    <details id="destinationOriginal"><summary>View original content</summary><p id="destinationExcerpt"></p></details>
-    <label class="field">Save in<select id="saveDestination" required></select></label>
-    <p id="destinationRules" class="fine"></p>
-    <label class="field">Title<input id="destinationPersonalTitle" maxlength="1000" placeholder="Give this save a useful name"></label>
-    <label class="field"><span id="destinationNoteLabel">Personal note</span><textarea id="reviewNote" rows="3" maxlength="50000" placeholder="Why are you saving this?"></textarea></label>
-    <div class="destination-folder-head"><label for="destinationFolder" class="field">Folder</label><button id="destinationNewFolderToggle" type="button" class="btn quiet" aria-expanded="false">New folder</button></div>
-    <label class="field"><select id="destinationFolder" aria-label="Folder"></select></label>
-    <div id="destinationNewFolder" hidden><label class="field">New folder name<input id="destinationFolderName" maxlength="80"></label><button id="destinationCreateFolder" type="button" class="btn secondary">Create</button><p id="destinationFolderFeedback" class="statusline" role="status"></p></div>
-    <fieldset class="save-tags-field"><legend>Personal tags</legend><div id="destinationTags" data-label="Add a personal tag"></div></fieldset>
-    <p id="destinationPreservation" class="fine" hidden>FoundKeep will also try to keep this post’s photos, videos and linked articles in your private library.</p>
-    <section id="destinationShare" hidden>
-      <h2>Shared with this collection</h2><p class="fine">Your personal note, folder and personal tags stay private.</p>
-      <label class="field">Title in collection<input id="destinationTitle" maxlength="200"></label>
-      <label class="field">Source link<input id="destinationUrl" type="url" maxlength="2048"></label>
-      <label class="field">Text in collection<textarea id="destinationBody" rows="4" maxlength="5000"></textarea></label>
-      <fieldset class="save-tags-field"><legend>Tags in collection</legend><div id="destinationSharedTags" data-label="Add a collection tag"></div></fieldset>
-      <label id="destinationImageLabel" class="attach-source" hidden><input id="destinationImage" type="checkbox">Include the saved image</label>
-    </section>
-  </fieldset>
-  <footer class="review-foot"><p id="destinationFeedback" class="statusline" role="status"></p>
-    <button id="destinationReload" type="button" class="btn quiet" hidden>Retry</button>
-    <button id="reviewCancel" type="button" class="btn quiet">Cancel</button>
-    <button id="destinationConfirm" type="submit" class="btn primary">Save</button></footer>
+<!-- The details card: opened from the dock's "Saved · Add details" widget to
+     edit a save that has already happened. It edits only the save the
+     background granted it (capture-details.js). Layout (approved design,
+     design-system Storybook "Extension / Add details card"): the title, a
+     boxless note, one row of folder and tag pills, then My library, Share and
+     Save on one line. Nothing sits above the title. -->
+<form id="detailsForm" class="card" data-ready="false" novalidate>
+  <div class="title-row">
+    <input id="detailsTitle" class="title" maxlength="1000" placeholder="Add a title" aria-label="Title" disabled>
+    <button id="detailsCancel" type="button" class="icon-button" aria-label="Close without saving" data-tip="Close"></button>
+  </div>
+  <textarea id="detailsNote" class="note" rows="2" maxlength="50000" placeholder="Add a note" aria-label="Personal note" disabled></textarea>
+  <div class="pills">
+    <button id="detailsFolder" type="button" class="pill" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+    <span id="detailsTags" class="chips" aria-label="Personal tags"></span>
+    <button id="detailsAddTag" type="button" class="pill ghost" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+  </div>
+  <div id="detailsShare" class="share-line" hidden>
+    <span id="detailsShareIcon" aria-hidden="true"></span>
+    <textarea id="sharedBody" class="note" rows="1" maxlength="5000" placeholder="Add a caption for the collection" aria-label="Caption for the collection"></textarea>
+  </div>
+  <p id="detailsFeedback" class="statusline" role="status"></p>
+  <footer class="foot">
+    <span class="pill static" id="detailsLibrary" data-tip="Saved to My library"></span>
+    <button id="detailsCollection" type="button" class="pill ghost" aria-haspopup="listbox" aria-expanded="false" disabled></button>
+    <button id="detailsReload" type="button" class="text-button" hidden>Retry</button>
+    <span class="spacer"></span>
+    <button id="detailsSave" type="submit" class="primary" disabled>Save details</button>
+  </footer>
 </form>
 <script src="review.js" type="module"></script>
 </body></html>

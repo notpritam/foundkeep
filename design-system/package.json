@@ -1,0 +1,17 @@
+{
+  "name": "@foundkeep/design-system",
+  "private": true,
+  "type": "module",
+  "description": "FoundKeep's design system in Storybook: live components built from the product's own CSS and markup.",
+  "scripts": {
+    "storybook": "storybook dev -p 8814 --no-open",
+    "build": "storybook build -o dist --quiet"
+  },
+  "devDependencies": {
+    "@storybook/addon-docs": "10.6.0",
+    "@storybook/html-vite": "10.6.0",
+    "storybook": "10.6.0",
+    "storybook-addon-pseudo-states": "10.6.0",
+    "vite": "^8.3.1"
+  }
+}

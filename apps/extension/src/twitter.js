@@ -1,16 +1,23 @@
-// Adds a FoundKeep destination-picker button to each X / Twitter action bar.
-// Clicking it opens a review of this tweet in the floating dock; only confirmation saves it.
-// The original author, text and permalink stay together. Self-contained script — all
-// network goes through the background worker, so no token lives in the page.
+// Adds a FoundKeep save button to each X / Twitter action bar. One click saves
+// the post straight to My library (the dock then offers "Add details"). The
+// original author, text and permalink stay together. Self-contained script —
+// all network goes through the background worker, so no token lives in the page.
 
 const PRODUCT_NAME = chrome.runtime.getManifest().action.default_title;
+const DEV = PRODUCT_NAME === "FoundKeep Dev";
 // Keep dev outside the marker used by already-installed production releases.
-const BUTTON_ATTRIBUTE = PRODUCT_NAME === "FoundKeep Dev" ? "data-foundkeep-dev" : "data-atlas";
+const BUTTON_ATTRIBUTE = DEV ? "data-foundkeep-dev" : "data-atlas";
 const OWN_BUTTON = `[${BUTTON_ATTRIBUTE}="${chrome.runtime.id}"]`;
-const MARK_SVG = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg>';
-const CHECK_SVG = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// The FoundKeep mark (apps/web/assets/mark.svg: a bookmark with a folded
+// top-right corner and a small dot) as a thin outline at X's own action-icon
+// size, so it sits naturally beside reply / like / bookmark.
+const MARK_SVG = '<svg data-icon="foundkeep-mark" width="18.75" height="18.75" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M7 3h7.5L18 6.5V21l-6-4-6 4V4a1 1 0 0 1 1-1z"/><path d="M14.5 3v2.5a1 1 0 0 0 1 1H18"/><circle cx="9.6" cy="7.2" r="1.1" fill="currentColor" stroke="none"/></svg>';
+// Dev builds mark the icon with a small emerald dot instead of text.
+const DEV_DOT = '<span data-foundkeep-dev-dot aria-hidden="true" style="position:absolute;top:6px;right:5px;width:6px;height:6px;border-radius:50%;background:#4cc38a;pointer-events:none"></span>';
 const IDLE = "var(--foundkeep-idle, #686868)";
 const ACCENT = "var(--foundkeep-accent, #0d7a50)";
+const SAVED = "#4cc38a";
 
 function extract(article) {
   const link = [...article.querySelectorAll('a[href*="/status/"]')].find((a) =>
@@ -55,27 +62,27 @@ function updatePalette(btn) {
   btn.style.setProperty('--foundkeep-accent', dark ? '#4cc38a' : '#0d7a50');
   btn.style.setProperty('--foundkeep-idle', dark ? '#a5aab2' : '#686868');
 }
+function label(btn, text) {
+  btn.title = text;
+  btn.setAttribute("aria-label", text);
+}
 function setState(btn, state) {
   updatePalette(btn);
   btn.dataset.state = state;
+  btn.style.opacity = "1";
   if (state === "saving") {
     btn.style.color = ACCENT;
     btn.style.opacity = "0.6";
-  } else if (state === "choosing") {
-    btn.style.color = ACCENT; btn.style.opacity = "1";
-    btn.title = "Choose a destination in the FoundKeep dock";
-    btn.setAttribute("aria-label", btn.title);
+    label(btn, `Saving to ${PRODUCT_NAME}…`);
   } else if (state === "saved") {
-    btn.style.color = ACCENT;
-    btn.style.background = "rgba(13,122,80,0.12)";
-    btn.style.opacity = "1";
-    btn.innerHTML = CHECK_SVG;
-    btn.title = `Saved to ${PRODUCT_NAME}`;
-    btn.setAttribute("aria-label", btn.title);
+    btn.style.color = SAVED;
+    btn.style.background = "transparent";
+    label(btn, `Saved to ${PRODUCT_NAME}`);
   } else if (state === "error") {
     btn.style.color = "#f4212e";
-    btn.style.opacity = "1";
-    btn.title = "Couldn't save — check the extension settings";
+    // Generic on purpose: the reason (signed out, disabled in preferences…)
+    // is shown in the FoundKeep dock, never written into x.com's DOM.
+    label(btn, `Couldn’t save to ${PRODUCT_NAME}`);
     setTimeout(() => {
       if (btn.dataset.state === "error") reset(btn);
     }, 2500);
@@ -89,9 +96,7 @@ function reset(btn) {
   btn.style.color = IDLE;
   btn.style.background = "transparent";
   btn.style.opacity = "1";
-  btn.innerHTML = MARK_SVG + (PRODUCT_NAME === "FoundKeep Dev" ? '<small style="font-size:9px;margin-left:2px">Dev</small>' : "");
-  btn.title = `Choose where to save in ${PRODUCT_NAME}`;
-  btn.setAttribute("aria-label", btn.title);
+  label(btn, `Save to ${PRODUCT_NAME}`);
 }
 
 function makeButton() {
@@ -102,10 +107,10 @@ function makeButton() {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.style.cssText =
-    "display:inline-flex;align-items:center;justify-content:center;width:34.75px;height:34.75px;padding:0;margin:0;border:0;background:transparent;border-radius:9999px;cursor:pointer;color:" +
+    "position:relative;display:inline-flex;align-items:center;justify-content:center;width:34.75px;height:34.75px;padding:0;margin:0;border:0;background:transparent;border-radius:9999px;cursor:pointer;color:" +
     IDLE +
     ";transition:color .2s,background .2s,opacity .2s;";
-  if (PRODUCT_NAME === "FoundKeep Dev") btn.style.width = "52px";
+  btn.innerHTML = MARK_SVG + (DEV ? DEV_DOT : "");
   reset(btn);
 
   btn.addEventListener("mouseenter", () => {
@@ -115,7 +120,7 @@ function makeButton() {
     btn.style.background = "rgba(13,122,80,0.1)";
   });
   btn.addEventListener("mouseleave", () => {
-    if (['saved', 'saving', 'choosing', 'error'].includes(btn.dataset.state)) return;
+    if (['saved', 'saving', 'error'].includes(btn.dataset.state)) return;
     btn.style.color = IDLE;
     btn.style.background = "transparent";
   });
@@ -124,9 +129,10 @@ function makeButton() {
 
   btn.addEventListener("click", (e) => {
     if (!e.isTrusted) return;
-    if (btn.dataset.state === "saving") return;
     e.preventDefault();
     e.stopPropagation();
+    // Already saved (or saving): a second click never saves a duplicate.
+    if (btn.dataset.state === "saving" || btn.dataset.state === "saved") return;
     const article = btn.closest('article[data-testid="tweet"]');
     if (!article) return;
     const data = extract(article);
@@ -136,7 +142,7 @@ function makeButton() {
     try {
       chrome.runtime.sendMessage({ kind: "saveTweet", payload: data }, (res) => {
         if (chrome.runtime.lastError || !res?.ok) return setState(btn, "error");
-        setState(btn, res.pending ? "choosing" : "saved");
+        setState(btn, "saved");
       });
     } catch {
       setState(btn, "error");
@@ -189,10 +195,5 @@ function refreshFeature() {
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.kind === "atlas-preferences-changed") refreshFeature();
-  if (message?.kind === "foundkeep-tweet-result") {
-    for (const button of document.querySelectorAll(OWN_BUTTON + ' button')) {
-      if (button.dataset.tweetUrl === message.url) setState(button, message.cancelled ? 'idle' : 'saved');
-    }
-  }
 });
 refreshFeature();

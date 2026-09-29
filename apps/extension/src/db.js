@@ -150,6 +150,20 @@ export async function getCapture(id) {
 export async function updateCapture(id, patch) {
   return updateWhere(id, patch, () => true);
 }
+/** Patch a capture from its current value inside one transaction, so a
+ *  read-modify-write (e.g. bumping a revision) can never interleave with
+ *  another writer. `compute` returns the patch, or null to leave it as is. */
+export async function updateCaptureWith(id, compute) {
+  return write(async (store) => {
+    const rec = await reqToPromise(store.get(id));
+    if (!rec) return null;
+    const patch = compute(rec);
+    if (!patch) return rec;
+    Object.assign(rec, patch, { updatedAt: Date.now() });
+    await reqToPromise(store.put(rec));
+    return rec;
+  });
+}
 async function updateWhere(id, patch, allowed) {
   return write(async (store) => {
     const rec = await reqToPromise(store.get(id));

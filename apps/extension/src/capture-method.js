@@ -1,5 +1,5 @@
-// provenance.captureMethod for a staged capture — the one mapping
-// performCapture (background.js) uses, kept free of chrome.* so tests can
+// provenance.captureMethod for a capture — the one mapping
+// performCapture (capture-actions.js) uses, kept free of chrome.* so tests can
 // check every trigger/action against the backend's allowlist
 // (apps/backend/src/customer-provenance.ts METHODS). A method outside that
 // set 400s on upload with invalid_capture_context.
@@ -19,4 +19,17 @@ export function captureMethodFor(action, trigger, { attachPage = false } = {}) {
   // played — and the backend has no "dock-*" methods, only "popup-*" (R12).
   const prefix = trigger === "dock" ? "popup" : trigger || "popup";
   return `${prefix}-${suffix}`;
+}
+
+// Keyboard shortcuts save directly. Both screenshot shortcuts start the same
+// corner-toolbar flow as the dock's Screenshot button ("region": drag a
+// selection, or choose Full page there). The full-page shortcut captures the
+// page directly when region selection is turned off, and when full page
+// itself is turned off it asks for "fullpage" so the capture says so,
+// instead of opening a selector that cannot do what the shortcut promises.
+export function actionForCommand(command, capture = {}) {
+  if (command === "region-screenshot") return "region";
+  if (command === "full-page-screenshot") return capture.region === false || capture.fullPage === false ? "fullpage" : "region";
+  if (command === "save-highlight") return "highlight";
+  return null;
 }
