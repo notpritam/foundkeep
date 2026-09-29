@@ -5,30 +5,93 @@
   font-weight: 100 900;
   font-display: swap;
 }
+/* tokens:start — Generated from design-system/tokens.json by design-system/scripts/tokens.mjs. Edit the JSON, not this block. */
 :root {
   color-scheme: light;
-  --bg: #fafafa; --sidebar: #fff; --card: #fff; --panel: #f1f3f1;
-  --hover: #e6ece7; --line: #e4e4e4; --control: #929292;
-  --ink: #202020; --muted: #686868; --faint: #686868;
-  --accent: #0d7a50; --button: #0d7a50; --button-hover: #0a6242;
-  --on-button: #fff; --accent-bg: #e6f2ea; --good: #286c56; --bad: #ad3b35;
-  --font: Inter, system-ui, sans-serif; --display: var(--font);
+  --bg: #fafafa;
+  --sidebar: #fff;
+  --card: #fff;
+  --panel: #f1f3f1;
+  --hover: #e6ece7;
+  --line: #e4e4e4;
+  --control: #929292;
+  --ink: #202020;
+  --muted: #686868;
+  --faint: #686868;
+  --accent: #0d7a50;
+  --button: #0d7a50;
+  --button-hover: #0a6242;
+  --on-button: #fff;
+  --accent-bg: #e6f2ea;
+  --good: #286c56;
+  --bad: #ad3b35;
+  --font: Inter, system-ui, sans-serif;
+  --display: var(--font);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #08090a; --sidebar: #0f1011; --card: #0f1011; --panel: #1a1c20;
-  --hover: #262a2e; --line: #34373d; --control: #646872;
-  --ink: #f7f8f8; --muted: #a5aab2; --faint: #a5aab2;
-  --accent: #4cc38a; --button: #4cc38a; --button-hover: #6bd3a1;
-  --on-button: #05130d; --accent-bg: #163426; --good: #a7d4b1; --bad: #ffb5a8;
+  --bg: #08090a;
+  --sidebar: #0f1011;
+  --card: #0f1011;
+  --panel: #1a1c20;
+  --hover: #262a2e;
+  --line: #34373d;
+  --control: #646872;
+  --ink: #f7f8f8;
+  --muted: #a5aab2;
+  --faint: #a5aab2;
+  --accent: #4cc38a;
+  --button: #4cc38a;
+  --button-hover: #6bd3a1;
+  --on-button: #05130d;
+  --accent-bg: #163426;
+  --good: #a7d4b1;
+  --bad: #ffb5a8;
+  --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .55);
+  --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .6);
 }
-/* Scale tokens (both themes): the FoundKeep design system — spacing on a 4px
-   grid, one radius per role, control heights, a type scale and elevation.
-   Components (components.css) use only these and the colour tokens above. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
+    --bg: #08090a;
+    --sidebar: #0f1011;
+    --card: #0f1011;
+    --panel: #1a1c20;
+    --hover: #262a2e;
+    --line: #34373d;
+    --control: #646872;
+    --ink: #f7f8f8;
+    --muted: #a5aab2;
+    --faint: #a5aab2;
+    --accent: #4cc38a;
+    --button: #4cc38a;
+    --button-hover: #6bd3a1;
+    --on-button: #05130d;
+    --accent-bg: #163426;
+    --good: #a7d4b1;
+    --bad: #ffb5a8;
+    --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .55);
+    --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .6);
+  }
+}
+/* Scale tokens (both themes): spacing on a 4px grid, one radius per role,
+   control heights, a type scale and elevation. components.css uses only these. */
 :root {
-  --fk-space-1: 4px; --fk-space-2: 8px; --fk-space-3: 12px; --fk-space-4: 16px; --fk-space-5: 20px; --fk-space-6: 24px; --fk-space-8: 32px;
-  --fk-radius-sm: 8px; --fk-radius-md: 10px; --fk-radius-lg: 12px; --fk-radius-xl: 16px; --fk-radius-full: 999px;
-  --fk-control-sm: 30px; --fk-control-md: 36px; --fk-control-lg: 40px;
+  --fk-space-1: 4px;
+  --fk-space-2: 8px;
+  --fk-space-3: 12px;
+  --fk-space-4: 16px;
+  --fk-space-5: 20px;
+  --fk-space-6: 24px;
+  --fk-space-8: 32px;
+  --fk-radius-sm: 8px;
+  --fk-radius-md: 10px;
+  --fk-radius-lg: 12px;
+  --fk-radius-xl: 16px;
+  --fk-radius-full: 999px;
+  --fk-control-sm: 30px;
+  --fk-control-md: 36px;
+  --fk-control-lg: 40px;
   --fk-text-title: 600 16px/1.35 var(--font);
   --fk-text-body: 400 13.5px/1.5 var(--font);
   --fk-text-label: 500 12.5px/1 var(--font);
@@ -38,20 +101,7 @@
   --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .16), 0 2px 6px rgba(0, 0, 0, .06);
   --fk-ease: cubic-bezier(.2, .7, .2, 1);
 }
-:root[data-theme="dark"] { --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .55); --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .6); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) { --fk-shadow-popover: 0 16px 40px rgba(0, 0, 0, .55); --fk-shadow-card: 0 18px 48px rgba(0, 0, 0, .6); }
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
-  color-scheme: dark;
-  --bg: #08090a; --sidebar: #0f1011; --card: #0f1011; --panel: #1a1c20;
-  --hover: #262a2e; --line: #34373d; --control: #646872;
-  --ink: #f7f8f8; --muted: #a5aab2; --faint: #a5aab2;
-  --accent: #4cc38a; --button: #4cc38a; --button-hover: #6bd3a1;
-  --on-button: #05130d; --accent-bg: #163426; --good: #a7d4b1; --bad: #ffb5a8;
-  }
-}
+/* tokens:end */
 * {
   box-sizing: border-box;
 }
