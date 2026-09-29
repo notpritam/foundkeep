@@ -649,10 +649,10 @@
       "phase": "P5",
       "title": "Design system: bring the mobile app onto it",
       "area": "design",
-      "status": "todo",
+      "status": "doing",
       "owner": "agent",
       "asked": true,
-      "note": "After the extension. Same tokens and component names in the Expo app (replaces the azure palette item P5.7 when done)."
+      "note": "After the extension. Same tokens and component names in the Expo app (replaces the azure palette item P5.7 when done). 2026-09-29: foundation done — Storybook App section renders the real app (React Native Web) on a sample world, every screen as it is today in a device simulator (iPhone 17 Pro/SE, Pixel 9, iPad; light/dark; text size 100–200%; reduced motion/transparency), a flow map, and the Live app on a throwaway demo (deploy/demo, omni--8818). One token source (design-system/tokens.json). Next: proposals flow by flow, shell and library first."
     },
     {
       "id": "P5.19",
@@ -662,7 +662,7 @@
       "status": "todo",
       "owner": "agent",
       "asked": true,
-      "note": "After the app. The Next.js site and dashboard adopt the same tokens and components; Storybook grows a Web section. Includes the chosen drafts banner above the library (\"3 saves are still in your extension · Sync now\", Storybook Web / Planned / Drafts banner), which needs the site to ask the extension for its unsynced saves."
+      "note": "After the app. The Next.js site and dashboard adopt the same tokens and components; Storybook grows a Web section. Includes the chosen drafts banner above the library (\"3 saves are still in your extension · Sync now\", Storybook Web / Planned / Drafts banner), which needs the site to ask the extension for its unsynced saves. 2026-09-29: foundation done alongside the app — Storybook Dashboard section with every page as it is today (desktop/laptop/iPad/iPhone frames), a flow map and the Live dashboard on the same demo."
     },
     {
       "id": "P6.1",
