@@ -21,11 +21,12 @@ export { sleep };
 /**
  * `allUrls` adds "<all_urls>" to a disposable copy of the extension (as the
  * screenshot tests do: captureVisibleTab needs it and nothing here can make
- * a fresh activeTab gesture). `patchManifest` edits that same copy.
+ * a fresh activeTab gesture). `patchManifest` edits that same copy, and
+ * `extraFiles` ({ 'src/x.html': '…' }) adds pages to it — never to the source.
  */
-export async function launchExtension({ repo, allUrls = false, patchManifest = null, viewport = { width: 1280, height: 800 }, deviceScaleFactor = 2, headless = true }) {
+export async function launchExtension({ repo, allUrls = false, patchManifest = null, extraFiles = null, viewport = { width: 1280, height: 800 }, deviceScaleFactor = 2, headless = true }) {
   let extension = path.join(repo, 'apps/extension');
-  const copied = allUrls || !!patchManifest;
+  const copied = allUrls || !!patchManifest || !!extraFiles;
   if (copied) {
     const copy = await mkdtemp('/tmp/foundkeep-design-ext-');
     await cp(extension, copy, { recursive: true });
@@ -34,6 +35,7 @@ export async function launchExtension({ repo, allUrls = false, patchManifest = n
     if (allUrls) manifest.host_permissions.push('<all_urls>');
     patchManifest?.(manifest);
     await writeFile(manifestPath, JSON.stringify(manifest));
+    for (const [file, text] of Object.entries(extraFiles || {})) await writeFile(path.join(copy, file), text);
     extension = copy;
   }
   const profile = await mkdtemp('/tmp/foundkeep-design-profile-');
