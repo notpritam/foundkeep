@@ -4,6 +4,15 @@ Date: 2026-09-27
 Status: Approved in conversation (Pritam, 2026-09-27); awaiting spec review
 Replaces: the Chrome side panel as the extension's surface (`side_panel` → `src/library.html`)
 
+> **Revised 2026-09-29 (Pritam's Launchpad review).** Collapsed is a bookmark tab
+> tucked into the bottom edge, 16px from the right (it slides up, rests 5px below
+> the edge, lifts on hover). Expanded is icon-only — Save this page · Highlight ·
+> Screenshot · Note · Library · ⋯ — with a tooltip on hover or keyboard focus, and
+> no mark beside Save page. No drag grip: the dock is anchored and no longer
+> moves, so **Movement** below is superseded and `foundkeep-dock-position` is
+> cleared on update. Icons are one rounded 24px set (1.75 stroke, round caps and
+> joins, no sharp corners).
+
 ## Goal
 
 Replace the extension's Chrome side panel with a small floating dock that lives
@@ -46,7 +55,7 @@ Collapse happens on Escape, on a click outside the dock and card, and ~4 seconds
 after a successful save (the dock first shows a "Saved" confirmation). Collapse
 is not forced while a review is open.
 
-### Movement
+### Movement (superseded 2026-09-29 — the dock no longer moves)
 
 - Drag by the grip in the collapsed and expanded states (pointer events). The
   dock is clamped inside the viewport and re-clamped on resize.

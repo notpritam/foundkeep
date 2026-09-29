@@ -8,10 +8,6 @@ import { configuredFlash } from './badge.js';
 import * as db from './db.js';
 
 const HIDDEN_KEY = 'foundkeep-dock-hidden-origins', ALWAYS_KEY = 'foundkeep-dock-always-on', LOCAL_KEY = 'foundkeep-dock-local-prompt';
-// R10: the dock content script can never touch chrome.storage (it sits next
-// to account credentials); this is the one background-side holder of where
-// the dock sits on screen, reached only through the dock-position message.
-const DOCK_POSITION_KEY = 'foundkeep-dock-position';
 const DOCK_FILE = 'src/dock/dock.js';
 // Task 5: the opt-in "show on every site" content script — registered only
 // while chrome.permissions.contains({origins:['<all_urls>']}) is true, since
@@ -331,23 +327,6 @@ export async function handleDockMessage(msg, sender) {
       else if (msg.choice === 'move' && cloud.account?.id) { await importLocalCaptures({ confirmed: true, accountId: cloud.account.id }); void drainQueue(); }
       else return { ok: false };
       await refreshState(tab); return { ok: true };
-    }
-    case 'dock-position': {
-      // Only a genuine top-frame content script may read or write where the
-      // dock sits — never an extension page, and never a subframe. This
-      // never touches atlasCustomer or any other cloud/account storage key.
-      if (msg.reset === true) {
-        await chrome.storage.local.remove(DOCK_POSITION_KEY);
-        return { ok: true };
-      }
-      if (msg.pos !== undefined) {
-        const { fx, fy } = msg.pos || {};
-        if (!Number.isFinite(fx) || !Number.isFinite(fy) || fx < 0 || fx > 1 || fy < 0 || fy > 1) return { ok: false };
-        await chrome.storage.local.set({ [DOCK_POSITION_KEY]: { fx, fy } });
-        return { ok: true };
-      }
-      const stored = await chrome.storage.local.get(DOCK_POSITION_KEY);
-      return stored[DOCK_POSITION_KEY] || null;
     }
     default: return { ok: false };
   }

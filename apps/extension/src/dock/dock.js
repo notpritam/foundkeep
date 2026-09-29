@@ -5,57 +5,72 @@
   // (that sits next to credentials); every intent goes to the background as
   // a message, and every handler ignores untrusted (page-synthesized) events.
   //
-  // Sections: markup & styles · rendering & position · highlighter mode ·
+  // Sections: markup & styles · rendering · highlighter mode ·
   // note frame · "Saved · Add details" widget · details card · input ·
-  // background messages · test handle.
+  // tooltips · background messages · test handle.
   //
   // Anything the user types (a note, details) lives in an extension-origin
   // frame the page can neither read nor drive — never in this page DOM.
-  const EDGE = 16;
   const SAVED_TEXT = '✓ Saved to My library';
   const HIGHLIGHT_HINT = 'Select text to save · Esc to stop';
+  // One rounded 24px set: 1.75 stroke, round caps and joins, and no sharp
+  // corner anywhere — every corner and notch is drawn as a curve.
   const ICON = {
-    grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
-    mark: '<path d="M7 3h7.5L18 6.5V21l-6-4-6 4V4a1 1 0 0 1 1-1z"/><path d="M14.5 3v2.5a1 1 0 0 0 1 1H18"/><circle cx="9.6" cy="7.2" r="1.1" fill="currentColor" stroke="none"/>',
-    savepage: '<path d="M7 3h10a1 1 0 0 1 1 1v17l-6-4-6 4V4a1 1 0 0 1 1-1z"/>',
-    highlight: '<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>',
-    screenshot: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/>',
-    note: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/>',
-    library: '<path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>',
-    more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+    mark: '<path d="M9 3h4.4a2 2 0 0 1 1.4.6l2.6 2.6a2 2 0 0 1 .6 1.4v11.5a1 1 0 0 1-1.56.83L13 17.67Q12 17 11 17.67l-3.44 2.29A1 1 0 0 1 6 19.13V6a3 3 0 0 1 3-3z"/><path d="M14 3.4V6a1.5 1.5 0 0 0 1.5 1.5h2.1"/><circle cx="9.7" cy="7.4" r="1.2" fill="currentColor" stroke="none"/>',
+    savepage: '<path d="M9 3h6a3 3 0 0 1 3 3v13.13a1 1 0 0 1-1.56.83L13 17.67Q12 17 11 17.67l-3.44 2.29A1 1 0 0 1 6 19.13V6a3 3 0 0 1 3-3z"/>',
+    highlight: '<path d="M14.3 4.2a2.2 2.2 0 0 1 3.1 0l2.4 2.4a2.2 2.2 0 0 1 0 3.1l-6.1 6.1a2.2 2.2 0 0 1-3.1 0l-2.4-2.4a2.2 2.2 0 0 1 0-3.1z"/><path d="m8.5 13.4-2.3 2.3a1.4 1.4 0 0 0-.36.62L5.4 18.6l2.28-.44a1.4 1.4 0 0 0 .62-.36l2.3-2.3"/><path d="M13.5 20.5h6"/>',
+    screenshot: '<path d="M4 8.5V7a3 3 0 0 1 3-3h1.5M15.5 4H17a3 3 0 0 1 3 3v1.5M20 15.5V17a3 3 0 0 1-3 3h-1.5M8.5 20H7a3 3 0 0 1-3-3v-1.5"/><rect x="8.5" y="8.5" width="7" height="7" rx="2.2"/>',
+    note: '<path d="M11.5 4.5H7.5a3 3 0 0 0-3 3v9a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3v-4"/><path d="M17.3 4.2a2 2 0 0 1 2.8 2.8l-6.1 6.1a2 2 0 0 1-.93.52l-2.2.55a.5.5 0 0 1-.6-.6l.55-2.2a2 2 0 0 1 .52-.93z"/>',
+    // The same notebook as My library in the web sidebar.
+    library: '<rect x="4.5" y="3.5" width="15" height="17" rx="3"/><path d="M8.5 3.5v17M12 8.5h4M12 12h4"/>',
+    more: '<circle cx="6" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
   };
-  const svg = name => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
+  const svg = name => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
+  const FONT = 'font:500 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif';
+  // Collapsed, the dock is a bookmark tab tucked into the bottom edge (it
+  // rests 5px below the edge and rises on hover); open, an icon-only
+  // toolbar 16px above it. It is anchored bottom-right by CSS alone.
   const CSS = `
     :host{all:initial}
-    .dock{position:fixed;display:flex;align-items:center;gap:2px;padding:2px;background:#0f1011;color:#d6d8db;border:1px solid #1d1f22;border-radius:12px;
-      box-shadow:0 8px 28px rgba(0,0,0,.35);font:500 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif;transition:opacity .15s ease}
+    .dock{position:fixed;right:16px;bottom:16px;box-sizing:border-box;max-width:calc(100vw - 32px);display:flex;align-items:center;gap:2px;padding:4px;background:#0f1011;color:#d6d8db;
+      border:1px solid #1d1f22;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.35);${FONT};animation:fk-open .16s ease-out}
+    .dock[data-mode="collapsed"]{bottom:0;padding:0;border-bottom:0;border-radius:12px 12px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.2);
+      transform:translateY(5px);transition:transform .15s ease;animation:fk-tab .2s ease-out}
+    .dock[data-mode="collapsed"]:hover,.dock[data-mode="collapsed"]:focus-within{transform:none}
     .dock[hidden],[hidden]{display:none!important}
-    button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;height:36px;min-width:36px;padding:0 10px;border-radius:9px;cursor:pointer;color:inherit;white-space:nowrap}
-    button:hover{background:#1a1b1e}
+    button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;min-width:36px;padding:0 12px;border-radius:10px;
+      cursor:pointer;color:inherit;white-space:nowrap;transition:background-color .12s ease,color .12s ease}
+    button:hover{background:#1a1b1e;color:#f7f8f8}
     button:focus-visible{outline:2px solid #4cc38a;outline-offset:1px}
     button[aria-pressed="true"]{background:#163426;color:#4cc38a}
-    .grip{cursor:grab;padding:0;width:24px;justify-content:center;color:#8a8f98}
-    .grip:active{cursor:grabbing}
-    .pill{padding:0 10px}
-    .status{padding:0 10px;color:#8a8f98;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .actions button[aria-expanded="true"]{background:#1a1b1e;color:#f7f8f8}
+    .pill{width:44px;height:32px;padding:0 0 5px;border-radius:12px 12px 0 0}
     .actions{display:flex;align-items:center;gap:2px}
+    .actions button{width:36px;padding:0}
+    .status{padding:0 10px;color:#8a8f98;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .status[data-tone="ok"]{color:#4cc38a}.status[data-tone="error"]{color:#f28b82}
     .signin{display:flex;flex-direction:column;align-items:stretch;gap:2px}
+    .signin button{color:#f7f8f8}
     .waiting{padding:8px 10px 2px;color:#8a8f98;max-width:260px;white-space:normal;line-height:1.35}
-    .menu{position:absolute;bottom:44px;right:0;display:flex;flex-direction:column;min-width:220px;padding:4px;background:#0f1011;border:1px solid #1d1f22;border-radius:12px}
-    .menu button{width:100%}
-    .menu.below{bottom:auto;top:44px}
+    .menu{position:absolute;bottom:48px;right:0;display:flex;flex-direction:column;min-width:220px;padding:4px;background:#0f1011;border:1px solid #1d1f22;border-radius:14px;
+      box-shadow:0 8px 28px rgba(0,0,0,.35)}
+    .menu button{width:100%;justify-content:flex-start}
+    .tip{position:fixed;padding:6px 9px;background:#1c1d21;color:#f7f8f8;border:1px solid #2a2c31;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.3);
+      font:500 12px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;white-space:nowrap;pointer-events:none;animation:fk-tip .12s ease-out}
     .note-card{position:fixed;width:320px;border:0;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.35);background:transparent;color-scheme:normal}
-    .toast{position:fixed;display:flex;align-items:center;gap:0;padding:2px 2px 2px 12px;background:#0f1011;color:#d6d8db;border:1px solid #1d1f22;border-radius:10px;
-      box-shadow:0 8px 28px rgba(0,0,0,.35);font:500 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif;white-space:nowrap;transition:opacity .2s ease}
+    .toast{position:fixed;display:flex;align-items:center;gap:0;padding:2px 2px 2px 12px;background:#0f1011;color:#d6d8db;border:1px solid #1d1f22;border-radius:12px;
+      box-shadow:0 8px 28px rgba(0,0,0,.35);${FONT};white-space:nowrap;transition:opacity .2s ease}
     .toast .saved{color:#4cc38a}
     .toast .sep{color:#8a8f98;padding:0 2px 0 6px}
     .toast button{height:30px;padding:0 10px;color:#f7f8f8}
     .toast.fading{opacity:0}
     .flash{position:fixed;pointer-events:none;background:rgba(76,195,138,.5);border-radius:2px;animation:foundkeep-flash 1s ease-in forwards}
     @keyframes foundkeep-flash{0%,35%{opacity:1}100%{opacity:0}}
+    @keyframes fk-open{from{opacity:0;transform:translateY(6px)}}
+    @keyframes fk-tab{from{transform:translateY(100%)}}
+    @keyframes fk-tip{from{opacity:0;transform:translateY(2px)}}
     .card{position:fixed;width:380px;border:0;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.4);background:transparent;color-scheme:normal}
-    @media (prefers-reduced-motion:reduce){.dock,.toast{transition:none}.flash{animation:none;opacity:.8}}`;
+    @media (prefers-reduced-motion:reduce){.dock,.toast,.tip,button{transition:none;animation:none}.flash{animation:none;opacity:.8}}`;
 
   // ---------------------------------------------------------------------------
   // Markup
@@ -63,19 +78,20 @@
   const host = document.createElement('foundkeep-dock');
   host.style.cssText = 'all:initial;position:fixed;inset:auto;z-index:2147483646;';
   const root = host.attachShadow({ mode: 'closed' });
+  // Icon-only controls: aria-label names each one, data-tip is the tooltip.
+  const tool = (action, tip, extra = '') => `<button data-action="${action}" aria-label="${tip}" data-tip="${tip}"${extra}>${svg(action)}</button>`;
   root.innerHTML = `<style>${CSS}</style>
     <div class="dock" hidden role="toolbar" aria-label="FoundKeep">
-      <button class="grip" aria-label="Move FoundKeep dock" aria-description="Drag or use arrow keys to move. Press Home to reset.">${svg('grip')}</button>
       <button class="pill" data-action="expand" aria-label="Open FoundKeep" aria-expanded="false">${svg('mark')}</button>
       <div class="actions" hidden>
-        <button data-action="savepage">${svg('savepage')}Save page</button>
-        <button data-action="highlight" aria-pressed="false">${svg('highlight')}Highlight</button>
-        <button data-action="screenshot">${svg('screenshot')}Screenshot</button>
-        <button data-action="note" aria-expanded="false">${svg('note')}Note</button>
-        <button data-action="library">${svg('library')}Library</button>
-        <button data-action="more" aria-haspopup="menu" aria-label="More">${svg('more')}</button>
+        ${tool('savepage', 'Save this page')}
+        ${tool('highlight', 'Highlight text to save it', ' aria-pressed="false"')}
+        ${tool('screenshot', 'Take a screenshot')}
+        ${tool('note', 'Write a note', ' aria-expanded="false"')}
+        ${tool('library', 'Open your library')}
+        ${tool('more', 'More options', ' aria-haspopup="menu" aria-expanded="false"')}
       </div>
-      <div class="signin" hidden><span class="waiting" hidden></span><button data-action="sign-in">Sign in to save</button></div>
+      <div class="signin" hidden><span class="waiting" hidden></span><button data-action="sign-in">${svg('mark')}Sign in to save</button></div>
       <span class="status" role="status" hidden></span>
       <div class="menu" data-menu="more" role="menu" hidden>
         <button data-action="always-on" role="menuitem">Show on every site</button>
@@ -85,23 +101,27 @@
       <div class="local" hidden><span class="status"></span><button data-action="local-move">Move to My library</button><button data-action="local-later">Later</button></div>
     </div>
     <div class="toast" role="status" hidden><span class="saved">${SAVED_TEXT}</span><span class="sep" aria-hidden="true"> · </span><button data-action="details">Add details</button></div>
+    <div class="tip" aria-hidden="true" hidden></div>
     <div class="flashes"></div>`;
   const $ = selector => root.querySelector(selector);
-  const dockEl = $('.dock'), toastEl = $('.toast');
+  const dockEl = $('.dock'), toastEl = $('.toast'), tipEl = $('.tip');
   let mode = 'hidden', dockState = null, frame = null, readyTimer = 0, dockReady = null, hello = 'pending';
-  let pos = null; // {fx, fy} fractions of the viewport for the dock's top-left corner
   let highlighting = false, lastHighlight = null, flashCount = 0, toastTimer = 0, capturing = false, noteFrame = null, noteTimer = 0;
+  let tipTimer = 0, tipFor = null, tipWarmUntil = 0;
 
   const send = message => chrome.runtime.sendMessage(message).catch(() => null);
 
   // ---------------------------------------------------------------------------
-  // Rendering & position
+  // Rendering
   // ---------------------------------------------------------------------------
   const isOpen = () => mode === 'expanded' || mode === 'details';
   function render() {
     dockEl.hidden = mode === 'hidden';
+    dockEl.dataset.mode = mode;
     const open = isOpen();
     const connected = !!dockState?.connected;
+    // The bookmark tab is the collapsed dock; open, the toolbar replaces it.
+    $('.pill').hidden = open;
     $('.actions').hidden = !open || !connected;
     $('.signin').hidden = !open || connected;
     // I5: saves made without an account (1.7.12 allowed it) are still in this
@@ -123,49 +143,38 @@
     if (!open || !connected) { closeMenus(); stopHighlighting(); closeNote(true, false); }
     place();
   }
-  function closeMenus() { for (const menu of root.querySelectorAll('.menu')) menu.hidden = true; }
+  function closeMenus() { for (const menu of root.querySelectorAll('.menu')) menu.hidden = true; $('[data-action="more"]').setAttribute('aria-expanded', 'false'); }
   function status(text, tone = '') {
     const el = $('.dock > .status'); el.hidden = !text; el.textContent = text; el.dataset.tone = tone;
-    place(); // the dock's width changed: keep it anchored where it sits
+    place(); // the dock's width changed: move what sits next to it
   }
-  function size() { const r = dockEl.getBoundingClientRect(); return { w: r.width || 48, h: r.height || 42 }; }
-  // Shared by place() (render) and setPosition() (what gets persisted) so
-  // the two can never clamp differently.
-  function clamp(left, top) {
-    const { w, h } = size();
-    return { left: Math.min(Math.max(0, left), Math.max(0, innerWidth - w)), top: Math.min(Math.max(0, top), Math.max(0, innerHeight - h)) };
-  }
+  // The dock anchors itself (CSS); this only places what opens next to it.
   function place() {
     if (dockEl.hidden) { toastEl.hidden = true; return; }
-    const { w, h } = size();
-    const raw = pos ? { left: pos.fx * innerWidth, top: pos.fy * innerHeight } : { left: innerWidth - w - EDGE, top: innerHeight - h - EDGE };
-    const { left, top } = clamp(raw.left, raw.top);
-    dockEl.style.left = left + 'px'; dockEl.style.top = top + 'px';
-    // Popovers open above the dock, or below it when it sits near the top.
-    const below = top < 220;
-    for (const el of root.querySelectorAll('.menu')) el.classList.toggle('below', below);
     if (frame) placeCard();
     if (noteFrame) placeNote();
     if (!toastEl.hidden) placeToast();
   }
-  function setPosition(left, top, persist = true) {
-    // Clamp before storing the fraction, not just before rendering: a drag
-    // or arrow-key move that ends outside the viewport must persist where
-    // the dock actually landed (the edge), not a fraction outside 0..1 that
-    // the background's dock-position handler rejects.
-    const clamped = clamp(left, top);
-    pos = { fx: clamped.left / innerWidth, fy: clamped.top / innerHeight }; place();
-    // The dock cannot touch chrome.storage directly (it would sit next to
-    // account credentials); the background is the only trusted holder of
-    // where the dock sits, so persistence goes through a message.
-    if (persist) void send({ kind: 'dock-position', pos });
+  const shown = el => !!el && el.getClientRects().length > 0;
+  // The dock's vertical slide (appearing, or the tab's hover lift) right now.
+  const shift = () => new DOMMatrixReadOnly(getComputedStyle(dockEl).transform).m42 || 0;
+  // Where the dock rests: what opens next to it is placed against this, so a
+  // toast placed mid-slide never ends up over the tab.
+  function dockBox() { const r = dockEl.getBoundingClientRect(), dy = shift(); return { left: r.left, right: r.right, top: r.top - dy, bottom: r.bottom - dy }; }
+  // Keyboard focus lands on the tab when collapsed, else the first control.
+  function focusHome() {
+    const target = [$('.pill'), ...root.querySelectorAll('.actions > button, .signin > button')].find(shown);
+    target?.focus({ preventScroll: true });
   }
   function setMode(next) {
     // Keep keyboard focus inside the dock when it was there already; never
     // pull it away from the page (e.g. when the dock collapses by itself).
     const hadFocus = !!root.activeElement;
-    mode = next; render();
-    if (next === 'collapsed' && hadFocus) $('.pill').focus({ preventScroll: true });
+    mode = next; hideTip();
+    // The tab has no room for a message, and it would be stale on reopening.
+    if (!isOpen()) status('');
+    render();
+    if (hadFocus && next !== 'hidden' && (next === 'collapsed' || !shown(root.activeElement))) focusHome();
   }
 
   // ---------------------------------------------------------------------------
@@ -244,7 +253,7 @@
   const composing = () => !!noteFrame;
   function openComposer() { closeMenus(); stopHighlighting(); status(''); void send({ kind: 'dock-note' }); }
   function placeNote() {
-    const d = dockEl.getBoundingClientRect(), h = Math.min(Number(noteFrame.dataset.height || 132), innerHeight - 24);
+    const d = dockBox(), h = Math.min(Number(noteFrame.dataset.height || 132), innerHeight - 24);
     noteFrame.style.height = h + 'px';
     noteFrame.style.left = Math.min(Math.max(8, d.right - 320), innerWidth - 328) + 'px';
     const above = d.top - h - 8;
@@ -281,7 +290,7 @@
   // ---------------------------------------------------------------------------
   const TOAST_MS = 5000;
   function placeToast() {
-    const d = dockEl.getBoundingClientRect(), t = toastEl.getBoundingClientRect();
+    const d = dockBox(), t = toastEl.getBoundingClientRect();
     const above = d.top - t.height - 8;
     toastEl.style.left = Math.max(8, d.right - t.width) + 'px';
     toastEl.style.top = (above >= 8 ? above : Math.min(d.bottom + 8, innerHeight - t.height - 8)) + 'px';
@@ -314,7 +323,7 @@
   // background, which checks the card's one-time grant for this tab.
   // ---------------------------------------------------------------------------
   function placeCard() {
-    const d = dockEl.getBoundingClientRect(), h = Number(frame.dataset.height || 420);
+    const d = dockBox(), h = Number(frame.dataset.height || 420);
     const height = Math.min(h, innerHeight - 24);
     const left = Math.min(Math.max(8, d.right - 380), innerWidth - 388);
     const above = d.top - height - 8;
@@ -340,7 +349,7 @@
     // ready even when it shows an error, so its own message stays on screen.
     readyTimer = setTimeout(() => { closeCard(); setMode('expanded'); status('FoundKeep could not open details on this page. Edit this save in your library.', 'error'); }, 3000);
   }
-  // M4: a card that had keyboard focus hands it back to the pill when it
+  // M4: a card that had keyboard focus hands it back to the dock when it
   // closes, instead of dropping it on the page's <body>.
   function closeCard(notify = true) {
     clearTimeout(readyTimer);
@@ -348,7 +357,7 @@
     const focused = root.activeElement === frame;
     frame.remove(); frame = null;
     if (notify) void send({ kind: 'dock-details-closed' });
-    if (focused) $('.pill').focus({ preventScroll: true });
+    if (focused) focusHome();
   }
 
   // ---------------------------------------------------------------------------
@@ -356,10 +365,11 @@
   // ---------------------------------------------------------------------------
   root.addEventListener('click', event => {
     if (!event.isTrusted) return;
+    hideTip();
     const button = event.target.closest?.('button[data-action]'); if (!button) return;
     const action = button.dataset.action;
     if (action === 'expand') return void setMode(mode === 'collapsed' ? 'expanded' : mode === 'details' ? 'details' : 'collapsed');
-    if (action === 'more') { const menu = $('[data-menu="more"]'); const open = menu.hidden; closeMenus(); menu.hidden = !open; return; }
+    if (action === 'more') { const menu = $('[data-menu="more"]'); const open = menu.hidden; closeMenus(); menu.hidden = !open; button.setAttribute('aria-expanded', String(open)); return; }
     closeMenus();
     if (action === 'details') { hideToastOnly(); return void send({ kind: 'dock-details' }); }
     if (action === 'highlight') {
@@ -377,28 +387,52 @@
     if (action === 'local-move' || action === 'local-later') return void send({ kind: 'dock-local', choice: action === 'local-move' ? 'move' : 'later' });
   });
   function hideToastOnly() { clearTimeout(toastTimer); toastEl.hidden = true; }
-  // Drag by the grip with pointer capture.
-  const grip = $('.grip');
-  grip.addEventListener('pointerdown', event => {
-    if (!event.isTrusted || event.button !== 0) return;
-    const start = dockEl.getBoundingClientRect(), dx = event.clientX - start.left, dy = event.clientY - start.top;
-    grip.setPointerCapture(event.pointerId);
-    const move = e => { if (e.isTrusted) setPosition(e.clientX - dx, e.clientY - dy, false); };
-    const up = e => { grip.releasePointerCapture(e.pointerId); grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up);
-      const r = dockEl.getBoundingClientRect(); setPosition(r.left, r.top); };
-    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up);
+  // ---------------------------------------------------------------------------
+  // Tooltips: each icon-only control says what it does on hover (after a
+  // short delay, then at once while moving along the toolbar) and on
+  // keyboard focus. Never over a menu, card or note field above the dock.
+  // ---------------------------------------------------------------------------
+  const TIP_DELAY = 450, TIP_WARM = 500;
+  function tipText(button) {
+    if (button.dataset.action === 'highlight' && highlighting) return 'Stop highlighting';
+    if (button.dataset.action === 'note' && composing()) return 'Close note';
+    return button.dataset.tip;
+  }
+  function showTip(button, now = false) {
+    if (tipFor === button) return;
+    clearTimeout(tipTimer); tipFor = button;
+    const open = () => {
+      if (!isOpen() || !shown(button) || frame || noteFrame || !$('[data-menu="more"]').hidden) return hideTip();
+      tipEl.textContent = tipText(button); tipEl.hidden = false;
+      const b = button.getBoundingClientRect(), t = tipEl.getBoundingClientRect(), top = b.top - shift();
+      tipEl.style.left = Math.min(Math.max(8, b.left + b.width / 2 - t.width / 2), innerWidth - t.width - 8) + 'px';
+      tipEl.style.top = Math.max(8, top - t.height - 8) + 'px';
+    };
+    if (now || Date.now() < tipWarmUntil) open(); else tipTimer = setTimeout(open, TIP_DELAY);
+  }
+  function hideTip() {
+    clearTimeout(tipTimer); tipFor = null;
+    if (!tipEl.hidden) tipWarmUntil = Date.now() + TIP_WARM;
+    tipEl.hidden = true;
+  }
+  root.addEventListener('pointerover', event => {
+    const button = event.isTrusted && event.pointerType !== 'touch' && event.target.closest?.('[data-tip]');
+    if (button) showTip(button);
   });
-  grip.addEventListener('keydown', event => {
-    if (!event.isTrusted) return;
-    const step = event.shiftKey ? 64 : 16, r = dockEl.getBoundingClientRect();
-    const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
-    if (delta) { event.preventDefault(); setPosition(r.left + delta[0], r.top + delta[1]); }
-    if (event.key === 'Home') { event.preventDefault(); pos = null; void send({ kind: 'dock-position', reset: true }); place(); }
+  root.addEventListener('pointerout', event => {
+    const button = event.target.closest?.('[data-tip]');
+    if (button && !button.contains(event.relatedTarget)) hideTip();
   });
+  root.addEventListener('focusin', event => {
+    const button = event.target.closest?.('[data-tip]');
+    if (button?.matches(':focus-visible')) showTip(button, true); else hideTip();
+  });
+  root.addEventListener('focusout', hideTip);
   // Esc closes the innermost thing first: the note field, then highlighter
   // mode, then the expanded dock.
   document.addEventListener('keydown', event => {
     if (!event.isTrusted || event.key !== 'Escape') return;
+    hideTip();
     if (composing()) { closeNote(); return; }
     if (highlighting) { stopHighlighting(); return; }
     if (mode === 'expanded') setMode('collapsed');
@@ -446,7 +480,8 @@
             if (!highlighting) status('');
             showToast();
           } else {
-            if (mode === 'hidden') setMode('expanded');
+            // The collapsed tab has no room for a message: open the toolbar.
+            if (mode === 'hidden' || mode === 'collapsed') setMode('expanded');
             status(message.text || '', message.tone || '');
           }
           respond({ shown: true });
@@ -498,7 +533,6 @@
   window.__foundkeepDock = {
     state: () => mode,
     rect: selector => { const r = root.querySelector(selector)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : { x: 0, y: 0, width: 0, height: 0 }; },
-    position: () => { const r = dockEl.getBoundingClientRect(); return { left: Math.round(r.left), top: Math.round(r.top) }; },
     focused: () => root.activeElement?.className || root.activeElement?.dataset?.action || null,
     visible: () => host.style.visibility !== 'hidden' && host.style.display !== 'none',
     status: () => $('.dock > .status')?.textContent || '',
@@ -530,13 +564,12 @@
       const box = el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
       return {
         css: CSS, html: copy.innerHTML, viewport: { width: innerWidth, height: innerHeight },
-        boxes: [...root.querySelectorAll('.dock, .toast, .menu, .card, .note-card, .flash')].map(box).filter(r => r.width && r.height),
+        boxes: [...root.querySelectorAll('.dock, .toast, .menu, .tip, .card, .note-card, .flash')].map(box).filter(r => r.width && r.height),
         frames: [...root.querySelectorAll('iframe')].map(f => ({ src: f.src, ...box(f) })),
       };
     },
   };
   document.documentElement.append(host);
-  void send({ kind: 'dock-position' }).then(stored => { pos = stored || null; place(); });
   // helloRequest keeps its own .then so a reply that arrives after
   // dockReady's 2s bound still updates dockState and re-renders.
   const helloRequest = send({ kind: 'dock-hello' });

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { dockWorld } from './helpers/dock-world.mjs';
-import { pollUntil } from './helpers/poll.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 
 const CONNECTED_STATE = {
@@ -15,7 +14,7 @@ const CONNECTED_STATE = {
   show: false,
 };
 
-test('dock: collapsed pill, expand, keyboard, drag and position memory, page scripts cannot drive it', { timeout: 45000 }, async t => {
+test('dock: bookmark tab, icon-only toolbar with tooltips, keyboard, page scripts cannot drive it', { timeout: 45000 }, async t => {
   const extension = process.env.FOUNDKEEP_TEST_EXTENSION || path.resolve('apps/extension');
   const profile = await mkdtemp('/tmp/foundkeep-dock-ui-'); let context;
   t.after(async () => { await context?.close(); await rm(profile, { recursive: true, force: true }); });
@@ -48,17 +47,53 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   assert.equal(await dock.evaluate(`__foundkeepDock.state()`), 'collapsed', 'a synthetic click must not expand the dock');
   // R10: the dock must never read chrome.storage itself — the background
   // (protectCloudStorage) keeps storage.local at TRUSTED_CONTEXTS so
-  // account credentials never reach a content script; the dock's own
-  // position persistence goes through the dock-position message instead.
+  // account credentials never reach a content script.
   assert.equal(await dock.evaluate(`chrome.storage.local.get(null).then(() => 'readable', () => 'blocked')`), 'blocked');
-  // Default bottom-right, 16px from the edges. R4: measure the .dock rect,
-  // not .pill — the pill sits inside the dock's 1px border + 2px padding.
-  const dockRect = await dock.evaluate(`__foundkeepDock.rect('.dock')`);
-  assert.equal(Math.round(1200 - (dockRect.x + dockRect.width)), 16); assert.equal(Math.round(800 - (dockRect.y + dockRect.height)), 16);
+  // Collapsed: a bookmark tab at the bottom-right, 16px from the right edge,
+  // tucked into the bottom edge (it slides up into place and rests 5px
+  // below it). No drag grip.
+  await dock.waitFor(`(() => { const r = __foundkeepDock.rect('.dock'); return Math.round(r.y + r.height) === 805; })()`);
+  const tab = await dock.evaluate(`__foundkeepDock.rect('.dock')`);
+  assert.equal(Math.round(1200 - (tab.x + tab.width)), 16);
+  assert.ok(tab.y < 800 && tab.y + tab.height > 800, 'the tab sits in the bottom edge: ' + JSON.stringify(tab));
+  assert.doesNotMatch((await dock.evaluate(`__foundkeepDock.snapshot()`)).html, /grip/);
+  // Hovering the tab lifts it flush with the edge.
+  const pill = await dock.evaluate(`__foundkeepDock.rect('.pill')`);
+  await web.mouse.move(pill.x + pill.width / 2, pill.y + 8);
+  await dock.waitFor(`(() => { const r = __foundkeepDock.rect('.dock'); return Math.round(r.y + r.height) === 800; })()`);
   await dock.click('.pill');
   await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
-  for (const action of ['savepage', 'highlight', 'screenshot', 'note', 'library', 'more'])
+  // Open: an icon-only toolbar 16px from the corner, without the tab's mark.
+  await web.mouse.move(200, 200);
+  await dock.waitFor(`(() => { const r = __foundkeepDock.rect('.dock'); return Math.round(800 - (r.y + r.height)) === 16; })()`);
+  const bar = await dock.evaluate(`__foundkeepDock.rect('.dock')`);
+  assert.equal(Math.round(1200 - (bar.x + bar.width)), 16);
+  assert.equal(await dock.evaluate(`__foundkeepDock.rect('.pill').width`), 0, 'no bookmark mark beside Save page');
+  for (const action of ['savepage', 'highlight', 'screenshot', 'note', 'library', 'more']) {
     assert.ok(await dock.evaluate(`!!__foundkeepDock.rect('[data-action="${action}"]').width`), action);
+    assert.equal((await dock.evaluate(`__foundkeepDock.text('[data-action="${action}"]')`)).trim(), '', `${action} is icon-only`);
+    assert.ok(await dock.evaluate(`__foundkeepDock.attr('[data-action="${action}"]', 'aria-label')`), `${action} is named`);
+  }
+  // Hovering an icon shows what it does, above it; moving along the toolbar
+  // switches at once; moving away hides it.
+  const tipShown = `__foundkeepDock.rect('.tip').width > 0`;
+  const hoverAction = async action => { const r = await dock.evaluate(`__foundkeepDock.rect('[data-action="${action}"]')`); await web.mouse.move(r.x + r.width / 2, r.y + r.height / 2, { steps: 3 }); return r; };
+  const highlightRect = await hoverAction('highlight');
+  await dock.waitFor(tipShown, 2000);
+  assert.equal(await dock.evaluate(`__foundkeepDock.text('.tip')`), 'Highlight text to save it');
+  const tip = await dock.evaluate(`__foundkeepDock.rect('.tip')`);
+  assert.ok(tip.y + tip.height <= highlightRect.y, 'the tooltip sits above the icon');
+  await hoverAction('library');
+  await dock.waitFor(`__foundkeepDock.text('.tip') === 'Open your library' && ${tipShown}`, 300);
+  await web.mouse.move(200, 200);
+  await dock.waitFor(`!(${tipShown})`, 1000);
+  // ⋯ looks pressed while its menu is open.
+  await dock.click('[data-action="more"]');
+  assert.equal(await dock.evaluate(`__foundkeepDock.attr('[data-action="more"]', 'aria-expanded')`), 'true');
+  assert.ok(await dock.evaluate(`__foundkeepDock.rect('[data-menu="more"]').height > 0`));
+  await dock.click('[data-action="more"]');
+  assert.equal(await dock.evaluate(`__foundkeepDock.attr('[data-action="more"]', 'aria-expanded')`), 'false');
+  await web.mouse.move(200, 200);
   // Screenshot goes straight to region selection: no Region / Full page popover.
   assert.equal(await dock.evaluate(`__foundkeepDock.rect('[data-menu="screenshot"]').height`), 0);
   assert.equal(await dock.evaluate(`__foundkeepDock.attr('[data-action="screenshot"]', 'aria-haspopup')`), null);
@@ -69,21 +104,21 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
   // (R1 negative case — the toggle never collapses a dock whose details card
   // is open — lives in tests/extension-review.mjs, which opens a real card.)
-  // Keyboard: Escape collapses and returns focus to the pill.
+  // Keyboard: Escape collapses and returns focus to the tab. (The mouse is
+  // parked away first: the toolbar slides through wherever the tab was.)
+  await web.mouse.move(200, 200);
   await web.keyboard.press('Escape');
   await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);
-  assert.equal(await dock.evaluate(`__foundkeepDock.focused()`), 'pill', 'Escape returns focus to the pill');
-  // Tab reaches every toolbar control in order.
-  await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
-  const reached = [];
-  for (let i = 0; i < 7; i++) { await web.keyboard.press('Tab'); reached.push(await dock.evaluate(`__foundkeepDock.focused()`)); }
-  for (const action of ['savepage', 'highlight', 'screenshot', 'note', 'library', 'more']) assert.ok(reached.includes(action), `Tab reaches ${action}: ${reached}`);
-  await web.keyboard.press('Escape'); await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);
-  // Design review (scripts/design/dock-review.mjs) copies the shadow root
-  // through the isolated-world handle — stylesheet and markup, keyboard focus
-  // marked — while the page still cannot reach the handle.
-  await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
-  await web.keyboard.press('Tab');
+  assert.equal(await dock.evaluate(`__foundkeepDock.focused()`), 'pill', 'Escape returns focus to the tab');
+  // Enter on the tab opens the toolbar with focus on its first control,
+  // whose tooltip shows at once; Tab reaches every other control.
+  await web.keyboard.press('Enter');
+  await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
+  await dock.waitFor(`__foundkeepDock.focused() === 'savepage'`);
+  await dock.waitFor(`__foundkeepDock.text('.tip') === 'Save this page' && ${tipShown}`, 1000);
+  // Design review (scripts/design/capture-extension.mjs) copies the shadow
+  // root through the isolated-world handle — stylesheet and markup, keyboard
+  // focus marked — while the page still cannot reach the handle.
   const snapshot = await dock.evaluate(`__foundkeepDock.snapshot()`);
   assert.match(snapshot.css, /\.dock\{position:fixed/);
   assert.match(snapshot.html, /<button data-action="savepage"[^>]*data-fk-focus-visible/);
@@ -91,67 +126,14 @@ test('dock: collapsed pill, expand, keyboard, drag and position memory, page scr
   assert.deepEqual(snapshot.viewport, { width: 1200, height: 800 });
   assert.ok(snapshot.boxes.some(box => box.width > 200), JSON.stringify(snapshot.boxes));
   assert.equal(await web.evaluate(() => typeof window.__foundkeepDock), 'undefined', 'the page cannot see the handle');
+  const reached = [];
+  for (let i = 0; i < 6; i++) { await web.keyboard.press('Tab'); reached.push(await dock.evaluate(`__foundkeepDock.focused()`)); }
+  for (const action of ['highlight', 'screenshot', 'note', 'library', 'more']) assert.ok(reached.includes(action), `Tab reaches ${action}: ${reached}`);
   await web.keyboard.press('Escape'); await dock.waitFor(`__foundkeepDock.state() === 'collapsed'`);
-  // Drag by the grip, then reload and summon again: the position is remembered.
-  await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
-  const grip = await dock.evaluate(`__foundkeepDock.rect('.grip')`);
-  await web.mouse.move(grip.x + 5, grip.y + 5); await web.mouse.down(); await web.mouse.move(300, 200, { steps: 8 }); await web.mouse.up();
-  const moved = await dock.evaluate(`__foundkeepDock.position()`);
-  assert.ok(moved.left < 400 && moved.top < 300, JSON.stringify(moved));
-  // Arrow keys move 16px, Shift+Arrow 64px, Home resets.
-  await dock.click('.grip'); await web.keyboard.press('ArrowRight');
-  assert.equal((await dock.evaluate(`__foundkeepDock.position()`)).left, moved.left + 16);
-  await web.keyboard.press('Shift+ArrowDown');
-  assert.equal((await dock.evaluate(`__foundkeepDock.position()`)).top, moved.top + 64);
-  await web.reload();
-  await worker.evaluate(async ({ id, state }) => {
-    await chrome.scripting.executeScript({ target: { tabId: id }, files: ['src/dock/dock.js'] });
-    await chrome.tabs.sendMessage(id, { kind: 'dock-show' });
-    await chrome.tabs.sendMessage(id, { kind: 'dock-state', state });
-  }, { id: tabId, state: CONNECTED_STATE });
-  const again = await dockWorld(web, extensionId); await again.waitFor(`__foundkeepDock.state() === 'collapsed'`);
-  const kept = await again.evaluate(`__foundkeepDock.position()`);
-  assert.equal(kept.left, moved.left + 16); assert.equal(kept.top, moved.top + 64);
-  await again.click('.pill'); await again.click('.grip'); await web.keyboard.press('Home');
-  const reset = await again.evaluate(`__foundkeepDock.rect('.dock')`);
-  assert.equal(Math.round(1200 - (reset.x + reset.width)), 16);
-  // A drag ending outside the viewport must persist where the dock actually
-  // landed (the clamped edge, flush with 0 margin) rather than an
-  // out-of-range fraction the background's dock-position handler rejects —
-  // which would otherwise silently fall back to the default position (with
-  // its 16px margin) on the next reload. Collapse first: the expanded dock
-  // is much wider, so "flush with the edge" is only comparable across the
-  // drag and the reload check below when both read the same (collapsed) width.
-  await again.click('.pill'); await again.waitFor(`__foundkeepDock.state() === 'collapsed'`);
-  const edgeGrip = await again.evaluate(`__foundkeepDock.rect('.grip')`);
-  await web.mouse.move(edgeGrip.x + 5, edgeGrip.y + 5); await web.mouse.down();
-  await web.mouse.move(5000, 400, { steps: 8 }); await web.mouse.up();
-  const draggedToEdge = await again.evaluate(`__foundkeepDock.rect('.dock')`);
-  assert.equal(Math.round(1200 - (draggedToEdge.x + draggedToEdge.width)), 0, 'dragging past the right edge clamps flush to it: ' + JSON.stringify(draggedToEdge));
-  // setPosition's persist message is fire-and-forget from the dock's side;
-  // wait for it to actually land in storage before reloading, or the reload
-  // can race ahead of it and observe the previous (or default) position.
-  await pollUntil(worker, async () => {
-    const stored = (await chrome.storage.local.get('foundkeep-dock-position'))['foundkeep-dock-position'];
-    return !!stored && stored.fx > 0.9;
-  }, null);
-  await web.reload();
-  await worker.evaluate(async ({ id, state }) => {
-    await chrome.scripting.executeScript({ target: { tabId: id }, files: ['src/dock/dock.js'] });
-    await chrome.tabs.sendMessage(id, { kind: 'dock-show' });
-    await chrome.tabs.sendMessage(id, { kind: 'dock-state', state });
-  }, { id: tabId, state: CONNECTED_STATE });
-  const afterEdgeDrag = await dockWorld(web, extensionId);
-  await afterEdgeDrag.waitFor(`__foundkeepDock.state() === 'collapsed'`);
-  const persistedEdge = await afterEdgeDrag.evaluate(`__foundkeepDock.rect('.dock')`);
-  assert.equal(Math.round(1200 - (persistedEdge.x + persistedEdge.width)), 0, 'the clamped edge position, not the default, survives a reload: ' + JSON.stringify(persistedEdge));
-  // Resizing the window keeps the dock inside the viewport. The resize
-  // handler runs on the next event-loop turn after Playwright applies the
-  // new viewport, so wait for the clamp rather than reading the rect
-  // immediately (R9: poll through the dock world instead of a raw
-  // page.waitForFunction, which never awaits an async predicate anyway).
+  // A small window keeps both shapes inside the viewport.
   await web.setViewportSize({ width: 500, height: 400 });
-  await afterEdgeDrag.waitFor(`(() => { const r = __foundkeepDock.rect('.dock'); return r.x >= 0 && r.x + r.width <= 500 && r.y + r.height <= 400; })()`);
-  const clamped = await afterEdgeDrag.evaluate(`__foundkeepDock.rect('.dock')`);
-  assert.ok(clamped.x >= 0 && clamped.x + clamped.width <= 500 && clamped.y + clamped.height <= 400, JSON.stringify(clamped));
+  await dock.waitFor(`(() => { const r = __foundkeepDock.rect('.dock'); return r.x >= 0 && r.x + r.width <= 500 && r.y < 400; })()`);
+  await dock.click('.pill'); await dock.waitFor(`__foundkeepDock.state() === 'expanded'`);
+  await web.mouse.move(100, 100);
+  await dock.waitFor(`(() => { const r = __foundkeepDock.rect('.dock'); return r.x >= 0 && r.x + r.width <= 500 && r.y + r.height <= 400; })()`);
 });

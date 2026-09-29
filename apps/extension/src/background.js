@@ -118,6 +118,8 @@ chrome.runtime.onInstalled.addListener((details) => {
     .catch(() => {});
   resumeBookmarkImport().catch(() => {});
   reconcileAlwaysOn().catch(() => {});
+  // 1.8.0 remembered where the dock was dragged; the dock no longer moves.
+  if (details?.reason === "update") chrome.storage.local.remove("foundkeep-dock-position").catch(() => {});
 });
 chrome.runtime.onStartup?.addListener(() => {
   getEffectivePreferences()

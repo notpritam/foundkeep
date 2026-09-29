@@ -281,7 +281,7 @@ test('details: after the account changes, the card cannot edit the earlier accou
   assert.equal((await localCaptures(ext))[0].sourceTitle, 'Details fixture');
 });
 
-test('details: keyboard — Add details moves focus into the card, and Esc returns it to the pill (M4)', { timeout: 40000 }, async t => {
+test('details: keyboard — Add details moves focus into the card, and Esc returns it to the toolbar (M4)', { timeout: 40000 }, async t => {
   const { web, dock } = await saveAndOpen(t, '__keys');
   await dock.click('[data-action="savepage"]');
   await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 10000);
@@ -299,7 +299,7 @@ test('details: keyboard — Add details moves focus into the card, and Esc retur
   assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture (typed)');
   await web.keyboard.press('Escape');
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
-  await dock.waitFor("__foundkeepDock.focused() === 'pill'");
+  await dock.waitFor("__foundkeepDock.focused() === 'savepage'");
 });
 
 test('dock-ui: the toolbar-icon toggle never collapses a dock with the details card open', { timeout: 30000 }, async t => {
