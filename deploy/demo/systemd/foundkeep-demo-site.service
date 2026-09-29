@@ -1,0 +1,15 @@
+[Unit]
+Description=FoundKeep live demo — dashboard (:8819, loopback)
+After=foundkeep-demo-backend.service
+
+[Service]
+WorkingDirectory=%h/.local/share/foundkeep-demo/site/current/apps/site
+Environment=PORT=8819
+Environment=HOSTNAME=127.0.0.1
+Environment=FOUNDKEEP_BACKEND_URL=http://127.0.0.1:8817
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

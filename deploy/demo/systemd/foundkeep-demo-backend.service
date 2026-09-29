@@ -1,0 +1,14 @@
+[Unit]
+Description=FoundKeep live demo — throwaway backend (:8817, loopback)
+
+[Service]
+WorkingDirectory=@REPO@/apps/backend
+Environment=ATLAS_PORT=8817
+Environment=ATLAS_HOST=127.0.0.1
+Environment=ATLAS_DATA_DIR=%h/.local/share/foundkeep-demo/data
+Environment=ATLAS_CUSTOMER_ORIGINS=https://omni--8818.getbb.app,http://127.0.0.1:8818
+ExecStart=%h/.bun/bin/bun run src/index.ts
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

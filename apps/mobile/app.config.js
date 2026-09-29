@@ -13,6 +13,8 @@ module.exports = ({ config }) => {
       intentFilters: [{ action: 'VIEW', autoVerify: true, category: ['BROWSABLE', 'DEFAULT'], data: [{ scheme: 'https', host: new URL(variant.origin).hostname, pathPrefix: '/open' }] }] },
     plugins: [...config.plugins.filter(plugin => (Array.isArray(plugin) ? plugin[0] : plugin) !== 'expo-sharing' && (Array.isArray(plugin) ? plugin[0] : plugin) !== 'expo-secure-store'),
       ['expo-sharing', { android: { enabled: true, singleShareMimeTypes: ['text/*', 'image/*', 'video/*', 'audio/*', 'application/*'], multipleShareMimeTypes: ['image/*', 'video/*', 'audio/*', 'application/*'] }, ios: { enabled: false } }], 'expo-secure-store', 'expo-system-ui', './plugins/withFoundkeepTheme.cjs'],
+    // Storybook's live demo serves the web build under a path (e.g. /app).
+    ...(process.env.FOUNDKEEP_WEB_BASE_URL ? { experiments: { ...config.experiments, baseUrl: process.env.FOUNDKEEP_WEB_BASE_URL } } : {}),
     extra: { ...config.extra, foundkeep: variant, eas: { ...config.extra.eas,
       build: { experimental: { ios: { appExtensions: [{ targetName: 'FoundkeepShare', bundleIdentifier: `${variant.iosBundle}.ShareExtension`, entitlements }] } } } } },
   };

@@ -1,0 +1,10 @@
+[Unit]
+Description=FoundKeep live demo — gateway (:8818, public through bb Connect)
+After=foundkeep-demo-site.service
+
+[Service]
+ExecStart=/usr/bin/node %h/.local/share/foundkeep-demo/gateway.mjs
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

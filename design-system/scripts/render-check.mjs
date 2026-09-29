@@ -23,7 +23,8 @@ const jobs = Number(option('jobs') || 4);
 const axeSource = await readFile(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 
 const index = await fetch(base + '/index.json').then(r => { if (!r.ok) throw new Error(`${base}/index.json: ${r.status}`); return r.json(); });
-const stories = Object.values(index.entries).filter(e => e.type === 'story' && (!only || (e.title + ' ' + e.name).toLowerCase().includes(only.toLowerCase())));
+// Live stories need the demo services (deploy/demo); deploy/demo/smoke.mjs covers them.
+const stories = Object.values(index.entries).filter(e => e.type === 'story' && !(e.tags || []).includes('live') && (!only || (e.title + ' ' + e.name).toLowerCase().includes(only.toLowerCase())));
 if (!stories.length) { console.error('No stories matched.'); process.exit(1); }
 
 const browser = await chromium.launch({ channel: 'chromium', headless: true, args: ['--no-sandbox'] });
