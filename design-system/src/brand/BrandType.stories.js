@@ -57,7 +57,7 @@ function brand() {
 
 const KEEP = [
   ['keep-serif', 'SF Pro + Instrument Serif italic'],
-  ['keep-hand', 'SF Pro + Caveat, tilted'],
+  ['keep-hand', 'SF Pro + Caveat, tilted (chosen)'],
   ['keep-mono', 'SF Pro + Space Mono, in a field'],
   ['keep-soft', 'Instrument Serif + SF Pro Heavy'],
   ['keep-weight', 'SF Pro only, light over black'],
