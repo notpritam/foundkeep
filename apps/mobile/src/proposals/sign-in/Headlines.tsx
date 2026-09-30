@@ -112,22 +112,21 @@ export const KEEP_STYLES: Record<KeepStyle, { label: string; lead: Face; word: W
 };
 
 /** Sizes and letter spacing Pritam tunes in Storybook Controls; unset values keep the style's own. */
-export type Tune = { leadSize?: number; leadSpacing?: number; wordSize?: number; wordSpacing?: number; subSize?: number };
+export type Tune = { leadSize?: number; leadSpacing?: number; wordSize?: number; wordSpacing?: number };
 function tuned(style: (typeof KEEP_STYLES)[KeepStyle], t: Tune = {}) {
   const lead: Face = { ...style.lead, ...(t.leadSize ? { fontSize: t.leadSize, lineHeight: Math.round(t.leadSize * 1.15) } : null), ...(t.leadSpacing != null ? { letterSpacing: t.leadSpacing } : null) };
   // The word size is the base word's; per-find words keep their proportions to it.
   const scale = t.wordSize ? t.wordSize / style.word.face.fontSize : 1;
   const word = (w: Word): Word => ({ ...w, face: { ...w.face, fontSize: Math.round(w.face.fontSize * scale), lineHeight: Math.round(w.face.lineHeight * scale), ...(t.wordSpacing != null ? { letterSpacing: t.wordSpacing } : null) } });
-  const sub = t.subSize ? { fontSize: t.subSize, lineHeight: Math.round(t.subSize * 1.45) } : null;
-  return { lead, word: word(style.word), per: style.per && Object.fromEntries(Object.entries(style.per).map(([k, w]) => [k, word(w)])), sub };
+  return { lead, word: word(style.word), per: style.per && Object.fromEntries(Object.entries(style.per).map(([k, w]) => [k, word(w)])) };
 }
 
 const WORDS = [{ word: 'link.', color: INK.butter }, { word: 'photo.', color: INK.peach }, { word: 'highlight.', color: INK.mint }, { word: 'voice memo.', color: INK.ice }, { word: 'idea.', color: INK.lilac }];
 /** C: "Keep every …" — the thing you keep keeps changing: link, photo, highlight… in its own colour. */
-export function RotatingHeadline({ start, motion, sub, subColor, keep = 'serif', tune, shadow = false }: Props & { keep?: KeepStyle; tune?: Tune }) {
+export function RotatingHeadline({ start, motion, keep = 'serif', tune, shadow = false }: Omit<Props, 'sub' | 'subColor'> & { keep?: KeepStyle; tune?: Tune }) {
   const glow = shadow ? SHADOW : null;
   const style = tuned(KEEP_STYLES[keep], tune);
-  const [l1, l2, s] = useEntrance([380, 520, 760], start, motion);
+  const [l1, l2] = useEntrance([380, 520], start, motion);
   const [index, setIndex] = useState(0);
   const turn = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -154,7 +153,6 @@ export function RotatingHeadline({ start, motion, sub, subColor, keep = 'serif',
         <Text maxFontSizeMultiplier={1.3} style={[word.face, styles.centred, { color: word.ink ?? current.color }, word.ink ? null : glow]}>{current.word}</Text>
       </Animated.View>
     </Animated.View>
-    <Animated.View style={rise(s, 10)}><Text maxFontSizeMultiplier={1.4} style={[styles.subCenter, style.sub, { color: subColor }, glow]}>{sub}</Text></Animated.View>
   </View>;
 }
 
