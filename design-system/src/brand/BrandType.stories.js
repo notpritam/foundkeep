@@ -28,7 +28,6 @@ function brand() {
     <section class="bt-specimen" aria-label="Type specimen">
       <div class="bt-poster" style="background-image:url(${sky})">
         <h2>Found it? Keep it.</h2>
-        <p>One private place for everything you find.</p>
       </div>
       <div class="bt-text">
         <h3>A place for the things worth keeping.</h3>

@@ -41,10 +41,10 @@ const ABOVE: Find[] = [
   { source: require('../../../assets/images/finds/tag.webp'), x: 0.8, y: 0.52, size: 70, rotate: 9, depth: 1, delay: 470, period: 8.1 },
 ];
 const LAYOUT: Record<HeadlineType, 'centre' | 'left'> = { highlighter: 'left', tags: 'centre', rotating: 'centre', stack: 'left' };
-const SUB: Record<HeadlineType, string> = {
+// Rotating finds has no line under it (Pritam, 2026-09-30): the words say it.
+const SUB: Record<Exclude<HeadlineType, 'rotating'>, string> = {
   highlighter: 'Pages, posts, photos and notes, kept in one private place.',
   tags: 'Everything you find, organised for you.',
-  rotating: 'One private place for everything you find.',
   stack: 'A private library for everything you find.',
 };
 
@@ -149,7 +149,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, bac
         {type === 'highlighter' ? <HighlighterHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'tags' ? <TagsHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'stack' ? <StackHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
-          : <RotatingHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} keep={keep} tune={tune} shadow={!!backdrop} />}
+          : <RotatingHeadline start={fontsReady} motion={motion} keep={keep} tune={tune} shadow={!!backdrop} />}
       </View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
         {providers.map((provider, i) => {

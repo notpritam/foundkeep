@@ -11,9 +11,9 @@ const BACKDROPS = {
 };
 
 type Args = { look: 'sky' | 'meadow'; keep: KeepStyle; objects: boolean; blur: number } & Tune;
-/** The chosen style's sizes, as Controls start them (SF Pro 40 / Caveat 70 / subline 16). */
-const CHOSEN: Tune = { leadSize: 40, leadSpacing: -1.2, wordSize: 70, wordSpacing: 0, subSize: 16 };
-const tuneOf = ({ leadSize, leadSpacing, wordSize, wordSpacing, subSize }: Args): Tune => ({ leadSize, leadSpacing, wordSize, wordSpacing, subSize });
+/** The chosen style's sizes, as Controls start them (SF Pro 40 / Caveat 70). */
+const CHOSEN: Tune = { leadSize: 40, leadSpacing: -1.2, wordSize: 70, wordSpacing: 0 };
+const tuneOf = ({ leadSize, leadSpacing, wordSize, wordSpacing }: Args): Tune => ({ leadSize, leadSpacing, wordSize, wordSpacing });
 const meta: Meta<Args> = {
   title: 'Proposals/Sign in',
   args: { look: 'sky', keep: 'hand', objects: true, blur: 1 },
@@ -26,7 +26,6 @@ const meta: Meta<Args> = {
     leadSpacing: { name: '“Keep Every” letter spacing', control: { type: 'range', min: -4, max: 4, step: 0.1 }, description: 'Letter spacing of “Keep Every”, in points (negative = tighter)' },
     wordSize: { name: 'Word size', control: { type: 'range', min: 36, max: 110, step: 1 }, description: 'Font size of the changing word (link, photo…), in points' },
     wordSpacing: { name: 'Word letter spacing', control: { type: 'range', min: -4, max: 6, step: 0.1 }, description: 'Letter spacing of the changing word, in points' },
-    subSize: { name: 'Line under it, size', control: { type: 'range', min: 12, max: 22, step: 0.5 }, description: 'Font size of “One private place for everything you find.”' },
   },
   parameters: { simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/sign-in', params: {} },
     docs: { description: { component: 'The first screen: no logo, no bookmark; the words are the design. The brand face is SF Pro (Apple’s system font); “Keep every” styles pair it with an expressive face for the changing word. Switch Sky/Meadow in Controls; press ↻ (Remount) to replay. Fonts: Google Fonts, SIL OFL.' } } },
