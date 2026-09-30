@@ -68,7 +68,7 @@ function useProviders(): OAuthProvider[] {
 }
 
 /** backdrop: a sky photograph shown behind everything with a very slight blur; without one, the look's gradient. */
-export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, emailOpen: startOpen = false }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; emailOpen?: boolean }) {
+export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, objects = true, emailOpen: startOpen = false }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; objects?: boolean; emailOpen?: boolean }) {
   const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
   const fontsReady = useDisplayFonts();
   const { scheme } = useAppearance();
@@ -122,7 +122,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, gradient('linear-gradient(180deg, rgba(4,24,48,.18) 0%, rgba(4,24,48,.26) 42%, rgba(4,24,48,.12) 66%, rgba(255,255,255,0) 82%)')]} />
     </> : look.haze.map((h, i) => <View key={i} pointerEvents="none" style={[styles.haze, { left: h.x * W, top: h.y * H, width: h.w * W, height: h.h * H }, gradient(`radial-gradient(closest-side, ${h.color}, transparent)`)]} />)}
 
-    {FINDS.map((find, i) => {
+    {objects ? FINDS.map((find, i) => {
       const d = DEPTH[find.depth], entry = v.finds[i], phase = v.drift[i], offset = (i * 0.37) % 1;
       // Each object drifts in towards its place from beyond it, turning as it settles.
       const px = find.x * W + find.size / 2, py = find.y * H + find.size / 2, len = Math.hypot(px - cx, py - cy) || 1;
@@ -138,7 +138,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
         ] }]}>
         <Image source={find.source} style={styles.img} accessible={false} />
       </Animated.View>;
-    })}
+    }) : null}
 
     {/* The words and buttons form a column: the headline centres (or sits low) in
         the space above the buttons; when large text needs more room than the
@@ -150,7 +150,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
         {type === 'highlighter' ? <HighlighterHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'tags' ? <TagsHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'stack' ? <StackHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
-          : <RotatingHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} font={font} />}
+          : <RotatingHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} font={font} shadow={!!backdrop} />}
       </View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
         {providers.map((provider, i) => {
@@ -163,7 +163,8 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
             </Pressable>
           </Animated.View>;
         })}
-        <Animated.View style={[styles.more, rise(v.buttons[2], 12)]}>
+        {/* Over a photograph the bottom can be dark rock or bright cloud, so the small words sit on frosted glass. */}
+        <Animated.View style={[styles.more, backdrop ? styles.frost : null, rise(v.buttons[2], 12)]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Continue with email" onPress={() => setEmailOpen(true)} hitSlop={8}>
             <Text maxFontSizeMultiplier={1.4} style={[styles.email, { color: look.bottomInk }]}>Continue with email</Text>
           </Pressable>
@@ -192,6 +193,7 @@ const styles = StyleSheet.create({
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.92 },
   buttonLabel: { fontSize: 16, fontWeight: '600' },
   more: { alignItems: 'center', gap: 6, paddingTop: 6 },
+  frost: { backgroundColor: 'rgba(255,255,255,.78)', borderRadius: 20, paddingVertical: 10, paddingHorizontal: 16, marginTop: 4 },
   email: { fontSize: 15, fontWeight: '600', paddingVertical: 6 },
   legal: { fontSize: 12, textAlign: 'center' },
 });
