@@ -68,7 +68,7 @@ function useProviders(): OAuthProvider[] {
 }
 
 /** backdrop: a sky photograph shown behind everything with a very slight blur; without one, the look's gradient. */
-export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, objects = true }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; objects?: boolean }) {
+export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, blur = 2, objects = true }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; blur?: number; objects?: boolean }) {
   const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
   const fontsReady = useDisplayFonts();
   const { scheme } = useAppearance();
@@ -115,8 +115,8 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
 
   return <View style={[styles.fill, gradient(look.background)]}>
     {backdrop ? <>
-      {/* Slightly larger than the screen so the blur never shows a soft edge. */}
-      <Image source={backdrop} blurRadius={2} resizeMode="cover" accessible={false} style={styles.backdrop} />
+      {/* Larger than the screen by more than the blur reaches, so it never shows a soft edge. */}
+      <Image source={backdrop} blurRadius={blur} resizeMode="cover" accessible={false} style={[styles.backdrop, { top: -(blur * 3 + 8), left: -(blur * 3 + 8), right: -(blur * 3 + 8), bottom: -(blur * 3 + 8) }]} />
       {/* A gentle shade where the words sit, clear again behind the buttons. */}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, gradient('linear-gradient(180deg, rgba(4,24,48,.18) 0%, rgba(4,24,48,.26) 42%, rgba(4,24,48,.12) 66%, rgba(255,255,255,0) 82%)')]} />
     </> : look.haze.map((h, i) => <View key={i} pointerEvents="none" style={[styles.haze, { left: h.x * W, top: h.y * H, width: h.w * W, height: h.h * H }, gradient(`radial-gradient(closest-side, ${h.color}, transparent)`)]} />)}
@@ -171,7 +171,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
 const styles = StyleSheet.create({
   fill: { flex: 1, overflow: 'hidden' },
   haze: { position: 'absolute' },
-  backdrop: { position: 'absolute', top: '-2%', left: '-2%', width: '104%', height: '104%' },
+  backdrop: { position: 'absolute' },
   find: { position: 'absolute' },
   img: { width: '100%', height: '100%', resizeMode: 'contain' },
   column: { flexGrow: 1 },
