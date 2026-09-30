@@ -13,7 +13,7 @@ const BACKDROPS = {
 type Args = { look: 'sky' | 'meadow'; font: RotatingFont; objects: boolean; blur: number };
 const meta: Meta<Args> = {
   title: 'Proposals/Sign in',
-  args: { look: 'sky', font: 'instrument', objects: true, blur: 2 },
+  args: { look: 'sky', font: 'instrument', objects: true, blur: 1 },
   argTypes: {
     look: { control: 'inline-radio', options: ['sky', 'meadow'], description: 'Sky or Meadow (colours for the gradient and buttons)' },
     font: { control: 'select', options: ['instrument', 'dmserif', 'bricolage', 'unbounded', 'syne', 'jakarta'], description: 'Typeface for Rotating finds' },
