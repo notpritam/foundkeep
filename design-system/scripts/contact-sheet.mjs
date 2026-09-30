@@ -21,7 +21,7 @@ for (const story of stories) {
   shots.push({ label: `${story.title.replace(/^.*?\//, '')} · ${story.name}`, data: (await page.screenshot()).toString('base64') });
   await page.close();
 }
-const sheet = await browser.newPage({ viewport: { width: columns * (width / 2 + 16) + 16, height: 400 } });
+const sheet = await browser.newPage({ viewport: { width: Math.round(columns * (width / 2 + 16) + 16), height: 400 } });
 await sheet.setContent(`<body style="margin:0;padding:16px;background:#e9ebee;font:600 11px system-ui;display:grid;grid-template-columns:repeat(${columns},${width / 2}px);gap:16px">${shots.map(s => `<figure style="margin:0"><img src="data:image/png;base64,${s.data}" style="width:${width / 2}px;border-radius:10px;display:block;box-shadow:0 1px 3px #0003"><figcaption style="margin-top:6px">${s.label}</figcaption></figure>`).join('')}</body>`);
 await writeFile(out, await sheet.screenshot({ fullPage: true }));
 await browser.close();
