@@ -1,0 +1,15 @@
+/* Brand type proposal on the dashboard and site (Storybook only): with
+   <html data-brand> set by applyWebPairing(), the text face replaces Inter
+   through --fk-font-sans, and page titles, the wordmark and the scenic
+   headlines take the display face. Card titles (a save card's h2) and section
+   titles (h3, h4) stay in the text face. Fonts never fake a weight or an
+   italic they don't have. */
+html[data-brand] { --fk-font-sans: var(--brand-text); font-synthesis: none; }
+html[data-brand] body :is(.customer-body, .landing-body, .social-collections) :is(h1, h2):not(.capture-card *),
+html[data-brand] body :is(.customer-body, .landing-body) :is(.brand, .sidebar-brand, .footer-wordmark, .sidebar-bottom > p) {
+  font-family: var(--brand-display) !important;
+  font-weight: var(--brand-display-weight) !important;
+  letter-spacing: var(--brand-display-tracking) !important;
+}
+/* The landing's coloured headline words keep the display face's single weight. */
+html[data-brand] body .landing-body h1 :is(span, em, strong) { font-weight: inherit !important; }
