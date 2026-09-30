@@ -6,7 +6,8 @@ import type { RotatingFont } from '../../../../apps/mobile/src/proposals/sign-in
 const BACKDROPS = {
   alpineMorning: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/alpine-morning.webp'), alpineGoldenMeadow: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/alpine-golden-meadow.webp'), sunriseAboveClouds: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sunrise-above-clouds.webp'),
   alpineSunbeams: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/alpine-sunbeams.webp'), terraceDusk: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/terrace-dusk.webp'),
-  skyCumulus: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-cumulus.webp'), skyGolden: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-golden.webp'), skyAboveClouds: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-above-clouds.webp'), skyAlpine: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-alpine.webp'), meadowSky: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/meadow-sky.webp'),
+  skyCumulus: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-cumulus.webp'),
+  cumulusTopLight: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-cumulus-top-light.webp'), cumulusTopMedium: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-cumulus-top-medium.webp'), cumulusTopFull: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-cumulus-top-full.webp'), skyGolden: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-golden.webp'), skyAboveClouds: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-above-clouds.webp'), skyAlpine: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/sky-alpine.webp'), meadowSky: require('../../../../apps/mobile/assets/images/sign-in-backgrounds/meadow-sky.webp'),
 };
 
 type Args = { look: 'sky' | 'meadow'; font: RotatingFont; objects: boolean; blur: number };
@@ -24,6 +25,10 @@ const meta: Meta<Args> = {
 };
 export default meta;
 type Story = StoryObj<Args>;
+// Pritam's pick: Codex's Cumulus sky, with clouds added at the top in three strengths.
+export const CumulusTopLight: Story = { name: 'Cumulus · clouds on top, light', render: a => <FirstScreen look={a.look} type="rotating" font={a.font} objects={a.objects} blur={a.blur} backdrop={BACKDROPS.cumulusTopLight} /> };
+export const CumulusTopMedium: Story = { name: 'Cumulus · clouds on top, medium', render: a => <FirstScreen look={a.look} type="rotating" font={a.font} objects={a.objects} blur={a.blur} backdrop={BACKDROPS.cumulusTopMedium} /> };
+export const CumulusTopFull: Story = { name: 'Cumulus · clouds on top, full', render: a => <FirstScreen look={a.look} type="rotating" font={a.font} objects={a.objects} blur={a.blur} backdrop={BACKDROPS.cumulusTopFull} /> };
 // Story names must be literal: Storybook reads them without running the file.
 export const RotatingInstrument: Story = { name: 'Rotating finds · Instrument Serif', render: ({ look }) => <FirstScreen look={look} type="rotating" font="instrument" /> };
 export const RotatingDMSerif: Story = { name: 'Rotating finds · DM Serif Display', render: ({ look }) => <FirstScreen look={look} type="rotating" font="dmserif" /> };
