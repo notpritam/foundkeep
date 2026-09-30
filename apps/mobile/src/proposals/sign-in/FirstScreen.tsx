@@ -14,7 +14,7 @@ import { useSession } from '../../session/SessionProvider.tsx';
 import { isOAuthProvider, OAUTH_NAMES, type OAuthProvider } from '../../auth-oauth.ts';
 import { EmailSheet } from './EmailSheet.tsx';
 import { gradient, look as lookFor, type LookName } from './looks.ts';
-import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, type HeadlineType } from './Headlines.tsx';
+import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, type HeadlineType, type RotatingFont } from './Headlines.tsx';
 
 /** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier). */
 type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number };
@@ -47,11 +47,9 @@ const SUB: Record<HeadlineType, string> = {
   rotating: 'One private place for everything you find.',
   stack: 'A private library for everything you find.',
 };
-const BOOKMARK = require('../../../assets/images/finds/bookmark.webp');
 
 // Motion: long, soft ease-outs (no springs), and a continuous drift.
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);          // expo out: fast start, long gentle landing
-const LAND = Easing.bezier(0.3, 1.18, 0.55, 1);          // the bookmark: a whisper of overshoot
 const DEPTH = [{ travel: 64, drift: 4, turn: 1.5, opacity: 0.94 }, { travel: 84, drift: 6, turn: 2, opacity: 1 }, { travel: 104, drift: 8, turn: 2.5, opacity: 1 }];
 // A smooth loop (a sine wave) from a linear 0 → 1 phase.
 const STEPS = Array.from({ length: 25 }, (_, i) => i / 24);
@@ -69,7 +67,8 @@ function useProviders(): OAuthProvider[] {
   return [...providers].sort((a, b) => ['google', 'apple'].indexOf(a) - ['google', 'apple'].indexOf(b));
 }
 
-export function FirstScreen({ look: lookName, type = 'rotating', emailOpen: startOpen = false }: { look: LookName; type?: HeadlineType; emailOpen?: boolean }) {
+/** backdrop: a sky photograph shown behind everything with a very slight blur; without one, the look's gradient. */
+export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, emailOpen: startOpen = false }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; emailOpen?: boolean }) {
   const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
   const fontsReady = useDisplayFonts();
   const { scheme } = useAppearance();
@@ -83,12 +82,12 @@ export function FirstScreen({ look: lookName, type = 'rotating', emailOpen: star
   // Entrance values run 0 → 1 once; drift phases loop 0 → 1 for ever.
   const v = useRef({
     finds: AROUND.map(() => new Animated.Value(0)),
-    bookmark: new Animated.Value(0), buttons: [0, 1, 2].map(() => new Animated.Value(0)),
-    drift: [...AROUND.map(() => new Animated.Value(0)), new Animated.Value(0)],
+    buttons: [0, 1, 2].map(() => new Animated.Value(0)),
+    drift: AROUND.map(() => new Animated.Value(0)),
   }).current;
 
   useEffect(() => {
-    const entrance = [...v.finds, v.bookmark, ...v.buttons];
+    const entrance = [...v.finds, ...v.buttons];
     if (!motion) {
       // Reduced motion (or not known yet): the finished screen, still.
       const settle = setTimeout(() => entrance.forEach(value => value.setValue(1)), 120);
@@ -99,7 +98,6 @@ export function FirstScreen({ look: lookName, type = 'rotating', emailOpen: star
     const to = (value: Animated.Value, delay: number, duration: number, easing = SETTLE) => Animated.timing(value, { toValue: 1, delay, duration, easing, useNativeDriver: native });
     const run = Animated.parallel([
       ...v.finds.map((value, i) => to(value, (FINDS[i] ?? FINDS[0]).delay, 1500 + (FINDS[i] ?? FINDS[0]).depth * 120)),
-      to(v.bookmark, 820, 1150, LAND),
       ...v.buttons.map((value, i) => to(value, 980 + i * 80, 850)),
     ]);
     // The drift starts with the entrance, so nothing ever stops and restarts;
@@ -117,7 +115,12 @@ export function FirstScreen({ look: lookName, type = 'rotating', emailOpen: star
   const cx = W / 2, cy = H * 0.42;
 
   return <View style={[styles.fill, gradient(look.background)]}>
-    {look.haze.map((h, i) => <View key={i} pointerEvents="none" style={[styles.haze, { left: h.x * W, top: h.y * H, width: h.w * W, height: h.h * H }, gradient(`radial-gradient(closest-side, ${h.color}, transparent)`)]} />)}
+    {backdrop ? <>
+      {/* Slightly larger than the screen so the blur never shows a soft edge. */}
+      <Image source={backdrop} blurRadius={2} resizeMode="cover" accessible={false} style={styles.backdrop} />
+      {/* A gentle shade where the words sit, clear again behind the buttons. */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, gradient('linear-gradient(180deg, rgba(4,24,48,.18) 0%, rgba(4,24,48,.26) 42%, rgba(4,24,48,.12) 66%, rgba(255,255,255,0) 82%)')]} />
+    </> : look.haze.map((h, i) => <View key={i} pointerEvents="none" style={[styles.haze, { left: h.x * W, top: h.y * H, width: h.w * W, height: h.h * H }, gradient(`radial-gradient(closest-side, ${h.color}, transparent)`)]} />)}
 
     {FINDS.map((find, i) => {
       const d = DEPTH[find.depth], entry = v.finds[i], phase = v.drift[i], offset = (i * 0.37) % 1;
@@ -147,15 +150,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', emailOpen: star
         {type === 'highlighter' ? <HighlighterHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'tags' ? <TagsHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'stack' ? <StackHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
-          : <RotatingHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />}
-        {/* The save itself lands below the headline, on screens with room for it. */}
-        {layout === 'centre' && H >= 720 ? <Animated.View pointerEvents="none" style={[styles.bookmark, { opacity: v.bookmark.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }),
-          transform: [
-            { translateY: Animated.add(v.bookmark.interpolate({ inputRange: [0, 1], outputRange: [-70, 0] }), v.drift[FINDS.length].interpolate(wave(5))) },
-            { rotate: v.bookmark.interpolate({ inputRange: [0, 1], outputRange: ['-24deg', '-8deg'] }) },
-          ] }]}>
-          <Image source={BOOKMARK} style={styles.img} accessible={false} />
-        </Animated.View> : null}
+          : <RotatingHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} font={font} />}
       </View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
         {providers.map((provider, i) => {
@@ -184,6 +179,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', emailOpen: star
 const styles = StyleSheet.create({
   fill: { flex: 1, overflow: 'hidden' },
   haze: { position: 'absolute' },
+  backdrop: { position: 'absolute', top: '-2%', left: '-2%', width: '104%', height: '104%' },
   find: { position: 'absolute' },
   img: { width: '100%', height: '100%', resizeMode: 'contain' },
   column: { flexGrow: 1 },
@@ -191,7 +187,6 @@ const styles = StyleSheet.create({
   low: { justifyContent: 'flex-start', alignItems: 'stretch', paddingBottom: 28, paddingTop: 4 },
   wordmark: { alignSelf: 'flex-start' },
   spacer: { flexGrow: 1, minHeight: 24 },
-  bookmark: { width: 52, height: 52, marginTop: 8 },
   actions: { paddingHorizontal: 20, gap: 10 },
   button: { minHeight: 56, paddingHorizontal: 16, borderRadius: 28, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.92 },
