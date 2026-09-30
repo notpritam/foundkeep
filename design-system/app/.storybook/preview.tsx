@@ -24,10 +24,10 @@ const none = { top: 0, bottom: 0, left: 0, right: 0 };
 /** Screens (parameters.simulator) render inside the device; components render as they are.
  * parameters.route = { pathname, params, header } is the route a screen sees; parameters.session
  * picks the sample session; parameters.msw.handlers.story overrides the sample world. */
-const simulator: Decorator = (Story, { id, globals, parameters }) => {
+const simulator: Decorator = (Story, { id, globals, parameters, args }) => {
   const device = DEVICES[globals.device] || DEVICES['iphone-17-pro'];
   const scheme = globals.theme === 'dark' ? 'dark' : 'light';
-  if (parameters.simulator && !isInner()) return <PhoneFrame device={device} src={innerUrl(id, globals)} dark={scheme === 'dark'} keyboard={!!parameters.keyboard} />;
+  if (parameters.simulator && !isInner()) return <PhoneFrame device={device} src={innerUrl(id, globals)} dark={scheme === 'dark'} keyboard={!!parameters.keyboard} storyId={id} args={args} />;
   setMediaPreferences({ reducedMotion: globals.motion === 'reduced', reducedTransparency: globals.transparency === 'reduced' });
   const insets = parameters.simulator ? device.insets : none;
   const palette = palettes[scheme];
