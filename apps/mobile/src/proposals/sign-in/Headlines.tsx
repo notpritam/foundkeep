@@ -47,7 +47,9 @@ function useEntrance(delays: number[], start: boolean, motion: boolean, duration
 const rise = (v: Animated.Value, by = 18) => ({ opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
 const slide = (v: Animated.Value, by = -22) => ({ opacity: v, transform: [{ translateX: v.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
 
-type Props = { start: boolean; motion: boolean; sub: string; subColor: string };
+type Props = { start: boolean; motion: boolean; sub: string; subColor: string; shadow?: boolean };
+/** Over a photograph, a soft shadow keeps white words readable on bright patches of sky. */
+const SHADOW = { textShadowColor: 'rgba(3,20,40,.35)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 14 };
 
 /** A: an elegant serif, and "good things" swept with a highlighter, as you would in FoundKeep. */
 export function HighlighterHeadline({ start, motion, sub, subColor }: Props) {
@@ -97,7 +99,8 @@ export const ROTATING_FONTS: Record<RotatingFont, { label: string; lead: Face; w
 
 const WORDS = [{ word: 'link.', color: INK.butter }, { word: 'photo.', color: INK.peach }, { word: 'highlight.', color: INK.mint }, { word: 'voice memo.', color: INK.ice }, { word: 'idea.', color: INK.lilac }];
 /** C: "Keep every …" — the thing you keep keeps changing: link, photo, highlight… in its own colour. */
-export function RotatingHeadline({ start, motion, sub, subColor, font = 'instrument' }: Props & { font?: RotatingFont }) {
+export function RotatingHeadline({ start, motion, sub, subColor, font = 'instrument', shadow = false }: Props & { font?: RotatingFont }) {
+  const glow = shadow ? SHADOW : null;
   const face = ROTATING_FONTS[font];
   const [l1, l2, s] = useEntrance([380, 520, 760], start, motion);
   const [index, setIndex] = useState(0);
@@ -117,13 +120,13 @@ export function RotatingHeadline({ start, motion, sub, subColor, font = 'instrum
   }, [start, motion, turn]);
   const current = motion ? WORDS[index] : { word: 'find.', color: INK.butter };
   return <View style={styles.center} accessibilityRole="header" accessibilityLabel="Keep every link, photo, highlight, voice memo and idea.">
-    <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[face.lead, styles.centred, { color: INK.white }]}>Keep every</Text></Animated.View>
+    <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[face.lead, styles.centred, { color: INK.white }, glow]}>Keep every</Text></Animated.View>
     <Animated.View style={[rise(l2), styles.rotor, { minHeight: face.word.lineHeight }]}>
       <Animated.View style={{ opacity: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }), transform: [{ translateY: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [22, 0, -18] }) }] }}>
-        <Text maxFontSizeMultiplier={1.3} style={[face.word, styles.centred, { color: current.color }]}>{current.word}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={[face.word, styles.centred, { color: current.color }, glow]}>{current.word}</Text>
       </Animated.View>
     </Animated.View>
-    <Animated.View style={rise(s, 10)}><Text maxFontSizeMultiplier={1.4} style={[styles.subCenter, { color: subColor }]}>{sub}</Text></Animated.View>
+    <Animated.View style={rise(s, 10)}><Text maxFontSizeMultiplier={1.4} style={[styles.subCenter, { color: subColor }, glow]}>{sub}</Text></Animated.View>
   </View>;
 }
 

@@ -39,3 +39,17 @@ Use case: photorealistic-natural. Create one premium photographic landscape BACK
 Exact prompt:
 
 Use case: photorealistic-natural. Create one premium photographic landscape BACKGROUND ONLY for a phone sign-in screen. Portrait narrow 9:19.5 aspect ratio, ideally 1170 x 2532 pixels. Edge-to-edge image with no border. Calm sophisticated natural atmosphere, beautiful soft light, subtle photographic texture, believable aerial perspective. Composition is critical: the entire middle band from 35% to 55% of image height must be calm, uncluttered, mid-to-deep coloured open sky suitable for WHITE live typography later; no bright clouds or horizon crossing this band. Keep open sky dominant from the top down through 65% height. The bottom quarter must be lighter, softer and lower contrast for live white and black pill buttons to be placed later. Preserve quiet negative space and let clouds/land frame rather than fill it. No text, no logos, no UI, no buttons, no objects, no people, no birds, no aircraft, no buildings, no watermark, no visible sun disk, no lens flare or sun flare. Do not add typography. Do not blur the image artificially; the application will add a slight blur. Scene: a spacious blue-teal sky above GENTLY ROLLING GREEN MEADOW HILLS for an emerald-themed app. Sky dominates the upper 75%, with calm mid-deep natural cyan-blue around #205e7d in the central band, nuanced clear blue above, and a gentle pale aqua transition toward the low horizon. All hills stay inside the lowest quarter. Hills are soft, layered, velvety green, emerald farther back and fresh sage-green closer, naturally sunlit and softened by morning haze. Bottom quarter is luminous soft pale green and mint, low contrast with no dark foreground. Sparse soft white clouds restricted to low horizon edges. Photographic pastoral calm, not a cartoon, not oversaturated. No flowers, fences, paths, trees, livestock, people or buildings.
+
+## From Pritam (ChatGPT, 2026-09-30)
+
+Five images Pritam generated in ChatGPT and downloaded to his MacBook
+(`~/Downloads/ChatGPT Image Sep 30, 2026, 05_17_16 PM-1.png` … `-5.png`),
+resized to 900 px wide and exported as WebP (quality 80):
+
+| File | Source | Scene |
+|---|---|---|
+| `alpine-morning.webp` | …PM-1.png | alpine peaks above a valley of cloud, clear morning sky |
+| `alpine-golden-meadow.webp` | …PM-2.png | golden-hour peaks over a flowering alpine meadow |
+| `sunrise-above-clouds.webp` | …PM-3.png | the sun rising over peaks and a sea of cloud |
+| `alpine-sunbeams.webp` | …PM-4.png | sunbeams through cloud over peaks and rocks |
+| `terrace-dusk.webp` | …PM-5.png | a concrete terrace and stair above the clouds at dusk |
