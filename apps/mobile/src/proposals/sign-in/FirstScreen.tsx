@@ -68,7 +68,7 @@ function useProviders(): OAuthProvider[] {
 }
 
 /** backdrop: a sky photograph shown behind everything with a very slight blur; without one, the look's gradient. */
-export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, blur = 2, objects = true }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; blur?: number; objects?: boolean }) {
+export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, blur = 1, objects = true }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; blur?: number; objects?: boolean }) {
   const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
   const fontsReady = useDisplayFonts();
   const { scheme } = useAppearance();
