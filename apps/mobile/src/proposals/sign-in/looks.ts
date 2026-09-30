@@ -1,8 +1,9 @@
-// Proposal (sign-in, 2026-09-30): the three looks for the first screen. When
-// Pritam picks one, it moves into the real screen and this folder is deleted.
+// Proposal (sign-in, 2026-09-30): the two looks for the first screen (Pritam:
+// "sky or meadow"). When he picks one it moves into the real screen and this
+// folder is deleted.
 import { Platform, type ViewStyle } from 'react-native';
 
-export type LookName = 'sky' | 'meadow' | 'paper';
+export type LookName = 'sky' | 'meadow';
 export type Look = {
   /** Full-screen background, as a CSS gradient. */
   background: string;
@@ -17,7 +18,9 @@ export type Look = {
   statusBar: 'light' | 'dark';
 };
 
-export function look(name: LookName, scheme: 'light' | 'dark'): Look {
+// Both looks are bright scenes in light and dark alike; the email sheet over
+// them follows the theme.
+export function look(name: LookName, _scheme: 'light' | 'dark'): Look {
   if (name === 'sky') return {
     background: 'linear-gradient(180deg, #1678cc 0%, #248ddc 52%, #6cc0f1 76%, #d4f0fd 100%)',
     haze: [{ x: -0.1, y: 0.06, w: 0.7, h: 0.12, color: 'rgba(255,255,255,.75)' }, { x: 0.45, y: 0.22, w: 0.75, h: 0.14, color: 'rgba(255,255,255,.55)' }, { x: -0.2, y: 0.82, w: 0.9, h: 0.16, color: 'rgba(255,255,255,.8)' }, { x: 0.25, y: 0.35, w: 0.5, h: 0.3, color: 'rgba(255,255,255,.28)' }],
@@ -27,7 +30,7 @@ export function look(name: LookName, scheme: 'light' | 'dark'): Look {
     secondary: { background: '#ffffff', ink: '#202020', border: 'rgba(255,255,255,0)' },
     statusBar: 'light',
   };
-  if (name === 'meadow') return {
+  return {
     background: 'linear-gradient(180deg, #08563a 0%, #0d7a50 50%, #3fbf87 76%, #d6f3e4 100%)',
     haze: [{ x: 0.2, y: 0.3, w: 0.6, h: 0.32, color: 'rgba(214,243,228,.35)' }, { x: -0.25, y: 0.8, w: 1, h: 0.18, color: 'rgba(255,255,255,.45)' }, { x: 0.5, y: 0.02, w: 0.7, h: 0.12, color: 'rgba(191,238,214,.35)' }],
     ink: '#ffffff', muted: 'rgba(255,255,255,.84)', bottomInk: '#063a26', bottomMuted: '#2f5a47',
@@ -35,16 +38,6 @@ export function look(name: LookName, scheme: 'light' | 'dark'): Look {
     primary: { background: '#0b0c0d', ink: '#ffffff', border: '#0b0c0d' },
     secondary: { background: '#ffffff', ink: '#202020', border: 'rgba(255,255,255,0)' },
     statusBar: 'light',
-  };
-  const dark = scheme === 'dark';
-  return {
-    background: dark ? 'linear-gradient(180deg, #08090a 0%, #0f1011 60%, #0d1612 100%)' : 'linear-gradient(180deg, #fafafa 0%, #f4f6f4 60%, #e8f3ec 100%)',
-    haze: [{ x: 0.15, y: 0.3, w: 0.7, h: 0.34, color: dark ? 'rgba(76,195,138,.16)' : 'rgba(13,122,80,.10)' }],
-    ink: dark ? '#f7f8f8' : '#202020', muted: dark ? '#a5aab2' : '#686868', bottomInk: dark ? '#f7f8f8' : '#202020', bottomMuted: dark ? '#a5aab2' : '#686868',
-    emblem: { fill: dark ? '#1a1c20' : '#ffffff', ring: dark ? '#34373d' : '#e4e4e4', glow: dark ? 'rgba(76,195,138,.35)' : 'rgba(13,122,80,.18)' },
-    primary: { background: dark ? '#f7f8f8' : '#0b0c0d', ink: dark ? '#08090a' : '#ffffff', border: dark ? '#f7f8f8' : '#0b0c0d' },
-    secondary: { background: dark ? '#1a1c20' : '#ffffff', ink: dark ? '#f7f8f8' : '#202020', border: dark ? '#34373d' : '#e4e4e4' },
-    statusBar: dark ? 'light' : 'dark',
   };
 }
 

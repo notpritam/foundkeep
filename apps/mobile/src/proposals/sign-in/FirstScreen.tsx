@@ -1,7 +1,7 @@
 // Proposal (sign-in, 2026-09-30): the app's first screen, after Pritam's
-// reference (a sky of 3D objects flying in around a centred headline, the
-// sign-in buttons rising last). Real sign-in: the same Apple/Google route and
-// email sign-in as today. Three looks: sky, meadow, paper (looks.ts).
+// reference. FoundKeep's own 3D objects (design-system/assets-3d) drift in
+// around a centred headline and keep drifting; the sign-in buttons rise last.
+// Real sign-in: the same Apple/Google route and email sign-in as today.
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
@@ -15,21 +15,30 @@ import { isOAuthProvider, OAUTH_NAMES, type OAuthProvider } from '../../auth-oau
 import { EmailSheet } from './EmailSheet.tsx';
 import { gradient, look as lookFor, type LookName } from './looks.ts';
 
-type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; from: [number, number]; float: number };
-/** Things people keep, around the edges; x and y are fractions of the screen. */
+/** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier). */
+type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number };
+/** What FoundKeep keeps, around the edges; x and y are fractions of the screen. */
 const FINDS: Find[] = [
-  { source: require('../../../assets/images/finds/camera.png'), x: 0.04, y: 0.085, size: 88, rotate: -12, from: [-1, -1], float: 3.4 },
-  { source: require('../../../assets/images/finds/airplane.png'), x: 0.72, y: 0.07, size: 104, rotate: 8, from: [1, -1], float: 4.1 },
-  { source: require('../../../assets/images/finds/admission_tickets.png'), x: -0.07, y: 0.22, size: 96, rotate: -18, from: [-1, 0], float: 3.8 },
-  { source: require('../../../assets/images/finds/steaming_bowl.png'), x: 0.76, y: 0.2, size: 90, rotate: 6, from: [1, 0], float: 3.1 },
-  { source: require('../../../assets/images/finds/light_bulb.png'), x: 0.06, y: 0.5, size: 60, rotate: -8, from: [-1, 0], float: 4.4 },
-  { source: require('../../../assets/images/finds/books.png'), x: 0.8, y: 0.49, size: 72, rotate: 10, from: [1, 0], float: 3.6 },
-  { source: require('../../../assets/images/finds/headphone.png'), x: -0.07, y: 0.62, size: 92, rotate: -14, from: [-1, 1], float: 3.9 },
-  { source: require('../../../assets/images/finds/hot_beverage.png'), x: 0.81, y: 0.61, size: 80, rotate: 12, from: [1, 1], float: 3.3 },
+  { source: require('../../../assets/images/finds/photo.webp'), x: 0.05, y: 0.075, size: 84, rotate: -6, depth: 1, delay: 90, period: 9.2 },
+  { source: require('../../../assets/images/finds/post.webp'), x: 0.68, y: 0.07, size: 104, rotate: 5, depth: 2, delay: 170, period: 10.6 },
+  { source: require('../../../assets/images/finds/voice.webp'), x: -0.03, y: 0.235, size: 96, rotate: -8, depth: 0, delay: 240, period: 8.4 },
+  { source: require('../../../assets/images/finds/sparkles.webp'), x: 0.8, y: 0.235, size: 62, rotate: 8, depth: 0, delay: 300, period: 7.6 },
+  { source: require('../../../assets/images/finds/highlight.webp'), x: 0.01, y: 0.49, size: 92, rotate: -4, depth: 1, delay: 360, period: 9.8 },
+  { source: require('../../../assets/images/finds/folder.webp'), x: 0.8, y: 0.48, size: 82, rotate: 6, depth: 1, delay: 410, period: 8.9 },
+  { source: require('../../../assets/images/finds/video.webp'), x: 0.0, y: 0.615, size: 100, rotate: -5, depth: 2, delay: 470, period: 10.2 },
+  { source: require('../../../assets/images/finds/tag.webp'), x: 0.78, y: 0.61, size: 84, rotate: 9, depth: 2, delay: 530, period: 8.1 },
 ];
-const BOOKMARK = require('../../../assets/images/finds/bookmark.png');
+const BOOKMARK = require('../../../assets/images/finds/bookmark.webp');
 const MARK = require('../../../assets/images/mark.png');
 const LINES = ['Meet FoundKeep,', 'a place for the things', 'worth keeping.'];
+
+// Motion: long, soft ease-outs (no springs), and a continuous drift.
+const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);          // expo out: fast start, long gentle landing
+const LAND = Easing.bezier(0.3, 1.18, 0.55, 1);          // the bookmark: a whisper of overshoot
+const DEPTH = [{ travel: 64, drift: 4, turn: 1.5, opacity: 0.94 }, { travel: 84, drift: 6, turn: 2, opacity: 1 }, { travel: 104, drift: 8, turn: 2.5, opacity: 1 }];
+// A smooth loop (a sine wave) from a linear 0 → 1 phase.
+const STEPS = Array.from({ length: 25 }, (_, i) => i / 24);
+const wave = (amplitude: number, offset = 0) => ({ inputRange: STEPS, outputRange: STEPS.map(t => amplitude * Math.sin((t + offset) * Math.PI * 2)) });
 
 function useProviders(): OAuthProvider[] {
   const { client } = useSession();
@@ -52,49 +61,60 @@ export function FirstScreen({ look: lookName, emailOpen: startOpen = false }: { 
   const providers = useProviders();
   const [emailOpen, setEmailOpen] = useState(startOpen);
 
-  // One value per moment of the entrance, 0 → 1.
-  const values = useRef({ emblem: new Animated.Value(0), finds: FINDS.map(() => new Animated.Value(0)), lines: LINES.map(() => new Animated.Value(0)), bookmark: new Animated.Value(0), buttons: [new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)], float: FINDS.map(() => new Animated.Value(0)) }).current;
+  // Entrance values run 0 → 1 once; drift phases loop 0 → 1 for ever.
+  const v = useRef({
+    emblem: new Animated.Value(0), finds: FINDS.map(() => new Animated.Value(0)), lines: LINES.map(() => new Animated.Value(0)),
+    bookmark: new Animated.Value(0), buttons: [0, 1, 2].map(() => new Animated.Value(0)),
+    drift: [...FINDS.map(() => new Animated.Value(0)), new Animated.Value(0)],
+  }).current;
+
   useEffect(() => {
-    const all = [values.emblem, ...values.finds, ...values.lines, values.bookmark, ...values.buttons];
+    const entrance = [v.emblem, ...v.finds, ...v.lines, v.bookmark, ...v.buttons];
     if (!motion) {
-      // Reduced motion (or not known yet): the finished screen, without movement.
-      const settle = setTimeout(() => all.forEach(v => v.setValue(1)), 120);
+      // Reduced motion (or not known yet): the finished screen, still.
+      const settle = setTimeout(() => entrance.forEach(value => value.setValue(1)), 120);
       return () => clearTimeout(settle);
     }
-    all.forEach(v => v.setValue(0));
+    entrance.forEach(value => value.setValue(0));
     const native = Platform.OS !== 'web';
-    const spring = (value: Animated.Value, delay: number, bounciness = 9) => Animated.sequence([Animated.delay(delay), Animated.spring(value, { toValue: 1, bounciness, speed: 11, useNativeDriver: native })]);
-    const fade = (value: Animated.Value, delay: number, duration = 420) => Animated.timing(value, { toValue: 1, delay, duration, easing: Easing.out(Easing.cubic), useNativeDriver: native });
-    const entrance = Animated.parallel([
-      fade(values.emblem, 0, 500),
-      ...values.finds.map((value, i) => spring(value, 140 + i * 55)),
-      ...values.lines.map((value, i) => fade(value, 320 + i * 120)),
-      spring(values.bookmark, 760, 12),
-      ...values.buttons.map((value, i) => fade(value, 900 + i * 130, 380)),
+    const to = (value: Animated.Value, delay: number, duration: number, easing = SETTLE) => Animated.timing(value, { toValue: 1, delay, duration, easing, useNativeDriver: native });
+    const run = Animated.parallel([
+      to(v.emblem, 0, 900),
+      ...v.finds.map((value, i) => to(value, FINDS[i].delay, 1500 + FINDS[i].depth * 120)),
+      ...v.lines.map((value, i) => to(value, 380 + i * 100, 1000)),
+      to(v.bookmark, 820, 1150, LAND),
+      ...v.buttons.map((value, i) => to(value, 980 + i * 80, 850)),
     ]);
-    const floats = values.float.map((value, i) => Animated.loop(Animated.sequence([
-      Animated.timing(value, { toValue: 1, duration: FINDS[i].float * 500, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
-      Animated.timing(value, { toValue: 0, duration: FINDS[i].float * 500, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
-    ])));
-    entrance.start(({ finished }) => { if (finished) floats.forEach(f => f.start()); });
-    return () => { entrance.stop(); floats.forEach(f => f.stop()); };
-  }, [motion, values]);
+    // The drift starts with the entrance, so nothing ever stops and restarts;
+    // each object has its own period, so they never move in step.
+    const drift = v.drift.map((value, i) => {
+      value.setValue(0);
+      const period = (FINDS[i]?.period ?? 9.5) * 1000;
+      return Animated.loop(Animated.timing(value, { toValue: 1, duration: period, easing: Easing.linear, useNativeDriver: native }));
+    });
+    run.start(); drift.forEach(loop => loop.start());
+    return () => { run.stop(); drift.forEach(loop => loop.stop()); };
+  }, [motion, v]);
 
-  const rise = (v: Animated.Value, by = 16) => ({ opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
-  const primaryIsApple = (p: OAuthProvider) => p === 'apple';
+  const rise = (value: Animated.Value, by = 20) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
+  const cx = W / 2, cy = H * 0.42;
 
   return <View style={[styles.fill, gradient(look.background)]}>
     {look.haze.map((h, i) => <View key={i} pointerEvents="none" style={[styles.haze, { left: h.x * W, top: h.y * H, width: h.w * W, height: h.h * H }, gradient(`radial-gradient(closest-side, ${h.color}, transparent)`)]} />)}
 
     {FINDS.map((find, i) => {
-      const v = values.finds[i];
-      const bob = values.float[i].interpolate({ inputRange: [0, 1], outputRange: [-5, 5] });
-      return <Animated.View key={i} pointerEvents="none" style={[styles.find, { left: find.x * W, top: find.y * H, width: find.size, height: find.size, opacity: v,
+      const d = DEPTH[find.depth], entry = v.finds[i], phase = v.drift[i], offset = (i * 0.37) % 1;
+      // Each object drifts in towards its place from beyond it, turning as it settles.
+      const px = find.x * W + find.size / 2, py = find.y * H + find.size / 2, len = Math.hypot(px - cx, py - cy) || 1;
+      const fromX = ((px - cx) / len) * d.travel, fromY = ((py - cy) / len) * d.travel;
+      const turn = Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [find.rotate + (fromX > 0 ? 10 : -10), find.rotate] }), phase.interpolate(wave(d.turn, offset + 0.25)));
+      return <Animated.View key={i} pointerEvents="none" style={[styles.find, { left: find.x * W, top: find.y * H, width: find.size, height: find.size,
+        opacity: entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity, d.opacity] }),
         transform: [
-          { translateX: v.interpolate({ inputRange: [0, 1], outputRange: [find.from[0] * 120, 0] }) },
-          { translateY: Animated.add(v.interpolate({ inputRange: [0, 1], outputRange: [find.from[1] * 120, 0] }), bob) },
-          { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) },
-          { rotate: v.interpolate({ inputRange: [0, 1], outputRange: [`${find.rotate - 30}deg`, `${find.rotate}deg`] }) },
+          { translateX: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromX, 0] }), phase.interpolate(wave(d.drift * 0.6, offset + 0.5))) },
+          { translateY: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromY, 0] }), phase.interpolate(wave(d.drift, offset))) },
+          { scale: entry.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) },
+          { rotate: turn.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) },
         ] }]}>
         <Image source={find.source} style={styles.img} accessible={false} />
       </Animated.View>;
@@ -106,35 +126,38 @@ export function FirstScreen({ look: lookName, emailOpen: startOpen = false }: { 
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.column, { paddingTop: insets.top + 12 }]}>
       <View style={styles.center}>
         <Animated.View style={[styles.emblem, { backgroundColor: look.emblem.fill, borderColor: look.emblem.ring, shadowColor: look.emblem.glow,
-          opacity: values.emblem, transform: [{ scale: values.emblem.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
+          opacity: v.emblem, transform: [{ scale: v.emblem.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) }] }]}>
           <Image source={MARK} style={styles.mark} accessibilityLabel="FoundKeep" />
         </Animated.View>
         <View style={styles.headline} accessibilityRole="header">
-          {LINES.map((line, i) => <Animated.View key={line} style={rise(values.lines[i])}><Text maxFontSizeMultiplier={1.4} style={[styles.line, { color: look.ink }]}>{line}</Text></Animated.View>)}
+          {LINES.map((line, i) => <Animated.View key={line} style={rise(v.lines[i])}><Text maxFontSizeMultiplier={1.4} style={[styles.line, { color: look.ink }]}>{line}</Text></Animated.View>)}
         </View>
-        {/* The bookmark drops in below the headline, on screens with room for it. */}
-        {H >= 720 ? <Animated.View pointerEvents="none" style={[styles.bookmark, { opacity: values.bookmark,
-          transform: [{ translateY: values.bookmark.interpolate({ inputRange: [0, 1], outputRange: [-120, 0] }) }, { rotate: values.bookmark.interpolate({ inputRange: [0, 1], outputRange: ['-40deg', '-8deg'] }) }] }]}>
+        {/* The save itself lands below the headline, on screens with room for it. */}
+        {H >= 720 ? <Animated.View pointerEvents="none" style={[styles.bookmark, { opacity: v.bookmark.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }),
+          transform: [
+            { translateY: Animated.add(v.bookmark.interpolate({ inputRange: [0, 1], outputRange: [-70, 0] }), v.drift[FINDS.length].interpolate(wave(5))) },
+            { rotate: v.bookmark.interpolate({ inputRange: [0, 1], outputRange: ['-24deg', '-8deg'] }) },
+          ] }]}>
           <Image source={BOOKMARK} style={styles.img} accessible={false} />
         </Animated.View> : null}
       </View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
-      {providers.map((provider, i) => {
-        const tone = primaryIsApple(provider) ? look.primary : look.secondary;
-        return <Animated.View key={provider} style={rise(values.buttons[Math.min(i, 1)], 28)}>
-          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/oauth/complete', params: { provider, intent: 'sign-in' } })}
-            style={({ pressed }): StyleProp<ViewStyle> => [styles.button, { backgroundColor: tone.background, borderColor: tone.border }, pressed ? styles.pressed : null]}>
-            <Ionicons name={provider === 'apple' ? 'logo-apple' : provider === 'google' ? 'logo-google' : 'globe-outline'} size={20} color={tone.ink} />
-            <Text maxFontSizeMultiplier={1.3} style={[styles.buttonLabel, { color: tone.ink }]}>Continue with {OAUTH_NAMES[provider]}</Text>
+        {providers.map((provider, i) => {
+          const tone = provider === 'apple' ? look.primary : look.secondary;
+          return <Animated.View key={provider} style={rise(v.buttons[Math.min(i, 1)], 22)}>
+            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/oauth/complete', params: { provider, intent: 'sign-in' } })}
+              style={({ pressed }): StyleProp<ViewStyle> => [styles.button, { backgroundColor: tone.background, borderColor: tone.border }, pressed ? styles.pressed : null]}>
+              <Ionicons name={provider === 'apple' ? 'logo-apple' : provider === 'google' ? 'logo-google' : 'globe-outline'} size={20} color={tone.ink} />
+              <Text maxFontSizeMultiplier={1.3} style={[styles.buttonLabel, { color: tone.ink }]}>Continue with {OAUTH_NAMES[provider]}</Text>
+            </Pressable>
+          </Animated.View>;
+        })}
+        <Animated.View style={[styles.more, rise(v.buttons[2], 12)]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Continue with email" onPress={() => setEmailOpen(true)} hitSlop={8}>
+            <Text maxFontSizeMultiplier={1.4} style={[styles.email, { color: look.bottomInk }]}>Continue with email</Text>
           </Pressable>
-        </Animated.View>;
-      })}
-      <Animated.View style={[styles.more, rise(values.buttons[2], 12)]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Continue with email" onPress={() => setEmailOpen(true)} hitSlop={8}>
-          <Text maxFontSizeMultiplier={1.4} style={[styles.email, { color: look.bottomInk }]}>Continue with email</Text>
-        </Pressable>
-        <Text maxFontSizeMultiplier={1.4} style={[styles.legal, { color: look.bottomMuted }]}>By continuing you accept the Terms and Privacy.</Text>
-      </Animated.View>
+          <Text maxFontSizeMultiplier={1.4} style={[styles.legal, { color: look.bottomMuted }]}>By continuing you accept the Terms and Privacy.</Text>
+        </Animated.View>
       </View>
     </ScrollView>
 
@@ -153,7 +176,7 @@ const styles = StyleSheet.create({
   mark: { width: 38, height: 38, borderRadius: 9 },
   headline: { alignItems: 'center' },
   line: { fontSize: 30, lineHeight: 36, fontWeight: '600', letterSpacing: -0.6, textAlign: 'center' },
-  bookmark: { width: 68, height: 68, marginTop: 6 },
+  bookmark: { width: 52, height: 52, marginTop: 8 },
   actions: { paddingHorizontal: 20, gap: 10 },
   button: { minHeight: 56, paddingHorizontal: 16, borderRadius: 28, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.92 },
