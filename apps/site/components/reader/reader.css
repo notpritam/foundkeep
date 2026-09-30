@@ -1,5 +1,5 @@
 /* Shared reader structure. A narrow panel stacks; an expanded reader uses a context column. */
-html body .reader-surface{color:var(--fk-ink);background:var(--fk-surface);font-family:Inter,system-ui,sans-serif;container-type:inline-size;scrollbar-color:var(--fk-control) var(--fk-surface);overscroll-behavior:contain}
+html body .reader-surface{color:var(--fk-ink);background:var(--fk-surface);font-family:var(--fk-font-sans);container-type:inline-size;scrollbar-color:var(--fk-control) var(--fk-surface);overscroll-behavior:contain}
 html body .reader-surface .reader-toolbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 14px;background:var(--fk-surface);border-bottom:1px solid var(--fk-line)}
 html body .reader-surface .reader-toolbar-label{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--fk-muted);font-size:12px;font-weight:400}
 html body .reader-surface .reader-toolbar-actions{display:flex;align-items:center;gap:4px;margin-left:auto}
@@ -10,14 +10,14 @@ html body .reader-icon-button svg{display:block;width:18px;height:18px;fill:none
 html body .reader-surface .reader-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:28px;padding:26px}
 html body .reader-surface .reader-content{min-width:0}
 html body .reader-surface .reader-heading{margin:0 0 22px}
-html body .reader-surface .reader-heading h2{font-family:Inter,system-ui,sans-serif;font-size:28px;line-height:1.3;letter-spacing:-.035em;font-weight:550;color:var(--fk-ink);margin:10px 0 0;text-wrap:pretty;overflow-wrap:anywhere}
+html body .reader-surface .reader-heading h2{font-family:var(--fk-font-sans);font-size:28px;line-height:1.3;letter-spacing:-.035em;font-weight:550;color:var(--fk-ink);margin:10px 0 0;text-wrap:pretty;overflow-wrap:anywhere}
 html body .reader-surface .reader-byline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:var(--fk-muted);font-size:12px;line-height:1.5}
 html body .reader-surface .reader-byline>*+*{border-left:1px solid var(--fk-line);padding-left:10px}
 html body .reader-surface .reader-byline a{color:var(--fk-muted);text-decoration:none}
 html body .reader-surface .reader-byline a:hover{color:var(--fk-accent)}
 html body .reader-surface :is(.reader-prose,.detail-section p){font-size:15px;line-height:1.85;max-width:72ch;white-space:pre-wrap;color:var(--fk-ink);overflow-wrap:anywhere;margin:0}
 html body .reader-surface .detail-section{margin:26px 0 0}
-html body .reader-surface :is(.detail-section h3,.reader-context h3){font-family:Inter,system-ui,sans-serif;letter-spacing:0;font-size:12px;line-height:1.5;font-weight:550;color:var(--fk-muted);margin:0 0 10px}
+html body .reader-surface :is(.detail-section h3,.reader-context h3){font-family:var(--fk-font-sans);letter-spacing:0;font-size:12px;line-height:1.5;font-weight:550;color:var(--fk-muted);margin:0 0 10px}
 html body .reader-surface .reader-context{min-width:0;padding-top:22px;border-top:1px solid var(--fk-line);font-size:12px;line-height:1.65;color:var(--fk-muted);overflow-wrap:anywhere}
 html body .reader-surface .reader-collection-name{font-size:13px;color:var(--fk-ink);line-height:1.6;margin:0 0 22px}
 html body .reader-surface .reader-metadata{margin:0 0 24px;font-size:12px;line-height:1.6}

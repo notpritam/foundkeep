@@ -6,9 +6,6 @@ import '../../../apps/site/app/customer.css';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import { ThemeProvider } from '../../../apps/site/components/appearance/theme';
 import { DEVICES, WEB_DEVICES, simulatorGlobals } from '../../simulator/devices.ts';
-import { applyWebPairing, brandGlobal } from '../../simulator/brand-type.ts';
-import '../../simulator/brand-fonts.css';
-import '../../simulator/brand-type-web.css';
 import { dashboardHandlers } from '../src/handlers.ts';
 import { BrowserFrame, innerUrl, isInner, listenForInnerErrors, relayErrorsToParent } from '../../simulator/Frame.tsx';
 
@@ -22,7 +19,6 @@ if (isInner()) document.head.insertAdjacentHTML('beforeend', '<style>html,body,#
 const simulator: Decorator = (Story, { id, globals, parameters, args }) => {
   const dark = globals.theme === 'dark', theme = dark ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
-  applyWebPairing(globals.brand);
   // The dashboard's ThemeProvider reads the stored preference, so components
   // that ask useTheme() (Settings, the mind map, the header toggle) agree.
   try { localStorage.setItem('foundkeep.appearance', theme); } catch { /* storage unavailable */ }
@@ -36,8 +32,8 @@ const simulator: Decorator = (Story, { id, globals, parameters, args }) => {
 const preview: Preview = {
   loaders: [mswLoader],
   decorators: [simulator],
-  globalTypes: simulatorGlobals(WEB_DEVICES, brandGlobal),
-  initialGlobals: { device: 'desktop', theme: 'light', brand: 'today' },
+  globalTypes: simulatorGlobals(WEB_DEVICES),
+  initialGlobals: { device: 'desktop', theme: 'light' },
   parameters: { options: { storySort: { order: ['Start here', 'Flow map', 'Live', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', nextjs: { appDirectory: true }, msw: { handlers: { story: [], world: dashboardHandlers } } },
 };
 export default preview;

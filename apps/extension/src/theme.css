@@ -25,7 +25,7 @@
   --accent-bg: #e6f2ea;
   --good: #286c56;
   --bad: #ad3b35;
-  --font: Inter, system-ui, sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif;
   --display: var(--font);
 }
 :root[data-theme="dark"] {

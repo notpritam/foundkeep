@@ -98,7 +98,7 @@ export const tokens = {
       "card": "0 18px 48px rgba(0, 0, 0, .6)"
     }
   },
-  "fontFamily": "Inter"
+  "fontFamily": "System"
 } as const;
 
 export type ColorName = keyof typeof tokens.color.light;
