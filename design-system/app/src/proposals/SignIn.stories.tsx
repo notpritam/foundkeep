@@ -1,14 +1,18 @@
 import type { Meta, StoryObj } from '@storybook/react-native-web-vite';
 import { FirstScreen } from '../../../../apps/mobile/src/proposals/sign-in/FirstScreen.tsx';
 
-const meta: Meta = {
+type Args = { look: 'sky' | 'meadow' };
+const meta: Meta<Args> = {
   title: 'Proposals/Sign in',
+  args: { look: 'sky' },
+  argTypes: { look: { control: 'inline-radio', options: ['sky', 'meadow'], description: 'Sky or Meadow' } },
   parameters: { simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/sign-in', params: {} },
-    docs: { description: { component: 'The first screen, after the reference Pritam saved (3D objects fly in around a centred headline; the sign-in buttons rise last). Two looks (Pritam: sky or meadow), one choreography, and FoundKeep’s own 3D objects (design-system/assets-3d). Press ↻ (Remount) in the toolbar to replay the entrance; the Motion switch shows it with reduced motion. Compare with Current / Sign-in / Sign in.' } } },
+    docs: { description: { component: 'The first screen, after Pritam’s review: no logo; the words are the design. Four type treatments, each with FoundKeep’s own 3D objects and the soft motion. Switch Sky/Meadow in Controls; press ↻ (Remount) to replay. Fonts: Instrument Serif, Bricolage Grotesque, Fraunces (Google Fonts, OFL).' } } },
 };
 export default meta;
-type Story = StoryObj;
-export const Sky: Story = { name: 'A · Sky', render: () => <FirstScreen look="sky" /> };
-export const Meadow: Story = { name: 'B · Meadow', render: () => <FirstScreen look="meadow" /> };
-export const SkyEmail: Story = { name: 'A · Sky, continuing with email', render: () => <FirstScreen look="sky" emailOpen />, parameters: { keyboard: true } };
-export const MeadowEmail: Story = { name: 'B · Meadow, continuing with email', render: () => <FirstScreen look="meadow" emailOpen />, parameters: { keyboard: true } };
+type Story = StoryObj<Args>;
+export const Highlighter: Story = { name: '1 · Highlighter', render: ({ look }) => <FirstScreen look={look} type="highlighter" /> };
+export const Tags: Story = { name: '2 · Tags', render: ({ look }) => <FirstScreen look={look} type="tags" /> };
+export const Rotating: Story = { name: '3 · Rotating finds', render: ({ look }) => <FirstScreen look={look} type="rotating" /> };
+export const Stack: Story = { name: '4 · Big stack', render: ({ look }) => <FirstScreen look={look} type="stack" /> };
+export const Email: Story = { name: 'Continuing with email', render: ({ look }) => <FirstScreen look={look} type="rotating" emailOpen />, parameters: { keyboard: true } };

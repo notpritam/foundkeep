@@ -14,11 +14,13 @@ import { useSession } from '../../session/SessionProvider.tsx';
 import { isOAuthProvider, OAUTH_NAMES, type OAuthProvider } from '../../auth-oauth.ts';
 import { EmailSheet } from './EmailSheet.tsx';
 import { gradient, look as lookFor, type LookName } from './looks.ts';
+import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, type HeadlineType } from './Headlines.tsx';
 
 /** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier). */
 type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number };
 /** What FoundKeep keeps, around the edges; x and y are fractions of the screen. */
-const FINDS: Find[] = [
+/** Around a centred headline. */
+const AROUND: Find[] = [
   { source: require('../../../assets/images/finds/photo.webp'), x: 0.05, y: 0.075, size: 84, rotate: -6, depth: 1, delay: 90, period: 9.2 },
   { source: require('../../../assets/images/finds/post.webp'), x: 0.68, y: 0.07, size: 104, rotate: 5, depth: 2, delay: 170, period: 10.6 },
   { source: require('../../../assets/images/finds/voice.webp'), x: -0.03, y: 0.235, size: 96, rotate: -8, depth: 0, delay: 240, period: 8.4 },
@@ -28,9 +30,24 @@ const FINDS: Find[] = [
   { source: require('../../../assets/images/finds/video.webp'), x: 0.0, y: 0.615, size: 100, rotate: -5, depth: 2, delay: 470, period: 10.2 },
   { source: require('../../../assets/images/finds/tag.webp'), x: 0.78, y: 0.61, size: 84, rotate: 9, depth: 2, delay: 530, period: 8.1 },
 ];
+/** Above and beside a headline set low on the left. */
+const ABOVE: Find[] = [
+  { source: require('../../../assets/images/finds/photo.webp'), x: 0.05, y: 0.15, size: 84, rotate: -7, depth: 1, delay: 90, period: 9.2 },
+  { source: require('../../../assets/images/finds/post.webp'), x: 0.56, y: 0.075, size: 112, rotate: 5, depth: 2, delay: 170, period: 10.6 },
+  { source: require('../../../assets/images/finds/voice.webp'), x: 0.32, y: 0.26, size: 88, rotate: -6, depth: 0, delay: 240, period: 8.4 },
+  { source: require('../../../assets/images/finds/sparkles.webp'), x: 0.82, y: 0.24, size: 56, rotate: 8, depth: 0, delay: 300, period: 7.6 },
+  { source: require('../../../assets/images/finds/highlight.webp'), x: 0.0, y: 0.33, size: 90, rotate: -4, depth: 1, delay: 360, period: 9.8 },
+  { source: require('../../../assets/images/finds/folder.webp'), x: 0.66, y: 0.36, size: 86, rotate: 6, depth: 2, delay: 410, period: 8.9 },
+  { source: require('../../../assets/images/finds/tag.webp'), x: 0.8, y: 0.52, size: 70, rotate: 9, depth: 1, delay: 470, period: 8.1 },
+];
+const LAYOUT: Record<HeadlineType, 'centre' | 'left'> = { highlighter: 'left', tags: 'centre', rotating: 'centre', stack: 'left' };
+const SUB: Record<HeadlineType, string> = {
+  highlighter: 'Pages, posts, photos and notes, kept in one private place.',
+  tags: 'Everything you find, organised for you.',
+  rotating: 'One private place for everything you find.',
+  stack: 'A private library for everything you find.',
+};
 const BOOKMARK = require('../../../assets/images/finds/bookmark.webp');
-const MARK = require('../../../assets/images/mark.png');
-const LINES = ['Meet FoundKeep,', 'a place for the things', 'worth keeping.'];
 
 // Motion: long, soft ease-outs (no springs), and a continuous drift.
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);          // expo out: fast start, long gentle landing
@@ -52,7 +69,9 @@ function useProviders(): OAuthProvider[] {
   return [...providers].sort((a, b) => ['google', 'apple'].indexOf(a) - ['google', 'apple'].indexOf(b));
 }
 
-export function FirstScreen({ look: lookName, emailOpen: startOpen = false }: { look: LookName; emailOpen?: boolean }) {
+export function FirstScreen({ look: lookName, type = 'rotating', emailOpen: startOpen = false }: { look: LookName; type?: HeadlineType; emailOpen?: boolean }) {
+  const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
+  const fontsReady = useDisplayFonts();
   const { scheme } = useAppearance();
   const look = useMemo(() => lookFor(lookName, scheme), [lookName, scheme]);
   const { width: W, height: H } = useWindowDimensions();
@@ -63,13 +82,13 @@ export function FirstScreen({ look: lookName, emailOpen: startOpen = false }: { 
 
   // Entrance values run 0 → 1 once; drift phases loop 0 → 1 for ever.
   const v = useRef({
-    emblem: new Animated.Value(0), finds: FINDS.map(() => new Animated.Value(0)), lines: LINES.map(() => new Animated.Value(0)),
+    finds: AROUND.map(() => new Animated.Value(0)),
     bookmark: new Animated.Value(0), buttons: [0, 1, 2].map(() => new Animated.Value(0)),
-    drift: [...FINDS.map(() => new Animated.Value(0)), new Animated.Value(0)],
+    drift: [...AROUND.map(() => new Animated.Value(0)), new Animated.Value(0)],
   }).current;
 
   useEffect(() => {
-    const entrance = [v.emblem, ...v.finds, ...v.lines, v.bookmark, ...v.buttons];
+    const entrance = [...v.finds, v.bookmark, ...v.buttons];
     if (!motion) {
       // Reduced motion (or not known yet): the finished screen, still.
       const settle = setTimeout(() => entrance.forEach(value => value.setValue(1)), 120);
@@ -79,9 +98,7 @@ export function FirstScreen({ look: lookName, emailOpen: startOpen = false }: { 
     const native = Platform.OS !== 'web';
     const to = (value: Animated.Value, delay: number, duration: number, easing = SETTLE) => Animated.timing(value, { toValue: 1, delay, duration, easing, useNativeDriver: native });
     const run = Animated.parallel([
-      to(v.emblem, 0, 900),
-      ...v.finds.map((value, i) => to(value, FINDS[i].delay, 1500 + FINDS[i].depth * 120)),
-      ...v.lines.map((value, i) => to(value, 380 + i * 100, 1000)),
+      ...v.finds.map((value, i) => to(value, (FINDS[i] ?? FINDS[0]).delay, 1500 + (FINDS[i] ?? FINDS[0]).depth * 120)),
       to(v.bookmark, 820, 1150, LAND),
       ...v.buttons.map((value, i) => to(value, 980 + i * 80, 850)),
     ]);
@@ -94,7 +111,7 @@ export function FirstScreen({ look: lookName, emailOpen: startOpen = false }: { 
     });
     run.start(); drift.forEach(loop => loop.start());
     return () => { run.stop(); drift.forEach(loop => loop.stop()); };
-  }, [motion, v]);
+  }, [motion, v, FINDS]);
 
   const rise = (value: Animated.Value, by = 20) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
   const cx = W / 2, cy = H * 0.42;
@@ -120,20 +137,19 @@ export function FirstScreen({ look: lookName, emailOpen: startOpen = false }: { 
       </Animated.View>;
     })}
 
-    {/* The words and buttons form a column: the emblem and headline centre in
+    {/* The words and buttons form a column: the headline centres (or sits low) in
         the space above the buttons; when large text needs more room than the
         screen has, the column scrolls instead of running under the buttons. */}
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.column, { paddingTop: insets.top + 12 }]}>
-      <View style={styles.center}>
-        <Animated.View style={[styles.emblem, { backgroundColor: look.emblem.fill, borderColor: look.emblem.ring, shadowColor: look.emblem.glow,
-          opacity: v.emblem, transform: [{ scale: v.emblem.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) }] }]}>
-          <Image source={MARK} style={styles.mark} accessibilityLabel="FoundKeep" />
-        </Animated.View>
-        <View style={styles.headline} accessibilityRole="header">
-          {LINES.map((line, i) => <Animated.View key={line} style={rise(v.lines[i])}><Text maxFontSizeMultiplier={1.4} style={[styles.line, { color: look.ink }]}>{line}</Text></Animated.View>)}
-        </View>
+      <View style={[styles.center, layout === 'left' && styles.low]}>
+        {/* Left layouts: the name at the top, the words low; they stack rather than overlap. */}
+        {layout === 'left' ? <><View style={styles.wordmark}><Wordmark color={look.ink} start motion={motion} /></View><View style={styles.spacer} /></> : null}
+        {type === 'highlighter' ? <HighlighterHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
+          : type === 'tags' ? <TagsHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
+          : type === 'stack' ? <StackHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
+          : <RotatingHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />}
         {/* The save itself lands below the headline, on screens with room for it. */}
-        {H >= 720 ? <Animated.View pointerEvents="none" style={[styles.bookmark, { opacity: v.bookmark.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }),
+        {layout === 'centre' && H >= 720 ? <Animated.View pointerEvents="none" style={[styles.bookmark, { opacity: v.bookmark.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }),
           transform: [
             { translateY: Animated.add(v.bookmark.interpolate({ inputRange: [0, 1], outputRange: [-70, 0] }), v.drift[FINDS.length].interpolate(wave(5))) },
             { rotate: v.bookmark.interpolate({ inputRange: [0, 1], outputRange: ['-24deg', '-8deg'] }) },
@@ -172,10 +188,9 @@ const styles = StyleSheet.create({
   img: { width: '100%', height: '100%', resizeMode: 'contain' },
   column: { flexGrow: 1 },
   center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 16, gap: 22 },
-  emblem: { width: 76, height: 76, borderRadius: 38, borderWidth: 1, alignItems: 'center', justifyContent: 'center', shadowOpacity: 1, shadowRadius: 28, shadowOffset: { width: 0, height: 0 } },
-  mark: { width: 38, height: 38, borderRadius: 9 },
-  headline: { alignItems: 'center' },
-  line: { fontSize: 30, lineHeight: 36, fontWeight: '600', letterSpacing: -0.6, textAlign: 'center' },
+  low: { justifyContent: 'flex-start', alignItems: 'stretch', paddingBottom: 28, paddingTop: 4 },
+  wordmark: { alignSelf: 'flex-start' },
+  spacer: { flexGrow: 1, minHeight: 24 },
   bookmark: { width: 52, height: 52, marginTop: 8 },
   actions: { paddingHorizontal: 20, gap: 10 },
   button: { minHeight: 56, paddingHorizontal: 16, borderRadius: 28, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },

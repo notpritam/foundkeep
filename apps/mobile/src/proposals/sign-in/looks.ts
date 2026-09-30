@@ -22,7 +22,7 @@ export type Look = {
 // them follows the theme.
 export function look(name: LookName, _scheme: 'light' | 'dark'): Look {
   if (name === 'sky') return {
-    background: 'linear-gradient(180deg, #1678cc 0%, #248ddc 52%, #6cc0f1 76%, #d4f0fd 100%)',
+    background: 'linear-gradient(180deg, #0e5aa8 0%, #156dc0 48%, #1a78c8 72%, #6dbdf0 86%, #d4f0fd 100%)',
     haze: [{ x: -0.1, y: 0.06, w: 0.7, h: 0.12, color: 'rgba(255,255,255,.75)' }, { x: 0.45, y: 0.22, w: 0.75, h: 0.14, color: 'rgba(255,255,255,.55)' }, { x: -0.2, y: 0.82, w: 0.9, h: 0.16, color: 'rgba(255,255,255,.8)' }, { x: 0.25, y: 0.35, w: 0.5, h: 0.3, color: 'rgba(255,255,255,.28)' }],
     ink: '#ffffff', muted: 'rgba(255,255,255,.82)', bottomInk: '#0b2e4a', bottomMuted: '#3b5a70',
     emblem: { fill: 'rgba(255,255,255,.22)', ring: 'rgba(255,255,255,.55)', glow: 'rgba(255,255,255,.7)' },
@@ -31,7 +31,7 @@ export function look(name: LookName, _scheme: 'light' | 'dark'): Look {
     statusBar: 'light',
   };
   return {
-    background: 'linear-gradient(180deg, #08563a 0%, #0d7a50 50%, #3fbf87 76%, #d6f3e4 100%)',
+    background: 'linear-gradient(180deg, #07492f 0%, #0a6a44 48%, #0d7a50 72%, #4cc28c 86%, #d6f3e4 100%)',
     haze: [{ x: 0.2, y: 0.3, w: 0.6, h: 0.32, color: 'rgba(214,243,228,.35)' }, { x: -0.25, y: 0.8, w: 1, h: 0.18, color: 'rgba(255,255,255,.45)' }, { x: 0.5, y: 0.02, w: 0.7, h: 0.12, color: 'rgba(191,238,214,.35)' }],
     ink: '#ffffff', muted: 'rgba(255,255,255,.84)', bottomInk: '#063a26', bottomMuted: '#2f5a47',
     emblem: { fill: 'rgba(255,255,255,.18)', ring: 'rgba(255,255,255,.5)', glow: 'rgba(191,238,214,.8)' },
