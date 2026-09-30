@@ -3,7 +3,7 @@
 // browser bar) around an iframe exactly the device's size, and that iframe
 // renders the story itself (`simulator=inner`). The story then gets a real
 // viewport: window size, media queries and 100vh match the device.
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Device } from './devices.ts';
 
 export const isInner = () => typeof location !== 'undefined' && new URLSearchParams(location.search).get('simulator') === 'inner';
@@ -21,6 +21,35 @@ export function relayErrorsToParent() {
 export function listenForInnerErrors() {
   if (isInner()) return;
   window.addEventListener('message', e => { if (e.data?.type === 'fk-simulator-error') console.error(`[simulator] ${e.data.message}`); });
+}
+
+/** Storybook's URL form of simple args: key:value;flag:!true (anything else is left out). */
+function argsParam(args: Record<string, unknown> = {}) {
+  return Object.entries(args).map(([k, v]) => typeof v === 'boolean' ? `${k}:!${v}` : (typeof v === 'number' || (typeof v === 'string' && /^[\w -]*$/.test(v))) ? `${k}:${v}` : null).filter(Boolean).join(';');
+}
+
+/** The screen inside a frame. It opens with the story's current args, and every
+ * later change in Controls is sent straight into it (no reload), so the device
+ * shows exactly what the Controls panel says. */
+function LiveFrame({ src, storyId, args, title, style }: { src: string; storyId?: string; args?: Record<string, unknown>; title: string; style: CSSProperties }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const [initial] = useState(() => { const a = argsParam(args); return a ? `${src}&args=${encodeURIComponent(a)}` : src; });
+  // The args it opened with are in its URL; only later changes are sent, once
+  // the inner preview has finished starting (it rejects updates before that).
+  const key = JSON.stringify(args ?? {});
+  const opened = useRef(key), changed = useRef(false);
+  const send = async () => {
+    // Once anything has changed, every value is sent — including a return to the first one.
+    if (key !== opened.current) changed.current = true;
+    if (!changed.current || !storyId || !args) return;
+    const inner = ref.current?.contentWindow as unknown as { __STORYBOOK_PREVIEW__?: { initializationPromise?: Promise<unknown> }; __STORYBOOK_ADDONS_CHANNEL__?: { emit: (event: string, data: unknown) => void } } | null;
+    const preview = inner?.__STORYBOOK_PREVIEW__, channel = inner?.__STORYBOOK_ADDONS_CHANNEL__;
+    if (!preview || !channel) return;
+    await preview.initializationPromise?.catch(() => {});
+    channel.emit('updateStoryArgs', { storyId, updatedArgs: args });
+  };
+  useEffect(() => { void send(); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <iframe ref={ref} title={title} src={initial} onLoad={() => void send()} style={style} />;
 }
 
 export function innerUrl(storyId: string, globals: Record<string, unknown>) {
@@ -69,13 +98,13 @@ function Keyboard({ device, dark }: { device: Device; dark: boolean }) {
 
 /** insetContent: the page inside knows nothing of safe areas (a live web build), so
  * keep it clear of the status bar and home indicator, as iOS would. */
-export function PhoneFrame({ device, src, dark, keyboard = false, insetContent = false, background }: { device: Device; src: string; dark: boolean; keyboard?: boolean; insetContent?: boolean; background?: string }) {
+export function PhoneFrame({ device, src, dark, keyboard = false, insetContent = false, background, storyId, args }: { device: Device; src: string; dark: boolean; keyboard?: boolean; insetContent?: boolean; background?: string; storyId?: string; args?: Record<string, unknown> }) {
   const bezel = device.kind === 'tablet' ? 16 : 12;
   const kb = keyboard ? KEYBOARD[device.platform] : 0;
   return <Scaled width={device.width + bezel * 2} height={device.height + bezel * 2}>
     <div style={{ padding: bezel, borderRadius: device.radius + bezel, background: '#1b1c1e', boxShadow: '0 0 0 1px #3a3b3e, 0 30px 80px rgba(0,0,0,.35)' }}>
       <div style={{ position: 'relative', width: device.width, height: device.height, borderRadius: device.radius, overflow: 'hidden', background: background || (dark ? '#000' : '#fff') }}>
-        <iframe title={`${device.label} screen`} src={src} style={{ display: 'block', width: device.width, height: device.height - kb - (insetContent ? device.insets.top + device.insets.bottom : 0), marginTop: insetContent ? device.insets.top : 0, border: 0, background }} />
+        <LiveFrame key={src} storyId={storyId} args={args} title={`${device.label} screen`} src={src} style={{ display: 'block', width: device.width, height: device.height - kb - (insetContent ? device.insets.top + device.insets.bottom : 0), marginTop: insetContent ? device.insets.top : 0, border: 0, background }} />
         {insetContent ? <span aria-hidden="true" style={{ position: 'absolute', inset: '0 0 auto 0', height: device.insets.top, background }} /> : null}
         <StatusBar device={device} dark={dark} />
         {keyboard ? <Keyboard device={device} dark={dark} /> : null}
@@ -85,8 +114,8 @@ export function PhoneFrame({ device, src, dark, keyboard = false, insetContent =
   </Scaled>;
 }
 
-export function BrowserFrame({ device, src, dark, url }: { device: Device; src: string; dark: boolean; url: string }) {
-  if (device.kind === 'phone' || device.kind === 'tablet') return <PhoneFrame device={device} src={src} dark={dark} />;
+export function BrowserFrame({ device, src, dark, url, storyId, args }: { device: Device; src: string; dark: boolean; url: string; storyId?: string; args?: Record<string, unknown> }) {
+  if (device.kind === 'phone' || device.kind === 'tablet') return <PhoneFrame device={device} src={src} dark={dark} storyId={storyId} args={args} />;
   const bar = 40;
   return <Scaled width={device.width} height={device.height + bar}>
     <div style={{ borderRadius: device.radius, overflow: 'hidden', border: `1px solid ${dark ? '#2a2c30' : '#d9dbde'}`, boxShadow: '0 30px 80px rgba(0,0,0,.25)', background: dark ? '#08090a' : '#fff' }}>
@@ -94,7 +123,7 @@ export function BrowserFrame({ device, src, dark, url }: { device: Device; src: 
         {['#ff5f57', '#febc2e', '#28c840'].map(c => <span key={c} style={{ width: 12, height: 12, borderRadius: 6, background: c }} />)}
         <span style={{ flex: 1, maxWidth: 520, margin: '0 auto', height: 26, borderRadius: 7, background: dark ? '#0f1011' : '#fff', color: dark ? '#a5aab2' : '#686868', font: '400 13px Inter, system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{url}</span>
       </div>
-      <iframe title={`${device.label} window`} src={src} style={{ display: 'block', width: device.width, height: device.height, border: 0 }} />
+      <LiveFrame key={src} storyId={storyId} args={args} title={`${device.label} window`} src={src} style={{ display: 'block', width: device.width, height: device.height, border: 0 }} />
     </div>
   </Scaled>;
 }

@@ -16,7 +16,7 @@ listenForInnerErrors();
 if (isInner()) document.head.insertAdjacentHTML('beforeend', '<style>html,body,#storybook-root{min-height:100%;margin:0}body{padding:0!important;display:block!important}</style>');
 
 /** Pages (parameters.simulator) render in a browser window of the chosen size; components render as they are. */
-const simulator: Decorator = (Story, { id, globals, parameters }) => {
+const simulator: Decorator = (Story, { id, globals, parameters, args }) => {
   const dark = globals.theme === 'dark', theme = dark ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
   // The dashboard's ThemeProvider reads the stored preference, so components
@@ -24,7 +24,7 @@ const simulator: Decorator = (Story, { id, globals, parameters }) => {
   try { localStorage.setItem('foundkeep.appearance', theme); } catch { /* storage unavailable */ }
   if (parameters.simulator && !isInner()) {
     const device = DEVICES[globals.device] || DEVICES.desktop;
-    return <BrowserFrame device={device} src={innerUrl(id, globals)} dark={dark} url={parameters.url || 'foundkeep.app/dashboard'} />;
+    return <BrowserFrame device={device} src={innerUrl(id, globals)} dark={dark} url={parameters.url || 'foundkeep.app/dashboard'} storyId={id} args={args} />;
   }
   return <ThemeProvider key={theme}><Story /></ThemeProvider>;
 };
