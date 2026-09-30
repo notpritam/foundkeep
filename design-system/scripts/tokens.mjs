@@ -49,14 +49,15 @@ function appModule() {
     color: { light: colors('light'), dark: colors('dark') },
     space: t.space, radius: t.radius, control: t.control,
     text: Object.fromEntries(Object.entries(t.text).map(([k, v]) => [k, textStyle(v)])),
-    shadow: t.shadow, fontFamily: 'Inter',
+    // The app sets no family: iOS draws SF Pro, the brand face, on its own.
+    shadow: t.shadow, fontFamily: 'System',
   };
   return `// ${HEADER} file.\nexport const tokens = ${JSON.stringify(tokens, null, 2)} as const;\n\nexport type ColorName = keyof typeof tokens.color.light;\nexport type Scheme = keyof typeof tokens.color;\n`;
 }
 
 // Dashboard: colours as --fk-color-* so they never collide with appearance.css.
 function dashboardCss() {
-  const font = 'var(--fk-font-sans, Inter, system-ui, sans-serif)';
+  const font = `var(--fk-font-sans, ${t.font.font})`;
   return [
     `/* ${HEADER} file. */`,
     ':root {',

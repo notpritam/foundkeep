@@ -1,24 +1,26 @@
 // Proposal (sign-in, 2026-09-30): the words are the design. Four headline
 // treatments for the first screen, each a display face with character and
 // colour that means something in FoundKeep (a highlight, tags, the kinds of
-// things you keep). Fonts: Google Fonts, SIL OFL (assets/fonts/OFL.txt).
+// things you keep). The brand's own face is SF Pro, Apple's system font;
+// these expressive faces are for moments like sign-in and onboarding.
+// Fonts: Google Fonts, SIL OFL (assets/fonts/OFL.txt).
 import { useFonts } from 'expo-font';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, View, type TextStyle } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View, type TextStyle, type ViewStyle } from 'react-native';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 
 export type HeadlineType = 'highlighter' | 'tags' | 'rotating' | 'stack';
-export const DISPLAY = { serif: 'InstrumentSerif', serifItalic: 'InstrumentSerif-Italic', grotesque: 'Bricolage-ExtraBold', unbounded: 'Unbounded-Bold', syne: 'Syne-ExtraBold', jakarta: 'PlusJakartaSans-ExtraBold', hand: 'Caveat-Bold', dmSerif: 'DMSerifDisplay', dmSerifItalic: 'DMSerifDisplay-Italic' } as const;
+export const DISPLAY = { serif: 'InstrumentSerif', serifItalic: 'InstrumentSerif-Italic', grotesque: 'Bricolage-ExtraBold', hand: 'Caveat-Bold', mono: 'SpaceMono-Bold', dmSerif: 'DMSerifDisplay', dmSerifItalic: 'DMSerifDisplay-Italic' } as const;
+/** SF Pro: the system font on iOS; on the web, the same face through -apple-system (Inter or the system sans elsewhere). */
+export const SF = Platform.select({ web: '-apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif', default: undefined });
 
 export function useDisplayFonts() {
   const [loaded, error] = useFonts({
     [DISPLAY.serif]: require('../../../assets/fonts/InstrumentSerif-Regular.ttf'),
     [DISPLAY.serifItalic]: require('../../../assets/fonts/InstrumentSerif-Italic.ttf'),
     [DISPLAY.grotesque]: require('../../../assets/fonts/BricolageGrotesque-ExtraBold.ttf'),
-    [DISPLAY.unbounded]: require('../../../assets/fonts/Unbounded-Bold.ttf'),
-    [DISPLAY.syne]: require('../../../assets/fonts/Syne-ExtraBold.ttf'),
-    [DISPLAY.jakarta]: require('../../../assets/fonts/PlusJakartaSans-ExtraBold.ttf'),
     [DISPLAY.hand]: require('../../../assets/fonts/Caveat-Bold.ttf'),
+    [DISPLAY.mono]: require('../../../assets/fonts/SpaceMono-Bold.ttf'),
     [DISPLAY.dmSerif]: require('../../../assets/fonts/DMSerifDisplay-Regular.ttf'),
     [DISPLAY.dmSerifItalic]: require('../../../assets/fonts/DMSerifDisplay-Italic.ttf'),
   });
@@ -85,27 +87,34 @@ export function TagsHeadline({ start, motion, sub, subColor }: Props) {
   </View>;
 }
 
-/** Type pairings for the rotating headline: the lead words, then the changing word. */
-export type RotatingFont = 'instrument' | 'bricolage' | 'unbounded' | 'syne' | 'jakarta' | 'dmserif';
-type Face = { fontFamily: string; fontSize: number; lineHeight: number; letterSpacing: number };
-export const ROTATING_FONTS: Record<RotatingFont, { label: string; lead: Face; word: Face }> = {
-  instrument: { label: 'Instrument Serif', lead: { fontFamily: DISPLAY.serif, fontSize: 52, lineHeight: 56, letterSpacing: -0.6 }, word: { fontFamily: DISPLAY.serifItalic, fontSize: 64, lineHeight: 70, letterSpacing: -0.8 } },
-  bricolage: { label: 'Bricolage Grotesque', lead: { fontFamily: DISPLAY.grotesque, fontSize: 40, lineHeight: 46, letterSpacing: -1.2 }, word: { fontFamily: DISPLAY.grotesque, fontSize: 50, lineHeight: 58, letterSpacing: -1.6 } },
-  unbounded: { label: 'Unbounded', lead: { fontFamily: DISPLAY.unbounded, fontSize: 30, lineHeight: 38, letterSpacing: -0.6 }, word: { fontFamily: DISPLAY.unbounded, fontSize: 38, lineHeight: 48, letterSpacing: -1 } },
-  syne: { label: 'Syne', lead: { fontFamily: DISPLAY.syne, fontSize: 40, lineHeight: 46, letterSpacing: -1 }, word: { fontFamily: DISPLAY.syne, fontSize: 50, lineHeight: 58, letterSpacing: -1.4 } },
-  jakarta: { label: 'Plus Jakarta Sans + Caveat', lead: { fontFamily: DISPLAY.jakarta, fontSize: 38, lineHeight: 44, letterSpacing: -1.2 }, word: { fontFamily: DISPLAY.hand, fontSize: 62, lineHeight: 66, letterSpacing: 0 } },
-  dmserif: { label: 'DM Serif Display', lead: { fontFamily: DISPLAY.dmSerif, fontSize: 44, lineHeight: 50, letterSpacing: -0.6 }, word: { fontFamily: DISPLAY.dmSerifItalic, fontSize: 54, lineHeight: 62, letterSpacing: -0.8 } },
+/** "Keep every" in SF Pro, and the thing you keep in a face (and a frame) of its own. */
+export type KeepStyle = 'serif' | 'hand' | 'mono' | 'soft' | 'weight' | 'per-find';
+type Face = TextStyle & { fontSize: number; lineHeight: number };
+/** A changing word: its face, a frame around it (pill, marker), a tilt and, on a frame with a fill, its own ink. */
+type Word = { face: Face; frame?: ViewStyle; tilt?: string; ink?: string };
+const lead: Face = { fontFamily: SF, fontWeight: '700', fontSize: 40, lineHeight: 46, letterSpacing: -1.2 };
+const WORD = {
+  serif: { face: { fontFamily: DISPLAY.serifItalic, fontSize: 70, lineHeight: 74, letterSpacing: -1 } },
+  hand: { face: { fontFamily: DISPLAY.hand, fontSize: 70, lineHeight: 74 }, tilt: '-4deg' },
+  mono: { face: { fontFamily: DISPLAY.mono, fontSize: 40, lineHeight: 54, letterSpacing: -1.6 }, frame: { marginTop: 6, paddingHorizontal: 18, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,.5)', backgroundColor: 'rgba(255,255,255,.16)' } },
+  heavy: { face: { fontFamily: SF, fontWeight: '800', fontSize: 54, lineHeight: 62, letterSpacing: -1.8 } },
+  marker: { face: { fontFamily: SF, fontWeight: '800', fontSize: 52, lineHeight: 64, letterSpacing: -1.8 }, frame: { marginTop: 4, paddingHorizontal: 12, borderRadius: 12, backgroundColor: INK.butter }, tilt: '-1.5deg', ink: INK.navy },
+  dmItalic: { face: { fontFamily: DISPLAY.dmSerifItalic, fontSize: 62, lineHeight: 70, letterSpacing: -0.8 } },
+} satisfies Record<string, Word>;
+export const KEEP_STYLES: Record<KeepStyle, { label: string; lead: Face; word: Word; per?: Record<string, Word> }> = {
+  serif: { label: 'SF Pro + Instrument Serif italic', lead, word: WORD.serif },
+  hand: { label: 'SF Pro + Caveat, tilted', lead, word: WORD.hand },
+  mono: { label: 'SF Pro + Space Mono, in a field', lead, word: WORD.mono },
+  soft: { label: 'Instrument Serif + SF Pro Heavy', lead: { fontFamily: DISPLAY.serifItalic, fontSize: 52, lineHeight: 56, letterSpacing: -0.6 }, word: WORD.heavy },
+  weight: { label: 'SF Pro only: light over black', lead: { fontFamily: SF, fontWeight: '400', fontSize: 38, lineHeight: 44, letterSpacing: -0.9 }, word: { face: { fontFamily: SF, fontWeight: '900', fontSize: 52, lineHeight: 60, letterSpacing: -2 } } },
+  'per-find': { label: 'A style for each find', lead, word: WORD.serif, per: { 'link.': WORD.mono, 'photo.': WORD.serif, 'highlight.': WORD.marker, 'voice memo.': { ...WORD.hand, face: { ...WORD.hand.face, fontSize: 62, lineHeight: 70 } }, 'idea.': WORD.dmItalic } },
 };
-
-/** A brand type candidate for the headline (the Storybook Type toolbar,
- * design-system/simulator/brand-type.ts); replaces the font's two faces. */
-export type HeadlineFaces = { lead: TextStyle & { lineHeight: number }; word: TextStyle & { lineHeight: number } };
 
 const WORDS = [{ word: 'link.', color: INK.butter }, { word: 'photo.', color: INK.peach }, { word: 'highlight.', color: INK.mint }, { word: 'voice memo.', color: INK.ice }, { word: 'idea.', color: INK.lilac }];
 /** C: "Keep every …" — the thing you keep keeps changing: link, photo, highlight… in its own colour. */
-export function RotatingHeadline({ start, motion, sub, subColor, font = 'instrument', faces, shadow = false }: Props & { font?: RotatingFont; faces?: HeadlineFaces }) {
+export function RotatingHeadline({ start, motion, sub, subColor, keep = 'serif', shadow = false }: Props & { keep?: KeepStyle }) {
   const glow = shadow ? SHADOW : null;
-  const face = faces ?? ROTATING_FONTS[font];
+  const style = KEEP_STYLES[keep];
   const [l1, l2, s] = useEntrance([380, 520, 760], start, motion);
   const [index, setIndex] = useState(0);
   const turn = useRef(new Animated.Value(1)).current;
@@ -123,11 +132,14 @@ export function RotatingHeadline({ start, motion, sub, subColor, font = 'instrum
     return () => { live = false; clearInterval(timer); };
   }, [start, motion, turn]);
   const current = motion ? WORDS[index] : { word: 'find.', color: INK.butter };
+  const word = style.per?.[current.word] ?? style.word;
+  // The row keeps the height of its tallest word, so nothing below jumps as they change.
+  const rowHeight = Math.max(...[style.word, ...Object.values(style.per ?? {})].map(w => w.face.lineHeight + (w.frame ? 12 : 0)));
   return <View style={styles.center} accessibilityRole="header" accessibilityLabel="Keep every link, photo, highlight, voice memo and idea.">
-    <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[face.lead, styles.centred, { color: INK.white }, glow]}>Keep every</Text></Animated.View>
-    <Animated.View style={[rise(l2), styles.rotor, { minHeight: face.word.lineHeight }]}>
-      <Animated.View style={{ opacity: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }), transform: [{ translateY: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [22, 0, -18] }) }] }}>
-        <Text maxFontSizeMultiplier={1.3} style={[face.word, styles.centred, { color: current.color }, glow]}>{current.word}</Text>
+    <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[style.lead, styles.centred, { color: INK.white }, glow]}>Keep every</Text></Animated.View>
+    <Animated.View style={[rise(l2), styles.rotor, { minHeight: rowHeight }]}>
+      <Animated.View style={[word.frame, { opacity: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }), transform: [{ rotate: word.tilt ?? '0deg' }, { translateY: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [22, 0, -18] }) }] }]}>
+        <Text maxFontSizeMultiplier={1.3} style={[word.face, styles.centred, { color: word.ink ?? current.color }, word.ink ? null : glow]}>{current.word}</Text>
       </Animated.View>
     </Animated.View>
     <Animated.View style={rise(s, 10)}><Text maxFontSizeMultiplier={1.4} style={[styles.subCenter, { color: subColor }, glow]}>{sub}</Text></Animated.View>

@@ -1,89 +1,77 @@
-// Brand type (proposal, 2026-09-30): each candidate pairing set as FoundKeep —
-// a type specimen on the Cumulus sky, then the real app and dashboard screens
-// in that pairing (the App and Dashboard Storybooks, through their Type
-// toolbar). The pairings and their fonts are simulator/brand-type.ts and
-// simulator/brand-fonts.css; the screens only exist in the full build.
-import '../../simulator/brand-fonts.css';
+// Brand type (2026-09-30). Pritam: the brand face is Apple's — SF Pro, the
+// system font on his Mac and iPhone (-apple-system in tokens.json; Inter
+// stands in elsewhere). Expressive faces are kept for moments like sign-in
+// and onboarding: the "Keep every" styles of the app's first screen. The
+// screens come from the App and Dashboard Storybooks, so they exist only in
+// the full build.
 import './brand.css';
-import { PAIRINGS } from '../../simulator/brand-type.ts';
 import sky from '../../../apps/mobile/assets/images/sign-in-backgrounds/sky-cumulus-top-medium.webp';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const faceName = f => f.family.match(/'([^']+)'/)[1];
-const weightName = { 400: 'Regular', 500: 'Medium', 600: 'Semibold', 700: 'Bold', 800: 'Extrabold' };
 
-/** The pairing as CSS variables; --scale evens out how large each display face looks at one size. */
-function vars(p) {
-  return [['--display', p.display.family], ['--display-weight', p.display.weight], ['--display-tracking', `${p.display.tracking}em`],
-    ['--word', p.word.family], ['--word-weight', p.word.weight], ['--word-tracking', `${p.word.tracking}em`], ['--word-style', p.word.italic ? 'italic' : 'normal'],
-    ['--text', p.text.family], ['--scale', (p.lead[0] / 38).toFixed(3)]].map(([k, v]) => `${k}:${v}`).join(';');
-}
-
-/** A screen from the App or Dashboard Storybook, framed, in this pairing. */
-function screen(book, id, caption, p, extra = '') {
-  const globals = [`brand:${p.id}`, book === 'dashboard' ? 'device:laptop' : 'device:iphone-17-pro', extra].filter(Boolean).join(';');
-  return `<figure${book === 'dashboard' && id === 'current-landing--landing' ? ' class="bt-wide"' : ''}>
-    <iframe loading="lazy" title="${esc(caption)} in ${esc(p.name)}" src="./${book}/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(globals)}"></iframe>
+/** A screen from the App or Dashboard Storybook, in its device frame. */
+function screen(book, id, caption, wide = false) {
+  const globals = book === 'dashboard' ? 'device:laptop' : 'device:iphone-17-pro';
+  return `<figure${wide ? ' class="bt-wide"' : ''}>
+    <iframe loading="lazy" title="${esc(caption)}" src="./${book}/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(globals)}"></iframe>
     <figcaption>${esc(caption)}</figcaption></figure>`;
 }
 
-function board(id) {
-  const p = PAIRINGS[id];
+function brand() {
   const el = document.createElement('div');
-  el.className = 'bt'; el.style.cssText = vars(p);
+  el.className = 'bt';
   el.innerHTML = `
     <header class="bt-intro">
-      <div><h1 class="bt-display">${esc(p.name)}</h1><p>${esc(p.mood)} ${esc(p.source)}.</p></div>
-      <div class="bt-roles"><span>Display: <strong>${esc(faceName(p.display))} ${weightName[p.display.weight]}</strong></span><span>Text: <strong>${esc(faceName(p.text))}</strong></span></div>
+      <div><h1>SF Pro</h1><p>Apple’s own typeface is FoundKeep’s: the system font on Mac and iPhone, so the app, the extension and the site read like the devices they run on. Where SF isn’t installed (Windows, Android, Linux), Inter stands in.</p></div>
+      <div class="bt-roles"><span>Everything: <strong>SF Pro</strong></span><span>Moments: <strong>see Keep every styles</strong></span></div>
     </header>
     <section class="bt-specimen" aria-label="Type specimen">
       <div class="bt-poster" style="background-image:url(${sky})">
-        <h2 class="bt-display">Keep every <span class="bt-word">highlight.</span></h2>
+        <h2>Found it? Keep it.</h2>
         <p>One private place for everything you find.</p>
       </div>
       <div class="bt-text">
-        <h3 class="bt-display">Found it? Keep it.</h3>
+        <h3>A place for the things worth keeping.</h3>
         <p>Save a page from your browser, a photo from your phone, a line you highlighted. FoundKeep keeps them in one private collection and brings them back when you need them.</p>
         <div class="bt-ui"><button type="button">Continue with Google</button><button type="button">Add details</button><span>Reading list</span><span>Design</span></div>
         <div class="bt-meta">Saved from the web, 2 minutes ago. 1,284 finds in 36 folders.</div>
-        <div class="bt-glyphs bt-display">Aa Gg Qq &amp; 0123456789</div>
+        <div class="bt-weights"><span style="font-weight:300">Light</span><span style="font-weight:400">Regular</span><span style="font-weight:500">Medium</span><span style="font-weight:600">Semibold</span><span style="font-weight:700">Bold</span><span style="font-weight:800">Heavy</span><span style="font-weight:900">Black</span></div>
       </div>
     </section>
-    <h2 class="bt-part bt-display">In the app</h2>
-    <p>The first screen on the Cumulus sky, the library and a saved page, with the headline and titles in ${esc(faceName(p.display))}.</p>
+    <h2 class="bt-part">In the app</h2>
+    <p>iOS draws SF Pro on its own: the app sets no family.</p>
     <div class="bt-phones">
-      ${screen('app', 'proposals-sign-in--cumulus-top-medium', 'First screen', p)}
-      ${screen('app', 'current-library--library', 'Library', p)}
-      ${screen('app', 'current-save-detail--full-page', 'A saved page', p)}
+      ${screen('app', 'current-library--library', 'Library')}
+      ${screen('app', 'current-save-detail--full-page', 'A saved page')}
+      ${screen('app', 'current-you--you', 'You')}
     </div>
-    <h2 class="bt-part bt-display">On the web</h2>
-    <p>foundkeep.app, the scenic sign-in and the dashboard library.</p>
+    <h2 class="bt-part">On the web</h2>
+    <p>foundkeep.app and the dashboard, through <code>--fk-font-sans</code>.</p>
     <div class="bt-screens">
-      ${screen('dashboard', 'current-landing--landing', 'foundkeep.app', p)}
-      ${screen('dashboard', 'current-sign-in--log-in', 'Log in', p)}
-      ${screen('dashboard', 'current-library--library', 'Dashboard library', p)}
+      ${screen('dashboard', 'current-landing--landing', 'foundkeep.app', true)}
+      ${screen('dashboard', 'current-library--library', 'Dashboard library')}
+      ${screen('dashboard', 'current-save-detail--page', 'A saved page')}
     </div>`;
   return el;
 }
 
-function compare() {
+const KEEP = [
+  ['keep-serif', 'SF Pro + Instrument Serif italic'],
+  ['keep-hand', 'SF Pro + Caveat, tilted'],
+  ['keep-mono', 'SF Pro + Space Mono, in a field'],
+  ['keep-soft', 'Instrument Serif + SF Pro Heavy'],
+  ['keep-weight', 'SF Pro only, light over black'],
+  ['keep-per-find', 'A style for each find'],
+];
+function keep() {
   const el = document.createElement('div');
   el.className = 'bt';
-  el.innerHTML = `<header class="bt-intro"><div><h1>Brand type</h1><p>Seven ways FoundKeep could sound. Each pairing opens as a board: a specimen on the Cumulus sky, then the app and the dashboard set in it. The Type toolbar in the App and Dashboard Storybooks tries any pairing on any screen.</p></div></header>
-    <div class="bt-compare">${Object.values(PAIRINGS).map(p => `
-      <a class="bt-row" style="${vars(p)}" href="./?path=/story/brand-type--${p.id}" target="_top">
-        <div><div class="bt-row-name">${esc(p.name)}</div><div class="bt-row-note">${esc(p.source)}. ${esc(p.mood)}</div></div>
-        <div class="bt-row-sample"><div class="bt-display">Found it? Keep it.</div><p>Save a page from your browser, a photo from your phone, a line you highlighted. Find it again whenever you need it.</p></div>
-      </a>`).join('')}</div>`;
+  el.innerHTML = `
+    <header class="bt-intro"><div><h1>Keep every styles</h1><p>The first screen’s headline is where FoundKeep gets to show off. “Keep every” stays in SF Pro; the word that changes (link, photo, highlight, voice memo, idea) takes a face and a frame of its own. The same styles can carry onboarding and the sign-in page on the web.</p></div></header>
+    <div class="bt-phones bt-phones-six">${KEEP.map(([id, name]) => screen('app', `proposals-sign-in--${id}`, name)).join('')}</div>`;
   return el;
 }
 
 export default { title: 'Brand type', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
-export const Compare = { name: 'All pairings', render: compare };
-export const MonoJakarta = { name: 'Space Mono + Plus Jakarta Sans', render: () => board('mono-jakarta') };
-export const Instrument = { name: 'Instrument Serif + Instrument Sans', render: () => board('instrument') };
-export const YoungInstrument = { name: 'Young Serif + Instrument Sans', render: () => board('young-instrument') };
-export const SyneInter = { name: 'Syne + Inter', render: () => board('syne-inter') };
-export const RethinkSpectral = { name: 'Rethink Sans + Spectral', render: () => board('rethink-spectral') };
-export const InstrumentGeist = { name: 'Instrument Sans + Geist', render: () => board('instrument-geist') };
-export const Today = { name: 'As designed (Inter)', render: () => board('today') };
+export const SFPro = { name: 'SF Pro', render: brand };
+export const KeepEvery = { name: 'Keep every styles', render: keep };

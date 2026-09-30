@@ -60,7 +60,7 @@ const MindMapCanvas=forwardRef<MindMapCanvasHandle,Props>(function MindMapCanvas
      if(isFocus){ctx.beginPath();ctx.arc(x,y,r+4/scale,0,2*Math.PI);ctx.fillStyle=hexAlpha(s.colors.ring,.28);ctx.fill();}
      ctx.beginPath();ctx.arc(x,y,r,0,2*Math.PI);ctx.fillStyle=isFocus?s.colors.focus:node.color;ctx.fill();
      const alpha=s.focus?(on?1:0):labelAlpha(scale);
-     if(alpha>.02){ctx.globalAlpha=alpha;ctx.font=`${(on&&s.focus?11.5:11)/scale}px Inter,system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='top';ctx.lineWidth=3/scale;ctx.lineJoin='round';ctx.strokeStyle=s.colors.textHalo;ctx.strokeText(node.short,x,y+r+4/scale);ctx.fillStyle=s.colors.text;ctx.fillText(node.short,x,y+r+4/scale);}
+     if(alpha>.02){ctx.globalAlpha=alpha;ctx.font=`${(on&&s.focus?11.5:11)/scale}px -apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='top';ctx.lineWidth=3/scale;ctx.lineJoin='round';ctx.strokeStyle=s.colors.textHalo;ctx.strokeText(node.short,x,y+r+4/scale);ctx.fillStyle=s.colors.text;ctx.fillText(node.short,x,y+r+4/scale);}
      ctx.globalAlpha=1;
     })
     .nodePointerAreaPaint((node,color,ctx,scale)=>{ctx.beginPath();ctx.arc(node.x||0,node.y||0,Math.max(node.radius*s.settings.display.nodeSize,7/scale),0,2*Math.PI);ctx.fillStyle=color;ctx.fill();})

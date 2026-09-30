@@ -14,7 +14,7 @@ import { useAppearance } from '../../appearance/AppearanceProvider.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
 import { isOAuthProvider, OAUTH_NAMES, type OAuthProvider } from '../../auth-oauth.ts';
 import { gradient, look as lookFor, type LookName } from './looks.ts';
-import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, type HeadlineFaces, type HeadlineType, type RotatingFont } from './Headlines.tsx';
+import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, type HeadlineType, type KeepStyle } from './Headlines.tsx';
 
 /** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier). */
 type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number };
@@ -68,7 +68,7 @@ function useProviders(): OAuthProvider[] {
 }
 
 /** backdrop: a sky photograph shown behind everything with a very slight blur; without one, the look's gradient. */
-export function FirstScreen({ look: lookName, type = 'rotating', font, faces, backdrop, blur = 1, objects = true }: { look: LookName; type?: HeadlineType; font?: RotatingFont; faces?: HeadlineFaces; backdrop?: ImageSourcePropType; blur?: number; objects?: boolean }) {
+export function FirstScreen({ look: lookName, type = 'rotating', keep, backdrop, blur = 1, objects = true }: { look: LookName; type?: HeadlineType; keep?: KeepStyle; backdrop?: ImageSourcePropType; blur?: number; objects?: boolean }) {
   const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
   const fontsReady = useDisplayFonts();
   const { scheme } = useAppearance();
@@ -149,7 +149,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, faces, ba
         {type === 'highlighter' ? <HighlighterHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'tags' ? <TagsHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'stack' ? <StackHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
-          : <RotatingHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} font={font} faces={faces} shadow={!!backdrop} />}
+          : <RotatingHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} keep={keep} shadow={!!backdrop} />}
       </View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
         {providers.map((provider, i) => {
