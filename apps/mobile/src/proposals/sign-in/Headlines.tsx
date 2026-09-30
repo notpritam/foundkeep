@@ -101,6 +101,7 @@ const WORD = {
   marker: { face: { fontFamily: SF, fontWeight: '800', fontSize: 52, lineHeight: 64, letterSpacing: -1.8 }, frame: { marginTop: 4, paddingHorizontal: 12, borderRadius: 12, backgroundColor: INK.butter }, tilt: '-1.5deg', ink: INK.navy },
   dmItalic: { face: { fontFamily: DISPLAY.dmSerifItalic, fontSize: 62, lineHeight: 70, letterSpacing: -0.8 } },
 } satisfies Record<string, Word>;
+/** Pritam's pick (2026-09-30): 'hand', SF Pro + Caveat, tilted. */
 export const KEEP_STYLES: Record<KeepStyle, { label: string; lead: Face; word: Word; per?: Record<string, Word> }> = {
   serif: { label: 'SF Pro + Instrument Serif italic', lead, word: WORD.serif },
   hand: { label: 'SF Pro + Caveat, tilted', lead, word: WORD.hand },
@@ -110,11 +111,22 @@ export const KEEP_STYLES: Record<KeepStyle, { label: string; lead: Face; word: W
   'per-find': { label: 'A style for each find', lead, word: WORD.serif, per: { 'link.': WORD.mono, 'photo.': WORD.serif, 'highlight.': WORD.marker, 'voice memo.': { ...WORD.hand, face: { ...WORD.hand.face, fontSize: 62, lineHeight: 70 } }, 'idea.': WORD.dmItalic } },
 };
 
+/** Sizes and letter spacing Pritam tunes in Storybook Controls; unset values keep the style's own. */
+export type Tune = { leadSize?: number; leadSpacing?: number; wordSize?: number; wordSpacing?: number; subSize?: number };
+function tuned(style: (typeof KEEP_STYLES)[KeepStyle], t: Tune = {}) {
+  const lead: Face = { ...style.lead, ...(t.leadSize ? { fontSize: t.leadSize, lineHeight: Math.round(t.leadSize * 1.15) } : null), ...(t.leadSpacing != null ? { letterSpacing: t.leadSpacing } : null) };
+  // The word size is the base word's; per-find words keep their proportions to it.
+  const scale = t.wordSize ? t.wordSize / style.word.face.fontSize : 1;
+  const word = (w: Word): Word => ({ ...w, face: { ...w.face, fontSize: Math.round(w.face.fontSize * scale), lineHeight: Math.round(w.face.lineHeight * scale), ...(t.wordSpacing != null ? { letterSpacing: t.wordSpacing } : null) } });
+  const sub = t.subSize ? { fontSize: t.subSize, lineHeight: Math.round(t.subSize * 1.45) } : null;
+  return { lead, word: word(style.word), per: style.per && Object.fromEntries(Object.entries(style.per).map(([k, w]) => [k, word(w)])), sub };
+}
+
 const WORDS = [{ word: 'link.', color: INK.butter }, { word: 'photo.', color: INK.peach }, { word: 'highlight.', color: INK.mint }, { word: 'voice memo.', color: INK.ice }, { word: 'idea.', color: INK.lilac }];
 /** C: "Keep every …" — the thing you keep keeps changing: link, photo, highlight… in its own colour. */
-export function RotatingHeadline({ start, motion, sub, subColor, keep = 'serif', shadow = false }: Props & { keep?: KeepStyle }) {
+export function RotatingHeadline({ start, motion, sub, subColor, keep = 'serif', tune, shadow = false }: Props & { keep?: KeepStyle; tune?: Tune }) {
   const glow = shadow ? SHADOW : null;
-  const style = KEEP_STYLES[keep];
+  const style = tuned(KEEP_STYLES[keep], tune);
   const [l1, l2, s] = useEntrance([380, 520, 760], start, motion);
   const [index, setIndex] = useState(0);
   const turn = useRef(new Animated.Value(1)).current;
@@ -136,13 +148,13 @@ export function RotatingHeadline({ start, motion, sub, subColor, keep = 'serif',
   // The row keeps the height of its tallest word, so nothing below jumps as they change.
   const rowHeight = Math.max(...[style.word, ...Object.values(style.per ?? {})].map(w => w.face.lineHeight + (w.frame ? 12 : 0)));
   return <View style={styles.center} accessibilityRole="header" accessibilityLabel="Keep every link, photo, highlight, voice memo and idea.">
-    <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[style.lead, styles.centred, { color: INK.white }, glow]}>Keep every</Text></Animated.View>
+    <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[style.lead, styles.centred, { color: INK.white }, glow]}>Keep Every</Text></Animated.View>
     <Animated.View style={[rise(l2), styles.rotor, { minHeight: rowHeight }]}>
       <Animated.View style={[word.frame, { opacity: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }), transform: [{ rotate: word.tilt ?? '0deg' }, { translateY: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [22, 0, -18] }) }] }]}>
         <Text maxFontSizeMultiplier={1.3} style={[word.face, styles.centred, { color: word.ink ?? current.color }, word.ink ? null : glow]}>{current.word}</Text>
       </Animated.View>
     </Animated.View>
-    <Animated.View style={rise(s, 10)}><Text maxFontSizeMultiplier={1.4} style={[styles.subCenter, { color: subColor }, glow]}>{sub}</Text></Animated.View>
+    <Animated.View style={rise(s, 10)}><Text maxFontSizeMultiplier={1.4} style={[styles.subCenter, style.sub, { color: subColor }, glow]}>{sub}</Text></Animated.View>
   </View>;
 }
 
