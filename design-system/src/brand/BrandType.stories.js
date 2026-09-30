@@ -66,7 +66,7 @@ function keep() {
   const el = document.createElement('div');
   el.className = 'bt';
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>Keep every styles</h1><p>The first screen’s headline is where FoundKeep gets to show off. “Keep every” stays in SF Pro; the word that changes (link, photo, highlight, voice memo, idea) takes a face and a frame of its own. The same styles can carry onboarding and the sign-in page on the web.</p></div></header>
+    <header class="bt-intro"><div><h1>Keep every styles</h1><p>The first screen’s headline is where FoundKeep gets to show off. “Keep every” stays in SF Pro; the word that changes (Reel, Short, Article, Tweet, Post, Thread: what you come across while browsing) takes a face and a frame of its own. The same styles can carry onboarding and the sign-in page on the web.</p></div></header>
     <div class="bt-phones bt-phones-six">${KEEP.map(([id, name]) => screen('app', `proposals-sign-in--${id}`, name)).join('')}</div>`;
   return el;
 }

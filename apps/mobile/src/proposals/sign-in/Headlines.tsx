@@ -29,7 +29,7 @@ export function useDisplayFonts() {
 }
 
 /** Colours for words on a bright sky or meadow. */
-export const INK = { white: '#ffffff', soft: 'rgba(255,255,255,.86)', butter: '#ffe066', peach: '#ffc3a3', mint: '#a9f1cf', ice: '#d8f1ff', lilac: '#dccfff', coral: '#ff5a4e', navy: '#0b2e4a', forest: '#073d29' };
+export const INK = { white: '#ffffff', soft: 'rgba(255,255,255,.86)', butter: '#ffe066', peach: '#ffc3a3', mint: '#a9f1cf', ice: '#d8f1ff', lilac: '#dccfff', pink: '#ffc9e6', coral: '#ff5a4e', navy: '#0b2e4a', forest: '#073d29' };
 
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);
 const native = Platform.OS !== 'web';
@@ -108,7 +108,7 @@ export const KEEP_STYLES: Record<KeepStyle, { label: string; lead: Face; word: W
   mono: { label: 'SF Pro + Space Mono, in a field', lead, word: WORD.mono },
   soft: { label: 'Instrument Serif + SF Pro Heavy', lead: { fontFamily: DISPLAY.serifItalic, fontSize: 52, lineHeight: 56, letterSpacing: -0.6 }, word: WORD.heavy },
   weight: { label: 'SF Pro only: light over black', lead: { fontFamily: SF, fontWeight: '400', fontSize: 38, lineHeight: 44, letterSpacing: -0.9 }, word: { face: { fontFamily: SF, fontWeight: '900', fontSize: 52, lineHeight: 60, letterSpacing: -2 } } },
-  'per-find': { label: 'A style for each find', lead, word: WORD.serif, per: { 'link.': WORD.mono, 'photo.': WORD.serif, 'highlight.': WORD.marker, 'voice memo.': { ...WORD.hand, face: { ...WORD.hand.face, fontSize: 62, lineHeight: 70 } }, 'idea.': WORD.dmItalic } },
+  'per-find': { label: 'A style for each find', lead, word: WORD.serif, per: { 'Reel.': WORD.hand, 'Short.': WORD.marker, 'Article.': WORD.serif, 'Tweet.': WORD.mono, 'Post.': WORD.dmItalic, 'Thread.': WORD.hand } },
 };
 
 /** Sizes and letter spacing Pritam tunes in Storybook Controls; unset values keep the style's own. */
@@ -121,8 +121,9 @@ function tuned(style: (typeof KEEP_STYLES)[KeepStyle], t: Tune = {}) {
   return { lead, word: word(style.word), per: style.per && Object.fromEntries(Object.entries(style.per).map(([k, w]) => [k, word(w)])) };
 }
 
-const WORDS = [{ word: 'link.', color: INK.butter }, { word: 'photo.', color: INK.peach }, { word: 'highlight.', color: INK.mint }, { word: 'voice memo.', color: INK.ice }, { word: 'idea.', color: INK.lilac }];
-/** C: "Keep every …" — the thing you keep keeps changing: link, photo, highlight… in its own colour. */
+// What you come across while browsing (Pritam, 2026-09-30): the posts people save, not file types.
+const WORDS = [{ word: 'Reel.', color: INK.peach }, { word: 'Short.', color: INK.butter }, { word: 'Article.', color: INK.mint }, { word: 'Tweet.', color: INK.ice }, { word: 'Post.', color: INK.lilac }, { word: 'Thread.', color: INK.pink }];
+/** C: "Keep Every …" — the thing you keep keeps changing: Reel, Short, Article, Tweet… in its own colour. */
 export function RotatingHeadline({ start, motion, keep = 'serif', tune, shadow = false }: Omit<Props, 'sub' | 'subColor'> & { keep?: KeepStyle; tune?: Tune }) {
   const glow = shadow ? SHADOW : null;
   const style = tuned(KEEP_STYLES[keep], tune);
@@ -142,11 +143,11 @@ export function RotatingHeadline({ start, motion, keep = 'serif', tune, shadow =
     const timer = setInterval(next, 2600);
     return () => { live = false; clearInterval(timer); };
   }, [start, motion, turn]);
-  const current = motion ? WORDS[index] : { word: 'find.', color: INK.butter };
+  const current = motion ? WORDS[index] : { word: 'Post.', color: INK.butter };
   const word = style.per?.[current.word] ?? style.word;
   // The row keeps the height of its tallest word, so nothing below jumps as they change.
   const rowHeight = Math.max(...[style.word, ...Object.values(style.per ?? {})].map(w => w.face.lineHeight + (w.frame ? 12 : 0)));
-  return <View style={styles.center} accessibilityRole="header" accessibilityLabel="Keep every link, photo, highlight, voice memo and idea.">
+  return <View style={styles.center} accessibilityRole="header" accessibilityLabel="Keep every reel, short, article, tweet, post and thread.">
     <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[style.lead, styles.centred, { color: INK.white }, glow]}>Keep Every</Text></Animated.View>
     <Animated.View style={[rise(l2), styles.rotor, { minHeight: rowHeight }]}>
       <Animated.View style={[word.frame, { opacity: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }), transform: [{ rotate: word.tilt ?? '0deg' }, { translateY: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [22, 0, -18] }) }] }]}>

@@ -24,7 +24,7 @@ const meta: Meta<Args> = {
     blur: { control: { type: 'range', min: 0, max: 24, step: 1 }, description: 'Blur on the backdrop photo, in points (0 = sharp)' },
     leadSize: { name: '“Keep Every” size', control: { type: 'range', min: 24, max: 72, step: 1 }, description: 'Font size of “Keep Every”, in points' },
     leadSpacing: { name: '“Keep Every” letter spacing', control: { type: 'range', min: -4, max: 4, step: 0.1 }, description: 'Letter spacing of “Keep Every”, in points (negative = tighter)' },
-    wordSize: { name: 'Word size', control: { type: 'range', min: 36, max: 110, step: 1 }, description: 'Font size of the changing word (link, photo…), in points' },
+    wordSize: { name: 'Word size', control: { type: 'range', min: 36, max: 110, step: 1 }, description: 'Font size of the changing word (Reel, Short, Article…), in points' },
     wordSpacing: { name: 'Word letter spacing', control: { type: 'range', min: -4, max: 6, step: 0.1 }, description: 'Letter spacing of the changing word, in points' },
   },
   parameters: { simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/sign-in', params: {} },
