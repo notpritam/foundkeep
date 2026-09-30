@@ -36,10 +36,14 @@ function useFit(width: number, height: number) {
   }, [width, height]);
   return scale;
 }
+/** The device, scaled to fit and centred in the canvas both ways (on a Docs page, at its own height). */
 function Scaled({ width, height, children }: { width: number; height: number; children: ReactNode }) {
   const scale = useFit(width, height);
-  return <div style={{ width: width * scale, height: height * scale, margin: '0 auto' }}>
-    <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{children}</div>
+  const docs = typeof location !== 'undefined' && new URLSearchParams(location.search).get('viewMode') === 'docs';
+  return <div style={{ minHeight: docs ? undefined : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: docs ? 0 : 16, boxSizing: 'border-box' }}>
+    <div style={{ width: width * scale, height: height * scale, flex: 'none' }}>
+      <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{children}</div>
+    </div>
   </div>;
 }
 
