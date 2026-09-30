@@ -8,15 +8,19 @@ import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 
 export type HeadlineType = 'highlighter' | 'tags' | 'rotating' | 'stack';
-export const DISPLAY = { serif: 'InstrumentSerif', serifItalic: 'InstrumentSerif-Italic', grotesque: 'Bricolage-ExtraBold', soft: 'Fraunces-SemiBold', softItalic: 'Fraunces-SemiBoldItalic' } as const;
+export const DISPLAY = { serif: 'InstrumentSerif', serifItalic: 'InstrumentSerif-Italic', grotesque: 'Bricolage-ExtraBold', unbounded: 'Unbounded-Bold', syne: 'Syne-ExtraBold', jakarta: 'PlusJakartaSans-ExtraBold', hand: 'Caveat-Bold', dmSerif: 'DMSerifDisplay', dmSerifItalic: 'DMSerifDisplay-Italic' } as const;
 
 export function useDisplayFonts() {
   const [loaded, error] = useFonts({
     [DISPLAY.serif]: require('../../../assets/fonts/InstrumentSerif-Regular.ttf'),
     [DISPLAY.serifItalic]: require('../../../assets/fonts/InstrumentSerif-Italic.ttf'),
     [DISPLAY.grotesque]: require('../../../assets/fonts/BricolageGrotesque-ExtraBold.ttf'),
-    [DISPLAY.soft]: require('../../../assets/fonts/Fraunces-SemiBold.ttf'),
-    [DISPLAY.softItalic]: require('../../../assets/fonts/Fraunces-SemiBoldItalic.ttf'),
+    [DISPLAY.unbounded]: require('../../../assets/fonts/Unbounded-Bold.ttf'),
+    [DISPLAY.syne]: require('../../../assets/fonts/Syne-ExtraBold.ttf'),
+    [DISPLAY.jakarta]: require('../../../assets/fonts/PlusJakartaSans-ExtraBold.ttf'),
+    [DISPLAY.hand]: require('../../../assets/fonts/Caveat-Bold.ttf'),
+    [DISPLAY.dmSerif]: require('../../../assets/fonts/DMSerifDisplay-Regular.ttf'),
+    [DISPLAY.dmSerifItalic]: require('../../../assets/fonts/DMSerifDisplay-Italic.ttf'),
   });
   // A font that fails to load falls back to the system face rather than blocking sign-in.
   return loaded || !!error;
@@ -79,9 +83,22 @@ export function TagsHeadline({ start, motion, sub, subColor }: Props) {
   </View>;
 }
 
+/** Type pairings for the rotating headline: the lead words, then the changing word. */
+export type RotatingFont = 'instrument' | 'bricolage' | 'unbounded' | 'syne' | 'jakarta' | 'dmserif';
+type Face = { fontFamily: string; fontSize: number; lineHeight: number; letterSpacing: number };
+export const ROTATING_FONTS: Record<RotatingFont, { label: string; lead: Face; word: Face }> = {
+  instrument: { label: 'Instrument Serif', lead: { fontFamily: DISPLAY.serif, fontSize: 52, lineHeight: 56, letterSpacing: -0.6 }, word: { fontFamily: DISPLAY.serifItalic, fontSize: 64, lineHeight: 70, letterSpacing: -0.8 } },
+  bricolage: { label: 'Bricolage Grotesque', lead: { fontFamily: DISPLAY.grotesque, fontSize: 40, lineHeight: 46, letterSpacing: -1.2 }, word: { fontFamily: DISPLAY.grotesque, fontSize: 50, lineHeight: 58, letterSpacing: -1.6 } },
+  unbounded: { label: 'Unbounded', lead: { fontFamily: DISPLAY.unbounded, fontSize: 30, lineHeight: 38, letterSpacing: -0.6 }, word: { fontFamily: DISPLAY.unbounded, fontSize: 38, lineHeight: 48, letterSpacing: -1 } },
+  syne: { label: 'Syne', lead: { fontFamily: DISPLAY.syne, fontSize: 40, lineHeight: 46, letterSpacing: -1 }, word: { fontFamily: DISPLAY.syne, fontSize: 50, lineHeight: 58, letterSpacing: -1.4 } },
+  jakarta: { label: 'Plus Jakarta Sans + Caveat', lead: { fontFamily: DISPLAY.jakarta, fontSize: 38, lineHeight: 44, letterSpacing: -1.2 }, word: { fontFamily: DISPLAY.hand, fontSize: 62, lineHeight: 66, letterSpacing: 0 } },
+  dmserif: { label: 'DM Serif Display', lead: { fontFamily: DISPLAY.dmSerif, fontSize: 44, lineHeight: 50, letterSpacing: -0.6 }, word: { fontFamily: DISPLAY.dmSerifItalic, fontSize: 54, lineHeight: 62, letterSpacing: -0.8 } },
+};
+
 const WORDS = [{ word: 'link.', color: INK.butter }, { word: 'photo.', color: INK.peach }, { word: 'highlight.', color: INK.mint }, { word: 'voice memo.', color: INK.ice }, { word: 'idea.', color: INK.lilac }];
-/** C: a warm italic serif; the thing you keep keeps changing — link, photo, highlight… */
-export function RotatingHeadline({ start, motion, sub, subColor }: Props) {
+/** C: "Keep every …" — the thing you keep keeps changing: link, photo, highlight… in its own colour. */
+export function RotatingHeadline({ start, motion, sub, subColor, font = 'instrument' }: Props & { font?: RotatingFont }) {
+  const face = ROTATING_FONTS[font];
   const [l1, l2, s] = useEntrance([380, 520, 760], start, motion);
   const [index, setIndex] = useState(0);
   const turn = useRef(new Animated.Value(1)).current;
@@ -100,10 +117,10 @@ export function RotatingHeadline({ start, motion, sub, subColor }: Props) {
   }, [start, motion, turn]);
   const current = motion ? WORDS[index] : { word: 'find.', color: INK.butter };
   return <View style={styles.center} accessibilityRole="header" accessibilityLabel="Keep every link, photo, highlight, voice memo and idea.">
-    <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[styles.soft, { color: INK.white }]}>Keep every</Text></Animated.View>
-    <Animated.View style={[rise(l2), styles.rotor]}>
+    <Animated.View style={rise(l1)}><Text maxFontSizeMultiplier={1.3} style={[face.lead, styles.centred, { color: INK.white }]}>Keep every</Text></Animated.View>
+    <Animated.View style={[rise(l2), styles.rotor, { minHeight: face.word.lineHeight }]}>
       <Animated.View style={{ opacity: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }), transform: [{ translateY: turn.interpolate({ inputRange: [0, 1, 2], outputRange: [22, 0, -18] }) }] }}>
-        <Text maxFontSizeMultiplier={1.3} style={[styles.softItalic, { color: current.color }]}>{current.word}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={[face.word, styles.centred, { color: current.color }]}>{current.word}</Text>
       </Animated.View>
     </Animated.View>
     <Animated.View style={rise(s, 10)}><Text maxFontSizeMultiplier={1.4} style={[styles.subCenter, { color: subColor }]}>{sub}</Text></Animated.View>
@@ -137,9 +154,8 @@ const styles = StyleSheet.create({
   grotesque: { fontFamily: DISPLAY.grotesque, fontSize: 44, lineHeight: 54, letterSpacing: -1.2 },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingLeft: 14, paddingRight: 16, marginVertical: 3 },
   hole: { width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,.75)' },
-  soft: { fontFamily: DISPLAY.soft, fontSize: 40, lineHeight: 48, letterSpacing: -0.8, textAlign: 'center' },
-  softItalic: { fontFamily: DISPLAY.softItalic, fontSize: 50, lineHeight: 60, letterSpacing: -1, textAlign: 'center' },
-  rotor: { minHeight: 60, justifyContent: 'center' },
+  centred: { textAlign: 'center' },
+  rotor: { justifyContent: 'center' },
   stack: { fontFamily: DISPLAY.grotesque, fontSize: 68, lineHeight: 70, letterSpacing: -2.4 },
   subLeft: { fontSize: 16, lineHeight: 23, marginTop: 14, maxWidth: 300 },
   subCenter: { fontSize: 16, lineHeight: 23, marginTop: 14, maxWidth: 300, textAlign: 'center' },
