@@ -3,6 +3,7 @@ import { initialize, mswLoader } from 'msw-storybook-addon';
 import { SafeAreaFrameContext, SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { AppearanceContext } from '../../../apps/mobile/src/appearance/AppearanceProvider.tsx';
 import { MaterialProvider } from '../../../apps/mobile/src/components/ScenicSurface.tsx';
+import { MotionProvider } from '../../../apps/mobile/src/components/motion.tsx';
 import { palettes } from '../../../apps/mobile/src/theme.ts';
 import { StoryRoute } from '../mocks/expo-router.tsx';
 import { StorySession } from '../src/StoryApp.tsx';
@@ -34,7 +35,7 @@ const simulator: Decorator = (Story, { id, globals, parameters }) => {
   return <SafeAreaInsetsContext.Provider value={insets}><SafeAreaFrameContext.Provider value={{ x: 0, y: 0, width: device.width, height: device.height }}>
     <AppearanceContext.Provider value={{ preference: scheme, scheme, setPreference: async () => {} }}>
       <TextScale.Provider value={Number(globals.textSize) || 1}>
-        <MaterialProvider key={`${globals.transparency}-${globals.motion}`}><StorySession mode={parameters.session}>{parameters.session === 'signed-out' ? story : <BillingProvider>{story}</BillingProvider>}</StorySession></MaterialProvider>
+        <MotionProvider key={`motion-${globals.motion}`}><MaterialProvider key={`${globals.transparency}-${globals.motion}`}><StorySession mode={parameters.session}>{parameters.session === 'signed-out' ? story : <BillingProvider>{story}</BillingProvider>}</StorySession></MaterialProvider></MotionProvider>
       </TextScale.Provider>
     </AppearanceContext.Provider>
   </SafeAreaFrameContext.Provider></SafeAreaInsetsContext.Provider>;

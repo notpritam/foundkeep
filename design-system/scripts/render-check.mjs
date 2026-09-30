@@ -20,6 +20,9 @@ if (!base) { console.error('usage: render-check.mjs <storybook-url> [--globals k
 const globals = option('globals') ? option('globals').split(',').join(';') : '';
 const only = option('only');
 const jobs = Number(option('jobs') || 4);
+// --inner: load framed screens directly at phone size (the screen, not the device
+// frame), so the accessibility check reaches the screen itself.
+const inner = args.includes('--inner');
 const axeSource = await readFile(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 
 const index = await fetch(base + '/index.json').then(r => { if (!r.ok) throw new Error(`${base}/index.json: ${r.status}`); return r.json(); });
@@ -30,14 +33,14 @@ if (!stories.length) { console.error('No stories matched.'); process.exit(1); }
 const browser = await chromium.launch({ channel: 'chromium', headless: true, args: ['--no-sandbox'] });
 const results = [];
 async function check(story) {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ viewport: inner ? { width: 402, height: 874 } : { width: 1280, height: 900 } });
   const errors = [];
   page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text().slice(0, 300)); });
   // Stories tagged expected-http-errors fail a request on purpose (an error state).
   const httpOk = (story.tags || []).includes('expected-http-errors');
   page.on('response', r => { if (r.status() >= 400 && !httpOk) errors.push(`HTTP ${r.status()} ${r.url()}`); });
   page.on('pageerror', e => errors.push(String(e.message || e).slice(0, 300)));
-  const url = `${base}/iframe.html?id=${story.id}&viewMode=story${globals ? '&globals=' + encodeURIComponent(globals) : ''}`;
+  const url = `${base}/iframe.html?id=${story.id}&viewMode=story${inner ? '&simulator=inner' : ''}${globals ? '&globals=' + encodeURIComponent(globals) : ''}`;
   let a11y = [];
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 30000 });
