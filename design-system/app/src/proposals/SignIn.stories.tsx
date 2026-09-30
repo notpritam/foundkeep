@@ -44,4 +44,3 @@ export const OnMeadowSky: Story = { name: 'Backdrop · Meadow (Codex)', render: 
 export const Highlighter: Story = { name: 'Other · Highlighter', render: ({ look }) => <FirstScreen look={look} type="highlighter" /> };
 export const Tags: Story = { name: 'Other · Tags', render: ({ look }) => <FirstScreen look={look} type="tags" /> };
 export const Stack: Story = { name: 'Other · Big stack', render: ({ look }) => <FirstScreen look={look} type="stack" /> };
-export const Email: Story = { name: 'Continuing with email', render: ({ look }) => <FirstScreen look={look} type="rotating" emailOpen />, parameters: { keyboard: true } };

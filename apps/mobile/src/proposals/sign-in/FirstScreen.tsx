@@ -1,7 +1,8 @@
 // Proposal (sign-in, 2026-09-30): the app's first screen, after Pritam's
 // reference. FoundKeep's own 3D objects (design-system/assets-3d) drift in
 // around a centred headline and keep drifting; the sign-in buttons rise last.
-// Real sign-in: the same Apple/Google route and email sign-in as today.
+// Real sign-in: the same Apple/Google route as today. Only the two buttons at
+// the bottom: no email option and no terms line (Pritam, 2026-09-30).
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
@@ -12,7 +13,6 @@ import { useMotionAllowed } from '../../components/motion.tsx';
 import { useAppearance } from '../../appearance/AppearanceProvider.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
 import { isOAuthProvider, OAUTH_NAMES, type OAuthProvider } from '../../auth-oauth.ts';
-import { EmailSheet } from './EmailSheet.tsx';
 import { gradient, look as lookFor, type LookName } from './looks.ts';
 import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, type HeadlineType, type RotatingFont } from './Headlines.tsx';
 
@@ -25,10 +25,10 @@ const AROUND: Find[] = [
   { source: require('../../../assets/images/finds/post.webp'), x: 0.68, y: 0.07, size: 104, rotate: 5, depth: 2, delay: 170, period: 10.6 },
   { source: require('../../../assets/images/finds/voice.webp'), x: -0.03, y: 0.235, size: 96, rotate: -8, depth: 0, delay: 240, period: 8.4 },
   { source: require('../../../assets/images/finds/sparkles.webp'), x: 0.8, y: 0.235, size: 62, rotate: 8, depth: 0, delay: 300, period: 7.6 },
-  { source: require('../../../assets/images/finds/highlight.webp'), x: 0.01, y: 0.49, size: 92, rotate: -4, depth: 1, delay: 360, period: 9.8 },
-  { source: require('../../../assets/images/finds/folder.webp'), x: 0.8, y: 0.48, size: 82, rotate: 6, depth: 1, delay: 410, period: 8.9 },
-  { source: require('../../../assets/images/finds/video.webp'), x: 0.0, y: 0.615, size: 100, rotate: -5, depth: 2, delay: 470, period: 10.2 },
-  { source: require('../../../assets/images/finds/tag.webp'), x: 0.78, y: 0.61, size: 84, rotate: 9, depth: 2, delay: 530, period: 8.1 },
+  { source: require('../../../assets/images/finds/highlight.webp'), x: 0.01, y: 0.53, size: 92, rotate: -4, depth: 1, delay: 360, period: 9.8 },
+  { source: require('../../../assets/images/finds/folder.webp'), x: 0.8, y: 0.52, size: 82, rotate: 6, depth: 1, delay: 410, period: 8.9 },
+  { source: require('../../../assets/images/finds/video.webp'), x: 0.0, y: 0.655, size: 100, rotate: -5, depth: 2, delay: 470, period: 10.2 },
+  { source: require('../../../assets/images/finds/tag.webp'), x: 0.78, y: 0.645, size: 84, rotate: 9, depth: 2, delay: 530, period: 8.1 },
 ];
 /** Above and beside a headline set low on the left. */
 const ABOVE: Find[] = [
@@ -68,7 +68,7 @@ function useProviders(): OAuthProvider[] {
 }
 
 /** backdrop: a sky photograph shown behind everything with a very slight blur; without one, the look's gradient. */
-export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, objects = true, emailOpen: startOpen = false }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; objects?: boolean; emailOpen?: boolean }) {
+export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop, objects = true }: { look: LookName; type?: HeadlineType; font?: RotatingFont; backdrop?: ImageSourcePropType; objects?: boolean }) {
   const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
   const fontsReady = useDisplayFonts();
   const { scheme } = useAppearance();
@@ -77,12 +77,11 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
   const insets = useSafeAreaInsets();
   const motion = useMotionAllowed();
   const providers = useProviders();
-  const [emailOpen, setEmailOpen] = useState(startOpen);
 
   // Entrance values run 0 → 1 once; drift phases loop 0 → 1 for ever.
   const v = useRef({
     finds: AROUND.map(() => new Animated.Value(0)),
-    buttons: [0, 1, 2].map(() => new Animated.Value(0)),
+    buttons: [0, 1].map(() => new Animated.Value(0)),
     drift: AROUND.map(() => new Animated.Value(0)),
   }).current;
 
@@ -144,7 +143,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
         the space above the buttons; when large text needs more room than the
         screen has, the column scrolls instead of running under the buttons. */}
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.column, { paddingTop: insets.top + 12 }]}>
-      <View style={[styles.center, layout === 'left' && styles.low]}>
+      <View style={[styles.center, layout === 'left' ? styles.low : styles.lifted]}>
         {/* Left layouts: the name at the top, the words low; they stack rather than overlap. */}
         {layout === 'left' ? <><View style={styles.wordmark}><Wordmark color={look.ink} start motion={motion} /></View><View style={styles.spacer} /></> : null}
         {type === 'highlighter' ? <HighlighterHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
@@ -163,17 +162,9 @@ export function FirstScreen({ look: lookName, type = 'rotating', font, backdrop,
             </Pressable>
           </Animated.View>;
         })}
-        {/* Over a photograph the bottom can be dark rock or bright cloud, so the small words sit on frosted glass. */}
-        <Animated.View style={[styles.more, backdrop ? styles.frost : null, rise(v.buttons[2], 12)]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Continue with email" onPress={() => setEmailOpen(true)} hitSlop={8}>
-            <Text maxFontSizeMultiplier={1.4} style={[styles.email, { color: look.bottomInk }]}>Continue with email</Text>
-          </Pressable>
-          <Text maxFontSizeMultiplier={1.4} style={[styles.legal, { color: look.bottomMuted }]}>By continuing you accept the Terms and Privacy.</Text>
-        </Animated.View>
       </View>
     </ScrollView>
 
-    {emailOpen ? <EmailSheet onClose={() => setEmailOpen(false)} /> : null}
   </View>;
 }
 
@@ -186,14 +177,12 @@ const styles = StyleSheet.create({
   column: { flexGrow: 1 },
   center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 16, gap: 22 },
   low: { justifyContent: 'flex-start', alignItems: 'stretch', paddingBottom: 28, paddingTop: 4 },
+  // Centred words sit a little above the middle, clear of the objects beside them.
+  lifted: { paddingBottom: 84 },
   wordmark: { alignSelf: 'flex-start' },
   spacer: { flexGrow: 1, minHeight: 24 },
   actions: { paddingHorizontal: 20, gap: 10 },
   button: { minHeight: 56, paddingHorizontal: 16, borderRadius: 28, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.92 },
   buttonLabel: { fontSize: 16, fontWeight: '600' },
-  more: { alignItems: 'center', gap: 6, paddingTop: 6 },
-  frost: { backgroundColor: 'rgba(255,255,255,.78)', borderRadius: 20, paddingVertical: 10, paddingHorizontal: 16, marginTop: 4 },
-  email: { fontSize: 15, fontWeight: '600', paddingVertical: 6 },
-  legal: { fontSize: 12, textAlign: 'center' },
 });
