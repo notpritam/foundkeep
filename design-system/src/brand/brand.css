@@ -1,36 +1,33 @@
-/* Brand type boards (BrandType.stories.js). Each board is set in its own
-   pairing: --display and --text come from simulator/brand-type.ts. */
-.bt { --display: inherit; --text: inherit; font-family: var(--text); color: var(--ink); padding: 40px 48px 64px; max-width: 1480px; margin: 0 auto; }
-.bt a { color: inherit; }
-.bt-display { font-family: var(--display); font-weight: var(--display-weight); letter-spacing: var(--display-tracking); font-synthesis: none; }
+/* Brand type boards (BrandType.stories.js), set in the brand face (--font). */
+.bt { color: var(--ink); padding: 40px 48px 64px; max-width: 1480px; margin: 0 auto; }
+.bt :is(h1, h2, h3) { font-family: var(--font); font-weight: 700; letter-spacing: -.025em; }
 
-/* The pairing, introduced */
-.bt-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 40px; align-items: end; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
-.bt-intro h1 { margin: 0; font-size: calc(44px * var(--scale, 1)); line-height: 1.08; }
-.bt-intro p { margin: 0; max-width: 60ch; font-size: 16px; line-height: 1.6; color: var(--muted); }
+/* The introduction */
+.bt-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 40px; align-items: end; padding-bottom: 28px; margin-bottom: 32px; border-bottom: 1px solid var(--line); }
+.bt-intro h1 { margin: 0 0 8px; font-size: 44px; line-height: 1.08; }
+.bt-intro p { margin: 0; max-width: 64ch; font-size: 16px; line-height: 1.6; color: var(--muted); }
 .bt-roles { display: grid; gap: 6px; justify-items: end; font-size: 14px; color: var(--muted); text-align: right; }
 .bt-roles strong { color: var(--ink); font-weight: 600; }
 
-/* The type itself: a scenic poster and the text sizes beside it */
-.bt-specimen { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); gap: 32px; margin: 32px 0 44px; }
+/* The face: a scenic poster and the text sizes beside it */
+.bt-specimen { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); gap: 32px; margin-bottom: 44px; }
 .bt-poster { position: relative; min-height: 420px; border-radius: 28px; overflow: hidden; background: #1a78c8 center / cover no-repeat; display: grid; align-content: center; justify-items: center; padding: 48px 32px; text-align: center; color: #fff; }
 .bt-poster::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(4,24,48,.2), rgba(4,24,48,.28) 45%, rgba(4,24,48,.08) 80%); }
 .bt-poster > * { position: relative; margin: 0; text-shadow: 0 2px 18px rgba(4,24,48,.35); }
-.bt-poster h2 { font-size: calc(clamp(40px, 5vw, 76px) * var(--scale, 1)); line-height: 1.02; }
+.bt-poster h2 { font-size: clamp(44px, 5.4vw, 80px); line-height: 1.02; letter-spacing: -.035em; }
 .bt-poster p { margin-top: 18px; font-size: 18px; line-height: 1.5; max-width: 36ch; }
-.bt-poster .bt-word { display: block; font-family: var(--word); font-weight: var(--word-weight); font-style: var(--word-style); letter-spacing: var(--word-tracking); color: #ffe066; }
 .bt-text { display: grid; align-content: start; gap: 22px; }
-.bt-text h3 { margin: 0; font-size: calc(34px * var(--scale, 1)); line-height: 1.12; }
+.bt-text h3 { margin: 0; font-size: 34px; line-height: 1.12; }
 .bt-text p { margin: 0; font-size: 17px; line-height: 1.65; max-width: 52ch; }
 .bt-ui { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.bt-ui button { font: 600 15px/1 var(--text); padding: 14px 20px; border-radius: 999px; border: 0; background: #0b0c0d; color: #fff; }
+.bt-ui button { font: 600 15px/1 var(--font); padding: 14px 20px; border-radius: 999px; border: 0; background: #0b0c0d; color: #fff; }
 .bt-ui button + button { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 .bt-ui span { font-size: 13.5px; font-weight: 500; padding: 7px 12px; border-radius: 999px; background: var(--panel); }
 .bt-meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.bt-glyphs { font-size: calc(30px * var(--scale, 1)); line-height: 1.3; color: var(--muted); overflow-wrap: anywhere; }
+.bt-weights { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 26px; line-height: 1.3; }
 
-/* The product, in this pairing */
-.bt h2.bt-part { margin: 0 0 6px; font-size: calc(26px * var(--scale, 1)); line-height: 1.2; }
+/* The product in it */
+.bt h2.bt-part { margin: 0 0 6px; font-size: 26px; line-height: 1.2; }
 .bt-part + p { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
 .bt-phones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 44px; }
 .bt-screens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
@@ -39,22 +36,13 @@
 .bt figcaption { font-size: 14px; color: var(--muted); }
 .bt iframe { display: block; width: 100%; border: 0; border-radius: 18px; background: var(--panel); }
 .bt-phones iframe { height: 700px; }
+.bt-phones-six iframe { height: 760px; }
 .bt-screens iframe { height: 520px; }
 .bt-screens .bt-wide iframe { height: 760px; }
 
-/* All pairings at once */
-.bt-compare { display: grid; gap: 0; }
-.bt-row { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 32px; padding: 26px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
-.bt-row:hover .bt-row-name { text-decoration: underline; }
-.bt-row-name { font-size: 16px; font-weight: 600; }
-.bt-row-note { font-size: 14px; line-height: 1.5; color: var(--muted); margin-top: 6px; }
-.bt-row-sample { display: grid; gap: 10px; }
-.bt-row-sample .bt-display { font-size: calc(46px * var(--scale, 1)); line-height: 1.05; }
-.bt-row-sample p { margin: 0; font-size: 16px; line-height: 1.6; max-width: 64ch; }
-
 @media (max-width: 900px) {
   .bt { padding: 24px 20px 48px; }
-  .bt-intro, .bt-specimen, .bt-row { grid-template-columns: 1fr; }
+  .bt-intro, .bt-specimen { grid-template-columns: 1fr; }
   .bt-roles { justify-items: start; text-align: left; }
   .bt-phones, .bt-screens { grid-template-columns: 1fr; }
 }
