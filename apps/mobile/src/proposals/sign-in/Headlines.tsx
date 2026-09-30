@@ -4,7 +4,7 @@
 // things you keep). Fonts: Google Fonts, SIL OFL (assets/fonts/OFL.txt).
 import { useFonts } from 'expo-font';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View, type TextStyle } from 'react-native';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 
 export type HeadlineType = 'highlighter' | 'tags' | 'rotating' | 'stack';
@@ -97,11 +97,15 @@ export const ROTATING_FONTS: Record<RotatingFont, { label: string; lead: Face; w
   dmserif: { label: 'DM Serif Display', lead: { fontFamily: DISPLAY.dmSerif, fontSize: 44, lineHeight: 50, letterSpacing: -0.6 }, word: { fontFamily: DISPLAY.dmSerifItalic, fontSize: 54, lineHeight: 62, letterSpacing: -0.8 } },
 };
 
+/** A brand type candidate for the headline (the Storybook Type toolbar,
+ * design-system/simulator/brand-type.ts); replaces the font's two faces. */
+export type HeadlineFaces = { lead: TextStyle & { lineHeight: number }; word: TextStyle & { lineHeight: number } };
+
 const WORDS = [{ word: 'link.', color: INK.butter }, { word: 'photo.', color: INK.peach }, { word: 'highlight.', color: INK.mint }, { word: 'voice memo.', color: INK.ice }, { word: 'idea.', color: INK.lilac }];
 /** C: "Keep every …" — the thing you keep keeps changing: link, photo, highlight… in its own colour. */
-export function RotatingHeadline({ start, motion, sub, subColor, font = 'instrument', shadow = false }: Props & { font?: RotatingFont }) {
+export function RotatingHeadline({ start, motion, sub, subColor, font = 'instrument', faces, shadow = false }: Props & { font?: RotatingFont; faces?: HeadlineFaces }) {
   const glow = shadow ? SHADOW : null;
-  const face = ROTATING_FONTS[font];
+  const face = faces ?? ROTATING_FONTS[font];
   const [l1, l2, s] = useEntrance([380, 520, 760], start, motion);
   const [index, setIndex] = useState(0);
   const turn = useRef(new Animated.Value(1)).current;

@@ -13,6 +13,9 @@ import { APP_DEVICES, DEVICES, accessibilityGlobals, simulatorGlobals, textSizeG
 import { PhoneFrame, innerUrl, isInner, listenForInnerErrors, relayErrorsToParent } from '../../simulator/Frame.tsx';
 import { setMediaPreferences } from '../../simulator/media.ts';
 import { TextScale } from '../../simulator/text-scale.ts';
+import { brandGlobal, pairing } from '../../simulator/brand-type.ts';
+import { BrandType } from '../mocks/brand-text.ts';
+import '../../simulator/brand-fonts.css';
 
 // The sample world answers every API and image request (src/handlers.ts).
 initialize({ onUnhandledRequest: 'bypass', quiet: true, serviceWorker: { url: './mockServiceWorker.js' } });
@@ -34,9 +37,9 @@ const simulator: Decorator = (Story, { id, globals, parameters, args }) => {
   const story = parameters.route ? <StoryRoute route={parameters.route} colors={palette}><Story /></StoryRoute> : <Story />;
   return <SafeAreaInsetsContext.Provider value={insets}><SafeAreaFrameContext.Provider value={{ x: 0, y: 0, width: device.width, height: device.height }}>
     <AppearanceContext.Provider value={{ preference: scheme, scheme, setPreference: async () => {} }}>
-      <TextScale.Provider value={Number(globals.textSize) || 1}>
+      <TextScale.Provider value={Number(globals.textSize) || 1}><BrandType.Provider value={pairing(globals.brand)}>
         <MotionProvider key={`motion-${globals.motion}`}><MaterialProvider key={`${globals.transparency}-${globals.motion}`}><StorySession mode={parameters.session}>{parameters.session === 'signed-out' ? story : <BillingProvider>{story}</BillingProvider>}</StorySession></MaterialProvider></MotionProvider>
-      </TextScale.Provider>
+      </BrandType.Provider></TextScale.Provider>
     </AppearanceContext.Provider>
   </SafeAreaFrameContext.Provider></SafeAreaInsetsContext.Provider>;
 };
@@ -44,8 +47,8 @@ const simulator: Decorator = (Story, { id, globals, parameters, args }) => {
 const preview: Preview = {
   loaders: [mswLoader],
   decorators: [simulator],
-  globalTypes: simulatorGlobals(APP_DEVICES, { ...textSizeGlobal, ...accessibilityGlobals }),
-  initialGlobals: { device: 'iphone-17-pro', theme: 'light', textSize: '1', motion: 'full', transparency: 'full' },
+  globalTypes: simulatorGlobals(APP_DEVICES, { ...textSizeGlobal, ...accessibilityGlobals, ...brandGlobal }),
+  initialGlobals: { device: 'iphone-17-pro', theme: 'light', textSize: '1', motion: 'full', transparency: 'full', brand: 'today' },
   parameters: { options: { storySort: { order: ['Start here', 'Flow map', 'Live', 'Current', 'Proposals', 'Components', '*'] } }, layout: 'centered', msw: { handlers: { story: [], world: appHandlers } } },
 };
 export default preview;
