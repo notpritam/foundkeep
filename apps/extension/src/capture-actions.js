@@ -332,7 +332,9 @@ async function screenshotFlow(tab, trigger, preferenceState) {
     if (!preferences.capture.fullPage) throw new Error(captureDisabledMessage("fullpage"));
     return fullPageScreenshot(tab, captureMethodFor("fullpage", trigger), preferenceState);
   }
-  const { rect, dpr } = result;
+  // Window: exactly what is on screen — a region the size of the window, so it
+  // keeps the region capture method the backend already accepts.
+  const { rect, dpr } = result.window ? { rect: { x: 0, y: 0, ...result.window }, dpr: result.dpr } : result;
   await assertCaptureTab(tab);
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
     format: "png",
@@ -399,79 +401,121 @@ async function fullPageScreenshot(tab, captureMethod, preferenceState) {
     target: { tabId: tab.id },
     func: prepFullPage,
   }).catch(error => { throw friendlyCaptureError(error); });
+  const restore = () => chrome.scripting.executeScript({ target: { tabId: tab.id }, func: restoreFullPage });
   const dpr = Math.max(1, Number(dims.dpr) || 1);
-  const pixelWidth = Math.round(dims.viewW * dpr);
+  const pixelWidth = Math.round(dims.rect.w * dpr);
   if (!pixelWidth || pixelWidth > MAX_IMAGE_DIMENSION) {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: restoreFullPage }).catch(() => {});
+    await restore().catch(() => {});
     throw new Error("This page is too wide to capture safely at the current display scale.");
   }
   const pagePixels = Math.min(MAX_PAGE_PIXELS, limits.fullPagePixels);
   const pageHeight = Math.min(MAX_PAGE_PX, limits.fullPageCssHeight);
-  const heightByArea = Math.floor(pagePixels / (dims.viewW * dpr * dpr));
+  const heightByArea = Math.floor(pagePixels / (dims.rect.w * dpr * dpr));
   const heightByDimension = Math.floor(MAX_IMAGE_DIMENSION / dpr);
   const totalH = Math.max(1, Math.min(dims.totalHeight, pageHeight, heightByArea, heightByDimension));
   const shots = [];
   try {
-    for (let y = 0; y < totalH; y += dims.viewH) {
+    for (let y = 0; y < totalH; y += dims.rect.h) {
       const [{ result: actualY }] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (yy) => {
-          window.scrollTo(0, yy);
-          return window.scrollY;
-        },
+        func: scrollFullPage,
         args: [y],
       });
       await sleep(500);
+      // After the page has reacted to the scroll: hide whatever floats over it
+      // now, including headers that only turn fixed once the page scrolls.
+      if (actualY > 0) await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: hideFloating });
       await assertCaptureTab(tab);
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
         format: "png",
       }).catch(error => { throw friendlyCaptureError(error); });
       await assertCaptureTab(tab);
       shots.push({ y: actualY, dataUrl });
-      if (actualY + dims.viewH >= totalH) break;
+      if (actualY + dims.rect.h >= totalH) break;
     }
   } finally {
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: restoreFullPage,
-    });
+    await restore();
   }
-  const encoded = await stitch(shots, dims, totalH, limits.imageBytes);
+  const encoded = await stitch(shots, dims.rect, dpr, totalH, limits.imageBytes);
   const context = await readablePageContext(tab, captureMethod, preferenceState);
   return saveScreenshot(context, encoded);
 }
 
+// Injected: find what scrolls — the page itself or, on an app page whose
+// document never scrolls, the largest scrolling panel on screen — and report
+// the area to capture (CSS pixels, in the window). Floating elements anchored
+// to the bottom are hidden from the start (chat buttons, banners); ones at
+// the top stay for the first screen, so the image begins as the page looks.
 function prepFullPage() {
   window.__atlasHidden = [];
+  const root = document.scrollingElement || document.documentElement;
+  let scroller = null;
+  if (root.scrollHeight <= window.innerHeight + 4) {
+    let best = 0;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    for (let el = walker.nextNode(), scanned = 0; el && scanned < 50_000; el = walker.nextNode(), scanned++) {
+      if (el.scrollHeight <= el.clientHeight + 4 || !/(auto|scroll|overlay)/.test(getComputedStyle(el).overflowY)) continue;
+      const r = el.getBoundingClientRect();
+      const area = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+      if (area > best) { best = area; scroller = el; }
+    }
+  }
+  window.__atlasScroller = scroller;
+  window.__atlasScrollY = scroller ? scroller.scrollTop : window.scrollY;
+  window.__atlasScrollBehavior = document.documentElement.style.scrollBehavior;
+  document.documentElement.style.scrollBehavior = "auto";
+  if (scroller) { window.__atlasScrollerBehavior = scroller.style.scrollBehavior; scroller.style.scrollBehavior = "auto"; }
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
-  let scanned = 0;
-  while (scanned++ < 50_000) {
-    const el = walker.nextNode();
-    if (!el) break;
+  for (let el = walker.nextNode(), scanned = 0; el && scanned < 50_000; el = walker.nextNode(), scanned++) {
     const pos = getComputedStyle(el).position;
-    if (pos === "fixed" || pos === "sticky") {
+    if ((pos === "fixed" || pos === "sticky") && el.getBoundingClientRect().top > innerHeight / 2) {
       window.__atlasHidden.push([el, el.style.visibility]);
       el.style.visibility = "hidden";
     }
   }
-  window.__atlasScrollY = window.scrollY;
-  window.__atlasScrollBehavior = document.documentElement.style.scrollBehavior;
-  document.documentElement.style.scrollBehavior = "auto";
-  return {
-    totalHeight: document.documentElement.scrollHeight,
-    viewH: window.innerHeight,
-    viewW: window.innerWidth,
-    dpr: window.devicePixelRatio || 1,
-  };
+  let rect;
+  if (scroller) {
+    const r = scroller.getBoundingClientRect();
+    rect = { x: r.left + scroller.clientLeft, y: r.top + scroller.clientTop, w: scroller.clientWidth, h: scroller.clientHeight };
+  } else {
+    // The page without its scrollbar.
+    rect = { x: 0, y: 0, w: document.documentElement.clientWidth || window.innerWidth, h: window.innerHeight };
+  }
+  return { rect, totalHeight: scroller ? scroller.scrollHeight : root.scrollHeight, dpr: window.devicePixelRatio || 1 };
+}
+
+// Injected: scroll the page (or its panel) to y; returns where it really went.
+function scrollFullPage(y) {
+  const scroller = window.__atlasScroller;
+  if (scroller) { scroller.scrollTop = y; return scroller.scrollTop; }
+  window.scrollTo(0, y);
+  return window.scrollY;
+}
+
+// Injected: hide everything fixed or sticky (it would repeat on every screen),
+// then wait for the page to paint without it.
+function hideFloating() {
+  const hidden = window.__atlasHidden || (window.__atlasHidden = []);
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  for (let el = walker.nextNode(), scanned = 0; el && scanned < 50_000; el = walker.nextNode(), scanned++) {
+    const pos = getComputedStyle(el).position;
+    if ((pos === "fixed" || pos === "sticky") && el.style.visibility !== "hidden" && !hidden.some(([seen]) => seen === el)) {
+      hidden.push([el, el.style.visibility]);
+      el.style.visibility = "hidden";
+    }
+  }
+  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))));
 }
 
 function restoreFullPage() {
   for (const [el, vis] of window.__atlasHidden || []) el.style.visibility = vis;
   document.documentElement.style.scrollBehavior = window.__atlasScrollBehavior || "";
-  window.scrollTo(0, window.__atlasScrollY || 0);
-  delete window.__atlasHidden;
-  delete window.__atlasScrollY;
-  delete window.__atlasScrollBehavior;
+  const scroller = window.__atlasScroller;
+  if (scroller) {
+    scroller.scrollTop = window.__atlasScrollY || 0;
+    scroller.style.scrollBehavior = window.__atlasScrollerBehavior || "";
+  } else window.scrollTo(0, window.__atlasScrollY || 0);
+  for (const key of ["__atlasHidden", "__atlasScrollY", "__atlasScrollBehavior", "__atlasScroller", "__atlasScrollerBehavior"]) delete window[key];
 }
 
 async function encodeCanvas(canvas, qualities = [0.9, 0.75, 0.6, 0.45], maxBytes = MAX_IMAGE_BYTES) {
@@ -483,17 +527,18 @@ async function encodeCanvas(canvas, qualities = [0.9, 0.75, 0.6, 0.45], maxBytes
   throw new Error(`This screenshot is too detailed for FoundKeep's ${Math.floor(Math.min(MAX_IMAGE_BYTES, maxBytes) / 1048576)} MiB capture limit. Capture a smaller region or reduce the page zoom.`);
 }
 
-async function stitch(shots, dims, totalH, maxBytes) {
-  const canvas = new OffscreenCanvas(
-    Math.round(dims.viewW * dims.dpr),
-    Math.round(totalH * dims.dpr),
-  );
+// Each screen is cropped to the captured area and laid at the height it was
+// scrolled to, so the image keeps the page's own geometry (the last screen,
+// stopped short by the end of the page, overlaps the one before exactly).
+async function stitch(shots, rect, dpr, totalH, maxBytes) {
+  const w = Math.round(rect.w * dpr), h = Math.round(rect.h * dpr);
+  const canvas = new OffscreenCanvas(w, Math.round(totalH * dpr));
   const ctx = canvas.getContext("2d");
   for (const shot of shots) {
     const bmp = await createImageBitmap(
       await (await fetch(shot.dataUrl)).blob(),
     );
-    ctx.drawImage(bmp, 0, Math.round(shot.y * dims.dpr));
+    ctx.drawImage(bmp, Math.round(rect.x * dpr), Math.round(rect.y * dpr), w, h, 0, Math.round(shot.y * dpr), w, h);
   }
   return encodeCanvas(canvas, undefined, maxBytes);
 }

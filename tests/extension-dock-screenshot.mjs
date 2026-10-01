@@ -13,10 +13,10 @@ const PAGE = '<title>Shot fixture</title><meta name="description" content="A pag
 // captureVisibleTab needs the activeTab or all-urls permission specifically;
 // nothing in this suite can grant a fresh activeTab gesture, so every test
 // here uses the disposable all-urls copy of the extension.
-async function openShot(t, name, { uploads = null } = {}) {
+async function openShot(t, name, { uploads = null, page = PAGE } = {}) {
   const { context, worker, extensionId, origin } = await launch(t, { allUrls: true, prefix: 'foundkeep-shot-' });
   await signIn(context, worker, { uploads });
-  await fixture(context, origin + '/' + name, PAGE);
+  await fixture(context, origin + '/' + name, page);
   const web = await context.newPage(); await web.goto(origin + '/' + name);
   const ext = await extensionPage(context, worker);
   assert.equal(await summon(ext, origin + '/' + name + '*'), true);
@@ -42,7 +42,7 @@ test('screenshot: the dock button goes straight to region selection with a corne
   assert.equal(await dock.evaluate('__foundkeepDock.visible()'), false);
   const bar = await dock.evaluate(`window.__foundkeepCapture.rect('.bar')`);
   assert.ok(bar.width > 0 && bar.y < 40 && 1200 - (bar.x + bar.width) < 40, 'pinned to the top-right corner: ' + JSON.stringify(bar));
-  assert.equal(await dock.evaluate(`window.__foundkeepCapture.text('.bar')`), 'SelectionFull page✕');
+  assert.equal(await dock.evaluate(`window.__foundkeepCapture.text('.bar')`), 'SelectionWindowFull page✕');
   assert.equal(await dock.evaluate(`window.__foundkeepCapture.attr('[data-choice="selection"]', 'aria-pressed')`), 'true');
   // Design review copies the selector (stylesheet + markup) through the
   // isolated-world handle; the page cannot see it.
@@ -186,3 +186,79 @@ test('screenshot: a second screenshot while one is selecting is refused and does
   assert.deepEqual(await again, { ok: false, cancelled: true });
   assert.equal((await localCaptures(ext)).length, 0);
 });
+
+// Full page and Window must keep the page's own geometry: every part of the
+// page lands where it belongs in the image, once. Twelve solid bands, each
+// 300 CSS px tall, make any misplacement visible in the pixels.
+const BAND = ['#e53935', '#fb8c00', '#fdd835', '#43a047', '#00acc1', '#1e88e5', '#5e35b1', '#d81b60', '#6d4c41', '#00897b', '#7cb342', '#3949ab'];
+const bands = () => BAND.map((color, i) => `<div style="height:300px;background:${color}">Band ${i}</div>`).join('');
+const HEADER = '#222222';
+// A header that is static at the top and turns fixed once the page scrolls,
+// as many sites do: it must appear once, at the top, not on every screen.
+const WINDOW_PAGE = `<title>Window fixture</title><style>body{margin:0;font:16px sans-serif}</style><header id="h" style="height:60px;background:${HEADER};width:100%;top:0;left:0"></header>${bands()}`
+  // Like real sites, it keeps its space when it goes fixed, so the page doesn't jump.
+  + `<script>addEventListener('scroll', () => { const fixed = scrollY > 100; h.style.position = fixed ? 'fixed' : 'static'; document.body.style.paddingTop = fixed ? '60px' : '0'; })</script>`;
+// An app page: the document never scrolls; a panel beside a sidebar does.
+const APP_PAGE = `<title>App fixture</title><style>html,body{margin:0;height:100%;overflow:hidden;font:16px sans-serif}.app{display:flex;height:100%}.side{width:200px;background:#eeeeee}main{flex:1;overflow:auto}</style>`
+  + `<div class="app"><div class="side">Sidebar</div><main>${bands()}</main></div>`;
+// RGB of the saved image at (x, y), read in the extension from the stored blob.
+const pixels = (ext, points) => ext.evaluate(async points => {
+  const [capture] = (await (await import('./db.js')).listCaptures()).filter(c => c.type === 'screenshot');
+  const bitmap = await createImageBitmap(capture.blob);
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height), ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0);
+  return points.map(([x, y]) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3)));
+}, points);
+const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 24);
+async function shoot(web, dock, choice) {
+  await dock.click('[data-action="screenshot"]');
+  await toolbar(dock);
+  await clickChoice(web, dock, choice);
+  await dock.waitFor(`__foundkeepDock.toast() === ${JSON.stringify(SAVED)}`, 40000);
+}
+
+test('screenshot: Window saves exactly what is on screen', { timeout: 40000 }, async t => {
+  const { web, ext, dock } = await openShot(t, '__window', { page: WINDOW_PAGE });
+  await web.evaluate(() => scrollTo(0, 650));
+  await shoot(web, dock, 'window');
+  const { dpr, w, h } = await web.evaluate(() => ({ dpr: devicePixelRatio, w: innerWidth, h: innerHeight }));
+  const [capture] = await localCaptures(ext);
+  assert.equal(capture.type, 'screenshot');
+  assert.equal(capture.width, Math.round(w * dpr));
+  assert.equal(capture.height, Math.round(h * dpr));
+  assert.equal(capture.provenance.captureMethod, 'popup-region');
+  // Scrolled to 650: the top of the window is band 1 (60 + 300 → 360 … 660) then band 2.
+  const [top, below] = await pixels(ext, [[600, Math.round(5 * dpr)], [600, Math.round(100 * dpr)]]);
+  assert.ok(near(below, rgb(BAND[2])), 'band 2 below the fixed header: ' + below);
+  assert.ok(near(top, rgb(HEADER)), 'the fixed header is on screen, so the window shows it: ' + top);
+});
+
+test('screenshot: Full page keeps every part of a scrolling page in place, and a header that turns fixed appears once', { timeout: 60000 }, async t => {
+  const { web, ext, dock } = await openShot(t, '__bands', { page: WINDOW_PAGE });
+  await shoot(web, dock, 'fullpage');
+  const dpr = await web.evaluate(() => devicePixelRatio);
+  const [capture] = await localCaptures(ext);
+  assert.equal(capture.height, Math.round((60 + 300 * BAND.length) * dpr));
+  const centres = BAND.map((_, i) => [600, Math.round((60 + 300 * i + 150) * dpr)]);
+  const seen = await pixels(ext, centres);
+  BAND.forEach((color, i) => assert.ok(near(seen[i], rgb(color)), `band ${i} in place: ${seen[i]} vs ${color}`));
+  // Just below each screen's top edge, never the header again.
+  const seams = await pixels(ext, [1, 2, 3, 4].map(n => [600, Math.round((800 * n + 20) * dpr)]));
+  seams.forEach((pixel, n) => assert.ok(!near(pixel, rgb(HEADER)), `no repeated header on screen ${n + 2}: ${pixel}`));
+  const [header] = await pixels(ext, [[600, Math.round(30 * dpr)]]);
+  assert.ok(near(header, rgb(HEADER)), 'the header, once, at the top');
+});
+
+test('screenshot: Full page on an app page captures the whole scrolling panel, not one screen', { timeout: 60000 }, async t => {
+  const { web, ext, dock } = await openShot(t, '__app', { page: APP_PAGE });
+  await shoot(web, dock, 'fullpage');
+  const { dpr, panel } = await web.evaluate(() => { const m = document.querySelector('main'); return { dpr: devicePixelRatio, panel: { w: m.clientWidth, h: m.scrollHeight } }; });
+  const [capture] = await localCaptures(ext);
+  assert.equal(capture.width, Math.round(panel.w * dpr), 'as wide as the panel');
+  assert.equal(capture.height, Math.round(panel.h * dpr), 'as tall as everything in the panel');
+  const seen = await pixels(ext, BAND.map((_, i) => [Math.round(300 * dpr), Math.round((300 * i + 150) * dpr)]));
+  BAND.forEach((color, i) => assert.ok(near(seen[i], rgb(color)), `band ${i} in place: ${seen[i]} vs ${color}`));
+  assert.equal(await web.evaluate(() => document.querySelector('main').scrollTop), 0, 'the panel is scrolled back');
+});
+
