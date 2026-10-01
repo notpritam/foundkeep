@@ -54,7 +54,25 @@ function filmVariations() {
   return el;
 }
 
+/** The three Pritam shortlisted (2026-10-01), as numbered in the poll video. */
+function pickOne() {
+  const el = document.createElement('div');
+  el.className = 'bt';
+  const pages = [
+    ['proposals-sign-in--first-screen', '1 · Elements flying in'],
+    ['proposals-sign-in--with-film', '2 · White page, clear film'],
+    ['proposals-sign-in--with-film-on-sky', '3 · Sky page, soft film'],
+  ];
+  el.innerHTML = `
+    <header class="bt-intro"><div><h1>Pick one</h1><p>The shortlist: the floating elements over the sky, the film on a white page, and the soft film on the sky. All live. The side-by-side video for asking people: <a href="./downloads/sign-in-poll-1080p.mp4" download>sign-in-poll-1080p.mp4</a>.</p></div></header>
+    <div class="bt-phones bt-phones-three">${pages.map(([id, name]) => `<figure>
+      <iframe loading="lazy" title="${name}" src="./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent('device:iphone-17-pro')}"></iframe>
+      <figcaption>${name}</figcaption></figure>`).join('')}</div>`;
+  return el;
+}
+
 export default { title: 'Sign in', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
+export const PickOne = { name: 'Pick one', render: pickOne };
 export const FilmVariations = { name: 'Film variations', render: filmVariations };
 export const TwoVersions = { name: 'Versions', render: versions };
 export const Movement = { name: 'Movement on the page', render: movement };
