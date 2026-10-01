@@ -2,10 +2,11 @@
 // (so it must stay self-contained: no imports, no closures over this module).
 // It runs in the extension's isolated world, draws a crosshair veil plus a
 // small toolbar pinned to the tab's top-right corner — Selection (active) ·
-// Full page · ✕ — inside a closed shadow root, and resolves with the user's
-// choice:
+// Window · Full page · ✕ — inside a closed shadow root, and resolves with the
+// user's choice:
 //   { rect: {x, y, w, h}, dpr }  a dragged region (CSS pixels)
-//   { fullPage: true }           Full page was chosen
+//   { window: {w, h}, dpr }      Window: exactly what is on screen
+//   { fullPage: true }           Full page was chosen (the whole scroll)
 //   null                         ✕, Esc, or the tab was hidden
 //   { busy: true }               a selector is already open on this page
 // Only trusted input counts: a page script can dispatch synthetic events at
@@ -39,7 +40,8 @@ export function screenshotSelectInPage({ fullPage = true } = {}) {
     <div class="hint">Drag to capture · Esc to cancel</div>
     <div class="bar" role="toolbar" aria-label="FoundKeep screenshot">
       <button type="button" data-choice="selection" aria-pressed="true">Selection</button>
-      <button type="button" data-choice="fullpage">Full page</button>
+      <button type="button" data-choice="window" title="Exactly what is on screen">Window</button>
+      <button type="button" data-choice="fullpage" title="The whole page, scrolled">Full page</button>
       <button type="button" data-choice="cancel" aria-label="Cancel screenshot" title="Cancel (Esc)">✕</button>
     </div>`;
     const veil = root.querySelector(".veil"), box = root.querySelector(".box");
@@ -94,6 +96,7 @@ export function screenshotSelectInPage({ fullPage = true } = {}) {
     root.querySelector(".bar").addEventListener("click", (event) => {
       if (!event.isTrusted) return;
       const choice = event.target.closest?.("button[data-choice]")?.dataset.choice;
+      if (choice === "window") finish({ window: { w: window.innerWidth, h: window.innerHeight }, dpr });
       if (choice === "fullpage") finish({ fullPage: true });
       if (choice === "cancel") finish(null);
     });

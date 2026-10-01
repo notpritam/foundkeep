@@ -12,7 +12,7 @@ test("extension presents the FoundKeep identity while preserving its signed ID",
   ]);
   assert.ok(Object.values(manifest.commands).every((command) => command.description.includes("FoundKeep")));
   assert.equal(manifest.key.startsWith("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A"), true);
-  assert.equal(manifest.version, "1.8.2");
+  assert.equal(manifest.version, "1.8.3");
   // The details card (review.html) is still framed by the dock, so it stays a
   // dynamic-URL web-accessible resource; the before-save drafts are gone.
   // The note field (note.html) is framed the same way, so the page never sees

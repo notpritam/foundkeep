@@ -1,8 +1,8 @@
-# FoundKeep — Chrome Web Store 1.0.3 submission
+# FoundKeep — Chrome Web Store 1.0.4 submission
 
-Upload `deploy/dist/foundkeep-store-1.0.3.zip` (`bun run store:pack`) to the existing item **`cficnecbdbiddngllpfbacabgbcjinmk`**. The enclosing submission kit is a handoff archive, not the extension upload. Keep the established Store identity and existing public listing. Neither archive contains credentials.
+Upload `deploy/dist/foundkeep-store-1.0.4.zip` (`bun run store:pack`) to the existing item **`cficnecbdbiddngllpfbacabgbcjinmk`**. The enclosing submission kit is a handoff archive, not the extension upload. Keep the established Store identity and existing public listing. Neither archive contains credentials.
 
-## What's new in 1.0.3 (since 1.0.2)
+## What's new in 1.0.4 (since 1.0.2; 1.0.3 was never published)
 
 For the Store's "what's new" and for reviewers. Same permissions and hosts as 1.0.2.
 
@@ -11,6 +11,7 @@ For the Store's "what's new" and for reviewers. Same permissions and hosts as 1.
 - The dock is a small bookmark tab you can drag anywhere on the page; it tucks back into the bottom edge. Icon-only controls with tooltips, and a quiet count of saves still waiting to sync.
 - One click on the FoundKeep mark saves an X post.
 - Notes are typed in the extension's own frame, so the page can't read them; pictures from the right-click menu ask for that site's access in a small FoundKeep window when Chrome can't prompt from the menu.
+- Screenshots offer **Selection**, **Window** (exactly what is on screen) and **Full page** (the whole page, scrolled). Full page now captures app-style pages that scroll a panel, and headers that turn fixed while scrolling no longer repeat down the image.
 - The look now follows FoundKeep's brand: SF Pro on Mac, Inter elsewhere.
 
 This release is authorized for preparation and review submission. **Defer publishing after approval** and leave the existing public version available until a separate public-release request. In the dashboard, clear automatic publication in the review confirmation. With API v2, explicitly use `publishType: "STAGED_PUBLISH"`, `skipReview: false`, and `blockOnWarnings: true`. Do not use default publication mode. [Google's deferred publishing instructions](https://developer.chrome.com/docs/webstore/publish#deferred_publishing_option), [API publication modes](https://developer.chrome.com/docs/webstore/api/reference/rest/v2/publishers.items/publish).
@@ -95,7 +96,7 @@ Keep existing visibility, regions, Store ID and public link. This preparation cr
 
 Provide a verified dedicated reviewer account only in the private dashboard Test instructions field. Never place passwords or recovery codes in source, listing copy, this kit, screenshots or logs.
 
-Fresh 1.0.3 kit assets under `assets/` (`bun run store:assets`, then `bun run store:kit`). Upload the screenshots in this order:
+Fresh 1.0.4 kit assets under `assets/` (`bun run store:assets`, then `bun run store:kit`). Upload the screenshots in this order:
 
 1. `dock-toolbar.png` — "Save anything in one click": the dock on an article, 1280 × 800.
 2. `dock-review.png` — "Saved, straight to your library": the confirmation after a one-click save, 1280 × 800. (The file name stays because `deploy/pack-store-submission.sh` requires it.)
