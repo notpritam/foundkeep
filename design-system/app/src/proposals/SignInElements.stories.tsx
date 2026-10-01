@@ -116,7 +116,7 @@ function StyleSheetBoard() {
   const labels = ['Reel', 'Tweet', 'Photo post', 'Agent orb', 'Article', 'Short', 'Thread', 'Agent reply'];
   return <ScrollView contentContainerStyle={styles.page}>
     <Text style={styles.title}>Styles</Text>
-    <Text style={styles.intro}>The same eight objects in six styles, so they belong in the sky rather than sitting on it. Each style is on the screen in its own story.</Text>
+    <Text style={styles.intro}>The same eight objects in six styles, so they belong in the sky rather than sitting on it. To judge them on the page, see Sign in / Element styles on the page in the design system, or each Style story here.</Text>
     {STYLES.map(style => <View key={style.id} style={styles.group}>
       <Text style={styles.family}>{style.name}</Text>
       <Text style={styles.note}>{style.note}</Text>
@@ -147,7 +147,7 @@ const meta: Meta = { title: 'Proposals/Sign-in elements', parameters: { controls
 export default meta;
 type Story = StoryObj;
 const onScreen = { simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/sign-in', params: {} } };
-export const Styles: Story = { name: 'Styles · all six', render: () => <StyleSheetBoard />, parameters: { layout: 'fullscreen' } };
+export const Styles: Story = { name: 'Styles · the objects alone', render: () => <StyleSheetBoard />, parameters: { layout: 'fullscreen' } };
 export const StyleGlass: Story = { name: 'Style · glass', render: () => <Screen finds={styled(0)} />, parameters: onScreen };
 export const StyleCards: Story = { name: 'Style · cards', render: () => <Screen finds={styled(1)} />, parameters: onScreen };
 export const StylePaper: Story = { name: 'Style · paper', render: () => <Screen finds={styled(2)} />, parameters: onScreen };
