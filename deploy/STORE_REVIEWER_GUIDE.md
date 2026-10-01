@@ -1,17 +1,17 @@
-# FoundKeep 1.0.2 — Chrome Web Store reviewer guide
+# FoundKeep 1.0.3 — Chrome Web Store reviewer guide
 
 Update existing item **`cficnecbdbiddngllpfbacabgbcjinmk`** and preserve its ID. This Store build uses production `https://foundkeep.app`. The separate FoundKeep Dev build must not be uploaded here.
 
 ## Operator preparation
 
-1. Verify `foundkeep-store-1.0.2.zip`: root manifest, correct version, no self-hosting `key` or `update_url`, and matching kit SHA-256 checksums. Upload only this extension ZIP, not the enclosing kit.
+1. Verify `foundkeep-store-1.0.3.zip`: root manifest, correct version, no self-hosting `key` or `update_url`, and matching kit SHA-256 checksums. Upload only this extension ZIP, not the enclosing kit.
 2. Verify production config/backend still authorize Store ID `cficnecbdbiddngllpfbacabgbcjinmk` and manual ID `mjfcgmboaijfcaanepdipbgmipnccnpn`. Both already exist; preserve their allowlists. Check `https://foundkeep.app/customer-config.json`.
 3. Confirm the reviewed production automatic-connection/detailed-save APIs and final privacy policy are deployed before reviewer testing. Beta access and managed processing are backend configuration, not executable extension code fetched remotely.
 4. Verify the dedicated reviewer account still signs in. Supply its URL, email and password only in the private dashboard **Test instructions** field. Use existing private reviewer credentials if available; do not assume an old account/file still works. Never put credentials or recovery codes in source, listing copy, this kit, screenshots or logs.
 5. Replace obsolete screenshots/copy with this kit's dock-toolbar/dock-review assets and current permission disclosures. Inspect the draft before review submission.
 6. Submit with **deferred publishing**: clear automatic publication in the dashboard. API v2 requires explicit `publishType: "STAGED_PUBLISH"`, `skipReview: false`, and `blockOnWarnings: true`. Record returned review state. Do not publish a staged approval without a later public-release request. [Deferred publishing](https://developer.chrome.com/docs/webstore/publish#deferred_publishing_option), [API modes](https://developer.chrome.com/docs/webstore/api/reference/rest/v2/publishers.items/publish).
 
-No submitted/approved Store 1.0.2 build was available during preparation. The checked Store archive and identical manual runtime were tested unpacked. Once the uploaded package is available through the publisher's testing workflow, verify its assigned Store ID and repeat the connection/save checks below.
+The checks below were last run against the 1.0.3 package before submission. The checked Store archive and identical manual runtime were tested unpacked. Once the uploaded package is available through the publisher's testing workflow, verify its assigned Store ID and repeat the connection/save checks below.
 
 ## Reviewer path
 
