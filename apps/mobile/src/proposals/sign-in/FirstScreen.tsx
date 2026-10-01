@@ -41,6 +41,28 @@ const DEPTH = [{ travel: 64, drift: 4, turn: 1.5, opacity: 0.94 }, { travel: 84,
 const STEPS = Array.from({ length: 25 }, (_, i) => i / 24);
 const wave = (amplitude: number, offset = 0) => ({ inputRange: STEPS, outputRange: STEPS.map(t => amplitude * Math.sin((t + offset) * Math.PI * 2)) });
 
+/** How the objects keep moving once they have arrived (proposal, 2026-10-01).
+ * drift: a small float and turn (today). orbit: a slow ellipse round their
+ * place. bob: floating on water, up and down with a sway. rise: drifting
+ * upwards like bubbles, fading out at the top and in again below. */
+export type Movement = 'drift' | 'orbit' | 'bob' | 'rise';
+type Depth = (typeof DEPTH)[number];
+function moving(movement: Movement, d: Depth, phase: Animated.Value, offset: number) {
+  if (movement === 'orbit') return { x: phase.interpolate(wave(d.drift * 2.4, offset + 0.25)), y: phase.interpolate(wave(d.drift * 1.5, offset)), turn: phase.interpolate(wave(d.turn, offset)), fade: null };
+  if (movement === 'bob') return { x: phase.interpolate(wave(0, 0)), y: phase.interpolate(wave(d.drift * 2.2, offset)), turn: phase.interpolate(wave(d.turn * 2.6, offset + 0.15)), fade: null };
+  if (movement === 'rise') {
+    // Each object starts somewhere along its climb (t) and jumps back to the
+    // bottom exactly when it has faded out at the top.
+    const t = offset, top = 1 - t;
+    const points: [number, number][] = [[0, t], ...[0.15, 0.85].filter(c => c > t).map((c): [number, number] => [c - t, c]), [top, 1], [top, 0], ...[0.15, 0.85].filter(c => c < t).map((c): [number, number] => [c + top, c]), [1, t]];
+    const inputRange = points.map(p => p[0]);
+    const fade = (c: number) => c < 0.15 ? c / 0.15 : c > 0.85 ? (1 - c) / 0.15 : 1;
+    return { x: phase.interpolate(wave(d.drift * 0.8, offset)), y: phase.interpolate({ inputRange, outputRange: points.map(p => 30 - p[1] * 60) }), turn: phase.interpolate(wave(d.turn, offset)),
+      fade: phase.interpolate({ inputRange, outputRange: points.map(p => fade(p[1])) }) };
+  }
+  return { x: phase.interpolate(wave(d.drift * 0.6, offset + 0.5)), y: phase.interpolate(wave(d.drift, offset)), turn: phase.interpolate(wave(d.turn, offset + 0.25)), fade: null };
+}
+
 function useProviders(): OAuthProvider[] {
   const { client } = useSession();
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
@@ -53,8 +75,8 @@ function useProviders(): OAuthProvider[] {
   return [...providers].sort((a, b) => ['google', 'apple'].indexOf(a) - ['google', 'apple'].indexOf(b));
 }
 
-/** finds: the objects around the words (the element proposals swap them). */
-export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
+/** finds: the objects around the words; movement: how they keep moving (both proposals for now). */
+export function FirstScreen({ finds = FINDS, movement = 'drift' }: { finds?: Find[]; movement?: Movement }) {
   const fontReady = useHeadlineFont();
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -86,11 +108,11 @@ export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
     // each object has its own period, so they never move in step.
     const drift = v.drift.map((value, i) => {
       value.setValue(0);
-      return Animated.loop(Animated.timing(value, { toValue: 1, duration: finds[i].period * 1000, easing: Easing.linear, useNativeDriver: native }));
+      return Animated.loop(Animated.timing(value, { toValue: 1, duration: finds[i].period * (movement === 'rise' ? 1800 : 1000), easing: Easing.linear, useNativeDriver: native }));
     });
     run.start(); drift.forEach(loop => loop.start());
     return () => { run.stop(); drift.forEach(loop => loop.stop()); };
-  }, [motion, v, finds]);
+  }, [motion, v, finds, movement]);
 
   const rise = (value: Animated.Value, by = 20) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
   const cx = W / 2, cy = H * 0.42;
@@ -105,12 +127,14 @@ export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
       // Each object drifts in towards its place from beyond it, turning as it settles.
       const px = find.x * W + find.size / 2, py = find.y * H + find.size / 2, len = Math.hypot(px - cx, py - cy) || 1;
       const fromX = ((px - cx) / len) * d.travel, fromY = ((py - cy) / len) * d.travel;
-      const turn = Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [find.rotate + (fromX > 0 ? 10 : -10), find.rotate] }), phase.interpolate(wave(d.turn, offset + 0.25)));
+      const move = moving(movement, d, phase, offset);
+      const turn = Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [find.rotate + (fromX > 0 ? 10 : -10), find.rotate] }), move.turn);
+      const shown = entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity, d.opacity] });
       return <Animated.View key={i} pointerEvents="none" style={[styles.find, { left: find.x * W, top: find.y * H, width: find.size, height: find.size,
-        opacity: entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity, d.opacity] }),
+        opacity: move.fade ? Animated.multiply(shown, move.fade) : shown,
         transform: [
-          { translateX: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromX, 0] }), phase.interpolate(wave(d.drift * 0.6, offset + 0.5))) },
-          { translateY: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromY, 0] }), phase.interpolate(wave(d.drift, offset))) },
+          { translateX: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromX, 0] }), move.x) },
+          { translateY: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromY, 0] }), move.y) },
           { scale: entry.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) },
           { rotate: turn.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) },
         ] }]}>
