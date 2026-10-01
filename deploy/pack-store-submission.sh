@@ -23,6 +23,7 @@ required_assets = [
     "dock-toolbar.png",
     "save-review.png",
     "dock-review.png",
+    "library.png",
     "promo-small.png",
     "promo-marquee.png",
     "icon128.png",
