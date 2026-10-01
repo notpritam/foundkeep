@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { StorybookConfig } from '@storybook/react-native-web-vite';
 
@@ -21,6 +22,11 @@ const config: StorybookConfig = {
     // Dynamic Type on the web: the app's text wrappers scale by the simulator's text size.
     aliases.push({ find: /^(.*\/)?AdaptiveText\.tsx$/, replacement: path.resolve(import.meta.dirname, '../mocks/AdaptiveText.tsx') });
     aliases.push({ find: /^(.*\/)?AdaptiveTextInput\.tsx$/, replacement: path.resolve(import.meta.dirname, '../mocks/AdaptiveTextInput.tsx') });
+    // The sign-in films: previews play the 4K copies (film/render.mjs → downloads/*-4k-web.mp4) when they've been rendered.
+    for (const name of ['sign-in-film', 'sign-in-film-soft']) {
+      const hd = path.resolve(import.meta.dirname, `../../downloads/${name}-4k-web.mp4`);
+      if (existsSync(hd)) aliases.push({ find: new RegExp(`^(.*\\/)?assets\\/video\\/${name}\\.mp4$`), replacement: hd });
+    }
     config.resolve = { ...config.resolve, dedupe: [...(config.resolve?.dedupe || []), ...shared],
       alias: [...aliases, ...(Array.isArray(config.resolve?.alias) ? config.resolve.alias : Object.entries(config.resolve?.alias || {}).map(([find, replacement]) => ({ find, replacement: replacement as string })))] };
     config.server = { ...config.server, fs: { ...config.server?.fs, allow: [root, path.resolve(root, '../foundkeep-scenic-landing/node_modules')] } };
