@@ -1,26 +1,29 @@
-// Proposal (sign-in, 2026-09-30): the app's first screen, after Pritam's
-// reference. FoundKeep's own 3D objects (design-system/assets-3d) drift in
-// around a centred headline and keep drifting; the sign-in buttons rise last.
-// Real sign-in: the same Apple/Google route as today. Only the two buttons at
-// the bottom: no email option and no terms line (Pritam, 2026-09-30).
+// The app's first screen, locked 2026-10-01 (Pritam): FoundKeep's own 3D
+// objects drift in around a centred headline over the Cumulus sky (blur 1) and
+// keep drifting; the Apple and Google buttons rise last. No email option and
+// no terms line. Real sign-in: the same Apple/Google route as today.
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { useMotionAllowed } from '../../components/motion.tsx';
-import { useAppearance } from '../../appearance/AppearanceProvider.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
 import { isOAuthProvider, OAUTH_NAMES, type OAuthProvider } from '../../auth-oauth.ts';
-import { gradient, look as lookFor, type LookName } from './looks.ts';
-import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, LINES, type HeadlineType, type KeepStyle, type Tune } from './Headlines.tsx';
+import { KeepEveryHeadline, useHeadlineFont } from './Headline.tsx';
 
-/** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier). */
-type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number };
-/** What FoundKeep keeps, around the edges; x and y are fractions of the screen. */
-/** Around a centred headline. */
-const AROUND: Find[] = [
+const SKY = require('../../../assets/images/sign-in-backgrounds/sky-cumulus-top-medium.webp');
+const BLUR = 1;
+/** A gentle shade where the words sit, clear again behind the buttons. */
+const SHADE = 'linear-gradient(180deg, rgba(4,24,48,.18) 0%, rgba(4,24,48,.26) 42%, rgba(4,24,48,.12) 66%, rgba(255,255,255,0) 82%)';
+const shade = (Platform.OS === 'web' ? { backgroundImage: SHADE } : { experimental_backgroundImage: SHADE }) as ViewStyle;
+const BUTTON = { apple: { background: '#0b0c0d', ink: '#ffffff', border: '#0b0c0d' }, other: { background: '#ffffff', ink: '#202020', border: 'rgba(255,255,255,0)' } };
+
+/** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier). x and y are fractions of the screen. */
+export type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number };
+/** What FoundKeep keeps, around the edges. */
+export const FINDS: Find[] = [
   { source: require('../../../assets/images/finds/photo.webp'), x: 0.05, y: 0.075, size: 84, rotate: -6, depth: 1, delay: 90, period: 9.2 },
   { source: require('../../../assets/images/finds/post.webp'), x: 0.68, y: 0.07, size: 104, rotate: 5, depth: 2, delay: 170, period: 10.6 },
   { source: require('../../../assets/images/finds/voice.webp'), x: -0.03, y: 0.235, size: 96, rotate: -8, depth: 0, delay: 240, period: 8.4 },
@@ -30,22 +33,6 @@ const AROUND: Find[] = [
   { source: require('../../../assets/images/finds/video.webp'), x: 0.0, y: 0.655, size: 100, rotate: -5, depth: 2, delay: 470, period: 10.2 },
   { source: require('../../../assets/images/finds/tag.webp'), x: 0.78, y: 0.645, size: 84, rotate: 9, depth: 2, delay: 530, period: 8.1 },
 ];
-/** Above and beside a headline set low on the left. */
-const ABOVE: Find[] = [
-  { source: require('../../../assets/images/finds/photo.webp'), x: 0.05, y: 0.15, size: 84, rotate: -7, depth: 1, delay: 90, period: 9.2 },
-  { source: require('../../../assets/images/finds/post.webp'), x: 0.56, y: 0.075, size: 112, rotate: 5, depth: 2, delay: 170, period: 10.6 },
-  { source: require('../../../assets/images/finds/voice.webp'), x: 0.32, y: 0.26, size: 88, rotate: -6, depth: 0, delay: 240, period: 8.4 },
-  { source: require('../../../assets/images/finds/sparkles.webp'), x: 0.82, y: 0.24, size: 56, rotate: 8, depth: 0, delay: 300, period: 7.6 },
-  { source: require('../../../assets/images/finds/highlight.webp'), x: 0.0, y: 0.33, size: 90, rotate: -4, depth: 1, delay: 360, period: 9.8 },
-  { source: require('../../../assets/images/finds/folder.webp'), x: 0.66, y: 0.36, size: 86, rotate: 6, depth: 2, delay: 410, period: 8.9 },
-  { source: require('../../../assets/images/finds/tag.webp'), x: 0.8, y: 0.52, size: 70, rotate: 9, depth: 1, delay: 470, period: 8.1 },
-];
-const LAYOUT: Record<HeadlineType, 'centre' | 'left'> = { highlighter: 'left', tags: 'centre', rotating: 'centre', stack: 'left' };
-const SUB: Record<Exclude<HeadlineType, 'rotating'>, string> = {
-  highlighter: 'Pages, posts, photos and notes, kept in one private place.',
-  tags: 'Everything you find, organised for you.',
-  stack: 'A private library for everything you find.',
-};
 
 // Motion: long, soft ease-outs (no springs), and a continuous drift.
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);          // expo out: fast start, long gentle landing
@@ -66,13 +53,9 @@ function useProviders(): OAuthProvider[] {
   return [...providers].sort((a, b) => ['google', 'apple'].indexOf(a) - ['google', 'apple'].indexOf(b));
 }
 
-/** backdrop: a sky photograph shown behind everything with a very slight blur; without one, the look's gradient. */
-/** line: the words under Rotating finds (one of LINES while Pritam picks). */
-export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, line = LINES[0], backdrop, blur = 1, objects = true }: { look: LookName; type?: HeadlineType; keep?: KeepStyle; tune?: Tune; line?: string; backdrop?: ImageSourcePropType; blur?: number; objects?: boolean }) {
-  const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
-  const fontsReady = useDisplayFonts();
-  const { scheme } = useAppearance();
-  const look = useMemo(() => lookFor(lookName, scheme), [lookName, scheme]);
+/** finds: the objects around the words (the element proposals swap them). */
+export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
+  const fontReady = useHeadlineFont();
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const motion = useMotionAllowed();
@@ -80,9 +63,9 @@ export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, lin
 
   // Entrance values run 0 → 1 once; drift phases loop 0 → 1 for ever.
   const v = useRef({
-    finds: AROUND.map(() => new Animated.Value(0)),
+    finds: finds.map(() => new Animated.Value(0)),
     buttons: [0, 1].map(() => new Animated.Value(0)),
-    drift: AROUND.map(() => new Animated.Value(0)),
+    drift: finds.map(() => new Animated.Value(0)),
   }).current;
 
   useEffect(() => {
@@ -96,32 +79,28 @@ export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, lin
     const native = Platform.OS !== 'web';
     const to = (value: Animated.Value, delay: number, duration: number, easing = SETTLE) => Animated.timing(value, { toValue: 1, delay, duration, easing, useNativeDriver: native });
     const run = Animated.parallel([
-      ...v.finds.map((value, i) => to(value, (FINDS[i] ?? FINDS[0]).delay, 1500 + (FINDS[i] ?? FINDS[0]).depth * 120)),
+      ...v.finds.map((value, i) => to(value, finds[i].delay, 1500 + finds[i].depth * 120)),
       ...v.buttons.map((value, i) => to(value, 980 + i * 80, 850)),
     ]);
     // The drift starts with the entrance, so nothing ever stops and restarts;
     // each object has its own period, so they never move in step.
     const drift = v.drift.map((value, i) => {
       value.setValue(0);
-      const period = (FINDS[i]?.period ?? 9.5) * 1000;
-      return Animated.loop(Animated.timing(value, { toValue: 1, duration: period, easing: Easing.linear, useNativeDriver: native }));
+      return Animated.loop(Animated.timing(value, { toValue: 1, duration: finds[i].period * 1000, easing: Easing.linear, useNativeDriver: native }));
     });
     run.start(); drift.forEach(loop => loop.start());
     return () => { run.stop(); drift.forEach(loop => loop.stop()); };
-  }, [motion, v, FINDS]);
+  }, [motion, v, finds]);
 
   const rise = (value: Animated.Value, by = 20) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
   const cx = W / 2, cy = H * 0.42;
 
-  return <View style={[styles.fill, gradient(look.background)]}>
-    {backdrop ? <>
-      {/* Larger than the screen by more than the blur reaches, so it never shows a soft edge. */}
-      <Image source={backdrop} blurRadius={blur} resizeMode="cover" accessible={false} style={[styles.backdrop, { top: -(blur * 3 + 8), left: -(blur * 3 + 8), right: -(blur * 3 + 8), bottom: -(blur * 3 + 8) }]} />
-      {/* A gentle shade where the words sit, clear again behind the buttons. */}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, gradient('linear-gradient(180deg, rgba(4,24,48,.18) 0%, rgba(4,24,48,.26) 42%, rgba(4,24,48,.12) 66%, rgba(255,255,255,0) 82%)')]} />
-    </> : look.haze.map((h, i) => <View key={i} pointerEvents="none" style={[styles.haze, { left: h.x * W, top: h.y * H, width: h.w * W, height: h.h * H }, gradient(`radial-gradient(closest-side, ${h.color}, transparent)`)]} />)}
+  return <View style={styles.fill}>
+    {/* Larger than the screen by more than the blur reaches, so it never shows a soft edge. */}
+    <Image source={SKY} blurRadius={BLUR} resizeMode="cover" accessible={false} style={[styles.backdrop, { top: -(BLUR * 3 + 8), left: -(BLUR * 3 + 8), right: -(BLUR * 3 + 8), bottom: -(BLUR * 3 + 8) }]} />
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, shade]} />
 
-    {objects ? FINDS.map((find, i) => {
+    {finds.map((find, i) => {
       const d = DEPTH[find.depth], entry = v.finds[i], phase = v.drift[i], offset = (i * 0.37) % 1;
       // Each object drifts in towards its place from beyond it, turning as it settles.
       const px = find.x * W + find.size / 2, py = find.y * H + find.size / 2, len = Math.hypot(px - cx, py - cy) || 1;
@@ -137,23 +116,16 @@ export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, lin
         ] }]}>
         <Image source={find.source} style={styles.img} accessible={false} />
       </Animated.View>;
-    }) : null}
+    })}
 
-    {/* The words and buttons form a column: the headline centres (or sits low) in
-        the space above the buttons; when large text needs more room than the
-        screen has, the column scrolls instead of running under the buttons. */}
+    {/* The words and buttons form a column: the headline centres in the space
+        above the buttons; when large text needs more room than the screen has,
+        the column scrolls instead of running under the buttons. */}
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.column, { paddingTop: insets.top + 12 }]}>
-      <View style={[styles.center, layout === 'left' ? styles.low : styles.lifted]}>
-        {/* Left layouts: the name at the top, the words low; they stack rather than overlap. */}
-        {layout === 'left' ? <><View style={styles.wordmark}><Wordmark color={look.ink} start motion={motion} /></View><View style={styles.spacer} /></> : null}
-        {type === 'highlighter' ? <HighlighterHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
-          : type === 'tags' ? <TagsHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
-          : type === 'stack' ? <StackHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
-          : <RotatingHeadline start={fontsReady} motion={motion} sub={line} subColor={look.ink} keep={keep} tune={tune} shadow={!!backdrop} />}
-      </View>
+      <View style={styles.center}><KeepEveryHeadline start={fontReady} motion={motion} /></View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
         {providers.map((provider, i) => {
-          const tone = provider === 'apple' ? look.primary : look.secondary;
+          const tone = provider === 'apple' ? BUTTON.apple : BUTTON.other;
           return <Animated.View key={provider} style={rise(v.buttons[Math.min(i, 1)], 22)}>
             <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/oauth/complete', params: { provider, intent: 'sign-in' } })}
               style={({ pressed }): StyleProp<ViewStyle> => [styles.button, { backgroundColor: tone.background, borderColor: tone.border }, pressed ? styles.pressed : null]}>
@@ -164,23 +136,17 @@ export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, lin
         })}
       </View>
     </ScrollView>
-
   </View>;
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1, overflow: 'hidden' },
-  haze: { position: 'absolute' },
+  fill: { flex: 1, overflow: 'hidden', backgroundColor: '#1a78c8' },
   backdrop: { position: 'absolute' },
   find: { position: 'absolute' },
   img: { width: '100%', height: '100%', resizeMode: 'contain' },
   column: { flexGrow: 1 },
-  center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 16, gap: 22 },
-  low: { justifyContent: 'flex-start', alignItems: 'stretch', paddingBottom: 28, paddingTop: 4 },
-  // Centred words sit a little above the middle, clear of the objects beside them.
-  lifted: { paddingBottom: 84 },
-  wordmark: { alignSelf: 'flex-start' },
-  spacer: { flexGrow: 1, minHeight: 24 },
+  // The words sit a little above the middle, clear of the objects beside them.
+  center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingTop: 16, paddingBottom: 84 },
   actions: { paddingHorizontal: 20, gap: 10 },
   button: { minHeight: 56, paddingHorizontal: 16, borderRadius: 28, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.92 },

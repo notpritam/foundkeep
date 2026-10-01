@@ -1,4 +1,6 @@
-# Sky object assets
+# Element candidates: GPT-6 Astra
+
+First made for Codex's sky variants of the sign-in screen (removed 2026-10-01); kept as candidates for the floating elements.
 
 Generated with the built-in GPT image tool on 2026-09-30. The objects are independent transparent WebP images, animated by React Native; the screen is never flattened into a picture.
 
