@@ -3,8 +3,8 @@ import { FirstScreen as Screen } from '../../../../apps/mobile/src/proposals/sig
 
 // Locked 2026-10-01: the Cumulus sky (blur 1), "Keep Every" in SF Pro with the
 // word in Caveat, tilted, "All in one place, ready for your agent.", and the
-// Apple and Google buttons, with GPT-6 Astra's objects (choices and movement:
-// Proposals/Sign-in elements).
+// Apple and Google buttons, with floating cards (GPT-6 Astra). Movement is the
+// last open choice: Proposals/Sign-in movement.
 const meta: Meta = {
   title: 'Proposals/Sign in',
   parameters: { simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/sign-in', params: {} }, controls: { disable: true },
