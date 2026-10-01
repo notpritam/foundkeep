@@ -14,7 +14,7 @@ import { useAppearance } from '../../appearance/AppearanceProvider.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
 import { isOAuthProvider, OAUTH_NAMES, type OAuthProvider } from '../../auth-oauth.ts';
 import { gradient, look as lookFor, type LookName } from './looks.ts';
-import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, type HeadlineType, type KeepStyle, type Tune } from './Headlines.tsx';
+import { HighlighterHeadline, RotatingHeadline, StackHeadline, TagsHeadline, useDisplayFonts, Wordmark, LINES, type HeadlineType, type KeepStyle, type Tune } from './Headlines.tsx';
 
 /** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier). */
 type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number };
@@ -41,7 +41,6 @@ const ABOVE: Find[] = [
   { source: require('../../../assets/images/finds/tag.webp'), x: 0.8, y: 0.52, size: 70, rotate: 9, depth: 1, delay: 470, period: 8.1 },
 ];
 const LAYOUT: Record<HeadlineType, 'centre' | 'left'> = { highlighter: 'left', tags: 'centre', rotating: 'centre', stack: 'left' };
-// Rotating finds has no line under it (Pritam, 2026-09-30): the words say it.
 const SUB: Record<Exclude<HeadlineType, 'rotating'>, string> = {
   highlighter: 'Pages, posts, photos and notes, kept in one private place.',
   tags: 'Everything you find, organised for you.',
@@ -68,7 +67,8 @@ function useProviders(): OAuthProvider[] {
 }
 
 /** backdrop: a sky photograph shown behind everything with a very slight blur; without one, the look's gradient. */
-export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, backdrop, blur = 1, objects = true }: { look: LookName; type?: HeadlineType; keep?: KeepStyle; tune?: Tune; backdrop?: ImageSourcePropType; blur?: number; objects?: boolean }) {
+/** line: the words under Rotating finds (one of LINES while Pritam picks). */
+export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, line = LINES[0], backdrop, blur = 1, objects = true }: { look: LookName; type?: HeadlineType; keep?: KeepStyle; tune?: Tune; line?: string; backdrop?: ImageSourcePropType; blur?: number; objects?: boolean }) {
   const layout = LAYOUT[type], FINDS = layout === 'left' ? ABOVE : AROUND;
   const fontsReady = useDisplayFonts();
   const { scheme } = useAppearance();
@@ -149,7 +149,7 @@ export function FirstScreen({ look: lookName, type = 'rotating', keep, tune, bac
         {type === 'highlighter' ? <HighlighterHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'tags' ? <TagsHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
           : type === 'stack' ? <StackHeadline start={fontsReady} motion={motion} sub={SUB[type]} subColor={look.ink} />
-          : <RotatingHeadline start={fontsReady} motion={motion} keep={keep} tune={tune} shadow={!!backdrop} />}
+          : <RotatingHeadline start={fontsReady} motion={motion} sub={line} subColor={look.ink} keep={keep} tune={tune} shadow={!!backdrop} />}
       </View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
         {providers.map((provider, i) => {
