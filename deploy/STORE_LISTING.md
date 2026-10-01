@@ -1,6 +1,17 @@
-# FoundKeep — Chrome Web Store 1.0.2 submission
+# FoundKeep — Chrome Web Store 1.0.3 submission
 
-Upload `deploy/dist/foundkeep-store-1.0.2.zip` to the existing item **`cficnecbdbiddngllpfbacabgbcjinmk`**. The enclosing submission kit is a handoff archive, not the extension upload. Keep the established Store identity and existing public listing. Neither archive contains credentials.
+Upload `deploy/dist/foundkeep-store-1.0.3.zip` (`bun run store:pack`) to the existing item **`cficnecbdbiddngllpfbacabgbcjinmk`**. The enclosing submission kit is a handoff archive, not the extension upload. Keep the established Store identity and existing public listing. Neither archive contains credentials.
+
+## What's new in 1.0.3 (since 1.0.2)
+
+For the Store's "what's new" and for reviewers. Same permissions and hosts as 1.0.2.
+
+- Saves happen instantly from every entry point — the dock, keyboard shortcuts, the right-click menu and the X button — with no review step first.
+- **Add details** after a save: a small card shows a preview of what was saved and whether it has synced, and lets you change the title, add a note and tags, pick a folder or share it to a collection.
+- The dock is a small bookmark tab you can drag anywhere on the page; it tucks back into the bottom edge. Icon-only controls with tooltips, and a quiet count of saves still waiting to sync.
+- One click on the FoundKeep mark saves an X post.
+- Notes are typed in the extension's own frame, so the page can't read them; pictures from the right-click menu ask for that site's access in a small FoundKeep window when Chrome can't prompt from the menu.
+- The look now follows FoundKeep's brand: SF Pro on Mac, Inter elsewhere.
 
 This release is authorized for preparation and review submission. **Defer publishing after approval** and leave the existing public version available until a separate public-release request. In the dashboard, clear automatic publication in the review confirmation. With API v2, explicitly use `publishType: "STAGED_PUBLISH"`, `skipReview: false`, and `blockOnWarnings: true`. Do not use default publication mode. [Google's deferred publishing instructions](https://developer.chrome.com/docs/webstore/publish#deferred_publishing_option), [API publication modes](https://developer.chrome.com/docs/webstore/api/reference/rest/v2/publishers.items/publish).
 
