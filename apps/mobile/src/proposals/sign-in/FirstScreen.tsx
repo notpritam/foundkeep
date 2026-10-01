@@ -72,6 +72,15 @@ function moving(movement: Movement, d: Depth, phase: Animated.Value, offset: num
   return { x: phase.interpolate(wave(d.drift * 0.6, offset + 0.5)), y: phase.interpolate(wave(d.drift, offset)), turn: phase.interpolate(wave(d.turn, offset + 0.25)), fade: null };
 }
 
+/** The Cumulus sky at blur 1, with a gentle shade where the words sit (shared by the sign-in versions). */
+export function SkyBackdrop() {
+  return <>
+    {/* Larger than the screen by more than the blur reaches, so it never shows a soft edge. */}
+    <Image source={SKY} blurRadius={BLUR} resizeMode="cover" accessible={false} style={[styles.backdrop, { top: -(BLUR * 3 + 8), left: -(BLUR * 3 + 8), right: -(BLUR * 3 + 8), bottom: -(BLUR * 3 + 8) }]} />
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, shade]} />
+  </>;
+}
+
 export function useProviders(): OAuthProvider[] {
   const { client } = useSession();
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
@@ -138,9 +147,7 @@ export function FirstScreen({ movement = 'drift' }: { movement?: Movement }) {
   const cx = W / 2, cy = H * 0.42;
 
   return <View style={styles.fill}>
-    {/* Larger than the screen by more than the blur reaches, so it never shows a soft edge. */}
-    <Image source={SKY} blurRadius={BLUR} resizeMode="cover" accessible={false} style={[styles.backdrop, { top: -(BLUR * 3 + 8), left: -(BLUR * 3 + 8), right: -(BLUR * 3 + 8), bottom: -(BLUR * 3 + 8) }]} />
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, shade]} />
+    <SkyBackdrop />
 
     {finds.map((find, i) => {
       const d = DEPTH[find.depth], entry = v.finds[i], phase = v.drift[i], offset = (i * 0.37) % 1;

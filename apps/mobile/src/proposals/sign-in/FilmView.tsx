@@ -5,12 +5,16 @@
 import { createElement } from 'react';
 import { Image, Platform, StyleSheet } from 'react-native';
 
-const FILM = require('../../../assets/video/sign-in-film.mp4');
-const POSTER = require('../../../assets/video/sign-in-film.jpg');
+// soft: the same film with its sky far more blurred, for the version on the sky page.
+const FILMS = {
+  clear: { video: require('../../../assets/video/sign-in-film.mp4'), poster: require('../../../assets/video/sign-in-film.jpg') },
+  soft: { video: require('../../../assets/video/sign-in-film-soft.mp4'), poster: require('../../../assets/video/sign-in-film-soft.jpg') },
+};
 const url = (asset: unknown) => typeof asset === 'string' ? asset : (asset as { default?: string; uri?: string } | null)?.default ?? (asset as { uri?: string } | null)?.uri;
 
-export function FilmView({ motion }: { motion: boolean }) {
-  if (Platform.OS === 'web' && motion) return createElement('video', { src: url(FILM), poster: url(POSTER), autoPlay: true, loop: true, muted: true, playsInline: true, 'aria-hidden': true,
+export function FilmView({ motion, soft = false }: { motion: boolean; soft?: boolean }) {
+  const film = FILMS[soft ? 'soft' : 'clear'];
+  if (Platform.OS === 'web' && motion) return createElement('video', { src: url(film.video), poster: url(film.poster), autoPlay: true, loop: true, muted: true, playsInline: true, 'aria-hidden': true,
     style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' } });
-  return <Image source={POSTER} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} />;
+  return <Image source={film.poster} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} />;
 }

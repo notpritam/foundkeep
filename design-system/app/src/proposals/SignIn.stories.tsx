@@ -15,3 +15,5 @@ export default meta;
 export const FirstScreen: StoryObj = { name: 'First screen', render: () => <Screen /> };
 // A second version after Pritam's reference: a light page, and a window playing a film of FoundKeep at work (design-system/film).
 export const WithFilm: StoryObj = { name: 'With a film', render: () => <FilmScreen /> };
+// Version three: version one's sky behind the whole page, and the film with its own sky far more blurred.
+export const WithFilmOnSky: StoryObj = { name: 'With a film, on the sky', render: () => <FilmScreen page="sky" /> };
