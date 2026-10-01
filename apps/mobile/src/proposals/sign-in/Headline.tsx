@@ -30,7 +30,8 @@ const GLOW = { textShadowColor: 'rgba(3,20,40,.35)', textShadowOffset: { width: 
 const rise = (v: Animated.Value, by = 18) => ({ opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
 
 /** "Keep Every Reel." — the word changes every 2.6 s; reduced motion shows "Post." still. */
-export function KeepEveryHeadline({ start, motion }: { start: boolean; motion: boolean }) {
+/** onWord: told each time the word changes, so the objects can answer it. */
+export function KeepEveryHeadline({ start, motion, onWord }: { start: boolean; motion: boolean; onWord?: (word: string) => void }) {
   const entrance = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
   useEffect(() => {
     if (!start) return;
@@ -56,6 +57,7 @@ export function KeepEveryHeadline({ start, motion }: { start: boolean; motion: b
   }, [start, motion, turn]);
 
   const current = motion ? WORDS[index] : { word: 'Post.', color: INK.lilac };
+  useEffect(() => { if (start) onWord?.(current.word); }, [start, current.word, onWord]);
   const [lead, word, line] = entrance;
   return <View style={styles.center} accessibilityRole="header" accessibilityLabel="Keep every reel, short, article, tweet, post and thread. All in one place, ready for your agent.">
     <Animated.View style={rise(lead)}><Text maxFontSizeMultiplier={1.3} style={[styles.lead, GLOW]}>Keep Every</Text></Animated.View>

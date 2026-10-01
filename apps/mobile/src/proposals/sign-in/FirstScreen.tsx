@@ -1,9 +1,10 @@
-// The app's first screen, locked 2026-10-01 (Pritam): FoundKeep's own 3D
-// objects drift in around a centred headline over the Cumulus sky (blur 1) and
-// keep drifting; the Apple and Google buttons rise last. No email option and
+// The app's first screen, locked 2026-10-01 (Pritam): GPT-6 Astra's objects —
+// what you come across while browsing, and your agent — drift in around a
+// centred headline over the Cumulus sky (blur 1) and keep drifting; the Apple
+// and Google buttons rise last. No email option and
 // no terms line. Real sign-in: the same Apple/Google route as today.
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
@@ -20,18 +21,25 @@ const SHADE = 'linear-gradient(180deg, rgba(4,24,48,.18) 0%, rgba(4,24,48,.26) 4
 const shade = (Platform.OS === 'web' ? { backgroundImage: SHADE } : { experimental_backgroundImage: SHADE }) as ViewStyle;
 const BUTTON = { apple: { background: '#0b0c0d', ink: '#ffffff', border: '#0b0c0d' }, other: { background: '#ffffff', ink: '#202020', border: 'rgba(255,255,255,0)' } };
 
-/** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier). x and y are fractions of the screen. */
-export type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number };
-/** What FoundKeep keeps, around the edges. */
+/** Depth: 0 far (smaller, slower, softer), 1 middle, 2 near (larger, livelier).
+ * x and y are fractions of the screen; word: the headline word it stands for. */
+export type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number; word?: string };
+const E = {
+  reel: require('../../../assets/images/elements/reel.webp'), tweet: require('../../../assets/images/elements/tweet.webp'),
+  photoPost: require('../../../assets/images/elements/photo-post.webp'), agentOrb: require('../../../assets/images/elements/agent-orb.webp'),
+  article: require('../../../assets/images/elements/article.webp'), short: require('../../../assets/images/elements/short.webp'),
+  thread: require('../../../assets/images/elements/thread.webp'), agentReply: require('../../../assets/images/elements/agent-reply.webp'),
+};
+/** What you come across while browsing, and your agent, around the edges (GPT-6 Astra, assets/images/elements). */
 export const FINDS: Find[] = [
-  { source: require('../../../assets/images/finds/photo.webp'), x: 0.05, y: 0.075, size: 84, rotate: -6, depth: 1, delay: 90, period: 9.2 },
-  { source: require('../../../assets/images/finds/post.webp'), x: 0.68, y: 0.07, size: 104, rotate: 5, depth: 2, delay: 170, period: 10.6 },
-  { source: require('../../../assets/images/finds/voice.webp'), x: -0.03, y: 0.235, size: 96, rotate: -8, depth: 0, delay: 240, period: 8.4 },
-  { source: require('../../../assets/images/finds/sparkles.webp'), x: 0.8, y: 0.235, size: 62, rotate: 8, depth: 0, delay: 300, period: 7.6 },
-  { source: require('../../../assets/images/finds/highlight.webp'), x: 0.01, y: 0.53, size: 92, rotate: -4, depth: 1, delay: 360, period: 9.8 },
-  { source: require('../../../assets/images/finds/folder.webp'), x: 0.8, y: 0.52, size: 82, rotate: 6, depth: 1, delay: 410, period: 8.9 },
-  { source: require('../../../assets/images/finds/video.webp'), x: 0.0, y: 0.655, size: 100, rotate: -5, depth: 2, delay: 470, period: 10.2 },
-  { source: require('../../../assets/images/finds/tag.webp'), x: 0.78, y: 0.645, size: 84, rotate: 9, depth: 2, delay: 530, period: 8.1 },
+  { source: E.reel, x: 0.06, y: 0.07, size: 88, rotate: -6, depth: 1, delay: 90, period: 9.2, word: 'Reel.' },
+  { source: E.tweet, x: 0.66, y: 0.075, size: 108, rotate: 5, depth: 2, delay: 170, period: 10.6, word: 'Tweet.' },
+  { source: E.photoPost, x: -0.02, y: 0.235, size: 96, rotate: -8, depth: 0, delay: 240, period: 8.4, word: 'Post.' },
+  { source: E.agentOrb, x: 0.8, y: 0.235, size: 66, rotate: 0, depth: 0, delay: 300, period: 7.6 },
+  { source: E.article, x: 0.02, y: 0.52, size: 94, rotate: -4, depth: 1, delay: 360, period: 9.8, word: 'Article.' },
+  { source: E.short, x: 0.78, y: 0.51, size: 90, rotate: 6, depth: 1, delay: 410, period: 8.9, word: 'Short.' },
+  { source: E.thread, x: 0.0, y: 0.65, size: 100, rotate: -5, depth: 2, delay: 470, period: 10.2, word: 'Thread.' },
+  { source: E.agentReply, x: 0.76, y: 0.645, size: 90, rotate: 7, depth: 2, delay: 530, period: 8.1 },
 ];
 
 // Motion: long, soft ease-outs (no springs), and a continuous drift.
@@ -40,6 +48,29 @@ const DEPTH = [{ travel: 64, drift: 4, turn: 1.5, opacity: 0.94 }, { travel: 84,
 // A smooth loop (a sine wave) from a linear 0 → 1 phase.
 const STEPS = Array.from({ length: 25 }, (_, i) => i / 24);
 const wave = (amplitude: number, offset = 0) => ({ inputRange: STEPS, outputRange: STEPS.map(t => amplitude * Math.sin((t + offset) * Math.PI * 2)) });
+
+/** How the objects keep moving once they have arrived (proposal, 2026-10-01).
+ * drift: a small float and turn (today). orbit: a slow ellipse round their
+ * place. bob: floating on water, up and down with a sway. rise: drifting
+ * upwards like bubbles, fading out at the top and in again below. spotlight:
+ * drift, and the object for the headline's word lifts forward as it shows. */
+export type Movement = 'drift' | 'orbit' | 'bob' | 'rise' | 'spotlight';
+type Depth = (typeof DEPTH)[number];
+function moving(movement: Movement, d: Depth, phase: Animated.Value, offset: number) {
+  if (movement === 'orbit') return { x: phase.interpolate(wave(d.drift * 2.4, offset + 0.25)), y: phase.interpolate(wave(d.drift * 1.5, offset)), turn: phase.interpolate(wave(d.turn, offset)), fade: null };
+  if (movement === 'bob') return { x: phase.interpolate(wave(0, 0)), y: phase.interpolate(wave(d.drift * 2.2, offset)), turn: phase.interpolate(wave(d.turn * 2.6, offset + 0.15)), fade: null };
+  if (movement === 'rise') {
+    // Each object starts somewhere along its climb (t) and jumps back to the
+    // bottom exactly when it has faded out at the top.
+    const t = offset, top = 1 - t;
+    const points: [number, number][] = [[0, t], ...[0.15, 0.85].filter(c => c > t).map((c): [number, number] => [c - t, c]), [top, 1], [top, 0], ...[0.15, 0.85].filter(c => c < t).map((c): [number, number] => [c + top, c]), [1, t]];
+    const inputRange = points.map(p => p[0]);
+    const fade = (c: number) => c < 0.15 ? c / 0.15 : c > 0.85 ? (1 - c) / 0.15 : 1;
+    return { x: phase.interpolate(wave(d.drift * 0.8, offset)), y: phase.interpolate({ inputRange, outputRange: points.map(p => 30 - p[1] * 60) }), turn: phase.interpolate(wave(d.turn, offset)),
+      fade: phase.interpolate({ inputRange, outputRange: points.map(p => fade(p[1])) }) };
+  }
+  return { x: phase.interpolate(wave(d.drift * 0.6, offset + 0.5)), y: phase.interpolate(wave(d.drift, offset)), turn: phase.interpolate(wave(d.turn, offset + 0.25)), fade: null };
+}
 
 function useProviders(): OAuthProvider[] {
   const { client } = useSession();
@@ -53,8 +84,8 @@ function useProviders(): OAuthProvider[] {
   return [...providers].sort((a, b) => ['google', 'apple'].indexOf(a) - ['google', 'apple'].indexOf(b));
 }
 
-/** finds: the objects around the words (the element proposals swap them). */
-export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
+/** finds: the objects around the words; movement: how they keep moving (both proposals for now). */
+export function FirstScreen({ finds = FINDS, movement = 'drift' }: { finds?: Find[]; movement?: Movement }) {
   const fontReady = useHeadlineFont();
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -66,7 +97,17 @@ export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
     finds: finds.map(() => new Animated.Value(0)),
     buttons: [0, 1].map(() => new Animated.Value(0)),
     drift: finds.map(() => new Animated.Value(0)),
+    focus: finds.map(() => new Animated.Value(0)),
   }).current;
+
+  // Spotlight: the object for the word on screen comes forward; the last one settles back.
+  const [word, setWord] = useState<string>();
+  const onWord = useCallback((next: string) => setWord(next), []);
+  useEffect(() => {
+    if (movement !== 'spotlight' || !motion) return;
+    const run = Animated.parallel(v.focus.map((value, i) => Animated.timing(value, { toValue: finds[i].word === word ? 1 : 0, duration: 700, easing: SETTLE, useNativeDriver: Platform.OS !== 'web' })));
+    run.start(); return () => run.stop();
+  }, [word, movement, motion, v, finds]);
 
   useEffect(() => {
     const entrance = [...v.finds, ...v.buttons];
@@ -86,11 +127,11 @@ export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
     // each object has its own period, so they never move in step.
     const drift = v.drift.map((value, i) => {
       value.setValue(0);
-      return Animated.loop(Animated.timing(value, { toValue: 1, duration: finds[i].period * 1000, easing: Easing.linear, useNativeDriver: native }));
+      return Animated.loop(Animated.timing(value, { toValue: 1, duration: finds[i].period * (movement === 'rise' ? 1800 : 1000), easing: Easing.linear, useNativeDriver: native }));
     });
     run.start(); drift.forEach(loop => loop.start());
     return () => { run.stop(); drift.forEach(loop => loop.stop()); };
-  }, [motion, v, finds]);
+  }, [motion, v, finds, movement]);
 
   const rise = (value: Animated.Value, by = 20) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
   const cx = W / 2, cy = H * 0.42;
@@ -105,13 +146,16 @@ export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
       // Each object drifts in towards its place from beyond it, turning as it settles.
       const px = find.x * W + find.size / 2, py = find.y * H + find.size / 2, len = Math.hypot(px - cx, py - cy) || 1;
       const fromX = ((px - cx) / len) * d.travel, fromY = ((py - cy) / len) * d.travel;
-      const turn = Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [find.rotate + (fromX > 0 ? 10 : -10), find.rotate] }), phase.interpolate(wave(d.turn, offset + 0.25)));
+      const move = moving(movement === 'spotlight' ? 'drift' : movement, d, phase, offset);
+      const turn = Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [find.rotate + (fromX > 0 ? 10 : -10), find.rotate] }), move.turn);
+      const shown = entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity, d.opacity] });
       return <Animated.View key={i} pointerEvents="none" style={[styles.find, { left: find.x * W, top: find.y * H, width: find.size, height: find.size,
-        opacity: entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity, d.opacity] }),
+        opacity: move.fade ? Animated.multiply(shown, move.fade) : shown,
         transform: [
-          { translateX: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromX, 0] }), phase.interpolate(wave(d.drift * 0.6, offset + 0.5))) },
-          { translateY: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromY, 0] }), phase.interpolate(wave(d.drift, offset))) },
-          { scale: entry.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) },
+          { translateX: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromX, 0] }), move.x) },
+          { translateY: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromY, 0] }), move.y) },
+          { translateY: v.focus[i].interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) },
+          { scale: Animated.multiply(entry.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }), v.focus[i].interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] })) },
           { rotate: turn.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) },
         ] }]}>
         <Image source={find.source} style={styles.img} accessible={false} />
@@ -122,7 +166,7 @@ export function FirstScreen({ finds = FINDS }: { finds?: Find[] }) {
         above the buttons; when large text needs more room than the screen has,
         the column scrolls instead of running under the buttons. */}
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.column, { paddingTop: insets.top + 12 }]}>
-      <View style={styles.center}><KeepEveryHeadline start={fontReady} motion={motion} /></View>
+      <View style={styles.center}><KeepEveryHeadline start={fontReady} motion={motion} onWord={onWord} /></View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
         {providers.map((provider, i) => {
           const tone = provider === 'apple' ? BUTTON.apple : BUTTON.other;
