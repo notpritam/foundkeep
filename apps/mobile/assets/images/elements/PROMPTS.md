@@ -112,3 +112,169 @@ TOP RIGHT: MAP PIN. One chunky coral map pin hovering just above and very close 
 BOTTOM LEFT: PRODUCT. One rounded ivory product card with a small photographic image of a plain unbranded pastel sneaker, two navy abstract lines below, and a soft coral blank price-tag shape tucked at one corner. No swoosh, stripes, logos, text or prices.
 BOTTOM MIDDLE: TICKET. One thick butter-yellow and soft-pink event ticket stub, rounded edges with semicircular side notches and a subtle line of tiny perforations dividing off the short stub. A few embossed navy horizontal strokes and one small simple coral four-point star, no lettering, numbers or barcode.
 BOTTOM RIGHT: STICKY NOTE. One soft butter-yellow sticky note made of thick tactile paper, its lower corner slightly curled upward, with a simple small dark navy hand-drawn looping doodle and tiny coral dot. No words, letters or numbers. The doodle should be a loose abstract loop, not a logo.
+
+## Styles
+
+2026-10-01: six material studies of the same eight objects. Generated with the built-in GPT image tool as six 4-column × 2-row transparent sprite sheets. Each generation received `apps/mobile/assets/images/sign-in-backgrounds/sky-cumulus-top-medium.webp` as a lighting/environment reference only.
+
+Row-major object order: `reel`, `short`, `article`, `tweet`, `photo-post`, `thread`, `agent-orb`, `agent-reply`. Individual files are in `styles/<style>/<name>.webp`. Exports preserve generated alpha, fit measured object bounds plus a safety margin into 360 × 360 pixels, and add 20 transparent pixels on each side for a final 400 × 400 canvas. WebP quality 86, alpha quality 100. No background removal or synthetic object drawing was used.
+
+Validation: all 48 individual exports are 400 × 400 with genuine alpha, 29–67% fully transparent pixels, and a fully transparent outer 12-pixel border. Source and crop boundaries were checked for clipping. All eight objects in all six styles were visually compared at 90 px over the reference sky. Asset sizes range from 11,892 to 45,700 bytes.
+
+Each style’s `contact-sheet.webp` places the eight labelled objects over the exact 900 × 1950 sky photograph. The photograph is unchanged; labels belong only to the contact sheets. Generated source sheets remain outside the checkout.
+
+### glass
+
+Source sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-69009d8c-f4be-4acd-991a-b0b23c7dbc35.png`.
+
+Exact prompt:
+
+```text
+Use case: stylized-concept. Create one production sprite sheet of EIGHT isolated floating objects for FoundKeep, a private library of saved content.
+Input image is LIGHTING AND ENVIRONMENT REFERENCE ONLY: the assets will later be composited into this exact photographic blue cumulus sky. Do not reproduce the sky background in this sheet. Deliver actual transparent RGBA, no backdrop, no white matte, no checkerboard.
+Format: wide 2:1 image, ideally 2048 x 1024. Exactly FOUR columns by TWO rows, equal square cells, row-major order specified below. Each whole object, including any glow, must fit in the central 70% of its cell with at least 15% totally transparent padding on every side. No overlap, no clipping, no labels or cell borders.
+Lighting: natural cool daylight, sunlight from upper left, blue skylight fill on lower and right surfaces. Same photographic atmosphere as the supplied sky. No golden light, no orange shadows, no studio ground plane. Natural self-shading only; no detached cast shadows. Slight three-quarter view and restrained diagonal tilt. Simple bold shapes designed to read at 80-100 px. No busy microdetail, no readable text, letters, numbers, brands, logos, platform marks or watermark. At most TWO abstract strokes to suggest writing.
+Keep these exact eight identities and this order:
+TOP ROW, left to right:
+1 REEL: one vertical 9:16 video card, a large simple triangular play mark at center. No extra controls.
+2 SHORT: two overlapping vertical video cards, visibly two separate layers, large play mark on the front.
+3 ARTICLE: a single page, one folded corner, one simple landscape picture block and ONE bold headline stroke below.
+4 TWEET: one horizontal rounded social post card with a round avatar and TWO short strokes. No other tiny icons.
+BOTTOM ROW, left to right:
+5 PHOTO POST: one square photo card with one simple mountain lake image block and one prominent heart in its bottom margin.
+6 THREAD: three small connected post cards, each with one circular avatar and ONE short stroke; a visible vertical connector through the avatars joins the three into one compact group.
+7 AGENT ORB: one small luminous sphere with a single four-point sparkle inside; no detached decorative stars, keep any glow close to the orb.
+8 AGENT REPLY: one rounded chat bubble with a short tail containing one large four-point sparkle, no other symbols.
+Material-specific instructions below override picture realism when needed; retain the same recognizable object silhouettes and identities.
+STYLE: GLASS. Apple-like liquid glass, almost colourless clear-to-frosted thick glass, very softly rounded polished edges. The glass gently refracts blue sky and white clouds as reflections within the material, with bright daylight rim light and luminous cool-blue internal refraction. Large frosted WHITE play marks, heart, sparkle, avatar and strokes are suspended within the glass. Picture blocks are a simple frosted mountain silhouette inside the glass, not colourful photographs. Genuine translucent alpha through clear material is desirable; transparent outside silhouette mandatory. Subtle delicate optical richness, not plastic, not metal, no rainbow gradients. No saturated accent colours.
+```
+
+### paper
+
+Source sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-7fcccd2d-0fa3-4527-b2ee-ce9936f07bc5.png`.
+
+Exact prompt:
+
+```text
+Use case: stylized-concept. Create one production sprite sheet of EIGHT isolated floating objects for FoundKeep, a private library of saved content.
+Input image is LIGHTING AND ENVIRONMENT REFERENCE ONLY: the assets will later be composited into this exact photographic blue cumulus sky. Do not reproduce the sky background in this sheet. Deliver actual transparent RGBA, no backdrop, no white matte, no checkerboard.
+Format: wide 2:1 image, ideally 2048 x 1024. Exactly FOUR columns by TWO rows, equal square cells, row-major order specified below. Each whole object, including any glow, must fit in the central 70% of its cell with at least 15% totally transparent padding on every side. No overlap, no clipping, no labels or cell borders.
+Lighting: natural cool daylight, sunlight from upper left, blue skylight fill on lower and right surfaces. Same photographic atmosphere as the supplied sky. No golden light, no orange shadows, no studio ground plane. Natural self-shading only; no detached cast shadows. Slight three-quarter view and restrained diagonal tilt. Simple bold shapes designed to read at 80-100 px. No busy microdetail, no readable text, letters, numbers, brands, logos, platform marks or watermark. At most TWO abstract strokes to suggest writing.
+Keep these exact eight identities and this order:
+TOP ROW, left to right:
+1 REEL: one vertical 9:16 video card, a large simple triangular play mark at center. No extra controls.
+2 SHORT: two overlapping vertical video cards, visibly two separate layers, large play mark on the front.
+3 ARTICLE: a single page, one folded corner, one simple landscape picture block and ONE bold headline stroke below.
+4 TWEET: one horizontal rounded social post card with a round avatar and TWO short strokes. No other tiny icons.
+BOTTOM ROW, left to right:
+5 PHOTO POST: one square photo card with one simple mountain lake image block and one prominent heart in its bottom margin.
+6 THREAD: three small connected post cards, each with one circular avatar and ONE short stroke; a visible vertical connector through the avatars joins the three into one compact group.
+7 AGENT ORB: one small luminous sphere with a single four-point sparkle inside; no detached decorative stars, keep any glow close to the orb.
+8 AGENT REPLY: one rounded chat bubble with a short tail containing one large four-point sparkle, no other symbols.
+Material-specific instructions below override picture realism when needed; retain the same recognizable object silhouettes and identities.
+STYLE: PAPER. Photoreal white matte cardstock papercraft diorama. Folded, cut and layered white paper, crisp soft edges, subtle fibrous surface, cool blue self-shading, sunlight on upper-left folds. Predominantly clean white rather than ivory. Symbols are cut paper in relief or carefully recessed, bold and simple. Maximum ONE small accent per object: muted coral play/heart, pale blue picture block, pale lilac sparkle. Picture blocks are a simple layered paper mountain landscape. Orb is an elegant round folded-paper sphere with a small inset lilac sparkle, still recognizably spherical. Not porcelain or shiny plastic.
+```
+
+### cloud
+
+Source sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-e4212d95-b6b5-4453-9dac-170c613f53f1.png`.
+
+Exact prompt:
+
+```text
+Use case: stylized-concept. Create one production sprite sheet of EIGHT isolated floating objects for FoundKeep, a private library of saved content.
+Input image is LIGHTING AND ENVIRONMENT REFERENCE ONLY: the assets will later be composited into this exact photographic blue cumulus sky. Do not reproduce the sky background in this sheet. Deliver actual transparent RGBA, no backdrop, no white matte, no checkerboard.
+Format: wide 2:1 image, ideally 2048 x 1024. Exactly FOUR columns by TWO rows, equal square cells, row-major order specified below. Each whole object, including any glow, must fit in the central 70% of its cell with at least 15% totally transparent padding on every side. No overlap, no clipping, no labels or cell borders.
+Lighting: natural cool daylight, sunlight from upper left, blue skylight fill on lower and right surfaces. Same photographic atmosphere as the supplied sky. No golden light, no orange shadows, no studio ground plane. Natural self-shading only; no detached cast shadows. Slight three-quarter view and restrained diagonal tilt. Simple bold shapes designed to read at 80-100 px. No busy microdetail, no readable text, letters, numbers, brands, logos, platform marks or watermark. At most TWO abstract strokes to suggest writing.
+Keep these exact eight identities and this order:
+TOP ROW, left to right:
+1 REEL: one vertical 9:16 video card, a large simple triangular play mark at center. No extra controls.
+2 SHORT: two overlapping vertical video cards, visibly two separate layers, large play mark on the front.
+3 ARTICLE: a single page, one folded corner, one simple landscape picture block and ONE bold headline stroke below.
+4 TWEET: one horizontal rounded social post card with a round avatar and TWO short strokes. No other tiny icons.
+BOTTOM ROW, left to right:
+5 PHOTO POST: one square photo card with one simple mountain lake image block and one prominent heart in its bottom margin.
+6 THREAD: three small connected post cards, each with one circular avatar and ONE short stroke; a visible vertical connector through the avatars joins the three into one compact group.
+7 AGENT ORB: one small luminous sphere with a single four-point sparkle inside; no detached decorative stars, keep any glow close to the orb.
+8 AGENT REPLY: one rounded chat bubble with a short tail containing one large four-point sparkle, no other symbols.
+Material-specific instructions below override picture realism when needed; retain the same recognizable object silhouettes and identities.
+STYLE: CLOUD. Objects sculpted from real soft white cumulus cloud, airy volumetric masses with sunlit edges and cool blue shadow. Each object silhouette is clear and confident, with just a few big soft billows rather than many noisy small bumps. Pure white cloud body; embed ONE restrained small coloured symbol per object: coral play marks and heart, pale sky-blue picture patch, lilac sparkle. Avatar and short strokes subtly recessed into cloud volume. Picture blocks are a very simple recessed mountain silhouette. Agent orb is a round compact luminous cloud with lilac sparkle. No outlined cartoon cloud, no plastic, no paper, no hard rectangular outer border. Semi-transparent wispy edges, real alpha outside.
+```
+
+### photo
+
+Source sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-adcfd7f9-39a4-4ad9-8ef5-da69c29c4e04.png`.
+
+Exact prompt:
+
+```text
+Use case: stylized-concept. Create one production sprite sheet of EIGHT isolated floating objects for FoundKeep, a private library of saved content.
+Input image is LIGHTING AND ENVIRONMENT REFERENCE ONLY: the assets will later be composited into this exact photographic blue cumulus sky. Do not reproduce the sky background in this sheet. Deliver actual transparent RGBA, no backdrop, no white matte, no checkerboard.
+Format: wide 2:1 image, ideally 2048 x 1024. Exactly FOUR columns by TWO rows, equal square cells, row-major order specified below. Each whole object, including any glow, must fit in the central 70% of its cell with at least 15% totally transparent padding on every side. No overlap, no clipping, no labels or cell borders.
+Lighting: natural cool daylight, sunlight from upper left, blue skylight fill on lower and right surfaces. Same photographic atmosphere as the supplied sky. No golden light, no orange shadows, no studio ground plane. Natural self-shading only; no detached cast shadows. Slight three-quarter view and restrained diagonal tilt. Simple bold shapes designed to read at 80-100 px. No busy microdetail, no readable text, letters, numbers, brands, logos, platform marks or watermark. At most TWO abstract strokes to suggest writing.
+Keep these exact eight identities and this order:
+TOP ROW, left to right:
+1 REEL: one vertical 9:16 video card, a large simple triangular play mark at center. No extra controls.
+2 SHORT: two overlapping vertical video cards, visibly two separate layers, large play mark on the front.
+3 ARTICLE: a single page, one folded corner, one simple landscape picture block and ONE bold headline stroke below.
+4 TWEET: one horizontal rounded social post card with a round avatar and TWO short strokes. No other tiny icons.
+BOTTOM ROW, left to right:
+5 PHOTO POST: one square photo card with one simple mountain lake image block and one prominent heart in its bottom margin.
+6 THREAD: three small connected post cards, each with one circular avatar and ONE short stroke; a visible vertical connector through the avatars joins the three into one compact group.
+7 AGENT ORB: one small luminous sphere with a single four-point sparkle inside; no detached decorative stars, keep any glow close to the orb.
+8 AGENT REPLY: one rounded chat bubble with a short tail containing one large four-point sparkle, no other symbols.
+Material-specific instructions below override picture realism when needed; retain the same recognizable object silhouettes and identities.
+STYLE: PHOTO. Photoreal physical things photographed suspended in the same daylight as the reference sky. Reel is a real unbranded slim silver phone displaying a simple blue mountain video with a large white play mark; short is two such phones overlapping. Article is a real white magazine page with a mountain photograph and one printed gray headline stroke, slight curled corner. Tweet is a real white printed post card with a blue circular avatar and two gray printed strokes. Photo post is a real instant-photo print with mountain lake photo and one small coral heart printed in its footer. Thread is three white paper post cards joined through punched circular avatars by a thin pale-blue thread. Agent orb is a real opalescent glass sphere with a luminous four-point star inside; agent reply is a physical frosted white acrylic chat bubble with an inset lilac four-point sparkle. Natural fine surface texture, realistic thin materials, natural soft shadows on themselves, subtle atmospheric depth. Restrained palette. Avoid toy-like exaggerated thickness, studio warmth or illustrated porcelain.
+```
+
+### cards
+
+Source sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-ede22fd3-5f10-489a-9ae9-b2d30b6d9f3f.png`.
+
+Exact prompt:
+
+```text
+Use case: stylized-concept. Create one production sprite sheet of EIGHT isolated floating objects for FoundKeep, a private library of saved content.
+Input image is LIGHTING AND ENVIRONMENT REFERENCE ONLY: the assets will later be composited into this exact photographic blue cumulus sky. Do not reproduce the sky background in this sheet. Deliver actual transparent RGBA, no backdrop, no white matte, no checkerboard.
+Format: wide 2:1 image, ideally 2048 x 1024. Exactly FOUR columns by TWO rows, equal square cells, row-major order specified below. Each whole object, including any glow, must fit in the central 70% of its cell with at least 15% totally transparent padding on every side. No overlap, no clipping, no labels or cell borders.
+Lighting: natural cool daylight, sunlight from upper left, blue skylight fill on lower and right surfaces. Same photographic atmosphere as the supplied sky. No golden light, no orange shadows, no studio ground plane. Natural self-shading only; no detached cast shadows. Slight three-quarter view and restrained diagonal tilt. Simple bold shapes designed to read at 80-100 px. No busy microdetail, no readable text, letters, numbers, brands, logos, platform marks or watermark. At most TWO abstract strokes to suggest writing.
+Keep these exact eight identities and this order:
+TOP ROW, left to right:
+1 REEL: one vertical 9:16 video card, a large simple triangular play mark at center. No extra controls.
+2 SHORT: two overlapping vertical video cards, visibly two separate layers, large play mark on the front.
+3 ARTICLE: a single page, one folded corner, one simple landscape picture block and ONE bold headline stroke below.
+4 TWEET: one horizontal rounded social post card with a round avatar and TWO short strokes. No other tiny icons.
+BOTTOM ROW, left to right:
+5 PHOTO POST: one square photo card with one simple mountain lake image block and one prominent heart in its bottom margin.
+6 THREAD: three small connected post cards, each with one circular avatar and ONE short stroke; a visible vertical connector through the avatars joins the three into one compact group.
+7 AGENT ORB: one small luminous sphere with a single four-point sparkle inside; no detached decorative stars, keep any glow close to the orb.
+8 AGENT REPLY: one rounded chat bubble with a short tail containing one large four-point sparkle, no other symbols.
+Material-specific instructions below override picture realism when needed; retain the same recognizable object silhouettes and identities.
+STYLE: CARDS. Clean modern floating UI cards resembling premium iOS widgets and notifications, white and softly frosted rounded rectangles, thin crisp edges, subtle cool-blue edge shading and a very soft tight contact shadow ONLY between overlapping layers. Nearly front-facing with gentle perspective. Reel and short contain a simple photographic blue coastline thumbnail with a bold white play mark. Article and photo post have one real mountain-lake photo and minimal simple details as specified. Tweet and thread use pale-blue avatar circles and one or two navy strokes only. Heart is small coral. Orb is a soft frosted round luminous UI bubble with a white sparkle; agent reply is a frosted white chat bubble with a pale lilac sparkle. Clear app-content readability, no hardware frames, no porcelain or paper texture, no busy toolbars, no tiny controls. Premium restraint.
+```
+
+### clay
+
+Source sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-c2c7255d-2b9b-4b74-80b0-9283037a0db2.png`.
+
+Exact prompt:
+
+```text
+Use case: stylized-concept. Create one production sprite sheet of EIGHT isolated floating objects for FoundKeep, a private library of saved content.
+Input image is LIGHTING AND ENVIRONMENT REFERENCE ONLY: the assets will later be composited into this exact photographic blue cumulus sky. Do not reproduce the sky background in this sheet. Deliver actual transparent RGBA, no backdrop, no white matte, no checkerboard.
+Format: wide 2:1 image, ideally 2048 x 1024. Exactly FOUR columns by TWO rows, equal square cells, row-major order specified below. Each whole object, including any glow, must fit in the central 70% of its cell with at least 15% totally transparent padding on every side. No overlap, no clipping, no labels or cell borders.
+Lighting: natural cool daylight, sunlight from upper left, blue skylight fill on lower and right surfaces. Same photographic atmosphere as the supplied sky. No golden light, no orange shadows, no studio ground plane. Natural self-shading only; no detached cast shadows. Slight three-quarter view and restrained diagonal tilt. Simple bold shapes designed to read at 80-100 px. No busy microdetail, no readable text, letters, numbers, brands, logos, platform marks or watermark. At most TWO abstract strokes to suggest writing.
+Keep these exact eight identities and this order:
+TOP ROW, left to right:
+1 REEL: one vertical 9:16 video card, a large simple triangular play mark at center. No extra controls.
+2 SHORT: two overlapping vertical video cards, visibly two separate layers, large play mark on the front.
+3 ARTICLE: a single page, one folded corner, one simple landscape picture block and ONE bold headline stroke below.
+4 TWEET: one horizontal rounded social post card with a round avatar and TWO short strokes. No other tiny icons.
+BOTTOM ROW, left to right:
+5 PHOTO POST: one square photo card with one simple mountain lake image block and one prominent heart in its bottom margin.
+6 THREAD: three small connected post cards, each with one circular avatar and ONE short stroke; a visible vertical connector through the avatars joins the three into one compact group.
+7 AGENT ORB: one small luminous sphere with a single four-point sparkle inside; no detached decorative stars, keep any glow close to the orb.
+8 AGENT REPLY: one rounded chat bubble with a short tail containing one large four-point sparkle, no other symbols.
+Material-specific instructions below override picture realism when needed; retain the same recognizable object silhouettes and identities.
+STYLE: CLAY. Simplified premium matte porcelain, chunky smooth confident forms with rounded bevels, much less detail than typical 3D app illustrations. ONE soft colour per object: ice-blue reel, pale lilac short, white article, very pale mint tweet, white photo-post, pale ice-blue thread, pale mint orb, pale lilac reply. Symbols are white embossed relief or recessed same-material shading; no secondary colourful decorations, NO text strokes in this style except ONE broad embossed headline bar for article. Tweet identity is avatar plus a single broad recessed horizontal band. Thread has three avatar circles connected, otherwise blank. Pictures are simple monochrome embossed mountain silhouettes. Orb and reply have white four-point sparkle. All materials lit by cool sky daylight; no warm ivory, orange light, multicolour accents or glossy toy sheen.
+```
