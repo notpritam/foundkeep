@@ -4,9 +4,11 @@
 // search finds it again, and Kit, your agent, uses it. The phone shows the
 // app's real library (its palette and layout, apps/mobile). A Mac-style
 // pointer shows each tap; nothing is outlined. Drawn in a 360 × 400 design
-// space, rendered at three times that. Motion: soft eases, blur-dissolves
-// between screens and captions, slow camera moves and a gentle 3D sway; no
-// springs, and the last frames dissolve into the first, so it loops.
+// space and rendered at any multiple of it (three times for the app, 9.6
+// times for the 4K master) — everything is drawn at full resolution each
+// frame, never scaled up from a smaller picture, so text stays crisp. Motion:
+// soft eases, blur-dissolves between screens and captions, slow camera moves
+// and a gentle sway; no springs, and the last frames dissolve into the first.
 import type { CSSProperties, ReactNode } from 'react';
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { loadFont } from '@remotion/google-fonts/Inter';
@@ -16,7 +18,8 @@ const { fontFamily } = loadFont('normal', { weights: ['400', '500', '600', '700'
 
 export const FPS = 30;
 export const DURATION = 330;
-export type FilmProps = { skyBlur: number };
+/** skyBlur: in design units; scale: pixels per design unit (3 → 1080 × 1200, 9.6 → 3456 × 3840). */
+export type FilmProps = { skyBlur: number; scale: number };
 const SCENE = { save: 0, place: 84, find: 168, agent: 246, loop: 318 };
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);   // arrive: quick, then a long gentle landing
 const GLIDE = Easing.bezier(0.65, 0, 0.35, 1);   // move: ease in and out
@@ -72,11 +75,11 @@ const TAP = {
 };
 const PRESS = { share: 16, foundkeep: 40, search: SCENE.find + 16, kit: SCENE.agent - 2 };
 
-export function SignInFilm({ skyBlur }: FilmProps) {
+export function SignInFilm({ skyBlur, scale }: FilmProps) {
   const f = useCurrentFrame();
   const t = (f / DURATION) * Math.PI * 2;
   return <AbsoluteFill style={{ fontFamily, backgroundColor: '#2a7fcf' }}>
-    <div style={{ width: 360, height: 400, transform: 'scale(3)', transformOrigin: 'top left', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ width: 360, height: 400, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'relative', overflow: 'hidden' }}>
       <Img src={img('sign-in-backgrounds/sky-cumulus-top-medium.webp')} style={{ position: 'absolute', width: 400, height: 866, left: -20 + Math.sin(t) * 5, top: -170 + Math.cos(t) * 4, objectFit: 'cover', filter: `blur(${skyBlur}px)`, transform: 'scale(1.06)' }} />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(4,24,48,0.12), rgba(4,24,48,0) 35%, rgba(4,24,48,0.10))' }} />
       <Stage f={f}>
@@ -89,16 +92,17 @@ export function SignInFilm({ skyBlur }: FilmProps) {
   </AbsoluteFill>;
 }
 
-/** The camera and a gentle 3D sway, applied to the phone, the flying cards and the pointer together, so they never drift apart. */
+/** The camera and a gentle sway, applied to the phone, the flying cards and the pointer together, so they never drift apart.
+ * Flat (2D) transforms only: 3D ones make the browser flatten the layer to a picture first, which softens text. */
 function Stage({ f, children }: { f: number; children: ReactNode }) {
   const at = [0, 70, 96, 168, 186, 214, 236, 252, 300, 330];
   const scale = keys(f, at, [1, 1.035, 1, 1, 1.1, 1.1, 1, 1, 1.03, 1]);
   const y = keys(f, at, [0, -6, 0, 0, 30, 30, 0, 0, -18, 0]);
   const sway = [0, 42, 84, 126, 168, 207, 246, 282, 330];
-  const turnY = keys(f, sway, [-3, 1.5, 0, 3, 0, -2, 2, -1, -3]);
-  const turnX = keys(f, sway, [2.5, 1.5, 0, 2, 0.5, 1, 2.5, 2, 2.5]);
-  return <div style={{ position: 'absolute', inset: 0, transform: `translateY(${y}px) scale(${scale})`, transformOrigin: '50% 34%', willChange: 'transform' }}>
-    <div style={{ position: 'absolute', inset: 0, transform: `perspective(1100px) rotateX(${turnX}deg) rotateY(${turnY}deg)`, transformOrigin: '50% 45%', transformStyle: 'preserve-3d', willChange: 'transform' }}>{children}</div>
+  const lean = keys(f, sway, [-0.6, 0.3, 0, 0.6, 0, -0.4, 0.4, -0.2, -0.6]);
+  const drift = keys(f, sway, [-3, 1.5, 0, 3, 0, -2, 2, -1, -3]);
+  return <div style={{ position: 'absolute', inset: 0, transform: `translateY(${y}px) scale(${scale})`, transformOrigin: '50% 34%' }}>
+    <div style={{ position: 'absolute', inset: 0, transform: `translateX(${drift}px) rotate(${lean}deg)`, transformOrigin: '50% 60%' }}>{children}</div>
   </div>;
 }
 
@@ -166,7 +170,7 @@ function FlyIn({ f }: { f: number }) {
     const p = ramp(f, fl.at, fl.at + FLIGHT, GLIDE);
     const target = onScreen(f, slot(fl.to).x, slot(fl.to).y);
     return <div key={fl.to} style={{ position: 'absolute', left: mix(p, fl.from.x, target.x), top: mix(p, fl.from.y, target.y) - Math.sin(p * Math.PI) * 30, zIndex: 6,
-      opacity: ramp(f, fl.at, fl.at + 8), transform: `rotate(${mix(p, fl.from.r, 0)}deg) scale(${mix(p, 1.1, 1)})`, filter: `drop-shadow(0 ${mix(p, 16, 2)}px ${mix(p, 22, 6)}px rgba(4,24,48,${mix(p, 0.28, 0.08)}))`, willChange: 'transform' }}>
+      opacity: ramp(f, fl.at, fl.at + 8), transform: `rotate(${mix(p, fl.from.r, 0)}deg) scale(${mix(p, 1.1, 1)})`, filter: `drop-shadow(0 ${mix(p, 16, 2)}px ${mix(p, 22, 6)}px rgba(4,24,48,${mix(p, 0.28, 0.08)}))` }}>
       <Card save={SAVES[fl.to]} tagged={0} />
     </div>;
   })}</>;
@@ -175,7 +179,7 @@ function FlyIn({ f }: { f: number }) {
 function Phone({ f }: { f: number }) {
   const reel = reelShown(f);
   return <div style={{ position: 'absolute', left: PHONE_X, top: PHONE.top + float(f), width: PHONE.w, height: PHONE.h, borderRadius: 42, background: C.dark, padding: PHONE.bezel, boxSizing: 'border-box',
-    boxShadow: '0 26px 60px rgba(4,24,48,0.32), 0 0 0 1.2px #3b3d40 inset', willChange: 'transform' }}>
+    boxShadow: '0 26px 60px rgba(4,24,48,0.32), 0 0 0 1.2px #3b3d40 inset' }}>
     <div style={{ position: 'relative', width: SCREEN.w, height: SCREEN.h, borderRadius: 33, overflow: 'hidden', background: C.paper }}>
       <Library f={f} />
       <Kit f={f} />
@@ -255,7 +259,7 @@ const SHRINK = { from: SCENE.place - 10, to: SCENE.place + 18 };
 function Shrink({ f }: { f: number }) {
   if (f < SHRINK.from || f >= SHRINK.to) return null;
   const p = ramp(f, SHRINK.from, SHRINK.to, GLIDE), card = slot(0);
-  return <Img src={img('film/pasta.jpg')} style={{ position: 'absolute', zIndex: 4, objectFit: 'cover', willChange: 'transform',
+  return <Img src={img('film/pasta.jpg')} style={{ position: 'absolute', zIndex: 4, objectFit: 'cover',
     left: mix(p, REEL_PHOTO.x, card.x), top: mix(p, REEL_PHOTO.y, card.y), width: mix(p, REEL_PHOTO.w, CARD.w), height: mix(p, REEL_PHOTO.h, CARD.photo),
     borderRadius: `${mix(p, 0, 14)}px ${mix(p, 0, 14)}px 0 0`, boxShadow: `0 ${mix(p, 0, 10)}px ${mix(p, 0, 24)}px rgba(35,62,75,${mix(p, 0, 0.18)})` }} />;
 }
@@ -319,7 +323,7 @@ function Library({ f }: { f: number }) {
         const from = slot(i), to = save.dinner ? slot(dinner.indexOf(i)) : from;
         const keep = save.dinner ? 1 : 1 - filter;
         const tagged = ramp(f, SCENE.place + 50 + i * 4, SCENE.place + 64 + i * 4);
-        return <div key={i} style={{ position: 'absolute', left: mix(filter, from.x, to.x), top: mix(filter, from.y, to.y), opacity: enter * keep, willChange: 'transform',
+        return <div key={i} style={{ position: 'absolute', left: mix(filter, from.x, to.x), top: mix(filter, from.y, to.y), opacity: enter * keep,
           transform: `translateY(${rise}px) scale(${0.94 + keep * 0.06})` }}>
           <Card save={save} tagged={tagged} photo={i !== 0 || f >= SHRINK.to} />
         </div>;
@@ -340,7 +344,7 @@ function Kit({ f }: { f: number }) {
   const recipes = SAVES.filter(s => s.dinner);
   return <>
     <div style={{ position: 'absolute', inset: 0, background: `rgba(16,28,36,${0.24 * open})`, zIndex: 3 }} />
-    <div style={{ position: 'absolute', left: 0, right: 0, top: 74, bottom: 0, transform: `translateY(${(1 - open) * 320}px)`, background: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, zIndex: 4, padding: `9px ${GUTTER + 2}px`, boxSizing: 'border-box', boxShadow: '0 -10px 30px rgba(16,28,36,0.14)', willChange: 'transform' }}>
+    <div style={{ position: 'absolute', left: 0, right: 0, top: 74, bottom: 0, transform: `translateY(${(1 - open) * 320}px)`, background: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, zIndex: 4, padding: `9px ${GUTTER + 2}px`, boxSizing: 'border-box', boxShadow: '0 -10px 30px rgba(16,28,36,0.14)' }}>
       <div style={{ width: 32, height: 4, borderRadius: 2, background: C.line, margin: '0 auto 12px' }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
         <Img src={img('elements/agent-orb.webp')} style={{ width: 24, height: 24, objectFit: 'contain' }} />
