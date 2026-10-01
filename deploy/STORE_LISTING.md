@@ -95,13 +95,14 @@ Keep existing visibility, regions, Store ID and public link. This preparation cr
 
 Provide a verified dedicated reviewer account only in the private dashboard Test instructions field. Never place passwords or recovery codes in source, listing copy, this kit, screenshots or logs.
 
-Fresh 1.0.2 kit assets under `assets/`:
+Fresh 1.0.3 kit assets under `assets/` (`bun run store:assets`, then `bun run store:kit`). Upload the screenshots in this order:
 
-- `dock-toolbar.png` — the expanded floating dock on a page, 1280 × 800.
-- `save-review.png` — the "Add details" card open over a page after a save, 1280 × 800. (Re-capture for 1.8.1: earlier kits show the removed before-save review. The file name stays because `deploy/pack-store-submission.sh` requires it.)
-- `dock-review.png` — the dock's "✓ Saved to My library · Add details" widget after a one-click save, 1280 × 800. (Re-capture for 1.8.1, as above.)
-- `promo-small.png` — 440 × 280 tile.
+1. `dock-toolbar.png` — "Save anything in one click": the dock on an article, 1280 × 800.
+2. `dock-review.png` — "Saved, straight to your library": the confirmation after a one-click save, 1280 × 800. (The file name stays because `deploy/pack-store-submission.sh` requires it.)
+3. `save-review.png` — "Add details after you save": the card with its preview, a note and a folder, 1280 × 800. (Name kept, as above.)
+4. `library.png` — "Everything in one place": the FoundKeep library, 1280 × 800.
+- `promo-small.png` — 440 × 280 tile: "Keep Every find."
 - `promo-marquee.png` — optional 1400 × 560 tile.
 - `icon128.png` — packaged 128 × 128 icon.
 
-Screenshots use the exact Store archive loaded in a fresh disposable browser profile with synthetic local content and no account credentials. `ASSET_PROVENANCE.json` records the input hash and capture method. See `STORE_RELEASE_AUDIT.md` and `STORE_REVIEWER_GUIDE.md`. The self-hosted 1.7.11 ZIP/CRX is a separate channel and must not be uploaded to the Store.
+Screenshots use the exact Store archive loaded in a fresh disposable browser profile (the capture copy is granted all-site access, as "Show on every site" does) with sample content, a stand-in backend and no account credentials. `ASSET_PROVENANCE.json` records the input hash and capture method. See `STORE_RELEASE_AUDIT.md` and `STORE_REVIEWER_GUIDE.md`. The self-hosted 1.7.11 ZIP/CRX is a separate channel and must not be uploaded to the Store.
