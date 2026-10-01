@@ -1,0 +1,17 @@
+{
+  "name": "@foundkeep/film",
+  "private": true,
+  "type": "module",
+  "description": "Motion-graphics films for FoundKeep's app screens, made in Remotion and rendered to video.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.532",
+    "@remotion/google-fonts": "^4.0.532",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "remotion": "^4.0.532"
+  }
+}

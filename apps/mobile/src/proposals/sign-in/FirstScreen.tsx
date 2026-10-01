@@ -72,7 +72,7 @@ function moving(movement: Movement, d: Depth, phase: Animated.Value, offset: num
   return { x: phase.interpolate(wave(d.drift * 0.6, offset + 0.5)), y: phase.interpolate(wave(d.drift, offset)), turn: phase.interpolate(wave(d.turn, offset + 0.25)), fade: null };
 }
 
-function useProviders(): OAuthProvider[] {
+export function useProviders(): OAuthProvider[] {
   const { client } = useSession();
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
   useEffect(() => {
