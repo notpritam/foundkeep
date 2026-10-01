@@ -3,8 +3,10 @@
 // (save from anywhere, it lands in one place, find it again, your agent uses
 // it), then the locked headline and the two buttons. The first design, the
 // floating cards over the sky, stays locked beside it until he picks.
-// page: "light" (version two), or "sky" (version three: version one's sky
-// behind everything, and the film with its own sky far more blurred).
+// page: "light" (version two) or "sky" (version three: version one's sky
+// behind everything); film: its own sky lightly softened ("clear") or far more
+// blurred ("soft"); pageBlur: how blurred the page's sky is. The variations
+// board (design-system Sign in / Film variations) compares the combinations.
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -28,7 +30,7 @@ const BUTTONS = {
   sky: { google: { background: '#ffffff', ink: '#202020' }, other: { background: '#0b0c0d', ink: '#ffffff' } },
 };
 
-export function FilmScreen({ page = 'light' }: { page?: 'light' | 'sky' }) {
+export function FilmScreen({ page = 'light', film, pageBlur = 1 }: { page?: 'light' | 'sky'; film?: 'clear' | 'soft'; pageBlur?: number }) {
   const sky = page === 'sky', BUTTON = BUTTONS[page];
   const fontReady = useHeadlineFont();
   const { width: W } = useWindowDimensions();
@@ -46,14 +48,14 @@ export function FilmScreen({ page = 'light' }: { page?: 'light' | 'sky' }) {
     const run = Animated.parallel(v.map((value, i) => Animated.timing(value, { toValue: 1, delay: [60, 980, 1060][i], duration: [1100, 850, 850][i], easing: SETTLE, useNativeDriver: native })));
     run.start(); return () => run.stop();
   }, [motion, v]);
-  const [film, ...buttons] = v;
+  const [windowIn, ...buttons] = v;
   const rise = (value: Animated.Value, by = 20) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
 
   return <View style={[styles.fill, sky && styles.onSky]}>
-    {sky ? <><SkyBackdrop /><View pointerEvents="none" style={[StyleSheet.absoluteFill, wordsShade]} /></> : null}
+    {sky ? <><SkyBackdrop blur={pageBlur} /><View pointerEvents="none" style={[StyleSheet.absoluteFill, wordsShade]} /></> : null}
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.column, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 18 }]}>
-      <Animated.View style={[styles.window, sky && styles.windowOnSky, { width: windowW, height: windowH }, { opacity: film, transform: [{ scale: film.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }]}>
-        <FilmView motion={motion} soft={sky} />
+      <Animated.View style={[styles.window, sky && styles.windowOnSky, { width: windowW, height: windowH }, { opacity: windowIn, transform: [{ scale: windowIn.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }]}>
+        <FilmView motion={motion} soft={(film ?? (sky ? 'soft' : 'clear')) === 'soft'} />
       </Animated.View>
       <View style={styles.words}><KeepEveryHeadline start={fontReady} motion={motion} tone={sky ? 'sky' : 'light'} align="left" /></View>
       <View style={styles.actions}>
