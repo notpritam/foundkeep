@@ -35,5 +35,5 @@ function versions() {
 }
 
 export default { title: 'Sign in', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
-export const Versions = { name: 'Two versions', render: versions };
+export const TwoVersions = { name: 'Two versions', render: versions };
 export const Movement = { name: 'Movement on the page', render: movement };
