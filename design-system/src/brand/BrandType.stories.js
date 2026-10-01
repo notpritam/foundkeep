@@ -1,9 +1,9 @@
 // Brand type (2026-09-30). Pritam: the brand face is Apple's — SF Pro, the
 // system font on his Mac and iPhone (-apple-system in tokens.json; Inter
 // stands in elsewhere). Expressive faces are kept for moments like sign-in
-// and onboarding: the "Keep every" styles of the app's first screen. The
-// screens come from the App and Dashboard Storybooks, so they exist only in
-// the full build.
+// and onboarding: Caveat, for the word on the app's first screen. The screens
+// come from the App and Dashboard Storybooks, so they exist only in the full
+// build.
 import './brand.css';
 import sky from '../../../apps/mobile/assets/images/sign-in-backgrounds/sky-cumulus-top-medium.webp';
 
@@ -23,7 +23,7 @@ function brand() {
   el.innerHTML = `
     <header class="bt-intro">
       <div><h1>SF Pro</h1><p>Apple’s own typeface is FoundKeep’s: the system font on Mac and iPhone, so the app, the extension and the site read like the devices they run on. Where SF isn’t installed (Windows, Android, Linux), Inter stands in.</p></div>
-      <div class="bt-roles"><span>Everything: <strong>SF Pro</strong></span><span>Moments: <strong>see Keep every styles</strong></span></div>
+      <div class="bt-roles"><span>Everything: <strong>SF Pro</strong></span><span>Moments: <strong>Caveat, on the first screen</strong></span></div>
     </header>
     <section class="bt-specimen" aria-label="Type specimen">
       <div class="bt-poster" style="background-image:url(${sky})">
@@ -54,23 +54,5 @@ function brand() {
   return el;
 }
 
-const KEEP = [
-  ['keep-serif', 'SF Pro + Instrument Serif italic'],
-  ['keep-hand', 'SF Pro + Caveat, tilted (chosen)'],
-  ['keep-mono', 'SF Pro + Space Mono, in a field'],
-  ['keep-soft', 'Instrument Serif + SF Pro Heavy'],
-  ['keep-weight', 'SF Pro only, light over black'],
-  ['keep-per-find', 'A style for each find'],
-];
-function keep() {
-  const el = document.createElement('div');
-  el.className = 'bt';
-  el.innerHTML = `
-    <header class="bt-intro"><div><h1>Keep every styles</h1><p>The first screen’s headline is where FoundKeep gets to show off. “Keep every” stays in SF Pro; the word that changes (Reel, Short, Article, Tweet, Post, Thread: what you come across while browsing) takes a face and a frame of its own. The same styles can carry onboarding and the sign-in page on the web.</p></div></header>
-    <div class="bt-phones bt-phones-six">${KEEP.map(([id, name]) => screen('app', `proposals-sign-in--${id}`, name)).join('')}</div>`;
-  return el;
-}
-
 export default { title: 'Brand type', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
 export const SFPro = { name: 'SF Pro', render: brand };
-export const KeepEvery = { name: 'Keep every styles', render: keep };
