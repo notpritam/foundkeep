@@ -11,9 +11,9 @@ const BACKDROPS = {
 };
 
 type Args = { look: 'sky' | 'meadow'; keep: KeepStyle; line: string; objects: boolean; blur: number } & Tune;
-/** The chosen style's sizes, as Controls start them (SF Pro 40 / Caveat 70 / line 16). */
-const CHOSEN: Tune = { leadSize: 40, leadSpacing: -1.2, wordSize: 70, wordSpacing: 0, lineSize: 16 };
-const tuneOf = ({ leadSize, leadSpacing, wordSize, wordSpacing, lineSize }: Args): Tune => ({ leadSize, leadSpacing, wordSize, wordSpacing, lineSize });
+/** The chosen style's sizes, as Controls start them (SF Pro 40 / Caveat 70 / line 16 at 75%). */
+const CHOSEN: Tune = { leadSize: 40, leadSpacing: -1.2, wordSize: 70, wordSpacing: 0, lineSize: 16, lineOpacity: 0.75 };
+const tuneOf = ({ leadSize, leadSpacing, wordSize, wordSpacing, lineSize, lineOpacity }: Args): Tune => ({ leadSize, leadSpacing, wordSize, wordSpacing, lineSize, lineOpacity });
 const meta: Meta<Args> = {
   title: 'Proposals/Sign in',
   args: { look: 'sky', keep: 'hand', line: LINES[0], objects: true, blur: 1 },
@@ -26,6 +26,7 @@ const meta: Meta<Args> = {
     leadSpacing: { name: '“Keep Every” letter spacing', control: { type: 'range', min: -4, max: 4, step: 0.1 }, description: 'Letter spacing of “Keep Every”, in points (negative = tighter)' },
     wordSize: { name: 'Word size', control: { type: 'range', min: 36, max: 110, step: 1 }, description: 'Font size of the changing word (Reel, Short, Article…), in points' },
     line: { name: 'Line under it', control: { type: 'select', labels: Object.fromEntries(LINES.map(l => [l, l.replace('\n', ' ')])) }, options: [...LINES], description: 'Collect it in one place, and let your agent use it' },
+    lineOpacity: { name: 'Line under it, opacity', control: { type: 'range', min: 0.3, max: 1, step: 0.05 }, description: 'How strongly the line under the headline shows (1 = solid white)' },
     lineSize: { name: 'Line under it, size', control: { type: 'range', min: 12, max: 22, step: 0.5 }, description: 'Font size of the line under the headline' },
     wordSpacing: { name: 'Word letter spacing', control: { type: 'range', min: -4, max: 6, step: 0.1 }, description: 'Letter spacing of the changing word, in points' },
   },
