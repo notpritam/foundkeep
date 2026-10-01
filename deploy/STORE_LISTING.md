@@ -101,6 +101,7 @@ Fresh 1.0.3 kit assets under `assets/` (`bun run store:assets`, then `bun run st
 2. `dock-review.png` — "Saved, straight to your library": the confirmation after a one-click save, 1280 × 800. (The file name stays because `deploy/pack-store-submission.sh` requires it.)
 3. `save-review.png` — "Add details after you save": the card with its preview, a note and a folder, 1280 × 800. (Name kept, as above.)
 4. `library.png` — "Everything in one place": the FoundKeep library, 1280 × 800.
+5. `agents.png` — "Your AI agent can use it too": a connected agent and an instruction for it, 1280 × 800.
 - `promo-small.png` — 440 × 280 tile: "Keep Every find."
 - `promo-marquee.png` — optional 1400 × 560 tile.
 - `icon128.png` — packaged 128 × 128 icon.

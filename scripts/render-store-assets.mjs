@@ -97,6 +97,14 @@ const browser = await chromium.launch({ channel: 'chromium', headless: true, arg
   await page.goto(`http://localhost:8814/dashboard/iframe.html?id=current-library--library&viewMode=story&simulator=inner&globals=${encodeURIComponent('device:laptop')}`);
   await page.waitForTimeout(4000);
   await page.screenshot({ path: path.join(raw, 'library.png') });
+  // Agents: a connected agent, and an instruction being written for it.
+  await page.goto(`http://localhost:8814/dashboard/iframe.html?id=current-account-pages--agents-page&viewMode=story&simulator=inner&globals=${encodeURIComponent('device:laptop')}`);
+  await page.waitForTimeout(4000);
+  await page.evaluate(() => document.getElementById('connected-agents-title')?.scrollIntoView({ block: 'start' }));
+  await page.locator('.agent-instructions textarea').first().fill('Find the three recipes I saved this week and plan Friday dinner.');
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: path.join(raw, 'agents.png') });
   await page.close();
 }
 
@@ -106,9 +114,9 @@ const [interFont, caveat, icon, mark, ...shots] = await Promise.all([
   dataUrl(file('apps/mobile/assets/fonts/Caveat-Bold.ttf'), 'font/ttf'),
   dataUrl(file('apps/extension/icons/icon32.png'), 'image/png'),
   dataUrl(file('apps/extension/icons/icon128.png'), 'image/png'),
-  ...['dock', 'saved', 'details', 'library'].map(n => dataUrl(path.join(raw, `${n}.png`), 'image/png')),
+  ...['dock', 'saved', 'details', 'library', 'agents'].map(n => dataUrl(path.join(raw, `${n}.png`), 'image/png')),
 ]);
-const [dockShot, savedShot, detailsShot, libraryShot] = shots;
+const [dockShot, savedShot, detailsShot, libraryShot, agentsShot] = shots;
 const cards = Object.fromEntries(await Promise.all(['reel', 'tweet', 'article', 'photo-post', 'agent-orb'].map(async n => [n, await dataUrl(file(`apps/mobile/assets/images/elements/${n}.webp`), 'image/webp')])));
 
 const page = await browser.newPage({ deviceScaleFactor: 1 });
@@ -150,6 +158,7 @@ const SCREENS = [
   { name: 'dock-review.png', shot: savedShot, url: 'fieldnote.example/curved-furniture', title: 'Saved, straight to your library', line: 'No forms first. Add details later, only if you want to.' },
   { name: 'save-review.png', shot: detailsShot, url: 'fieldnote.example/curved-furniture', title: 'Add details after you save', line: 'A note, tags or a folder, with a preview of what you kept.' },
   { name: 'library.png', shot: libraryShot, url: 'foundkeep.app/dashboard', title: 'Everything in one place', line: 'Find it again in seconds, and let your AI agent use it too.' },
+  { name: 'agents.png', shot: agentsShot, url: 'foundkeep.app/dashboard/agents', title: 'Your AI agent can use it too', line: 'Connect Claude or any MCP agent to find, read and organize what you saved.' },
 ];
 for (const s of SCREENS) await render(s.name, 1280, 800, `${sky(1280, 800)}
   <div style="position:absolute;left:0;right:0;top:46px;text-align:center">
