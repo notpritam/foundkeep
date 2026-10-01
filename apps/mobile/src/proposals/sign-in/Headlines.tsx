@@ -112,13 +112,13 @@ export const KEEP_STYLES: Record<KeepStyle, { label: string; lead: Face; word: W
 };
 
 /** Sizes and letter spacing Pritam tunes in Storybook Controls; unset values keep the style's own. */
-export type Tune = { leadSize?: number; leadSpacing?: number; wordSize?: number; wordSpacing?: number; lineSize?: number };
+export type Tune = { leadSize?: number; leadSpacing?: number; wordSize?: number; wordSpacing?: number; lineSize?: number; lineOpacity?: number };
 function tuned(style: (typeof KEEP_STYLES)[KeepStyle], t: Tune = {}) {
   const lead: Face = { ...style.lead, ...(t.leadSize ? { fontSize: t.leadSize, lineHeight: Math.round(t.leadSize * 1.15) } : null), ...(t.leadSpacing != null ? { letterSpacing: t.leadSpacing } : null) };
   // The word size is the base word's; per-find words keep their proportions to it.
   const scale = t.wordSize ? t.wordSize / style.word.face.fontSize : 1;
   const word = (w: Word): Word => ({ ...w, face: { ...w.face, fontSize: Math.round(w.face.fontSize * scale), lineHeight: Math.round(w.face.lineHeight * scale), ...(t.wordSpacing != null ? { letterSpacing: t.wordSpacing } : null) } });
-  return { lead, word: word(style.word), per: style.per && Object.fromEntries(Object.entries(style.per).map(([k, w]) => [k, word(w)])), line: t.lineSize ? { fontSize: t.lineSize, lineHeight: Math.round(t.lineSize * 1.4) } : null };
+  return { lead, word: word(style.word), per: style.per && Object.fromEntries(Object.entries(style.per).map(([k, w]) => [k, word(w)])), line: { ...(t.lineSize ? { fontSize: t.lineSize, lineHeight: Math.round(t.lineSize * 1.4) } : null), ...(t.lineOpacity != null ? { opacity: t.lineOpacity } : null) } };
 }
 
 // What you come across while browsing (Pritam, 2026-09-30): the posts people save, not file types.
@@ -192,6 +192,7 @@ const styles = StyleSheet.create({
   stack: { fontFamily: DISPLAY.grotesque, fontSize: 68, lineHeight: 70, letterSpacing: -2.4 },
   subLeft: { fontSize: 16, lineHeight: 23, marginTop: 14, maxWidth: 300 },
   subCenter: { fontSize: 16, lineHeight: 23, marginTop: 14, maxWidth: 300, textAlign: 'center' },
-  line: { fontSize: 16, lineHeight: 22, marginTop: 14, fontWeight: '500', textAlign: 'center' },
+  // Quieter than the headline (Pritam, 2026-10-01).
+  line: { fontSize: 16, lineHeight: 22, marginTop: 14, fontWeight: '500', textAlign: 'center', opacity: 0.75 },
   wordmark: { fontFamily: DISPLAY.serifItalic, fontSize: 26, lineHeight: 30, letterSpacing: -0.2 },
 });
