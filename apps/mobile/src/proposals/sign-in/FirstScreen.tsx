@@ -72,11 +72,11 @@ function moving(movement: Movement, d: Depth, phase: Animated.Value, offset: num
   return { x: phase.interpolate(wave(d.drift * 0.6, offset + 0.5)), y: phase.interpolate(wave(d.drift, offset)), turn: phase.interpolate(wave(d.turn, offset + 0.25)), fade: null };
 }
 
-/** The Cumulus sky at blur 1, with a gentle shade where the words sit (shared by the sign-in versions). */
-export function SkyBackdrop() {
+/** The Cumulus sky (blur 1 unless asked), with a gentle shade where the words sit (shared by the sign-in versions). */
+export function SkyBackdrop({ blur = BLUR }: { blur?: number }) {
   return <>
     {/* Larger than the screen by more than the blur reaches, so it never shows a soft edge. */}
-    <Image source={SKY} blurRadius={BLUR} resizeMode="cover" accessible={false} style={[styles.backdrop, { top: -(BLUR * 3 + 8), left: -(BLUR * 3 + 8), right: -(BLUR * 3 + 8), bottom: -(BLUR * 3 + 8) }]} />
+    <Image source={SKY} blurRadius={blur} resizeMode="cover" accessible={false} style={[styles.backdrop, { top: -(blur * 3 + 8), left: -(blur * 3 + 8), right: -(blur * 3 + 8), bottom: -(blur * 3 + 8) }]} />
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, shade]} />
   </>;
 }
