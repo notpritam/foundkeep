@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Renders the sign-in films. For each: a 4K master (3456 × 3840, near-lossless
-// H.264) to download, and the app's copy (1080 × 1200) downsampled from it —
-// small text stays sharper that way than rendered small — plus a poster frame.
+// H.264) to download; a 4K copy light enough to stream (the design system's
+// previews play it); and the app's copy (1080 × 1200) downsampled from the
+// master — small text stays sharper that way than rendered small — plus a poster.
 // Copies, a still per scene and the AI video prompts go to design-system/downloads
 // (served by the design system at /downloads).
 //   /usr/bin/node design-system/film/render.mjs
@@ -23,6 +24,8 @@ for (const [id, name] of FILMS) {
   // The poster: the library with everything in it, shown before the film plays and with Reduce Motion.
   run(['still', 'src/index.ts', id, path.join(out, `${name}.jpg`), '--frame=150', '--image-format=jpeg', '--jpeg-quality=92']);
   await copyFile(path.join(out, `${name}.mp4`), path.join(downloads, `${name}.mp4`));
+  // A 4K copy light enough to stream, for the design system's previews and the shareable videos.
+  run(['-y', '-loglevel', 'error', '-i', master, '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', path.join(downloads, `${name}-4k-web.mp4`)], 'ffmpeg');
 }
 // One still per scene, for image-to-video tools.
 for (const [frame, scene] of [[40, '1-share'], [150, '2-one-place'], [226, '3-find'], [310, '4-agent']]) run(['still', 'src/index.ts', 'SignInFilm', path.join(downloads, `sign-in-film-${scene}.png`), `--frame=${frame}`]);

@@ -64,7 +64,7 @@ function pickOne() {
     ['proposals-sign-in--with-film-on-sky', '3 · Sky page, soft film'],
   ];
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>Pick one</h1><p>The shortlist: the floating elements over the sky, the film on a white page, and the soft film on the sky. All live. The side-by-side video for asking people: <a href="./downloads/sign-in-poll-1080p.mp4" download>sign-in-poll-1080p.mp4</a>.</p></div></header>
+    <header class="bt-intro"><div><h1>Pick one</h1><p>The shortlist: the floating elements over the sky, the film on a white page, and the soft film on the sky. All live, playing the films in 4K. To share, the three side by side on a moving gradient, no words: wide <a href="./downloads/sign-in-poll-1080p.mp4" download>1080p</a> · <a href="./downloads/sign-in-poll-4k.mp4" download>4K</a>; tall, for Reels, <a href="./downloads/sign-in-reel-1080x1920.mp4" download>1080 × 1920</a> · <a href="./downloads/sign-in-reel-4k.mp4" download>4K</a>.</p></div></header>
     <div class="bt-phones bt-phones-three">${pages.map(([id, name]) => `<figure>
       <iframe loading="lazy" title="${name}" src="./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent('device:iphone-17-pro')}"></iframe>
       <figcaption>${name}</figcaption></figure>`).join('')}</div>`;

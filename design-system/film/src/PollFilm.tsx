@@ -1,55 +1,73 @@
-// The poll (2026-10-01): Pritam's three shortlisted sign-in screens side by
-// side, numbered, at 1920 × 1080, to post and ask which is better. Each phone
-// plays its screen as captured frame by frame from the App Storybook
-// (scripts/capture-story.mjs → <public dir>/<1|2|3>/0000.jpg …), so what you
-// see is the real screen, not a redrawing.
+// The shortlist film (2026-10-01): Pritam's three shortlisted sign-in screens
+// side by side on a slowly moving gradient — the screens only, no words, so he
+// can add his own when he posts it. Each phone plays its screen as captured
+// frame by frame from the App Storybook (scripts/capture-story.mjs →
+// <public dir>/<1|2|3>/0000.jpg …), so it is the real screen, not a redrawing.
+// Two shapes: wide (1920 × 1080) and tall, for Reels (1080 × 1920), each
+// rendered at any multiple (2 → 4K).
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { loadFont } from '@remotion/google-fonts/Inter';
 
-const { fontFamily } = loadFont('normal', { weights: ['400', '500', '600', '700'], subsets: ['latin'] });
+const { fontFamily } = loadFont('normal', { weights: ['600'], subsets: ['latin'] });
 
 export const POLL = { fps: 30, frames: 390 };
+export type PollProps = { shape: 'wide' | 'tall'; scale: number };
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);
 const ramp = (f: number, a: number, b: number) => interpolate(f, [a, b], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: SETTLE });
-const INK = '#233E4B', MUTED = '#526B76';
 
-// The screens are 402 × 874 points; at 0.888 they fit 800 px of phone height.
-const SCREEN = { w: 357, h: 776 }, BEZEL = 12, GAP = 120;
+// A phone at the screens' own size (402 × 874 points) in a thin bezel; each shape sizes and spaces it.
+const SCREEN = { w: 402, h: 874 }, BEZEL = 13;
 const PHONE = { w: SCREEN.w + BEZEL * 2, h: SCREEN.h + BEZEL * 2 };
-const OPTIONS = [
-  { dir: '1', name: 'Elements flying in', light: true },
-  { dir: '2', name: 'White page with a film', light: false },
-  { dir: '3', name: 'Sky with a soft film', light: true },
-];
+const SHAPES = {
+  wide: { w: 1920, h: 1080, phone: 1, gap: 120 },
+  tall: { w: 1080, h: 1920, phone: 0.7, gap: 34 },
+};
+const SCREENS = [{ dir: '1', light: true }, { dir: '2', light: false }, { dir: '3', light: true }];
 
-export function PollFilm() {
-  const f = useCurrentFrame();
-  const left = (1920 - (PHONE.w * 3 + GAP * 2)) / 2;
-  const title = ramp(f, 0, 18);
-  return <AbsoluteFill style={{ fontFamily, background: 'radial-gradient(120% 90% at 50% 0%, #ffffff 0%, #f1f6f9 55%, #e7eff4 100%)' }}>
-    <div style={{ position: 'absolute', top: 44, left: 0, right: 0, textAlign: 'center', opacity: title, transform: `translateY(${(1 - title) * 10}px)` }}>
-      <div style={{ fontSize: 46, fontWeight: 700, letterSpacing: -1.2, color: INK }}>Which sign-in should FoundKeep ship?</div>
-      <div style={{ marginTop: 8, fontSize: 24, fontWeight: 500, color: MUTED }}>Reply 1, 2 or 3</div>
-    </div>
-    {OPTIONS.map((option, i) => {
-      const enter = ramp(f, 4 + i * 4, 22 + i * 4);
-      const frame = String(Math.min(f, POLL.frames - 1)).padStart(4, '0');
-      const ink = option.light ? '#ffffff' : INK;
-      return <div key={option.dir} style={{ position: 'absolute', left: left + i * (PHONE.w + GAP), top: 168, width: PHONE.w, opacity: enter, transform: `translateY(${(1 - enter) * 24}px)` }}>
-        <div style={{ position: 'relative', width: PHONE.w, height: PHONE.h, borderRadius: 66, background: '#0f1011', padding: BEZEL, boxSizing: 'border-box', boxShadow: '0 30px 70px rgba(35,62,75,0.22), 0 0 0 2px #3b3d40 inset' }}>
-          <div style={{ position: 'relative', width: SCREEN.w, height: SCREEN.h, borderRadius: 54, overflow: 'hidden', background: '#000' }}>
-            <Img src={staticFile(`${option.dir}/${frame}.jpg`)} style={{ width: '100%', height: '100%', display: 'block' }} />
-            {/* The status bar the screens leave room for. */}
-            <span style={{ position: 'absolute', left: 38, top: 22, fontSize: 17, fontWeight: 600, color: ink, letterSpacing: -0.3 }}>9:41</span>
-            <div style={{ position: 'absolute', left: '50%', top: 12, width: 112, height: 33, marginLeft: -56, borderRadius: 17, background: '#000' }} />
-            <div style={{ position: 'absolute', right: 34, top: 25, width: 26, height: 12, borderRadius: 4, border: `1.5px solid ${ink}`, padding: 1.5, boxSizing: 'border-box', opacity: 0.95 }}><div style={{ width: '78%', height: '100%', borderRadius: 2, background: ink }} /></div>
-          </div>
-        </div>
-        <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 20, background: INK, color: '#fff', fontSize: 21, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{option.dir}</div>
-          <span style={{ fontSize: 24, fontWeight: 600, color: INK, letterSpacing: -0.4 }}>{option.name}</span>
-        </div>
-      </div>;
+/** Soft colour fields drifting on slow loops — sky blues with a little lilac, mint and peach. Positions are fractions of the frame. */
+const FIELDS = [
+  { color: '#5aa9f0', size: 1.0, x: 0.12, y: 0.2, dx: 0.10, dy: 0.08, speed: 1, phase: 0 },
+  { color: '#b9a8ff', size: 0.86, x: 0.82, y: 0.18, dx: 0.08, dy: 0.10, speed: 1, phase: 0.3 },
+  { color: '#9fe3c8', size: 0.82, x: 0.25, y: 0.9, dx: 0.12, dy: 0.06, speed: 1, phase: 0.55 },
+  { color: '#ffc9ae', size: 0.75, x: 0.78, y: 0.86, dx: 0.09, dy: 0.08, speed: 1, phase: 0.8 },
+  { color: '#2f7fd6', size: 0.69, x: 0.5, y: 0.45, dx: 0.14, dy: 0.10, speed: 2, phase: 0.15 },
+];
+function Gradient({ f, w, h }: { f: number; w: number; h: number }) {
+  const t = (f / POLL.frames) * Math.PI * 2, unit = Math.max(w, h) * 0.57;
+  return <AbsoluteFill style={{ background: 'linear-gradient(160deg, #dcecfb 0%, #eaf2fb 45%, #f2eefb 100%)', overflow: 'hidden' }}>
+    {FIELDS.map((field, i) => {
+      const size = field.size * unit;
+      const x = (field.x + Math.sin(t * field.speed + field.phase * Math.PI * 2) * field.dx) * w;
+      const y = (field.y + Math.cos(t * field.speed + field.phase * Math.PI * 2) * field.dy) * h;
+      return <div key={i} style={{ position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size, borderRadius: '50%',
+        background: `radial-gradient(closest-side, ${field.color}, transparent)`, opacity: 0.9, filter: 'blur(60px)' }} />;
     })}
+  </AbsoluteFill>;
+}
+
+export function PollFilm({ shape, scale }: PollProps) {
+  const f = useCurrentFrame();
+  const S = SHAPES[shape], pw = PHONE.w * S.phone, ph = PHONE.h * S.phone;
+  const left = (S.w - (pw * 3 + S.gap * 2)) / 2, top = (S.h - ph) / 2;
+  return <AbsoluteFill style={{ fontFamily, backgroundColor: '#e6f0fa' }}>
+    <div style={{ width: S.w, height: S.h, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'relative', overflow: 'hidden' }}>
+      <Gradient f={f} w={S.w} h={S.h} />
+      {SCREENS.map((screen, i) => {
+        const enter = ramp(f, i * 4, 18 + i * 4);
+        const frame = String(Math.min(f, POLL.frames - 1)).padStart(4, '0');
+        const ink = screen.light ? '#ffffff' : '#233E4B';
+        return <div key={screen.dir} style={{ position: 'absolute', left: left + i * (pw + S.gap), top: top + (1 - enter) * 26, width: PHONE.w, height: PHONE.h, opacity: enter, transform: `scale(${S.phone})`, transformOrigin: 'top left' }}>
+          <div style={{ width: PHONE.w, height: PHONE.h, borderRadius: 70, background: '#0f1011', padding: BEZEL, boxSizing: 'border-box', boxShadow: '0 40px 90px rgba(20,48,84,0.28), 0 0 0 2px #3b3d40 inset' }}>
+            <div style={{ position: 'relative', width: SCREEN.w, height: SCREEN.h, borderRadius: 58, overflow: 'hidden', background: '#000' }}>
+              <Img src={staticFile(`${screen.dir}/${frame}.jpg`)} style={{ width: '100%', height: '100%', display: 'block' }} />
+              {/* The status bar the screens leave room for. */}
+              <span style={{ position: 'absolute', left: 42, top: 24, fontSize: 19, fontWeight: 600, color: ink, letterSpacing: -0.3 }}>9:41</span>
+              <div style={{ position: 'absolute', left: '50%', top: 13, width: 124, height: 36, marginLeft: -62, borderRadius: 18, background: '#000' }} />
+              <div style={{ position: 'absolute', right: 38, top: 28, width: 29, height: 13, borderRadius: 4, border: `1.6px solid ${ink}`, padding: 1.6, boxSizing: 'border-box', opacity: 0.95 }}><div style={{ width: '78%', height: '100%', borderRadius: 2, background: ink }} /></div>
+            </div>
+          </div>
+        </div>;
+      })}
+    </div>
   </AbsoluteFill>;
 }
