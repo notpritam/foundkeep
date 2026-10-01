@@ -28,3 +28,87 @@ This is a coherent six-object asset sheet, NOT a UI, NOT a phone screen. No logo
 Exact generation prompt:
 
 Use case: photorealistic-natural. Asset type: full bleed background for a mobile sign-in screen, portrait 2:3. A poetic photographic sky, viewed high above a bank of soft white cumulus clouds. Rich clear blue upper two thirds, sculptural sunlit clouds curling up from lower left and lower right to frame a generous empty central expanse. Cloud detail feels photographic, airy, calm, beautifully naturally lit. Upper sky deep azure #176B9D, lower sky pale blue; clouds only in the bottom third. No sunset, no stars, no buildings, no flying objects, no words, no UI, no logo. Negative space in the upper half must stay dark enough for a white heading to be added in live code. Subtle atmospheric fine grain, sophisticated editorial photography.
+
+## 2026-10-01: 24 additional floating candidates
+
+Created with the built-in GPT image tool as four six-object sprite sheets. The original 2026-09-30 six-object sheet was supplied as a **style reference only** on every call. No brand marks or readable lettering were requested.
+
+Exports use measured alpha bounds for each grouped object, including disconnected pieces such as the cursor ring. Each crop includes a 12-source-pixel safety margin, fits inside a 360 × 360 transparent area, and is padded to 400 × 400. WebP quality 86, alpha quality 100. The source sheets have genuine alpha: the coloured RGB halo visible in some raw generation previews is fully transparent and is absent when composited over blue. All new exports were checked for real alpha, fully transparent margins and no clipped source/crop bounds. The earlier six objects remain unchanged.
+
+The generated source sheets are retained in the image tool's output directory outside the checkout. `contact-sheet.webp` contains the earlier six followed by sheets A–D, on a sky-blue background, labelled by filename.
+
+### Sheet A
+
+Files: `reel.webp`, `short.webp`, `article.webp`, `tweet.webp`, `thread.webp`, `photo-post.webp`.
+
+Original generated sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-20f067f7-613c-472a-b029-3d6d4395b490.png`.
+
+Exact prompt (style reference supplied separately):
+
+Create ONE new production sprite sheet for FoundKeep, containing exactly SIX new isolated objects arranged in a precise 3-column by 2-row grid. LANDSCAPE 3:2 aspect ratio, ideally 1536 x 1024, so each of the six cells is square. Actual transparent RGBA background, not white, not a checkerboard, not a coloured backdrop. The supplied image is STYLE REFERENCE ONLY: match its beautiful physical materials, light, believable 3D forms and quality; do not repeat its objects unless explicitly requested below.
+Art direction: premium soft 3D editorial product illustration, tactile matte porcelain and thick ivory paper, warm sunlight from upper left, smooth bevels, gently rounded edges, no outlines, no ground plane and NO cast shadows. Three-quarter perspective with small elegant rotations, chunky readable shapes legible at 90 pixels. Soft accents: butter yellow, peach, mint, ice blue, lilac, soft pink and coral; navy for abstract text bars. Prefer a coherent restrained palette across this sheet. No readable text or lettering, numbers, words, logos or brand marks; absolutely no X/Twitter, YouTube, Instagram or TikTok branding. Use abstract raised strokes for writing, and only the simple generic symbols explicitly requested.
+LAYOUT REQUIREMENT: one whole object centred in each cell. Every visible part, including decorations and glow, MUST stay inside the central 70% of its cell, leaving a fully transparent gutter of at least 15% on EVERY side. No object may touch an image edge or another object. Do not add labels, cell borders or extra objects. Keep all six objects similarly sized in their cells. Each requested multi-part item is one compact grouped object.
+SHEET A — things you come across:
+TOP LEFT: REEL. One vertical 9:16 phone-like ivory video card with a recessed softly coloured scenic image of a coastline, a raised soft coral play triangle at centre, and a thin mint progress bar near the bottom. No brand, numbers or device manufacturer details.
+TOP MIDDLE: SHORT. Two compact stacked vertical video cards, the back card lilac, front card pale peach with a big raised ivory triangular play button, each with a subtle scenic image. Keep the cards physically distinct and the entire stack compact.
+TOP RIGHT: ARTICLE. A folded thick ivory magazine page, with one tiny photographic mountain landscape block, two navy headline bars and five thinner abstract text lines; a softly curled folded corner and butter-yellow highlight accent.
+BOTTOM LEFT: TWEET. A single ivory rounded social post card with a circular soft-pink avatar, two abstract name bars, exactly three navy text-like strokes, and tiny generic reply bubble, repost arrows and coral heart symbols along the bottom. No actual lettering and no network logos.
+BOTTOM MIDDLE: THREAD. Three small ivory and ice-blue post cards neatly fanned downward and slightly sideways, each with a round coloured avatar and two text-like bars. A clearly visible fine coral vertical connector runs through the three avatar centres, linking the cards. All three cards form one compact object.
+BOTTOM RIGHT: PHOTO POST. A square thick ivory social photo card containing a photographic mountain lake image, with a small raised coral heart and an ivory comment-bubble icon under the photo inside the card footer. No words or numbers.
+
+### Sheet B
+
+Files: `link.webp`, `bookmark.webp`, `heart.webp`, `comment.webp`, `browser.webp`, `cursor.webp`.
+
+Original generated sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-390683d6-4934-46be-bbba-08d19b101df1.png`.
+
+Exact prompt (style reference supplied separately):
+
+Create ONE new production sprite sheet for FoundKeep, containing exactly SIX new isolated objects arranged in a precise 3-column by 2-row grid. LANDSCAPE 3:2 aspect ratio, ideally 1536 x 1024, so each of the six cells is square. Actual transparent RGBA background, not white, not a checkerboard, not a coloured backdrop. The supplied image is STYLE REFERENCE ONLY: match its beautiful physical materials, light, believable 3D forms and quality; do not repeat its objects unless explicitly requested below.
+Art direction: premium soft 3D editorial product illustration, tactile matte porcelain and thick ivory paper, warm sunlight from upper left, smooth bevels, gently rounded edges, no outlines, no ground plane and NO cast shadows. Three-quarter perspective with small elegant rotations, chunky readable shapes legible at 90 pixels. Soft accents: butter yellow, peach, mint, ice blue, lilac, soft pink and coral; navy for abstract text bars. Prefer a coherent restrained palette across this sheet. No readable text or lettering, numbers, words, logos or brand marks; absolutely no X/Twitter, YouTube, Instagram or TikTok branding. Use abstract raised strokes for writing, and only the simple generic symbols explicitly requested.
+LAYOUT REQUIREMENT: one whole object centred in each cell. Every visible part, including decorations and glow, MUST stay inside the central 70% of its cell, leaving a fully transparent gutter of at least 15% on EVERY side. No object may touch an image edge or another object. Do not add labels, cell borders or extra objects. Keep all six objects similarly sized in their cells. Each requested multi-part item is one compact grouped object.
+SHEET B — keeping and finding:
+TOP LEFT: LINK. Exactly two interlocked glossy mint porcelain chain links, plump oval links with genuine holes and dimensional overlap, diagonally poised.
+TOP MIDDLE: BOOKMARK. One standing coral bookmark ribbon, thick softly beveled porcelain with a simple V-notch at the bottom and a very subtle backward curve; clean iconic silhouette, no symbol, no stand or base.
+TOP RIGHT: HEART. One puffy coral-pink heart, soft matte porcelain with a delicate lit bevel, strongly readable simple silhouette.
+BOTTOM LEFT: COMMENT. One pale lilac thick rounded speech bubble with a short pointed tail and three evenly spaced raised ivory dots on its front.
+BOTTOM MIDDLE: BROWSER. A compact ivory miniature browser window, softly rounded, with three small pastel dots in its top bar and a simple abstract page sketch inside: an ice-blue picture block and three navy text-like strokes. Not a screenshot, it is a physical porcelain object.
+BOTTOM RIGHT: CURSOR. A chunky white mouse-pointer arrow angled diagonally upward-left, dimensional beveled porcelain with a small soft mint circular click ring beside its tip. The ring and pointer are one tightly grouped floating object. No ground shadow.
+
+### Sheet C
+
+Files: `agent-orb.webp`, `agent-reply.webp`, `command.webp`, `connector.webp`, `collection.webp`, `search-sparkle.webp`.
+
+Original generated sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-c089d516-81a4-4b14-8ae2-706aac6a27fe.png`.
+
+Exact prompt (style reference supplied separately):
+
+Create ONE new production sprite sheet for FoundKeep, containing exactly SIX new isolated objects arranged in a precise 3-column by 2-row grid. LANDSCAPE 3:2 aspect ratio, ideally 1536 x 1024, so each of the six cells is square. Actual transparent RGBA background, not white, not a checkerboard, not a coloured backdrop. The supplied image is STYLE REFERENCE ONLY: match its beautiful physical materials, light, believable 3D forms and quality; do not repeat its objects unless explicitly requested below.
+Art direction: premium soft 3D editorial product illustration, tactile matte porcelain and thick ivory paper, warm sunlight from upper left, smooth bevels, gently rounded edges, no outlines, no ground plane and NO cast shadows. Three-quarter perspective with small elegant rotations, chunky readable shapes legible at 90 pixels. Soft accents: butter yellow, peach, mint, ice blue, lilac, soft pink and coral; navy for abstract text bars. Prefer a coherent restrained palette across this sheet. No readable text or lettering, numbers, words, logos or brand marks; absolutely no X/Twitter, YouTube, Instagram or TikTok branding. Use abstract raised strokes for writing, and only the simple generic symbols explicitly requested.
+LAYOUT REQUIREMENT: one whole object centred in each cell. Every visible part, including decorations and glow, MUST stay inside the central 70% of its cell, leaving a fully transparent gutter of at least 15% on EVERY side. No object may touch an image edge or another object. Do not add labels, cell borders or extra objects. Keep all six objects similarly sized in their cells. Each requested multi-part item is one compact grouped object.
+SHEET C — your agent:
+TOP LEFT: AGENT ORB. A softly luminous pearl sphere with subtle translucent porcelain depth and one small warm ivory four-point sparkle visible inside, a very delicate mint inner glow. Keep the outer silhouette crisp and surrounding background truly transparent, no broad halo outside the object.
+TOP MIDDLE: AGENT REPLY. A thick soft ice-blue chat bubble holding one small warm ivory four-point sparkle and two short navy raised text-like bars. Compact rounded shape, short tail.
+TOP RIGHT: COMMAND. One small rounded ivory terminal-window card with a soft lilac inset face, three tiny pastel top-bar dots, a single raised ivory right-pointing chevron prompt symbol and one vertical cursor bar. No readable text, letters, numbers or code.
+BOTTOM LEFT: CONNECTOR. Two small softly rounded ivory porcelain plug halves facing each other and almost joining across a narrow gap, mint inner sockets with a faint mint glow in the gap. One half has two short pins and the other matching sockets; short softly curved cable tails. Compact symmetrical group.
+BOTTOM MIDDLE: COLLECTION. A neat fanned stack of exactly three thick rounded cards in butter yellow, soft pink and ice blue. Front card ivory with a small mint rectangular inset. Plain material faces, no symbols or writing. Make three distinct cards easy to count.
+BOTTOM RIGHT: SEARCH SPARKLE. One soft lilac magnifying glass with a thick rounded handle, a transparent pale mint lens and a small warm ivory four-point sparkle visible inside the lens. No large external glow.
+
+### Sheet D
+
+Files: `recipe.webp`, `podcast.webp`, `map-pin.webp`, `product.webp`, `ticket.webp`, `sticky-note.webp`.
+
+Original generated sheet: `/home/pritam/.codex/generated_images/01a0f1db-68c5-7fd1-9d2c-0fae615d6171/exec-6cf4a842-04f8-4f2d-8385-3e732c8633f3.png`.
+
+Exact prompt (style reference supplied separately):
+
+Create ONE new production sprite sheet for FoundKeep, containing exactly SIX new isolated objects arranged in a precise 3-column by 2-row grid. LANDSCAPE 3:2 aspect ratio, ideally 1536 x 1024, so each of the six cells is square. Actual transparent RGBA background, not white, not a checkerboard, not a coloured backdrop. The supplied image is STYLE REFERENCE ONLY: match its beautiful physical materials, light, believable 3D forms and quality; do not repeat its objects unless explicitly requested below.
+Art direction: premium soft 3D editorial product illustration, tactile matte porcelain and thick ivory paper, warm sunlight from upper left, smooth bevels, gently rounded edges, no outlines, no ground plane and NO cast shadows. Three-quarter perspective with small elegant rotations, chunky readable shapes legible at 90 pixels. Soft accents: butter yellow, peach, mint, ice blue, lilac, soft pink and coral; navy for abstract text bars. Prefer a coherent restrained palette across this sheet. No readable text or lettering, numbers, words, logos or brand marks; absolutely no X/Twitter, YouTube, Instagram or TikTok branding. Use abstract raised strokes for writing, and only the simple generic symbols explicitly requested.
+LAYOUT REQUIREMENT: one whole object centred in each cell. Every visible part, including decorations and glow, MUST stay inside the central 70% of its cell, leaving a fully transparent gutter of at least 15% on EVERY side. No object may touch an image edge or another object. Do not add labels, cell borders or extra objects. Keep all six objects similarly sized in their cells. Each requested multi-part item is one compact grouped object.
+SHEET D — more you come across:
+TOP LEFT: RECIPE. A thick ivory recipe card with a small square photographic image of an appetising plated pasta dish, two navy abstract headline bars and three shorter ingredient strokes, plus one small butter-yellow corner tab. No lettering or numbers.
+TOP MIDDLE: PODCAST. One compact peach-and-ivory podcast card, with a raised mint waveform of seven rounded varying-height bars and a prominent soft ivory play triangle in a coral circular button. No microphones, lettering or brand marks.
+TOP RIGHT: MAP PIN. One chunky coral map pin hovering just above and very close to a tiny accordion-folded mint-and-ivory street map with simple pale lines. Keep the pin and map as one compact object; no place names, numbers or cast shadow.
+BOTTOM LEFT: PRODUCT. One rounded ivory product card with a small photographic image of a plain unbranded pastel sneaker, two navy abstract lines below, and a soft coral blank price-tag shape tucked at one corner. No swoosh, stripes, logos, text or prices.
+BOTTOM MIDDLE: TICKET. One thick butter-yellow and soft-pink event ticket stub, rounded edges with semicircular side notches and a subtle line of tiny perforations dividing off the short stub. A few embossed navy horizontal strokes and one small simple coral four-point star, no lettering, numbers or barcode.
+BOTTOM RIGHT: STICKY NOTE. One soft butter-yellow sticky note made of thick tactile paper, its lower corner slightly curled upward, with a simple small dark navy hand-drawn looping doodle and tiny coral dot. No words, letters or numbers. The doodle should be a loose abstract loop, not a logo.
