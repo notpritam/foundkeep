@@ -1,7 +1,7 @@
-// The app's first screen, locked 2026-10-01 (Pritam): GPT-6 Astra's objects —
-// what you come across while browsing, and your agent — drift in around a
-// centred headline over the Cumulus sky (blur 1) and keep drifting; the Apple
-// and Google buttons rise last. No email option and
+// The app's first screen, locked 2026-10-01 (Pritam): floating cards (GPT-6
+// Astra, like iOS widgets) — what you come across while browsing, and your
+// agent — drift in around a centred headline over the Cumulus sky (blur 1) and
+// keep drifting; the Apple and Google buttons rise last. No email option and
 // no terms line. Real sign-in: the same Apple/Google route as today.
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -30,7 +30,7 @@ const E = {
   article: require('../../../assets/images/elements/article.webp'), short: require('../../../assets/images/elements/short.webp'),
   thread: require('../../../assets/images/elements/thread.webp'), agentReply: require('../../../assets/images/elements/agent-reply.webp'),
 };
-/** What you come across while browsing, and your agent, around the edges (GPT-6 Astra, assets/images/elements). */
+/** What you come across while browsing, and your agent, around the edges: the cards (assets/images/elements). */
 export const FINDS: Find[] = [
   { source: E.reel, x: 0.06, y: 0.07, size: 88, rotate: -6, depth: 1, delay: 90, period: 9.2, word: 'Reel.' },
   { source: E.tweet, x: 0.66, y: 0.075, size: 108, rotate: 5, depth: 2, delay: 170, period: 10.6, word: 'Tweet.' },
@@ -84,11 +84,9 @@ function useProviders(): OAuthProvider[] {
   return [...providers].sort((a, b) => ['google', 'apple'].indexOf(a) - ['google', 'apple'].indexOf(b));
 }
 
-/** Depth of field: as if the camera were focused on the words — near objects a little soft, far ones hazed into the sky. */
-const FOCUS = [{ blur: 0.8, haze: 0.78 }, { blur: 0, haze: 1 }, { blur: 1.6, haze: 1 }];
-
-/** finds: the objects around the words; movement: how they keep moving; depth: depth of field (all proposals for now). */
-export function FirstScreen({ finds = FINDS, movement = 'drift', depth = false }: { finds?: Find[]; movement?: Movement; depth?: boolean }) {
+/** movement: how the cards keep moving (a proposal until Pritam picks one). */
+export function FirstScreen({ movement = 'drift' }: { movement?: Movement }) {
+  const finds = FINDS;
   const fontReady = useHeadlineFont();
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -151,8 +149,7 @@ export function FirstScreen({ finds = FINDS, movement = 'drift', depth = false }
       const fromX = ((px - cx) / len) * d.travel, fromY = ((py - cy) / len) * d.travel;
       const move = moving(movement === 'spotlight' ? 'drift' : movement, d, phase, offset);
       const turn = Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [find.rotate + (fromX > 0 ? 10 : -10), find.rotate] }), move.turn);
-      const f = depth ? FOCUS[find.depth] : { blur: 0, haze: 1 };
-      const shown = entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity * f.haze, d.opacity * f.haze] });
+      const shown = entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity, d.opacity] });
       return <Animated.View key={i} pointerEvents="none" style={[styles.find, { left: find.x * W, top: find.y * H, width: find.size, height: find.size,
         opacity: move.fade ? Animated.multiply(shown, move.fade) : shown,
         transform: [
@@ -162,7 +159,7 @@ export function FirstScreen({ finds = FINDS, movement = 'drift', depth = false }
           { scale: Animated.multiply(entry.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }), v.focus[i].interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] })) },
           { rotate: turn.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) },
         ] }]}>
-        <Image source={find.source} blurRadius={f.blur} style={styles.img} accessible={false} />
+        <Image source={find.source} style={styles.img} accessible={false} />
       </Animated.View>;
     })}
 
