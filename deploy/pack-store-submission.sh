@@ -24,6 +24,7 @@ required_assets = [
     "save-review.png",
     "dock-review.png",
     "library.png",
+    "agents.png",
     "promo-small.png",
     "promo-marquee.png",
     "icon128.png",
