@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-native-web-vite';
 import { FirstScreen as Screen } from '../../../../apps/mobile/src/proposals/sign-in/FirstScreen.tsx';
+import { FilmScreen } from '../../../../apps/mobile/src/proposals/sign-in/FilmScreen.tsx';
 
 // Locked 2026-10-01: the Cumulus sky (blur 1), "Keep Every" in SF Pro with the
 // word in Caveat, tilted, "All in one place, ready for your agent.", and the
@@ -12,3 +13,5 @@ const meta: Meta = {
 };
 export default meta;
 export const FirstScreen: StoryObj = { name: 'First screen', render: () => <Screen /> };
+// A second version after Pritam's reference: a light page, and a window playing a film of FoundKeep at work (design-system/film).
+export const WithFilm: StoryObj = { name: 'With a film', render: () => <FilmScreen /> };
