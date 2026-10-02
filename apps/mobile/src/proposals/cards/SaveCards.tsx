@@ -22,30 +22,18 @@ import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { CapturePreview } from '../../components/CapturePreview.tsx';
 import { Shimmer } from '../../components/Shimmer.tsx';
 import { captureTitle } from '../../collection/model.ts';
-import { previewRatio, savedAge, sourcePlatform } from '../../../../../packages/shared/src/collection-presentation.ts';
+import { previewRatio, savedAge } from '../../../../../packages/shared/src/collection-presentation.ts';
 import { usePalette, type Palette } from '../library/parts.tsx';
+import { origin } from '../../collection/origin.ts';
 
 export type CardStyle = 'quiet' | 'pills' | 'marked';
 type CardProps = { capture: Capture; onOpen: (capture: Capture) => void };
 
 // ——— Where a save came from ———
 
-const MARKS: Record<string, { icon: string; color: string | null }> = {
-  X: { icon: 'logo-x', color: null }, Instagram: { icon: 'logo-instagram', color: '#E1306C' }, YouTube: { icon: 'logo-youtube', color: '#FF0033' },
-  TikTok: { icon: 'logo-tiktok', color: null }, Pinterest: { icon: 'logo-pinterest', color: '#E60023' }, Reddit: { icon: 'logo-reddit', color: '#FF4500' },
-  LinkedIn: { icon: 'logo-linkedin', color: '#0A66C2' }, GitHub: { icon: 'logo-github', color: null }, Medium: { icon: 'logo-medium', color: null }, Threads: { icon: 'logo-threads', color: null },
-};
-/** The platform or site a save came from, with its mark (a website: a globe); color null means ink, 'muted' muted. */
-export function origin(capture: Capture): { name: string; icon: string; color?: string | null } {
-  if (capture.type === 'note') return { name: 'Note', icon: 'create-outline' };
-  const platform = sourcePlatform(capture);
-  if (platform && MARKS[platform]) return { name: capture.type === 'tweet' && capture.provenance?.authors?.[0] ? capture.provenance.authors[0] : platform, ...MARKS[platform] };
-  const site = capture.provenance?.siteName || platform;
-  if (site) return { name: site, icon: 'globe-outline', color: 'muted' };
-  if (capture.type === 'audio') return { name: 'Voice memo', icon: 'mic-outline' };
-  if (capture.type === 'document' || capture.type === 'file') return { name: capture.fileMime?.includes('pdf') ? 'PDF' : 'File', icon: 'document-outline' };
-  return { name: capture.savedVia === 'iphone' ? 'From your iPhone' : 'Saved', icon: capture.savedVia === 'iphone' ? 'phone-portrait-outline' : 'bookmark-outline' };
-}
+/** Where a save came from — now the app's own (collection/origin.ts), shared with the Library's card. */
+export { origin };
+
 function Mark({ capture, P, size = 14 }: { capture: Capture; P: Palette; size?: number }) {
   const from = origin(capture);
   return <Ionicons name={from.icon as 'logo-x'} size={size} color={from.color === 'muted' ? P.muted : from.color ?? P.ink} />;

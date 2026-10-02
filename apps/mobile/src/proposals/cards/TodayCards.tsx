@@ -20,7 +20,7 @@ import { useMaterial } from '../../components/ScenicSurface.tsx';
 import { captureTitle } from '../../collection/model.ts';
 import { colors, palettes } from '../../theme.ts';
 import { previewRatio, savedAge, savedVia, savedViaLabels, type SavedVia } from '../../../../../packages/shared/src/collection-presentation.ts';
-import { origin } from './SaveCards.tsx';
+import { origin } from '../../collection/origin.ts';
 
 type CardProps = { capture: Capture; onOpen: (capture: Capture) => void };
 const VIA: Record<SavedVia, string> = { iphone: 'phone-portrait-outline', android: 'logo-android', browser: 'laptop-outline', dashboard: 'globe-outline' };
