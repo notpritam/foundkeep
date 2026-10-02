@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { Capture } from '../api/types.ts';
 import { captureTitle } from '../collection/model.ts';
 import { CapturePreview, captureIcons, captureLabels } from './CapturePreview.tsx';
+import { Shimmer, ShimmerText } from './Shimmer.tsx';
 import { colors, palettes } from '../theme.ts';
 import { useThemedStyles } from '../appearance/AppearanceProvider.tsx';
 import { previewRatio, savedAge, savedVia, savedViaLabels, sourcePlatform } from '../../../../packages/shared/src/collection-presentation.ts';
@@ -20,7 +21,9 @@ export const GalleryCard = memo(function GalleryCard({ capture, onOpen }: { capt
   const via = savedVia(capture);
   const pending = capture.status === 'pending' || capture.status === 'processing';
   return <Pressable accessibilityRole="button" accessibilityLabel={`Open ${captureLabels[capture.type]} ${captureTitle(capture)}`} accessibilityHint={pending ? 'Saved. Details are being prepared.' : undefined} onPress={() => onOpen(capture)} style={({ pressed }) => [styles.card, { backgroundColor: opaque ? palette.surface : palette.glassCard }, written && styles.written, pressed && styles.pressed]}>
-    {!written ? <CapturePreview capture={capture} style={[styles.preview, { aspectRatio: previewRatio(capture.width, capture.height) }]} /> : null}
+    {/* Being prepared, with nothing to show yet: the picture's place shimmers. */}
+    {written ? null : pending && !(capture.previewUrl || capture.blobUrl || capture.fileUrl) ? <Shimmer style={[styles.preview, { aspectRatio: 1.4 }]} />
+      : <CapturePreview capture={capture} style={[styles.preview, { aspectRatio: previewRatio(capture.width, capture.height) }]} />}
     <View style={[styles.copy, !written && styles.caption, !written && { backgroundColor: opaque ? palette.surface : palette.glassCard }, opaque && { borderColor: palette.line }]}>
       <View style={styles.source}><Ionicons name={captureIcons[capture.type]} size={13} color={colors.muted} /><Text style={styles.sourceText} numberOfLines={1}>{source}</Text></View>
       <Text style={styles.title} numberOfLines={4}>{captureTitle(capture)}</Text>
@@ -29,7 +32,7 @@ export const GalleryCard = memo(function GalleryCard({ capture, onOpen }: { capt
       {capture.userTags?.length ? <Text style={styles.sourceText} numberOfLines={2}>{capture.userTags.slice(0, 2).map(tag => `#${tag}`).join('  ')}{capture.userTags.length > 2 ? ` +${capture.userTags.length - 2}` : ''}</Text> : null}
       <Text style={styles.saved} numberOfLines={2}>{via ? `${savedViaLabels[via]} · ` : ''}{savedAge(capture)}</Text>
       {capture.batchId ? <View style={styles.state}><Ionicons name="layers-outline" size={12} color={colors.muted} /><Text style={styles.sourceText}>Saved together</Text></View> : null}
-      {pending ? <View style={styles.state}><Ionicons name="time-outline" size={12} color={colors.pending} /><Text style={[styles.stateText, { color: colors.pending }]}>Preparing details</Text></View> : capture.status === 'failed' ? <Text style={styles.stateText}>Saved · details unavailable</Text> : null}
+      {pending ? <ShimmerText style={styles.stateText} color={palette.muted} highlight={palette.ink}>Preparing details</ShimmerText> : capture.status === 'failed' ? <Text style={styles.stateText}>Saved · details unavailable</Text> : null}
     </View>
   </Pressable>;
 });
