@@ -1,0 +1,165 @@
+{
+  "commit": "da51363",
+  "stories": [
+    {
+      "id": "proposals-banner-preview--screenshot",
+      "title": "Proposals/Banner preview",
+      "name": "All five · region screenshot"
+    },
+    {
+      "id": "proposals-banner-preview--full-page",
+      "title": "Proposals/Banner preview",
+      "name": "All five · full-page screenshot"
+    },
+    {
+      "id": "proposals-banner-preview--post",
+      "title": "Proposals/Banner preview",
+      "name": "All five · post on X"
+    },
+    {
+      "id": "proposals-banner-preview--article",
+      "title": "Proposals/Banner preview",
+      "name": "All five · article"
+    },
+    {
+      "id": "proposals-banner-preview--highlight",
+      "title": "Proposals/Banner preview",
+      "name": "All five · highlight"
+    },
+    {
+      "id": "proposals-banner-preview--image",
+      "title": "Proposals/Banner preview",
+      "name": "All five · image"
+    },
+    {
+      "id": "proposals-banner-preview--framed",
+      "title": "Proposals/Banner preview",
+      "name": "A. Framed · every kind"
+    },
+    {
+      "id": "proposals-banner-preview--edge-to-edge",
+      "title": "Proposals/Banner preview",
+      "name": "B. Edge to edge · every kind"
+    },
+    {
+      "id": "proposals-banner-preview--tall-with-fade",
+      "title": "Proposals/Banner preview",
+      "name": "C. Tall with fade · every kind"
+    },
+    {
+      "id": "proposals-banner-preview--compact-strip",
+      "title": "Proposals/Banner preview",
+      "name": "D. Compact strip · every kind"
+    },
+    {
+      "id": "proposals-banner-preview--in-a-frame",
+      "title": "Proposals/Banner preview",
+      "name": "E. In a frame of its source · every kind"
+    },
+    {
+      "id": "proposals-banner-preview--playground",
+      "title": "Proposals/Banner preview",
+      "name": "Playground"
+    },
+    {
+      "id": "proposals-draft-status--all-five",
+      "title": "Proposals/Draft status",
+      "name": "All five places (didn’t sync)"
+    },
+    {
+      "id": "proposals-draft-status--beside-save",
+      "title": "Proposals/Draft status",
+      "name": "1. Beside Save · every state"
+    },
+    {
+      "id": "proposals-draft-status--beside-close",
+      "title": "Proposals/Draft status",
+      "name": "2. Beside Close · every state"
+    },
+    {
+      "id": "proposals-draft-status--on-the-preview",
+      "title": "Proposals/Draft status",
+      "name": "3. On the preview · every state"
+    },
+    {
+      "id": "proposals-draft-status--in-the-library-badge",
+      "title": "Proposals/Draft status",
+      "name": "4. In the My library badge · every state"
+    },
+    {
+      "id": "proposals-draft-status--before-the-title",
+      "title": "Proposals/Draft status",
+      "name": "5. Before the title · every state"
+    },
+    {
+      "id": "proposals-draft-status--playground",
+      "title": "Proposals/Draft status",
+      "name": "Playground"
+    },
+    {
+      "id": "proposals-drafts--on-the-card",
+      "title": "Proposals/Drafts",
+      "name": "A. On the Add details card"
+    },
+    {
+      "id": "proposals-drafts--on-the-dock",
+      "title": "Proposals/Drafts",
+      "name": "B. On the dock"
+    },
+    {
+      "id": "proposals-drafts--dashboard-banner",
+      "title": "Proposals/Drafts",
+      "name": "C. Dashboard banner"
+    },
+    {
+      "id": "proposals-drafts--dashboard-cards",
+      "title": "Proposals/Drafts",
+      "name": "D. Draft cards in the library"
+    },
+    {
+      "id": "proposals-drafts--dashboard-section",
+      "title": "Proposals/Drafts",
+      "name": "E. “In your extension” section"
+    },
+    {
+      "id": "proposals-save-preview--all-five",
+      "title": "Proposals/Save preview",
+      "name": "All five (a region screenshot)"
+    },
+    {
+      "id": "proposals-save-preview--all-five-highlight",
+      "title": "Proposals/Save preview",
+      "name": "All five (a highlight)"
+    },
+    {
+      "id": "proposals-save-preview--banner",
+      "title": "Proposals/Save preview",
+      "name": "1. Banner · every kind"
+    },
+    {
+      "id": "proposals-save-preview--thumbnail-row",
+      "title": "Proposals/Save preview",
+      "name": "2. Thumbnail row · every kind"
+    },
+    {
+      "id": "proposals-save-preview--inline",
+      "title": "Proposals/Save preview",
+      "name": "3. Inline · every kind"
+    },
+    {
+      "id": "proposals-save-preview--peek",
+      "title": "Proposals/Save preview",
+      "name": "4. Peek · every kind"
+    },
+    {
+      "id": "proposals-save-preview--side-thumbnail",
+      "title": "Proposals/Save preview",
+      "name": "5. Side thumbnail · every kind"
+    },
+    {
+      "id": "proposals-save-preview--playground",
+      "title": "Proposals/Save preview",
+      "name": "Playground"
+    }
+  ]
+}

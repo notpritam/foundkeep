@@ -1,0 +1,30 @@
+{
+  "commit": "2c53ceb",
+  "stories": [
+    {
+      "id": "current-sign-in--sign-in-screen",
+      "title": "Current/Sign-in",
+      "name": "Sign in"
+    },
+    {
+      "id": "current-sign-in--create-account",
+      "title": "Current/Sign-in",
+      "name": "Create an account"
+    },
+    {
+      "id": "current-sign-in--save-recovery-code",
+      "title": "Current/Sign-in",
+      "name": "Save your recovery code"
+    },
+    {
+      "id": "current-sign-in--recover-account",
+      "title": "Current/Sign-in",
+      "name": "Recover an account"
+    },
+    {
+      "id": "current-sign-in--apple-or-google-failed",
+      "title": "Current/Sign-in",
+      "name": "Apple or Google sign-in could not be verified"
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "commit": "2ab8668",
+  "stories": [
+    {
+      "id": "proposals-sign-in--cumulus-top-light",
+      "title": "Proposals/Sign in",
+      "name": "Cumulus · clouds on top, light"
+    },
+    {
+      "id": "proposals-sign-in--cumulus-top-medium",
+      "title": "Proposals/Sign in",
+      "name": "Cumulus · clouds on top, medium"
+    },
+    {
+      "id": "proposals-sign-in--cumulus-top-full",
+      "title": "Proposals/Sign in",
+      "name": "Cumulus · clouds on top, full"
+    },
+    {
+      "id": "proposals-sign-in--keep-serif",
+      "title": "Proposals/Sign in",
+      "name": "Keep every · SF Pro + Instrument Serif italic"
+    },
+    {
+      "id": "proposals-sign-in--keep-hand",
+      "title": "Proposals/Sign in",
+      "name": "Keep every · SF Pro + Caveat, tilted (chosen)"
+    },
+    {
+      "id": "proposals-sign-in--keep-mono",
+      "title": "Proposals/Sign in",
+      "name": "Keep every · SF Pro + Space Mono, in a field"
+    },
+    {
+      "id": "proposals-sign-in--keep-soft",
+      "title": "Proposals/Sign in",
+      "name": "Keep every · Instrument Serif + SF Pro Heavy"
+    },
+    {
+      "id": "proposals-sign-in--keep-weight",
+      "title": "Proposals/Sign in",
+      "name": "Keep every · SF Pro only, light over black"
+    },
+    {
+      "id": "proposals-sign-in--keep-per-find",
+      "title": "Proposals/Sign in",
+      "name": "Keep every · a style for each find"
+    },
+    {
+      "id": "proposals-sign-in--on-alpine-morning",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Alpine morning (ChatGPT)"
+    },
+    {
+      "id": "proposals-sign-in--on-alpine-golden-meadow",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Golden meadow (ChatGPT)"
+    },
+    {
+      "id": "proposals-sign-in--on-sunrise-above-clouds",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Sunrise above clouds (ChatGPT)"
+    },
+    {
+      "id": "proposals-sign-in--on-alpine-sunbeams",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Sunbeams (ChatGPT)"
+    },
+    {
+      "id": "proposals-sign-in--on-terrace-dusk",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Terrace at dusk (ChatGPT)"
+    },
+    {
+      "id": "proposals-sign-in--on-sky-cumulus",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Cumulus (Codex)"
+    },
+    {
+      "id": "proposals-sign-in--on-sky-golden",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Golden hour (Codex)"
+    },
+    {
+      "id": "proposals-sign-in--on-sky-above-clouds",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Above the clouds (Codex)"
+    },
+    {
+      "id": "proposals-sign-in--on-sky-alpine",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Alpine sky (Codex)"
+    },
+    {
+      "id": "proposals-sign-in--on-meadow-sky",
+      "title": "Proposals/Sign in",
+      "name": "Backdrop · Meadow (Codex)"
+    },
+    {
+      "id": "proposals-sign-in--highlighter",
+      "title": "Proposals/Sign in",
+      "name": "Other · Highlighter"
+    },
+    {
+      "id": "proposals-sign-in--tags",
+      "title": "Proposals/Sign in",
+      "name": "Other · Tags"
+    },
+    {
+      "id": "proposals-sign-in--stack",
+      "title": "Proposals/Sign in",
+      "name": "Other · Big stack"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--found-things",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "1 · Found things"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--worth-keeping",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "2 · Worth keeping"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--curiosity",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "3 · Curiosity"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--little-moments",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "4 · Little moments"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--your-corner",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "5 · Your own corner"
+    }
+  ]
+}

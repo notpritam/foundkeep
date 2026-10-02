@@ -1,0 +1,195 @@
+{
+  "commit": "e525b37",
+  "stories": [
+    {
+      "id": "proposals-refined-card--chosen",
+      "title": "Proposals/Refined card",
+      "name": "Chosen: Refined, library and share by Save"
+    },
+    {
+      "id": "proposals-refined-card--chosen-sharing",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · sharing"
+    },
+    {
+      "id": "proposals-refined-card--sharing-pill",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · sharing A. just the pill"
+    },
+    {
+      "id": "proposals-refined-card--sharing-caption",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · sharing B. caption line"
+    },
+    {
+      "id": "proposals-refined-card--sharing-block",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · sharing C. small block"
+    },
+    {
+      "id": "proposals-refined-card--sharing-quote",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · sharing D. preview"
+    },
+    {
+      "id": "proposals-refined-card--sharing-popover",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · sharing E. in the list"
+    },
+    {
+      "id": "proposals-refined-card--sharing-overview",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · sharing, all five"
+    },
+    {
+      "id": "proposals-refined-card--chosen-picking-a-folder",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · picking a folder"
+    },
+    {
+      "id": "proposals-refined-card--chosen-share-picker",
+      "title": "Proposals/Refined card",
+      "name": "Chosen · picking a collection"
+    },
+    {
+      "id": "proposals-refined-card--overview",
+      "title": "Proposals/Refined card",
+      "name": "All six, with and without the edit hint"
+    },
+    {
+      "id": "proposals-refined-card--refined",
+      "title": "Proposals/Refined card",
+      "name": "Refined"
+    },
+    {
+      "id": "proposals-refined-card--refined-no-hint",
+      "title": "Proposals/Refined card",
+      "name": "Refined · no edit hint"
+    },
+    {
+      "id": "proposals-refined-card--refined-both-hints",
+      "title": "Proposals/Refined card",
+      "name": "Refined · hint on title and note"
+    },
+    {
+      "id": "proposals-refined-card--soft-pills",
+      "title": "Proposals/Refined card",
+      "name": "A. Soft pills"
+    },
+    {
+      "id": "proposals-refined-card--icon-pills",
+      "title": "Proposals/Refined card",
+      "name": "B. Icon pills"
+    },
+    {
+      "id": "proposals-refined-card--sections",
+      "title": "Proposals/Refined card",
+      "name": "C. Sections"
+    },
+    {
+      "id": "proposals-refined-card--inline-save",
+      "title": "Proposals/Refined card",
+      "name": "D. Inline save"
+    },
+    {
+      "id": "proposals-refined-card--text-line",
+      "title": "Proposals/Refined card",
+      "name": "E. Text line"
+    },
+    {
+      "id": "proposals-refined-card--one-library-pill",
+      "title": "Proposals/Refined card",
+      "name": "Refined · one My library pill"
+    },
+    {
+      "id": "proposals-refined-card--sharing",
+      "title": "Proposals/Refined card",
+      "name": "Refined · sharing"
+    },
+    {
+      "id": "proposals-refined-card--picking-a-folder",
+      "title": "Proposals/Refined card",
+      "name": "Refined · picking a folder"
+    },
+    {
+      "id": "proposals-add-details-card--all-five",
+      "title": "Proposals/Add details card",
+      "name": "All five, side by side"
+    },
+    {
+      "id": "proposals-add-details-card--v-1",
+      "title": "Proposals/Add details card",
+      "name": "1. Quiet sheet"
+    },
+    {
+      "id": "proposals-add-details-card--v-1-folder",
+      "title": "Proposals/Add details card",
+      "name": "1. Quiet sheet · picking a folder"
+    },
+    {
+      "id": "proposals-add-details-card--v-1-sharing",
+      "title": "Proposals/Add details card",
+      "name": "1. Quiet sheet · sharing"
+    },
+    {
+      "id": "proposals-add-details-card--v-2",
+      "title": "Proposals/Add details card",
+      "name": "2. Properties"
+    },
+    {
+      "id": "proposals-add-details-card--v-2-folder",
+      "title": "Proposals/Add details card",
+      "name": "2. Properties · picking a folder"
+    },
+    {
+      "id": "proposals-add-details-card--v-2-sharing",
+      "title": "Proposals/Add details card",
+      "name": "2. Properties · sharing"
+    },
+    {
+      "id": "proposals-add-details-card--v-3",
+      "title": "Proposals/Add details card",
+      "name": "3. Quick picks"
+    },
+    {
+      "id": "proposals-add-details-card--v-3-folder",
+      "title": "Proposals/Add details card",
+      "name": "3. Quick picks · picking a folder"
+    },
+    {
+      "id": "proposals-add-details-card--v-3-sharing",
+      "title": "Proposals/Add details card",
+      "name": "3. Quick picks · sharing"
+    },
+    {
+      "id": "proposals-add-details-card--v-4",
+      "title": "Proposals/Add details card",
+      "name": "4. Details and share"
+    },
+    {
+      "id": "proposals-add-details-card--v-4-folder",
+      "title": "Proposals/Add details card",
+      "name": "4. Details and share · picking a folder"
+    },
+    {
+      "id": "proposals-add-details-card--v-4-sharing",
+      "title": "Proposals/Add details card",
+      "name": "4. Details and share · sharing"
+    },
+    {
+      "id": "proposals-add-details-card--v-5",
+      "title": "Proposals/Add details card",
+      "name": "5. Icon row"
+    },
+    {
+      "id": "proposals-add-details-card--v-5-folder",
+      "title": "Proposals/Add details card",
+      "name": "5. Icon row · picking a folder"
+    },
+    {
+      "id": "proposals-add-details-card--v-5-sharing",
+      "title": "Proposals/Add details card",
+      "name": "5. Icon row · sharing"
+    }
+  ]
+}
