@@ -216,6 +216,19 @@
       "live": [
         "first-run--four-ways"
       ]
+    },
+    {
+      "id": "2026-10-02-library",
+      "date": "2026-10-02",
+      "product": "App",
+      "title": "The Library",
+      "question": "How should the place you come back to, to find what you kept, be laid out?",
+      "tried": "Today's “The collection.” (search, kind tabs, a masonry of mixed cards) against four layouts on a richer sample library: cards (the sign-in screen's cards, a picture and the title, nothing above it, in two columns); a grid like Photos (three across, by day, a small mark for videos, posts and links); shelves by kind (just saved, videos, to read, posts, photos, notes); and a dense list by day. Each in light and dark.",
+      "picked": "Not picked yet.",
+      "why": "Next in the flow after first run.",
+      "live": [
+        "library--four-ways"
+      ]
     }
   ]
 }

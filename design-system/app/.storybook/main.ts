@@ -11,7 +11,7 @@ const shared = ['react', 'react-dom', 'react-native-web', 'react-native-safe-are
 const config: StorybookConfig = {
   stories: ['../src/**/*.mdx', '../src/**/*.stories.@(ts|tsx)', '../../../apps/mobile/src/**/*.stories.@(ts|tsx)'],
   addons: ['@storybook/addon-docs'],
-  staticDirs: ['../../public', '../public'],
+  staticDirs: ['../../public', '../public', { from: '../../../apps/mobile/assets/images/film', to: '/samples/film' }],
   framework: { name: '@storybook/react-native-web-vite', options: { modulesToTranspile: ['react-native-safe-area-context', 'react-native-screens'] } },
   core: { disableTelemetry: true },
   docs: { defaultName: 'Docs' },

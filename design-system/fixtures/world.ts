@@ -51,14 +51,32 @@ export const saves = {
   processing: { ...base, ...at(0.1), id: 'cap-processing', type: 'bookmark', status: 'processing', savedVia: 'browser', sourceTitle: 'A field guide to small details', sourceUrl: 'https://fieldnotes.example/small-details' },
   failed: { ...base, ...at(140), id: 'cap-failed', type: 'bookmark', status: 'failed', enrichError: 'The page could not be read.', sourceTitle: 'Members-only article', sourceUrl: 'https://paywalled.example/story' },
   archived: { ...base, ...at(400), id: 'cap-archived', type: 'bookmark', sourceTitle: 'Old conference schedule', sourceUrl: 'https://conf.example/2025', archivedAt: hours(200) },
+  // What people mostly save from their phones (2026-10-02, for the Library proposals): reels, posts with photos,
+  // recipes, places and things. Photographs: the film's generated ones (samples/film), never real saves.
+  reel: { ...base, ...at(1), ...folder('f-kitchen'), id: 'cap-reel', type: 'video', savedVia: 'iphone', sourceTitle: 'Ten-minute ramen, one pot', sourceUrl: 'https://www.instagram.com/reel/sample-ramen/', previewUrl: 'preview', width: 800, height: 800, userTags: ['Cooking'], provenance: { siteName: 'Instagram', authors: ['noodle.diaries'], captureMethod: 'ios-share-url' } },
+  photoPost: { ...base, ...at(4), id: 'cap-photo-post', type: 'tweet', savedVia: 'iphone', sourceTitle: 'Slow Travels (@slowtravels) on X', sourceUrl: 'https://x.com/slowtravels/status/1841000000000000000', selectionText: 'Two days in Kyoto. The best part was getting lost in Gion after dark.', blobUrl: 'blob', fileMime: 'image/jpeg', width: 800, height: 800, userTags: ['Travel'], provenance: { siteName: 'X', authors: ['Slow Travels'], captureMethod: 'ios-share-url' } },
+  recipe: { ...base, ...at(6), ...folder('f-kitchen'), id: 'cap-recipe', type: 'bookmark', savedVia: 'iphone', sourceTitle: 'Weeknight tomato rigatoni', sourceUrl: 'https://smallkitchen.example/rigatoni', summary: 'Twenty minutes, one pan, and a sauce that clings.', previewUrl: 'preview', width: 800, height: 800, userTags: ['Cooking'], provenance: { siteName: 'Small Kitchen', captureMethod: 'ios-share-url' } },
+  product: { ...base, ...at(12), id: 'cap-product', type: 'bookmark', savedVia: 'browser', sourceTitle: 'Trail runner v4, the light one', sourceUrl: 'https://fieldandtrail.example/runner-v4', summary: 'Two hundred grams, a rock plate, and a wide toe box.', previewUrl: 'preview', width: 800, height: 800, userTags: ['Gear'], provenance: { siteName: 'Field & Trail', captureMethod: 'extension' } },
+  pin: { ...base, ...at(20), id: 'cap-pin', type: 'image', savedVia: 'iphone', sourceTitle: 'Lake cabin, early fog', sourceUrl: 'https://www.pinterest.com/pin/sample-lake/', blobUrl: 'blob', fileMime: 'image/jpeg', width: 800, height: 800, userTags: ['Travel'], provenance: { siteName: 'Pinterest', captureMethod: 'ios-share-url' } },
+  short: { ...base, ...at(28), ...folder('f-kitchen'), id: 'cap-short', type: 'video', savedVia: 'iphone', sourceTitle: 'How to fold a taco so it holds', sourceUrl: 'https://www.youtube.com/shorts/sample-tacos', previewUrl: 'preview', width: 800, height: 800, userTags: ['Cooking'], provenance: { siteName: 'YouTube', captureMethod: 'ios-share-url' } },
+  pourOver: { ...base, ...at(34), ...folder('f-reading'), id: 'cap-pour-over', type: 'bookmark', savedVia: 'browser', sourceTitle: 'Pour-over, the slow way', sourceUrl: 'https://slowcoffee.example/pour-over', summary: 'Bloom for forty seconds, then pour in three slow circles.', previewUrl: 'preview', width: 800, height: 800, provenance: { siteName: 'Slow Coffee', captureMethod: 'extension' } },
+  desk: { ...base, ...at(44), ...folder('f-design'), id: 'cap-desk', type: 'image', savedVia: 'iphone', sourceTitle: 'Desk, morning light', blobUrl: 'blob', fileMime: 'image/jpeg', fileName: 'IMG_2214.jpg', width: 800, height: 800, userTags: ['Design'], provenance: { captureMethod: 'ios-share-file' } },
+  plant: { ...base, ...at(60), id: 'cap-plant', type: 'image', savedVia: 'iphone', sourceTitle: 'Monstera cutting, week six', blobUrl: 'blob', fileMime: 'image/jpeg', fileName: 'IMG_2301.jpg', width: 800, height: 800, provenance: { captureMethod: 'ios-share-file' } },
+  poster: { ...base, ...at(80), id: 'cap-poster', type: 'image', savedVia: 'iphone', sourceTitle: 'Friday night, the Lantern Room', sourceUrl: 'https://www.instagram.com/p/sample-poster/', blobUrl: 'blob', fileMime: 'image/jpeg', width: 800, height: 800, provenance: { siteName: 'Instagram', captureMethod: 'ios-share-url' } },
+  chair: { ...base, ...at(100), ...folder('f-design'), id: 'cap-chair', type: 'bookmark', savedVia: 'browser', sourceTitle: 'A chair built to last fifty years', sourceUrl: 'https://slowmade.example/chair', summary: 'Ash, wedged joints, and not a single screw.', previewUrl: 'preview', width: 800, height: 800, userTags: ['Design'], provenance: { siteName: 'Slow Made', captureMethod: 'extension' } },
+  ridge: { ...base, ...at(110), id: 'cap-ridge', type: 'video', savedVia: 'iphone', sourceTitle: 'A ridge walk worth the climb', sourceUrl: 'https://www.tiktok.com/@sample.trails/video/1', previewUrl: 'preview', width: 800, height: 800, userTags: ['Travel'], provenance: { siteName: 'TikTok', captureMethod: 'ios-share-url' } },
 } satisfies Record<string, Capture & { savedVia?: Capture['savedVia'] }>;
 
 export type SaveKind = keyof typeof saves;
 export const allSaves: Capture[] = Object.values(saves);
 export const library: Capture[] = allSaves.filter(c => !c.archivedAt).sort((a, b) => b.capturedAt - a.capturedAt);
 
+/** The film's photographs, for the saves people make from their phones. */
+const FILM: Record<string, string> = { 'cap-reel': 'ramen', 'cap-photo-post': 'kyoto', 'cap-recipe': 'pasta', 'cap-product': 'sneaker', 'cap-pin': 'lake', 'cap-short': 'tacos', 'cap-pour-over': 'coffee', 'cap-desk': 'desk', 'cap-plant': 'plant', 'cap-poster': 'poster', 'cap-chair': 'chair', 'cap-ridge': 'trail' };
+
 /** Which sample image stands in for a save's bytes (blob, file or preview). */
 export function sampleFor(capture: Pick<Capture, 'id' | 'height' | 'width'>): string {
+  if (FILM[capture.id]) return `samples/film/${FILM[capture.id]}.jpg`;
   if (capture.id === 'cap-fullpage' || capture.id === 'cap-document') return SAMPLES.fullpage;
   if (capture.width === 700) return SAMPLES.chart;
   return SAMPLES.article;
