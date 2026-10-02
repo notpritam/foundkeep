@@ -8,6 +8,7 @@ import { createFoundkeepClient, FoundkeepApiError } from '../../api/client.ts';
 import { isOAuthProvider, OAUTH_NAMES, parseOAuthReturn, pendingOAuth, validAuthorizeUrl, type OAuthIntent, type OAuthProvider, type PendingOAuth } from '../../auth-oauth.ts';
 import { Brand, Button, Message, Screen } from '../../components/ui.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
+import { firstRun } from '../../first-run/deviceFlags.ts';
 import { HandoffView, type HandoffAction } from '../../sign-in/Handoff.tsx';
 import type { HandoffPhase } from '../../sign-in/handoffWords.ts';
 import { typography } from '../../theme.ts';
@@ -86,6 +87,8 @@ export default function OAuthComplete() {
         setMessage('Identity verified. Deleting your account will permanently remove your cloud collection and connections. This cannot be undone.');
       } else if (value.pending.intent === 'sign-in' && 'token' in result) {
         setStage('finishing');
+        // The app shows first run when it opens after this, once on this device.
+        firstRun.signedIn();
         await latest.current.acceptOAuthSession(result);
         router.replace((latest.current.consumePendingRoute() || '/(app)/(tabs)/collection') as Href);
       } else throw new Error('Sign-in could not be completed. Please start again.');
