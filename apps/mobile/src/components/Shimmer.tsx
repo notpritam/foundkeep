@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Platform, StyleSheet, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, useWindowDimensions, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import { useFocusEffect } from 'expo-router';
 import { colors, palettes } from '../theme.ts';
 import { useMotionAllowed } from './motion.tsx';
@@ -30,6 +31,38 @@ export function Shimmer({ children, style }: { children?: ReactNode; style?: Sty
     </Animated.View> : null}
   </View>;
 }
+/** Words with a soft light sweeping along them, like “Thinking…” — for a save whose details
+ * are being prepared (Pritam, 2026-10-02). Narrow windows onto a brighter copy of the words
+ * travel across them, each a little dimmer towards its edges; no mask needed, so it reads the
+ * same on the phone and the web. Stops when hidden, backgrounded or Reduce Motion is on. */
+export function ShimmerText({ children, style, color, highlight }: { children: string; style?: StyleProp<TextStyle>; color: string; highlight: string }) {
+  const allowed = useMotionAllowed();
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
+  const phase = useRef(new Animated.Value(0)).current;
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    phase.setValue(0);
+    if (!allowed || !focused || !width) return;
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(phase, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.quad), useNativeDriver: Platform.OS !== 'web', isInteraction: false }),
+      Animated.delay(250),
+    ]));
+    animation.start();
+    return () => animation.stop();
+  }, [allowed, focused, phase, width]);
+  const slice = Math.max(6, width * 0.07);
+  const travel = phase.interpolate({ inputRange: [0, 1], outputRange: [-slice * 5, width + slice * 5] });
+  return <View accessible accessibilityLabel={children} style={baseStyles.words} onLayout={event => setWidth(Math.ceil(event.nativeEvent.layout.width))}>
+    <Text numberOfLines={1} style={[style, { color }]}>{children}</Text>
+    {allowed && focused && width > 0 ? [.25, .55, .85, 1, .85, .55, .25].map((opacity, index) => {
+      const at = Animated.add(travel, (index - 3) * slice);
+      return <Animated.View key={index} pointerEvents="none" style={[baseStyles.slice, { width: slice, transform: [{ translateX: at }] }]}>
+        <Animated.View style={{ width, transform: [{ translateX: Animated.multiply(at, -1) }] }}><Text numberOfLines={1} style={[style, { color: highlight, opacity }]}>{children}</Text></Animated.View>
+      </Animated.View>;
+    }) : null}
+  </View>;
+}
 export function GallerySkeleton({ columns, viewportHeight }: { columns: number; viewportHeight: number }) {
   const styles = useThemedStyles(baseStyles);
   const palette = palettes[useAppearance().scheme];
@@ -50,4 +83,5 @@ const baseStyles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
   card: { borderRadius: 12, backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1 },
   copy: { padding: 14, gap: 12 }, line: { height: 14, width: '90%', borderRadius: 3, backgroundColor: colors.line },
+  words: { alignSelf: 'flex-start', overflow: 'hidden' }, slice: { position: 'absolute', top: 0, bottom: 0, left: 0, overflow: 'hidden' },
 });

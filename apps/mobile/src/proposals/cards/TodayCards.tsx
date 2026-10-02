@@ -15,6 +15,7 @@ import { useThemedStyles } from '../../appearance/AppearanceProvider.tsx';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { CapturePreview, captureLabels } from '../../components/CapturePreview.tsx';
+import { Shimmer, ShimmerText } from '../../components/Shimmer.tsx';
 import { useMaterial } from '../../components/ScenicSurface.tsx';
 import { captureTitle } from '../../collection/model.ts';
 import { colors, palettes } from '../../theme.ts';
@@ -44,16 +45,19 @@ function TodayCard({ capture, onOpen, arrangement }: CardProps & { arrangement: 
     <Text style={styles.small}>{savedAge(capture)}</Text>
     {capture.folder ? <View style={styles.folder}><Ionicons name="folder-outline" size={12} color={palette.muted} /><Text style={styles.small} numberOfLines={1}>{capture.folder.name}</Text></View> : null}
     {capture.batchId ? <Ionicons name="layers-outline" size={13} color={palette.muted} /> : null}
-    {pending ? <Ionicons name="hourglass-outline" size={13} color={palette.pending} /> : failed ? <Ionicons name="alert-circle-outline" size={13} color={palette.muted} /> : null}
+    {failed ? <Ionicons name="alert-circle-outline" size={13} color={palette.muted} /> : null}
   </View>;
   return <Pressable accessibilityRole="button" accessibilityLabel={`Open ${captureLabels[capture.type]}: ${said}`} onPress={() => onOpen(capture)}
     style={({ pressed }) => [styles.card, { backgroundColor: opaque ? palette.surface : palette.glassCard }, written && styles.written, pressed && styles.pressed]}>
-    {!written ? <CapturePreview capture={capture} style={[styles.preview, { aspectRatio: previewRatio(capture.width, capture.height) }]} /> : null}
+    {/* Being prepared, with nothing to show yet: the picture's place shimmers. */}
+    {written ? null : pending && !(capture.previewUrl || capture.blobUrl || capture.fileUrl) ? <Shimmer style={[styles.preview, { aspectRatio: 1.4 }]} />
+      : <CapturePreview capture={capture} style={[styles.preview, { aspectRatio: previewRatio(capture.width, capture.height) }]} />}
     <View style={[styles.copy, !written && styles.caption, !written && { backgroundColor: opaque ? palette.surface : palette.glassCard }, opaque && { borderColor: palette.line }]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {arrangement === 'concise' ? <View style={styles.source}>{mark}<Text style={styles.small} numberOfLines={1}>{from.name}</Text></View> : null}
       <Text style={styles.title} numberOfLines={4}>{title}</Text>
       {written && excerpt && excerpt !== title ? <Text style={styles.excerpt} numberOfLines={6}>{excerpt}</Text> : null}
       {icons}
+      {pending ? <ShimmerText style={styles.small} color={palette.muted} highlight={palette.ink}>Preparing details</ShimmerText> : null}
     </View>
   </Pressable>;
 }
