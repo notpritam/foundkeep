@@ -4,7 +4,9 @@
 // is, the headline and byline a save is shown by, and days to group saves in.
 // All on the app's palette, so every look follows light and dark.
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Capture, CaptureType } from '../../api/types.ts';
 import { useAppearance } from '../../appearance/AppearanceProvider.tsx';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
@@ -12,6 +14,8 @@ import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { CapturePreview, captureLabels } from '../../components/CapturePreview.tsx';
 import { captureTitle } from '../../collection/model.ts';
 import { palettes } from '../../theme.ts';
+import { useDock } from '../../components/FloatingDock.tsx';
+import { ScrollEdge } from '../../components/ScrollEdge';
 import { savedAge, sourcePlatform } from '../../../../../packages/shared/src/collection-presentation.ts';
 
 export function usePalette() { const { scheme } = useAppearance(); return { ...palettes[scheme], dark: scheme === 'dark' }; }
@@ -55,6 +59,28 @@ export function byDay(captures: Capture[]) {
     if (last?.label === label) last.items.push(capture); else groups.push({ label, items: [capture] });
   }
   return groups;
+}
+
+/** The bar that stays put while the library scrolls under it (Pritam's reference, 2026-10-02):
+ * its buttons always, the small title once the large one has scrolled away; behind it, and
+ * behind the dock, the scroll edge — what passes under blurs, strongest at the edge. */
+export const BAR = 52;
+export function useScrollY() {
+  const y = useRef(new Animated.Value(0)).current;
+  return { y, onScroll: Animated.event([{ nativeEvent: { contentOffset: { y } } }], { useNativeDriver: false }) };
+}
+export function Edges({ y, title, children }: { y: Animated.Value; title: string; children?: React.ReactNode }) {
+  const P = usePalette();
+  const insets = useSafeAreaInsets();
+  const { bottomSpace } = useDock();
+  return <>
+    <ScrollEdge edge="bottom" height={Math.max(bottomSpace, insets.bottom + 100) + 24} hold={0.35} color={P.paper} />
+    <ScrollEdge edge="top" height={insets.top + BAR + 44} hold={(insets.top + BAR - 6) / (insets.top + BAR + 44)} color={P.paper} />
+    <View pointerEvents="box-none" style={[styles.bar, { paddingTop: insets.top, height: insets.top + BAR }]}>
+      <Animated.Text accessibilityRole="header" style={[styles.barTitle, { color: P.ink, opacity: y.interpolate({ inputRange: [30, 60], outputRange: [0, 1], extrapolate: 'clamp' }) }]}>{title}</Animated.Text>
+      <View style={styles.barButtons}>{children}</View>
+    </View>
+  </>;
 }
 
 export function Header({ title, children, sub }: { title: string; sub?: string; children?: React.ReactNode }) {
@@ -103,6 +129,9 @@ export function KindMark({ capture, style }: { capture: Capture; style?: StylePr
 }
 
 const styles = StyleSheet.create({
+  bar: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  barTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  barButtons: { position: 'absolute', right: 20, bottom: 6, flexDirection: 'row', gap: 8 },
   header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12, gap: 12 },
   headerWords: { flex: 1, gap: 2 },
   title: { fontSize: 34, lineHeight: 40, fontWeight: '700', letterSpacing: -0.8 },
