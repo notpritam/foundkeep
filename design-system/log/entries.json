@@ -237,8 +237,8 @@
       "title": "The scroll edge: progressive blur",
       "question": "What happens where content scrolls under the top bar and the dock?",
       "tried": "Pritam's reference recording (an events app: a pinned header, the list blurring progressively as it slides under it, and again under a floating button at the bottom) and expo-backdrop's ProgressiveBlurView; iOS 26's own scroll edge effect (react-native-screens' scrollEdgeEffects) only works under the native navigation header, on iOS 26, and not on Android.",
-      "picked": "A progressive blur at the top and bottom of scrolling screens: full strength across the pinned bar (its buttons always, the small title once the large one has scrolled away), fading away below it, with a wash of the page colour; and behind the dock. On the phone, expo-backdrop's native ProgressiveBlurView (public UIKit and Android APIs; fades in once content is under it); on the web, stacked CSS backdrop blurs. In the Library proposals first.",
-      "why": "Pritam: “now in our scroll we will have progress blur in our app”, with the recording.",
+      "picked": "A progressive blur at the top and bottom of scrolling screens, placed as in the reference: full strength over the status bar and the pinned top bar, clearing in a short strip just below it; at the bottom, starting at the dock's middle so what's above it stays sharp. On the phone, expo-backdrop's native ProgressiveBlurView (public UIKit and Android APIs; fades in once content is under it); on the web, stacked CSS backdrop blurs. Shown on today's Library (behind a switch, off in the app until picked) and the Library proposals.",
+      "why": "Pritam: “now in our scroll we will have progress blur in our app”, with the recording; then “positioning of blur is wrong — show me how it will look on today's collection page”. The first try blurred too far below the bar and started well above the dock.",
       "live": [
         "library--four-ways"
       ]
