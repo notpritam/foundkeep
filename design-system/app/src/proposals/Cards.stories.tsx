@@ -6,12 +6,14 @@ import type { SaveCardComponent } from '../../../../apps/mobile/src/components/G
 import { usePalette } from '../../../../apps/mobile/src/proposals/library/parts.tsx';
 import { MarkedCard, PillsCard, QuietCard } from '../../../../apps/mobile/src/proposals/cards/SaveCards.tsx';
 import { ConciseCard, IconsCard } from '../../../../apps/mobile/src/proposals/cards/TodayCards.tsx';
+import { BeforeCard } from '../../../../apps/mobile/src/proposals/cards/BeforeCard.tsx';
 import { saves } from '../../../fixtures/world.ts';
 import { StoryTabs } from '../StoryTabs.tsx';
 
-// The Library's cards for every kind of save (proposal, 2026-10-02). Pritam keeps today's
-// style, made concise — icons, no tags: concise and icons, beside today's card; then the three
-// clean ones first proposed (quiet, with pills, marked), kept for the log. Each kind side by
+// The Library's cards for every kind of save (2026-10-02). Pritam picked today's style, made
+// concise — icons, no tags — with a glass caption: now the app's GalleryCard. Beside it the card
+// it replaced, the concise proposal as picked, the icons arrangement, and the three clean ones
+// first proposed (quiet, with pills, marked), kept for the log. Each kind side by
 // side, and each inside today's Library. Board: Library / Cards for every kind of save.
 const meta: Meta = { title: 'Proposals/Cards', parameters: { controls: { disable: true } } };
 export default meta;
@@ -23,7 +25,7 @@ const KINDS: [string, keyof typeof saves][] = [
   ['Pin (Pinterest)', 'pin'], ['Photo from the iPhone', 'desk'], ['Post on Instagram', 'poster'], ['Screenshot of a region', 'region'], ['Full-page screenshot', 'fullpage'],
   ['Highlight', 'highlight'], ['Note', 'note'], ['PDF', 'document'], ['Voice memo', 'audio'], ['Saved together', 'batchA'],
 ];
-const COLUMNS: [string, SaveCardComponent][] = [['Today', GalleryCard], ['Today, concise', ConciseCard], ['Today, icons', IconsCard], ['Quiet', QuietCard], ['With pills', PillsCard], ['Marked', MarkedCard]];
+const COLUMNS: [string, SaveCardComponent][] = [['Before', BeforeCard], ['In the app: concise, glass', GalleryCard], ['Concise (picked)', ConciseCard], ['Icons', IconsCard], ['Quiet', QuietCard], ['With pills', PillsCard], ['Marked', MarkedCard]];
 const open = () => {};
 
 function Kinds() {
@@ -38,7 +40,8 @@ function Kinds() {
 }
 export const EveryKind: Story = { name: 'Every kind of save', render: () => <Kinds />, parameters: { layout: 'fullscreen' } };
 const inLibrary = (Card: SaveCardComponent): Story => ({ render: () => <StoryTabs active="collection"><Collection scrollEdge card={Card} /></StoryTabs>, parameters: { simulator: true, layout: 'fullscreen', route: { pathname: '/collection', params: {} } } });
-export const InLibraryConcise: Story = { name: 'In the Library · today, concise', ...inLibrary(ConciseCard) };
+export const InLibraryBefore: Story = { name: 'In the Library · before', ...inLibrary(BeforeCard) };
+export const InLibraryConcise: Story = { name: 'In the Library · today, concise (picked)', ...inLibrary(ConciseCard) };
 export const InLibraryIcons: Story = { name: 'In the Library · today, icons', ...inLibrary(IconsCard) };
 export const InLibraryQuiet: Story = { name: 'In the Library · quiet', ...inLibrary(QuietCard) };
 export const InLibraryPills: Story = { name: 'In the Library · with pills', ...inLibrary(PillsCard) };
