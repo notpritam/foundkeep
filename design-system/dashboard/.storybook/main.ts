@@ -10,7 +10,7 @@ const own = { react: path.join(site, 'node_modules/react'), 'react-dom': path.jo
 const config: StorybookConfig = {
   stories: ['../src/**/*.mdx', '../src/**/*.stories.@(ts|tsx)', '../../../apps/site/components/**/*.stories.@(ts|tsx)'],
   addons: ['@storybook/addon-docs'],
-  staticDirs: ['../../public', '../public', { from: '../../../apps/site/public/assets', to: '/assets' }],
+  staticDirs: ['../../public', '../public', { from: '../../../apps/site/public/assets', to: '/assets' }, { from: '../../../apps/mobile/assets/images/film', to: '/samples/film' }],
   framework: { name: '@storybook/nextjs-vite', options: { nextConfigPath: path.join(site, 'next.config.ts') } },
   core: { disableTelemetry: true },
   docs: { defaultName: 'Docs' },
