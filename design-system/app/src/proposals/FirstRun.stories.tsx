@@ -4,7 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FirstRun, TRY_LOOP, tryTaps, type FirstRunLook } from '../../../../apps/mobile/src/proposals/first-run/FirstRun.tsx';
 import { PointerPath } from '../Playthrough.tsx';
 
-// First run (proposal, 2026-10-02): the screen after someone first signs in —
+// First run (proposal, 2026-10-02; Pritam picked Watch it happen, remade for the
+// app with an X-style post and a reel — Current/Onboarding — and provisional until
+// his recording of the real flow; all four kept for the design log): the screen after someone first signs in —
 // how to save from any app — four ways. play: the screens that can run by
 // themselves do (the steps turn, Try it once is tapped through by the
 // pointer); otherwise you can try them. os: the iPhone share sheet or
@@ -19,7 +21,7 @@ const meta: Meta<Args> = {
 export default meta;
 type Story = StoryObj<Args>;
 const look = (name: FirstRunLook): Story['render'] => args => <FirstRun look={name} os={args.os} autoplay={args.play} />;
-export const Watch: Story = { name: 'Watch it happen', render: look('watch') };
+export const Watch: Story = { name: 'Watch it happen (picked)', render: look('watch') };
 export const Steps: Story = { name: 'Three steps', render: look('steps') };
 export const Closeup: Story = { name: 'The share sheet, up close', render: look('closeup') };
 function TryPlayed({ os, play }: Args) {

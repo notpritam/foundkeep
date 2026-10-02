@@ -5,7 +5,7 @@ import { FlowMap, type Flow } from '../../simulator/flow-map.tsx';
 // (proposal: '<story id>') as each flow's variants land.
 const flows: Flow[] = [
   { title: 'Sign in', steps: [{ label: 'Sign in', current: 'current-sign-in--sign-in-screen', proposal: 'proposals-sign-in--with-film' }, { label: "Apple and Google can't be reached", current: 'current-sign-in--providers-unavailable' }, { label: 'After Continue with Google', current: 'current-sign-in--handoff', proposal: 'proposals-sign-in-handoff--gather' }, { label: 'Sign-in couldn’t be verified', current: 'current-sign-in--apple-or-google-failed' }, { label: 'Save your recovery code', current: 'current-sign-in--save-recovery-code' }] },
-  { title: 'First run', steps: [{ label: 'Save from anywhere', current: 'current-onboarding--save-from-anywhere', proposal: 'proposals-first-run--watch' }] },
+  { title: 'First run', steps: [{ label: 'Save from any app', current: 'current-onboarding--save-from-anywhere', proposal: 'proposals-first-run--watch' }] },
   { title: 'Library', steps: [{ label: 'Library', current: 'current-library--library' }, { label: 'Loading', current: 'current-library--loading' }, { label: 'Empty', current: 'current-library--empty' }, { label: 'Could not load', current: 'current-library--could-not-load' }] },
   { title: 'Save detail', note: 'Opened from a card in the Library.', steps: [
     { label: 'Page', current: 'current-save-detail--bookmark' }, { label: 'Region screenshot', current: 'current-save-detail--region-screenshot' }, { label: 'Full page', current: 'current-save-detail--full-page' },

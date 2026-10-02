@@ -211,8 +211,8 @@
       "title": "First run",
       "question": "What does someone see right after they first sign in?",
       "tried": "Watch it happen (a post goes Share → FoundKeep → into your library, on a loop); three steps (Tap Share · Pick FoundKeep · It’s kept, ready for your agent); the share sheet up close, with the iPhone step people miss (More, then add FoundKeep); try it once (share a sample post here and watch it land). Each for iPhone and Android.",
-      "picked": "Not picked yet.",
-      "why": "Today it is three paragraphs in a sheet, and people who sign in with Apple or Google never see it.",
+      "picked": "Watch it happen — remade for the app with an X-style post (FoundKeep right in the share sheet's row) and a reel (slide to More, then FoundKeep), the iOS 26 share sheet and FoundKeep's own save sheet; each save leaves as one of the sign-in screen's floating cards. Shown once on each device after signing in. Provisional: once the other screens are designed, Pritam records the real flow and it is remade from that recording.",
+      "why": "Pritam: watch it happen, with better post and reel screens, FoundKeep straight from the row or through More, playing by itself — “once we are done with all of our designs of the other screens, I will record and share the video … and make it much more real”.",
       "live": [
         "first-run--four-ways"
       ]
