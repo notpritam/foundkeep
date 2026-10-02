@@ -146,7 +146,8 @@ export function FloatingFinds({ movement = 'drift', settled = false, word, gathe
     return () => { arrive?.stop(); loops.forEach(loop => loop.stop()); };
   }, [motion, settled, v, finds, movement]);
 
-  const cx = W / 2, cy = H * 0.42, radius = Math.min(W * 0.38, 156);
+  // The ring keeps well clear of the words inside it (Pritam: the cards were too near the text).
+  const cx = W / 2, cy = H * 0.42, radius = Math.min(W * 0.42, 170);
   const toMiddle = gather?.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 1], extrapolate: 'clamp' });
   const inRing = gather?.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0.82], extrapolate: 'clamp' });
   const shrink = gather?.interpolate({ inputRange: [0, 1, 2], outputRange: [1, 0.64, 0.54], extrapolate: 'clamp' });
