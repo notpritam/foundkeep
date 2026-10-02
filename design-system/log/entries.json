@@ -203,6 +203,19 @@
       "live": [
         "sign-in--handoff"
       ]
+    },
+    {
+      "id": "2026-10-02-first-run",
+      "date": "2026-10-02",
+      "product": "App",
+      "title": "First run",
+      "question": "What does someone see right after they first sign in?",
+      "tried": "Watch it happen (a post goes Share → FoundKeep → into your library, on a loop); three steps (Tap Share · Pick FoundKeep · It’s kept, ready for your agent); the share sheet up close, with the iPhone step people miss (More, then add FoundKeep); try it once (share a sample post here and watch it land). Each for iPhone and Android.",
+      "picked": "Not picked yet.",
+      "why": "Today it is three paragraphs in a sheet, and people who sign in with Apple or Google never see it.",
+      "live": [
+        "first-run--four-ways"
+      ]
     }
   ]
 }
