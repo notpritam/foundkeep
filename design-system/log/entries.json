@@ -224,8 +224,8 @@
       "title": "The Library",
       "question": "How should the place you come back to, to find what you kept, be laid out?",
       "tried": "Today's “The collection.” (search, kind tabs, a masonry of mixed cards) against four layouts on a richer sample library: cards (the sign-in screen's cards, a picture and the title, nothing above it, in two columns); a grid like Photos (three across, by day, a small mark for videos, posts and links); shelves by kind (just saved, videos, to read, posts, photos, notes); and a dense list by day. Each in light and dark.",
-      "picked": "Not picked yet.",
-      "why": "Next in the flow after first run.",
+      "picked": "Today's layout, with the scroll edge (on in the app). Next: the cards — how each kind of save looks, with its platform, tags and folder, to make it clean.",
+      "why": "Pritam picked “Today, with the scroll edge” — and “we will work on our cards design … for each type of save … to clear out everything and make our UI clean”.",
       "live": [
         "library--four-ways"
       ]
@@ -241,6 +241,19 @@
       "why": "Pritam: “now in our scroll we will have progress blur in our app”, with the recording; then “positioning of blur is wrong — show me how it will look on today's collection page”. The first try blurred too far below the bar and started well above the dock.",
       "live": [
         "library--four-ways"
+      ]
+    },
+    {
+      "id": "2026-10-02-cards",
+      "date": "2026-10-02",
+      "product": "App",
+      "title": "Cards for every kind of save",
+      "question": "How should each kind of save look in the Library — with where it came from, its tags and its folder — so the cards are clean?",
+      "tried": "Today's card (a source chip over the picture, the title, folder, hashtags, “iPhone · 3d ago”, status lines) against three that share one order — the picture, the title with nothing above it, one line: quiet (where it came from, with the platform's mark, and when); with pills (the folder and first tags as pills); marked (the platform's mark on the picture's corner; when and the folder below). The kind shows in the picture: a play mark (tall for reels and shorts), a page and “PDF”, a quote bar, a note's tint, a sound wave, a stack for things saved together; still being read shimmers; couldn't be read says so. For 21 kinds of save, light and dark, and inside today's Library.",
+      "picked": "Not picked yet.",
+      "why": "Pritam: “we will work on our cards design … for each type of save … tag, platform, app … to clear out everything and make our UI clean”.",
+      "live": [
+        "library--cards"
       ]
     }
   ]

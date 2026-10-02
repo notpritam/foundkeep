@@ -7,7 +7,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimens
 import type { CaptureType } from '../../../api/types.ts';
 import { Brand, Message, Screen } from '../../../components/ui.tsx';
 import { OrganizationPicker, type OrganizationChoice } from '../../../components/OrganizationPicker.tsx';
-import { GalleryList } from '../../../components/GalleryList.tsx';
+import { GalleryList, type SaveCardComponent } from '../../../components/GalleryList.tsx';
 import { useDock } from '../../../components/FloatingDock.tsx';
 import { useCollection } from '../../../collection/useCollection.ts';
 import { useSession } from '../../../session/SessionProvider.tsx';
@@ -24,11 +24,12 @@ const filters: Array<{ type?: CaptureType; label: string }> = [
   { type: 'document', label: 'Documents' }, { type: 'selection', label: 'Highlights' }, { type: 'screenshot', label: 'Screenshots' },
   { type: 'audio', label: 'Audio' }, { type: 'video', label: 'Video' }, { type: 'tweet', label: 'Posts' }, { type: 'file', label: 'Files' },
 ];
-export default function CollectionRoute() { return <CollectionScreen />; }
+// The scroll edge is on (Pritam picked today's layout with it, 2026-10-02).
+export default function CollectionRoute() { return <CollectionScreen scrollEdge />; }
 
 /** scrollEdge: the list runs under a see-through top bar and the dock, blurring as it passes
- * (Pritam's reference, 2026-10-02) — shown in the design system until he picks it. */
-export function CollectionScreen({ scrollEdge = false }: { scrollEdge?: boolean }) {
+ * (Pritam's reference, 2026-10-02). Off only to show today's screen as it was. */
+export function CollectionScreen({ scrollEdge = false, card }: { scrollEdge?: boolean; card?: SaveCardComponent }) {
   const styles = useThemedStyles(baseStyles);
   const insets = useSafeAreaInsets();
   const paper = palettes[useAppearance().scheme].paper;
@@ -83,7 +84,7 @@ export function CollectionScreen({ scrollEdge = false }: { scrollEdge?: boolean 
   return <Screen top={!scrollEdge}>
     {scrollEdge ? null : topBar}
     <View style={styles.galleryRegion}>
-      <GalleryList archived={archived} resetKey={listReset} collection={collection} headerSpace={headerHeight + headerOffset} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
+      <GalleryList archived={archived} resetKey={listReset} collection={collection} headerSpace={headerHeight + headerOffset} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} Card={card} />
       <Animated.View testID="collection-expanded-controls" pointerEvents={compact ? 'none' : 'auto'} accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[styles.header, scrollEdge && { top: headerOffset, opacity: travel.interpolate({ inputRange: [0, Math.max(1, headerHeight * 0.55), Math.max(2, headerHeight)], outputRange: [1, 1, 0], extrapolate: 'clamp' }) }, { transform: [{ translateY: Animated.multiply(travel, -1) }] }]} onLayout={event => {
         const next = Math.ceil(event.nativeEvent.layout.height);
         if (next === measuredHeight.current) return;
