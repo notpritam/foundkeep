@@ -1,0 +1,208 @@
+{
+  "about": "The design log: every design decision, what was tried, what Pritam picked and why. Retired variants live in git at `archive` (tagged design-log/<id>); scripts/design-log-all.mjs photographs them into <id>/sheet.jpg. Live variants are still in Storybook (`live`). Nothing tried is deleted from history.",
+  "entries": [
+    {
+      "id": "2026-09-29-add-details-card",
+      "date": "2026-09-29",
+      "product": "Extension",
+      "title": "The Add details card",
+      "question": "What should the card that opens after a save look like?",
+      "tried": "Five redesigns of the old card (a quiet sheet first), then a Refined card in five treatments (soft pills, icon pills, sections, inline save, a text line) and five ways to share to a collection (just the pill, a caption line, a small block, a preview, in the list).",
+      "picked": "Refined: the title and note edited in place with nothing above the title, folder and tags as pills, My library and Share beside Save; sharing adds one caption line.",
+      "why": "Pritam: cards with nothing above the title, and pills instead of fields.",
+      "archive": "3a7d75d^",
+      "capture": [
+        "--hub",
+        "proposals-add-details-card,proposals-refined-card"
+      ]
+    },
+    {
+      "id": "2026-09-29-card-controls",
+      "date": "2026-09-29",
+      "product": "Extension",
+      "title": "From card controls to a design system",
+      "question": "Are “pill”, “chip” and “card controls” a design system?",
+      "tried": "The card's parts as one-off controls: buttons, a title and note, a list picker, a pill, a tag chip.",
+      "picked": "Named components with variants and sizes in one shared stylesheet — Card, Button, Select, Tag, Badge, Text field, Listbox, Status message, Tooltip — on scale tokens for space, radius, controls, text and shadow.",
+      "why": "Pritam: it can't be just card controls, pill, chip; use proper terms, variants, one system for the whole product.",
+      "archive": "eb7c9e4^",
+      "capture": [
+        "--hub",
+        "extension-card-controls"
+      ]
+    },
+    {
+      "id": "2026-09-29-save-preview",
+      "date": "2026-09-29",
+      "product": "Extension",
+      "title": "Previewing the save, and its sync state",
+      "question": "How does the card show what was saved, and whether it reached the library?",
+      "tried": "Banner previews in several frames, a save preview per kind, ways to show a draft's status, and where drafts collect.",
+      "picked": "A Framed banner preview of the save (a small WebP made by the extension, never the capture itself), one sync icon in its corner that retries or signs in, and drafts as a quiet count on the dock plus a banner above the library on the website.",
+      "why": "Picked in Storybook on 29 September and built the same day.",
+      "archive": "b95ff47^",
+      "capture": [
+        "--hub",
+        "proposals-banner-preview,proposals-draft-status,proposals-drafts,proposals-save-preview"
+      ]
+    },
+    {
+      "id": "2026-09-30-first-screen",
+      "date": "2026-09-30",
+      "product": "App",
+      "title": "The first screen: first ideas",
+      "question": "What does someone see the first time they open FoundKeep?",
+      "tried": "First-screen concepts with emoji objects floating round the words.",
+      "picked": "A direction: a sky or a meadow behind, smoother motion, and proper objects — things FoundKeep keeps — instead of emoji.",
+      "why": "Pritam: sky or meadow; smooth the animation; proper assets, things our app provides, not emoji.",
+      "archive": "687d8e7^",
+      "capture": [
+        "--app",
+        "proposals-sign-in",
+        "--hub",
+        "sign-in--"
+      ]
+    },
+    {
+      "id": "2026-09-30-rotating-finds",
+      "date": "2026-09-30",
+      "product": "App",
+      "title": "Rotating finds, in FoundKeep's own objects",
+      "question": "Which first screen, and in which type?",
+      "tried": "FoundKeep's own 3D objects (made in three.js), layouts round a centre bookmark, the rotating headline in Fraunces, and sky ideas.",
+      "picked": "Rotating finds — the headline's word changes through the things you keep — but not its font, and no bookmark in the centre.",
+      "why": "Pritam kept Rotating finds but not its font, and asked for no bookmark in the centre.",
+      "archive": "73aa602^",
+      "capture": [
+        "--app",
+        "proposals-sign-in",
+        "--hub",
+        "sign-in--"
+      ]
+    },
+    {
+      "id": "2026-09-30-typefaces",
+      "date": "2026-09-30",
+      "product": "Brand",
+      "title": "Typefaces",
+      "question": "What is FoundKeep's typeface, and what does the headline's word wear?",
+      "tried": "Six pairings for the headline — Instrument Serif, DM Serif Display, Bricolage Grotesque, Unbounded, Syne, Plus Jakarta Sans with a handwritten Caveat word — and a brand-type page trying them across the product.",
+      "picked": "SF Pro, Apple's own typeface, as the brand font everywhere; Caveat only for the sign-in word.",
+      "why": "Pritam: the font Apple uses; expressive faces only for moments like sign-in and onboarding.",
+      "archive": "6d4befd^",
+      "capture": [
+        "--app",
+        "proposals-sign-in",
+        "--hub",
+        "brand-type,sign-in--"
+      ]
+    },
+    {
+      "id": "2026-10-01-sign-in-lock",
+      "date": "2026-10-01",
+      "product": "App",
+      "title": "Locking the sign-in screen",
+      "question": "Which headline, layout and sky?",
+      "tried": "Headline styles and layouts, twelve backdrops (meadows, alpine mornings, skies above and below the clouds), Codex's sky screens, sizes and letter-spacing, and an email sheet.",
+      "picked": "The Cumulus sky at blur 1; “Keep Every” in SF Pro Bold with the word in Caveat, tilted, cycling Reel, Short, Article, Tweet, Post, Thread; “All in one place, ready for your agent.” at full opacity; the Apple and Google buttons.",
+      "why": "Pritam tuned the size and letter-spacing himself, swapped the caption for one about the agent, then: “lock this version down”.",
+      "archive": "c35e88a^",
+      "capture": [
+        "--app",
+        "proposals-sign-in",
+        "--hub",
+        "sign-in--"
+      ]
+    },
+    {
+      "id": "2026-10-01-elements",
+      "date": "2026-10-01",
+      "product": "App",
+      "title": "Floating elements: who makes them",
+      "question": "Where do the floating objects come from?",
+      "tried": "FoundKeep's own three.js renders, and GPT-6 Astra's first set of objects.",
+      "picked": "Every floating element from GPT-6 Astra, with the missing ones generated: reel, short, article, tweet, thread, photo post, and the agent's orb and reply.",
+      "why": "Pritam wanted every element from GPT-6 Astra — and there was still no tweet, reel or short.",
+      "archive": "f21a768^",
+      "capture": [
+        "--app",
+        "proposals-sign-in",
+        "--hub",
+        "sign-in--"
+      ]
+    },
+    {
+      "id": "2026-10-01-element-styles",
+      "date": "2026-10-01",
+      "product": "App",
+      "title": "Floating elements: style",
+      "question": "In what style do the eight objects float?",
+      "tried": "Six styles of the same eight objects — glass, cards, paper, cloud, photo, clay — with and without depth, and the porcelain set.",
+      "picked": "Cards: floating like iOS widgets, with real photos.",
+      "why": "The first set “looked out of place” on the sky (Pritam); of the six styles: “Cards — lock this and add this”.",
+      "archive": "32ada82^",
+      "capture": [
+        "--app",
+        "proposals-sign-in-elements--style",
+        "--columns",
+        "4"
+      ]
+    },
+    {
+      "id": "2026-10-01-movement",
+      "date": "2026-10-01",
+      "product": "App",
+      "title": "How the cards keep moving",
+      "question": "Once the cards arrive, how do they move?",
+      "tried": "Drift, spotlight on the headline's word, orbit, bob and sway, rise like bubbles.",
+      "picked": "Drift, in the app for now — still open.",
+      "why": "Not picked yet; drift is what the app uses.",
+      "live": [
+        "sign-in--movement"
+      ]
+    },
+    {
+      "id": "2026-10-02-sign-in-versions",
+      "date": "2026-10-02",
+      "product": "App",
+      "title": "Sign-in: three versions, and a poll",
+      "question": "Floating cards, or a window playing a film of FoundKeep at work?",
+      "tried": "Version one, the floating cards over the sky; version two, a light page with a window playing an 11-second film (share a reel, it lands in one place, find it again, Kit the agent uses it); version three, that film on the sky. Six film variations, and a poll video of all three.",
+      "picked": "Version one, in the app. Versions two and three kept for an A/B test.",
+      "why": "On X, people said version one was much better.",
+      "live": [
+        "sign-in--pick-one",
+        "sign-in--two-versions",
+        "sign-in--film-variations"
+      ]
+    },
+    {
+      "id": "2026-10-02-email",
+      "date": "2026-10-02",
+      "product": "App",
+      "title": "Apple and Google only",
+      "question": "Does the app keep an email sign-in?",
+      "tried": "The sign-in, create-account and recover screens with email and password, as they were.",
+      "picked": "Apple and Google only — no email anywhere in the app; if neither can be reached, say so and offer Try again.",
+      "why": "Pritam’s answer when asked whether email stays.",
+      "archive": "65e494d^",
+      "capture": [
+        "--app",
+        "current-sign-in"
+      ]
+    },
+    {
+      "id": "2026-10-02-handoff",
+      "date": "2026-10-02",
+      "product": "App",
+      "title": "After “Continue with Google”",
+      "question": "What does the app show while Google opens, waits, and signs you in?",
+      "tried": "The buttons become a card; a sheet over sign-in; the cards gather into a ring round Google's mark; a calm light page.",
+      "picked": "The cards gather — and go back to their places if it didn't finish.",
+      "why": "Pritam: “this is good”.",
+      "live": [
+        "sign-in--handoff"
+      ]
+    }
+  ]
+}

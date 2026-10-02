@@ -1,0 +1,40 @@
+{
+  "commit": "f8aa79d",
+  "stories": [
+    {
+      "id": "proposals-sign-in--first-screen",
+      "title": "Proposals/Sign in",
+      "name": "First screen"
+    },
+    {
+      "id": "proposals-sign-in-elements--candidates",
+      "title": "Proposals/Sign-in elements",
+      "name": "All candidates"
+    },
+    {
+      "id": "proposals-sign-in-elements--gpt-on-screen",
+      "title": "Proposals/Sign-in elements",
+      "name": "On the screen · GPT-6 Astra objects"
+    },
+    {
+      "id": "proposals-sign-in-elements--move-drift",
+      "title": "Proposals/Sign-in elements",
+      "name": "Movement · drift (today)"
+    },
+    {
+      "id": "proposals-sign-in-elements--move-orbit",
+      "title": "Proposals/Sign-in elements",
+      "name": "Movement · orbit"
+    },
+    {
+      "id": "proposals-sign-in-elements--move-bob",
+      "title": "Proposals/Sign-in elements",
+      "name": "Movement · bob and sway"
+    },
+    {
+      "id": "proposals-sign-in-elements--move-rise",
+      "title": "Proposals/Sign-in elements",
+      "name": "Movement · rise like bubbles"
+    }
+  ]
+}

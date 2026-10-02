@@ -1,0 +1,25 @@
+{
+  "commit": "d80dd9a",
+  "stories": [
+    {
+      "id": "proposals-sign-in--sky",
+      "title": "Proposals/Sign in",
+      "name": "A · Sky"
+    },
+    {
+      "id": "proposals-sign-in--meadow",
+      "title": "Proposals/Sign in",
+      "name": "B · Meadow"
+    },
+    {
+      "id": "proposals-sign-in--paper",
+      "title": "Proposals/Sign in",
+      "name": "C · Paper (follows light and dark)"
+    },
+    {
+      "id": "proposals-sign-in--sky-email",
+      "title": "Proposals/Sign in",
+      "name": "A · Sky, continuing with email"
+    }
+  ]
+}

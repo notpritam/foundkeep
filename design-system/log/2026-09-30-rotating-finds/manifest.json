@@ -1,0 +1,55 @@
+{
+  "commit": "b42f0cb",
+  "stories": [
+    {
+      "id": "proposals-sign-in--highlighter",
+      "title": "Proposals/Sign in",
+      "name": "1 · Highlighter"
+    },
+    {
+      "id": "proposals-sign-in--tags",
+      "title": "Proposals/Sign in",
+      "name": "2 · Tags"
+    },
+    {
+      "id": "proposals-sign-in--rotating",
+      "title": "Proposals/Sign in",
+      "name": "3 · Rotating finds"
+    },
+    {
+      "id": "proposals-sign-in--stack",
+      "title": "Proposals/Sign in",
+      "name": "4 · Big stack"
+    },
+    {
+      "id": "proposals-sign-in--email",
+      "title": "Proposals/Sign in",
+      "name": "Continuing with email"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--found-things",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "1 · Found things"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--worth-keeping",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "2 · Worth keeping"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--curiosity",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "3 · Curiosity"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--little-moments",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "4 · Little moments"
+    },
+    {
+      "id": "proposals-sign-in-·-sky-ideas--your-corner",
+      "title": "Proposals/Sign in · Sky ideas",
+      "name": "5 · Your own corner"
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "commit": "9ffcd03",
+  "stories": [
+    {
+      "id": "extension-card-controls-pill--folder",
+      "title": "Extension/Card controls/Pill",
+      "name": "Folder"
+    },
+    {
+      "id": "extension-card-controls-pill--add-tag",
+      "title": "Extension/Card controls/Pill",
+      "name": "+ Tag"
+    },
+    {
+      "id": "extension-card-controls-pill--my-library",
+      "title": "Extension/Card controls/Pill",
+      "name": "My library"
+    },
+    {
+      "id": "extension-card-controls-pill--share",
+      "title": "Extension/Card controls/Pill",
+      "name": "Share"
+    },
+    {
+      "id": "extension-card-controls-pill--shared-to-a-collection",
+      "title": "Extension/Card controls/Pill",
+      "name": "Shared to a collection"
+    },
+    {
+      "id": "extension-card-controls-pill--unavailable-folder",
+      "title": "Extension/Card controls/Pill",
+      "name": "Unavailable folder"
+    },
+    {
+      "id": "extension-card-controls-pill--all-kinds",
+      "title": "Extension/Card controls/Pill",
+      "name": "All kinds · light & dark"
+    },
+    {
+      "id": "extension-card-controls-pill--all-states",
+      "title": "Extension/Card controls/Pill",
+      "name": "All states · light & dark"
+    },
+    {
+      "id": "extension-card-controls-tag-chip--default",
+      "title": "Extension/Card controls/Tag chip",
+      "name": "Default"
+    },
+    {
+      "id": "extension-card-controls-tag-chip--long-name",
+      "title": "Extension/Card controls/Tag chip",
+      "name": "Long name"
+    },
+    {
+      "id": "extension-card-controls-tag-chip--all-states",
+      "title": "Extension/Card controls/Tag chip",
+      "name": "All states · light & dark"
+    },
+    {
+      "id": "extension-card-controls-title-and-note--title",
+      "title": "Extension/Card controls/Title and note",
+      "name": "Title"
+    },
+    {
+      "id": "extension-card-controls-title-and-note--note",
+      "title": "Extension/Card controls/Title and note",
+      "name": "Note"
+    },
+    {
+      "id": "extension-card-controls-title-and-note--empty-note",
+      "title": "Extension/Card controls/Title and note",
+      "name": "Empty note"
+    },
+    {
+      "id": "extension-card-controls-title-and-note--caption-line",
+      "title": "Extension/Card controls/Title and note",
+      "name": "Caption line"
+    },
+    {
+      "id": "extension-card-controls-title-and-note--all-states",
+      "title": "Extension/Card controls/Title and note",
+      "name": "All states · light & dark"
+    },
+    {
+      "id": "extension-card-controls-buttons--save-details",
+      "title": "Extension/Card controls/Buttons",
+      "name": "Save details"
+    },
+    {
+      "id": "extension-card-controls-buttons--save-when-shared",
+      "title": "Extension/Card controls/Buttons",
+      "name": "Save (shared)"
+    },
+    {
+      "id": "extension-card-controls-buttons--saving",
+      "title": "Extension/Card controls/Buttons",
+      "name": "Saving"
+    },
+    {
+      "id": "extension-card-controls-buttons--retry",
+      "title": "Extension/Card controls/Buttons",
+      "name": "Retry"
+    },
+    {
+      "id": "extension-card-controls-buttons--close",
+      "title": "Extension/Card controls/Buttons",
+      "name": "Close"
+    },
+    {
+      "id": "extension-card-controls-buttons--all-states",
+      "title": "Extension/Card controls/Buttons",
+      "name": "All states · light & dark"
+    },
+    {
+      "id": "extension-card-controls-list-picker--folders",
+      "title": "Extension/Card controls/List picker",
+      "name": "Folders"
+    },
+    {
+      "id": "extension-card-controls-list-picker--tags",
+      "title": "Extension/Card controls/List picker",
+      "name": "Tags"
+    },
+    {
+      "id": "extension-card-controls-list-picker--collections",
+      "title": "Extension/Card controls/List picker",
+      "name": "Collections"
+    }
+  ]
+}

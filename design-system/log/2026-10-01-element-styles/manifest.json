@@ -1,0 +1,50 @@
+{
+  "commit": "a0083e9",
+  "stories": [
+    {
+      "id": "proposals-sign-in-elements--styles",
+      "title": "Proposals/Sign-in elements",
+      "name": "Styles · the objects alone"
+    },
+    {
+      "id": "proposals-sign-in-elements--style-glass",
+      "title": "Proposals/Sign-in elements",
+      "name": "Style · glass"
+    },
+    {
+      "id": "proposals-sign-in-elements--style-cards",
+      "title": "Proposals/Sign-in elements",
+      "name": "Style · cards"
+    },
+    {
+      "id": "proposals-sign-in-elements--style-paper",
+      "title": "Proposals/Sign-in elements",
+      "name": "Style · paper"
+    },
+    {
+      "id": "proposals-sign-in-elements--style-cloud",
+      "title": "Proposals/Sign-in elements",
+      "name": "Style · cloud"
+    },
+    {
+      "id": "proposals-sign-in-elements--style-photo",
+      "title": "Proposals/Sign-in elements",
+      "name": "Style · photo"
+    },
+    {
+      "id": "proposals-sign-in-elements--style-clay",
+      "title": "Proposals/Sign-in elements",
+      "name": "Style · clay"
+    },
+    {
+      "id": "proposals-sign-in-elements--style-glass-depth",
+      "title": "Proposals/Sign-in elements",
+      "name": "Style · glass, with depth"
+    },
+    {
+      "id": "proposals-sign-in-elements--style-cards-depth",
+      "title": "Proposals/Sign-in elements",
+      "name": "Style · cards, with depth"
+    }
+  ]
+}
