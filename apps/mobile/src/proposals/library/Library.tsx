@@ -10,7 +10,7 @@
 //            notes — each scrolling sideways
 //   list     dense and quiet: a picture, the title, where it came from; by day
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Capture } from '../../api/types.ts';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
@@ -18,7 +18,7 @@ import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { useDock } from '../../components/FloatingDock.tsx';
 import { useCollection } from '../../collection/useCollection.ts';
 import { previewRatio } from '../../../../../packages/shared/src/collection-presentation.ts';
-import { age, byDay, byline, GLYPH, Header, headline, IconButton, KindMark, KINDS, openSave, Picture, pictured, Pills, SearchField, usePalette, written, type Kind } from './parts.tsx';
+import { age, BAR, byDay, byline, Edges, GLYPH, Header, headline, IconButton, KindMark, KINDS, openSave, Picture, pictured, Pills, SearchField, usePalette, useScrollY, written, type Kind } from './parts.tsx';
 
 export type LibraryLook = 'cards' | 'grid' | 'shelves' | 'list';
 export function LibraryProposal({ look }: { look: LibraryLook }) {
@@ -33,7 +33,7 @@ function useLibrary(kind: Kind = KINDS[0]) {
   const collection = useCollection({ type: kind.type });
   const insets = useSafeAreaInsets();
   const { bottomSpace } = useDock();
-  return { ...collection, top: insets.top + 10, bottom: Math.max(bottomSpace, insets.bottom + 100) + 12 };
+  return { ...collection, top: insets.top + BAR, bottom: Math.max(bottomSpace, insets.bottom + 100) + 12 };
 }
 function Empty({ loading, error }: { loading: boolean; error: string }) {
   const P = usePalette();
@@ -58,13 +58,14 @@ function Cards() {
     }
     return cols;
   }, [library.captures, column]);
-  return <ScrollView style={{ backgroundColor: P.paper }} contentContainerStyle={{ paddingTop: library.top, paddingBottom: library.bottom }}>
-    <Header title="Library"><IconButton icon="search" label="Search" /><IconButton icon="archive-outline" label="Archive" /></Header>
+  const scroll = useScrollY();
+  return <View style={[styles.frame, { backgroundColor: P.paper }]}><Animated.ScrollView onScroll={scroll.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: library.top, paddingBottom: library.bottom }}>
+    <Header title="Library" />
     <Pills value={kind} onChange={setKind} />
     {library.captures.length ? <View style={[styles.columns, { paddingHorizontal: pad, gap }]}>
       {columns.map((col, i) => <View key={i} style={[styles.column, { gap }]}>{col.map(capture => <SaveCard key={capture.id} capture={capture} />)}</View>)}
     </View> : <Empty loading={library.loading} error={library.error} />}
-  </ScrollView>;
+  </Animated.ScrollView><Edges y={scroll.y} title="Library"><IconButton icon="search" label="Search" /><IconButton icon="archive-outline" label="Archive" /></Edges></View>;
 }
 function SaveCard({ capture }: { capture: Capture }) {
   const P = usePalette();
@@ -89,8 +90,9 @@ function Grid() {
   const library = useLibrary(kind);
   const gap = 2, tile = (W - gap * 2) / 3;
   const groups = useMemo(() => byDay(library.captures), [library.captures]);
-  return <ScrollView style={{ backgroundColor: P.paper }} contentContainerStyle={{ paddingTop: library.top, paddingBottom: library.bottom }}>
-    <Header title="Library" sub={library.total ? `${library.total} saves` : undefined}><IconButton icon="search" label="Search" /><IconButton icon="archive-outline" label="Archive" /></Header>
+  const scroll = useScrollY();
+  return <View style={[styles.frame, { backgroundColor: P.paper }]}><Animated.ScrollView onScroll={scroll.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: library.top, paddingBottom: library.bottom }}>
+    <Header title="Library" sub={library.total ? `${library.total} saves` : undefined} />
     <Pills value={kind} onChange={setKind} />
     {groups.length ? groups.map(group => <View key={group.label}>
       <Text style={[styles.day, { color: P.ink }]}>{group.label}</Text>
@@ -101,7 +103,7 @@ function Grid() {
         </Pressable>)}
       </View>
     </View>) : <Empty loading={library.loading} error={library.error} />}
-  </ScrollView>;
+  </Animated.ScrollView><Edges y={scroll.y} title="Library"><IconButton icon="search" label="Search" /><IconButton icon="archive-outline" label="Archive" /></Edges></View>;
 }
 
 // ——— Shelves ———
@@ -119,8 +121,9 @@ function Shelves() {
     { title: 'Photos', items: all.filter(c => c.type === 'image' || c.type === 'screenshot'), shape: 'square' },
     { title: 'Notes and highlights', items: all.filter(written), shape: 'words' },
   ].filter(shelf => shelf.items.length) as Shelf[];
-  return <ScrollView style={{ backgroundColor: P.paper }} contentContainerStyle={{ paddingTop: library.top, paddingBottom: library.bottom }}>
-    <Header title="Library"><IconButton icon="archive-outline" label="Archive" /></Header>
+  const scroll = useScrollY();
+  return <View style={[styles.frame, { backgroundColor: P.paper }]}><Animated.ScrollView onScroll={scroll.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: library.top, paddingBottom: library.bottom }}>
+    <Header title="Library" />
     <SearchField />
     {shelves.length ? shelves.map(shelf => <View key={shelf.title} style={styles.shelf}>
       <Pressable accessibilityRole="button" accessibilityLabel={`See all ${shelf.title.toLowerCase()}`} style={styles.shelfHead}>
@@ -130,7 +133,7 @@ function Shelves() {
         {shelf.items.map(capture => <ShelfItem key={capture.id} capture={capture} shape={shelf.shape} />)}
       </ScrollView>
     </View>) : <Empty loading={library.loading} error={library.error} />}
-  </ScrollView>;
+  </Animated.ScrollView><Edges y={scroll.y} title="Library"><IconButton icon="archive-outline" label="Archive" /></Edges></View>;
 }
 function ShelfItem({ capture, shape }: { capture: Capture; shape: Shelf['shape'] }) {
   const P = usePalette();
@@ -166,8 +169,9 @@ function List() {
   const [kind, setKind] = useState(KINDS[0]);
   const library = useLibrary(kind);
   const groups = useMemo(() => byDay(library.captures), [library.captures]);
-  return <ScrollView style={{ backgroundColor: P.paper }} contentContainerStyle={{ paddingTop: library.top, paddingBottom: library.bottom }}>
-    <Header title="Library"><IconButton icon="archive-outline" label="Archive" /></Header>
+  const scroll = useScrollY();
+  return <View style={[styles.frame, { backgroundColor: P.paper }]}><Animated.ScrollView onScroll={scroll.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: library.top, paddingBottom: library.bottom }}>
+    <Header title="Library" />
     <SearchField />
     <View style={styles.listPills}><Pills value={kind} onChange={setKind} /></View>
     {groups.length ? groups.map(group => <View key={group.label} style={styles.listGroup}>
@@ -184,10 +188,11 @@ function List() {
         </Pressable>)}
       </View>
     </View>) : <Empty loading={library.loading} error={library.error} />}
-  </ScrollView>;
+  </Animated.ScrollView><Edges y={scroll.y} title="Library"><IconButton icon="archive-outline" label="Archive" /></Edges></View>;
 }
 
 const styles = StyleSheet.create({
+  frame: { flex: 1 },
   fill: { width: '100%', height: '100%' },
   pressed: { opacity: 0.85, transform: [{ scale: 0.985 }] },
   dim: { opacity: 0.8 },
