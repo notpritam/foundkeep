@@ -33,7 +33,8 @@ export function Shimmer({ children, style }: { children?: ReactNode; style?: Sty
 }
 /** Words with a soft light sweeping along them, like “Thinking…” — for a save whose details
  * are being prepared (Pritam, 2026-10-02). Narrow windows onto a brighter copy of the words
- * travel across them, each a little dimmer towards its edges; no mask needed, so it reads the
+ * travel across them, each a little nearer the base colour towards its edges — solid colours,
+ * never faded text, so the words keep their contrast throughout; no mask needed, so it reads the
  * same on the phone and the web. Stops when hidden, backgrounded or Reduce Motion is on. */
 export function ShimmerText({ children, style, color, highlight }: { children: string; style?: StyleProp<TextStyle>; color: string; highlight: string }) {
   const allowed = useMotionAllowed();
@@ -55,13 +56,21 @@ export function ShimmerText({ children, style, color, highlight }: { children: s
   const travel = phase.interpolate({ inputRange: [0, 1], outputRange: [-slice * 5, width + slice * 5] });
   return <View accessible accessibilityLabel={children} style={baseStyles.words} onLayout={event => setWidth(Math.ceil(event.nativeEvent.layout.width))}>
     <Text numberOfLines={1} style={[style, { color }]}>{children}</Text>
-    {allowed && focused && width > 0 ? [.25, .55, .85, 1, .85, .55, .25].map((opacity, index) => {
+    {allowed && focused && width > 0 ? [.25, .55, .85, 1, .85, .55, .25].map((amount, index) => {
       const at = Animated.add(travel, (index - 3) * slice);
       return <Animated.View key={index} pointerEvents="none" style={[baseStyles.slice, { width: slice, transform: [{ translateX: at }] }]}>
-        <Animated.View style={{ width, transform: [{ translateX: Animated.multiply(at, -1) }] }}><Text numberOfLines={1} style={[style, { color: highlight, opacity }]}>{children}</Text></Animated.View>
+        <Animated.View style={{ width, transform: [{ translateX: Animated.multiply(at, -1) }] }}><Text numberOfLines={1} style={[style, { color: mix(color, highlight, amount) }]}>{children}</Text></Animated.View>
       </Animated.View>;
     }) : null}
   </View>;
+}
+/** `from` moved `amount` of the way to `to` (#rrggbb colours; anything else gives `to`). */
+export function mix(from: string, to: string, amount: number) {
+  const hex = /^#([0-9a-f]{6})$/i;
+  const a = hex.exec(from)?.[1], b = hex.exec(to)?.[1];
+  if (!a || !b) return to;
+  const channel = (i: number) => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - amount) + parseInt(b.slice(i, i + 2), 16) * amount).toString(16).padStart(2, '0');
+  return `#${channel(0)}${channel(2)}${channel(4)}`;
 }
 export function GallerySkeleton({ columns, viewportHeight }: { columns: number; viewportHeight: number }) {
   const styles = useThemedStyles(baseStyles);
