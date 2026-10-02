@@ -45,3 +45,25 @@ export function TapPointer({ tap }: { tap: 'google' | 'apple' }) {
 }
 
 const styles = StyleSheet.create({ fill: { flex: 1, overflow: 'hidden' } });
+
+/** The Mac pointer on a loop `length` ms long, gliding in and pressing at each tap's moment (x, y in the screen). */
+export function PointerPath({ taps, length }: { taps: { x: number; y: number; at: number }[]; length: number }) {
+  const { width: W, height: H } = useWindowDimensions();
+  const motion = useMotionAllowed();
+  const clock = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!motion) return;
+    const loop = Animated.loop(Animated.timing(clock, { toValue: length, duration: length, easing: Easing.linear, useNativeDriver: false }));
+    loop.start(); return () => loop.stop();
+  }, [motion, length, clock]);
+  if (!motion || !taps.length) return null;
+  const start = Math.max(0, taps[0].at - 1400), end = taps[taps.length - 1].at + 300;
+  const points = [{ x: W * 0.86, y: H * 0.7, t: start }, ...taps.flatMap(tap => [{ x: tap.x, y: tap.y, t: tap.at - 160 }, { x: tap.x, y: tap.y, t: tap.at + 300 }])];
+  const along = (pick: (p: { x: number; y: number }) => number) => clock.interpolate({ inputRange: points.map(p => p.t), outputRange: points.map(pick), extrapolate: 'clamp', easing: Easing.bezier(0.45, 0, 0.2, 1) });
+  const press = clock.interpolate({ inputRange: taps.flatMap(tap => [tap.at - 60, tap.at + 40, tap.at + 180]), outputRange: taps.flatMap(() => [1, 0.84, 1]), extrapolate: 'clamp' });
+  return <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, opacity: clock.interpolate({ inputRange: [start, start + 300, end + 400, end + 800], outputRange: [0, 1, 1, 0], extrapolate: 'clamp' }),
+    transform: [{ translateX: along(p => p.x) }, { translateY: along(p => p.y) }, { scale: press }] }}>
+    {createElement('svg', { width: 20, height: 26, viewBox: '0 0 17 22', style: { display: 'block', overflow: 'visible', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))' } },
+      createElement('path', { d: ARROW, fill: '#111', stroke: '#fff', strokeWidth: 1.3, strokeLinejoin: 'round' }))}
+  </Animated.View>;
+}
