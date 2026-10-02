@@ -1,5 +1,5 @@
 import { AdaptiveText as Text } from './AdaptiveText.tsx';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType } from 'react';
 import { router } from 'expo-router';
 import { AccessibilityInfo, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { masonryLayout, previewRatio } from '../../../../packages/shared/src/collection-presentation.ts';
@@ -14,7 +14,9 @@ import { colors, palettes, typography } from '../theme.ts';
 import type { Capture } from '../api/types.ts';
 import { useAppearance, useThemedStyles } from '../appearance/AppearanceProvider.tsx';
 
-export function GalleryList({ collection, archived = false, filtered = false, headerSpace = 0, bottomSpace = 24, resetKey = 0, onScroll }: { collection: ReturnType<typeof useCollection>; archived?: boolean; filtered?: boolean; headerSpace?: number; bottomSpace?: number; resetKey?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void }) {
+/** A card for one save in the gallery (GalleryCard; the design system tries others). */
+export type SaveCardComponent = ComponentType<{ capture: Capture; onOpen: (capture: Capture) => void }>;
+export function GalleryList({ collection, archived = false, filtered = false, headerSpace = 0, bottomSpace = 24, resetKey = 0, onScroll, Card = GalleryCard }: { collection: ReturnType<typeof useCollection>; archived?: boolean; filtered?: boolean; headerSpace?: number; bottomSpace?: number; resetKey?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void; Card?: SaveCardComponent }) {
   const styles = useThemedStyles(baseStyles);
   const palette = palettes[useAppearance().scheme];
   const { width, height, fontScale } = useWindowDimensions();
@@ -90,7 +92,7 @@ export function GalleryList({ collection, archived = false, filtered = false, he
           if (height <= 0 || (cached?.height === height && cached.key === keys[index])) return;
           sizes.current.set(capture.id, { key: keys[index]!, height });
           if (frame.current === null) frame.current = requestAnimationFrame(() => { frame.current = null; measured(value => value + 1); });
-        }}><MotionBoundary enabled={visible}><GalleryCard capture={capture} onOpen={open} /></MotionBoundary></View>;
+        }}><MotionBoundary enabled={visible}><Card capture={capture} onOpen={open} /></MotionBoundary></View>;
       })}
     </View> : loading ? <GallerySkeleton columns={columns} viewportHeight={viewport.height} /> : error ? <View style={styles.empty}><Text style={typography.heading}>Couldn’t open your collection.</Text><Message error>{error}</Message><Button label="Try again" onPress={() => void refresh()} /></View> : <View style={styles.empty}>
       <Text style={[typography.title, { textAlign: 'center' }]}>{filtered ? 'No finds this time.' : archived ? 'Nothing archived yet.' : 'A home for your good finds.'}</Text>
