@@ -62,11 +62,11 @@ export function HandoffView({ phase, provider, on, reason, password = '', onPass
     <SkyBackdrop />
     <FloatingFinds settled gather={gather} />
     {/* Under the buttons, so the password card can rise over it when the keyboard opens. */}
-    <Animated.View pointerEvents="none" style={[styles.ringMiddle, { top: H * 0.42 - 76, transform: [{ translateY: lift }] }]}>
+    <Animated.View pointerEvents="none" style={[styles.ringMiddle, { top: H * 0.42 - 66, transform: [{ translateY: lift }] }]}>
       <Animated.View style={[styles.ringStack, softly(away)]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
         <ProviderMark provider={provider} />
         <Swap id={shown.current} align="start">
-          <View style={[styles.ringWords, { maxWidth: wide ? 250 : 214 }]}>
+          <View style={[styles.ringWords, { maxWidth: wide ? 260 : 180 }]}>
             <Text maxFontSizeMultiplier={1.3} style={[styles.title, GLOW]}>{words.title}</Text>
             {shown.current !== 'link' && words.body ? <Text maxFontSizeMultiplier={1.4} style={[styles.body, GLOW]}>{words.body}</Text> : null}
             {!words.body ? <View style={styles.progressCentre}><Progress /></View> : null}
@@ -130,7 +130,7 @@ function Pill({ label, tone, onPress, grow = false, disabled = false }: { label:
 
 function ProviderMark({ provider }: { provider: OAuthProvider | null }) {
   return <View style={styles.mark}>
-    <Ionicons name={provider === 'apple' ? 'logo-apple' : provider === 'google' ? 'logo-google' : 'log-in-outline'} size={32} color={INK.ink} />
+    <Ionicons name={provider === 'apple' ? 'logo-apple' : provider === 'google' ? 'logo-google' : 'log-in-outline'} size={28} color={INK.ink} />
   </View>;
 }
 
@@ -228,16 +228,16 @@ const styles = StyleSheet.create({
   field: { fontFamily: SF, minHeight: 50, borderRadius: 16, paddingHorizontal: 16, fontSize: 16, color: INK.ink, backgroundColor: INK.field },
   error: { fontFamily: SF, fontSize: 14, lineHeight: 19, color: INK.error, paddingHorizontal: 2 },
   ringMiddle: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  ringStack: { alignSelf: 'stretch', alignItems: 'center', gap: 14 },
+  ringStack: { alignSelf: 'stretch', alignItems: 'center', gap: 12 },
   ringWords: { alignSelf: 'center', alignItems: 'center', gap: 6 },
-  title: { fontFamily: SF, fontSize: 22, lineHeight: 27, fontWeight: '700', color: '#ffffff', textAlign: 'center', letterSpacing: -0.4 },
-  body: { fontFamily: SF, fontSize: 15, lineHeight: 21, fontWeight: '500', color: '#ffffff', textAlign: 'center' },
+  title: { fontFamily: SF, fontSize: 19, lineHeight: 24, fontWeight: '700', color: '#ffffff', textAlign: 'center', letterSpacing: -0.3 },
+  body: { fontFamily: SF, fontSize: 14, lineHeight: 19, fontWeight: '500', color: 'rgba(255,255,255,0.92)', textAlign: 'center' },
   progressCentre: { alignItems: 'center', paddingTop: 16 },
   pill: { minHeight: 50, paddingHorizontal: 18, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
   pillLabel: { fontFamily: SF, fontSize: 16, fontWeight: '600' },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },
   disabled: { opacity: 0.5 },
-  mark: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', shadowColor: '#06203a', shadowOpacity: 0.18, shadowRadius: 22, shadowOffset: { width: 0, height: 10 } },
+  mark: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', shadowColor: '#06203a', shadowOpacity: 0.18, shadowRadius: 22, shadowOffset: { width: 0, height: 10 } },
   track: { height: 4, borderRadius: 2, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.28)' },
   light: { height: 4, borderRadius: 2, backgroundColor: '#ffffff' },
 });
