@@ -4,7 +4,7 @@ import { FlowMap, type Flow } from '../../simulator/flow-map.tsx';
 // Every app flow in the order a person meets it. Proposals are added to a step
 // (proposal: '<story id>') as each flow's variants land.
 const flows: Flow[] = [
-  { title: 'Sign in', steps: [{ label: 'Sign in', current: 'current-sign-in--sign-in-screen', proposal: 'proposals-sign-in--first-screen' }, { label: 'Create an account', current: 'current-sign-in--create-account' }, { label: 'Save your recovery code', current: 'current-sign-in--save-recovery-code' }, { label: 'Recover an account', current: 'current-sign-in--recover-account' }, { label: 'Apple or Google failed', current: 'current-sign-in--apple-or-google-failed' }] },
+  { title: 'Sign in', steps: [{ label: 'Sign in', current: 'current-sign-in--sign-in-screen', proposal: 'proposals-sign-in--with-film' }, { label: "Apple and Google can't be reached", current: 'current-sign-in--providers-unavailable' }, { label: 'Apple or Google failed', current: 'current-sign-in--apple-or-google-failed' }, { label: 'Save your recovery code', current: 'current-sign-in--save-recovery-code' }] },
   { title: 'First run', steps: [{ label: 'Save from anywhere', current: 'current-onboarding--save-from-anywhere' }] },
   { title: 'Library', steps: [{ label: 'Library', current: 'current-library--library' }, { label: 'Loading', current: 'current-library--loading' }, { label: 'Empty', current: 'current-library--empty' }, { label: 'Could not load', current: 'current-library--could-not-load' }] },
   { title: 'Save detail', note: 'Opened from a card in the Library.', steps: [

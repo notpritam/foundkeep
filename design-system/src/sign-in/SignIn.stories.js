@@ -4,7 +4,7 @@
 import '../brand/brand.css';
 
 const PAGES = [
-  ['proposals-sign-in-movement--drift', 'Drift (today): a small float and turn'],
+  ['proposals-sign-in-movement--drift', 'Drift (in the app): a small float and turn'],
   ['proposals-sign-in-movement--spotlight', 'Spotlight: the card for the word lifts forward'],
   ['proposals-sign-in-movement--orbit', 'Orbit: a slow loop round each card’s place'],
   ['proposals-sign-in-movement--bob', 'Bob and sway: floating on water'],
@@ -25,9 +25,9 @@ function movement() {
 function versions() {
   const el = document.createElement('div');
   el.className = 'bt';
-  const pages = [['proposals-sign-in--first-screen', 'One: floating cards over the sky (locked)'], ['proposals-sign-in--with-film', 'Two: a light page with a window playing a film of FoundKeep at work'], ['proposals-sign-in--with-film-on-sky', 'Three: the film on the sky, its own sky far softer']];
+  const pages = [['current-sign-in--sign-in-screen', 'One: floating cards over the sky (in the app)'], ['proposals-sign-in--with-film', 'Two: a light page with a window playing a film of FoundKeep at work'], ['proposals-sign-in--with-film-on-sky', 'Three: the film on the sky, its own sky far softer']];
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>Sign-in versions</h1><p>The locked first screen; a second after Pritam’s reference, a light page with a window that plays an 11-second film of FoundKeep at work (share a reel, it lands in one place, find it again, your agent uses it); and a third with that film on version one’s sky. All live. The films: <a href="./downloads/sign-in-film.mp4" download>sign-in-film.mp4</a>, <a href="./downloads/sign-in-film-soft.mp4" download>sign-in-film-soft.mp4</a>; prompts for AI video tools: <a href="./downloads/sign-in-film-ai-prompts.md" download>sign-in-film-ai-prompts.md</a>.</p></div></header>
+    <header class="bt-intro"><div><h1>Sign-in versions</h1><p>The sign-in screen in the app (version one, the poll’s pick); a second after Pritam’s reference, a light page with a window that plays an 11-second film of FoundKeep at work (share a reel, it lands in one place, find it again, your agent uses it); and a third with that film on version one’s sky. Two and three are kept for an A/B test. All live. The films: <a href="./downloads/sign-in-film.mp4" download>sign-in-film.mp4</a>, <a href="./downloads/sign-in-film-soft.mp4" download>sign-in-film-soft.mp4</a>; prompts for AI video tools: <a href="./downloads/sign-in-film-ai-prompts.md" download>sign-in-film-ai-prompts.md</a>.</p></div></header>
     <div class="bt-phones bt-phones-three">${pages.map(([id, name]) => `<figure>
       <iframe loading="lazy" title="${name}" src="./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent('device:iphone-17-pro')}"></iframe>
       <figcaption>${name}</figcaption></figure>`).join('')}</div>`;
@@ -47,7 +47,7 @@ function filmVariations() {
     ['proposals-sign-in--film-sky-blur-14', 'Sky page blurred 14, soft film'],
   ];
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>Film variations</h1><p>The sign-in page with the film, six ways: a white page or version one’s sky; the film’s own sky lightly softened (clear) or far more blurred (soft); and the page’s sky at blur 1, 6 and 14. All live. The films: <a href="./downloads/sign-in-film.mp4" download>clear</a>, <a href="./downloads/sign-in-film-soft.mp4" download>soft</a>; prompts for AI video tools: <a href="./downloads/sign-in-film-ai-prompts.md" download>sign-in-film-ai-prompts.md</a>.</p></div></header>
+    <header class="bt-intro"><div><h1>Film variations</h1><p>The sign-in page with the film, six ways: a white page or version one’s sky; the film’s own sky lightly softened (clear) or far more blurred (soft); and the page’s sky at blur 1, 6 and 14. Two and three are kept for an A/B test. All live. The films: <a href="./downloads/sign-in-film.mp4" download>clear</a>, <a href="./downloads/sign-in-film-soft.mp4" download>soft</a>; prompts for AI video tools: <a href="./downloads/sign-in-film-ai-prompts.md" download>sign-in-film-ai-prompts.md</a>.</p></div></header>
     <div class="bt-phones bt-phones-three">${pages.map(([id, name]) => `<figure>
       <iframe loading="lazy" title="${name}" src="./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent('device:iphone-17-pro')}"></iframe>
       <figcaption>${name}</figcaption></figure>`).join('')}</div>`;
@@ -59,7 +59,7 @@ function pickOne() {
   const el = document.createElement('div');
   el.className = 'bt';
   const pages = [
-    ['proposals-sign-in--first-screen', '1 · Elements flying in'],
+    ['current-sign-in--sign-in-screen', '1 · Elements flying in (in the app)'],
     ['proposals-sign-in--with-film', '2 · White page, clear film'],
     ['proposals-sign-in--with-film-on-sky', '3 · Sky page, soft film'],
   ];

@@ -7,8 +7,9 @@ const captureId = '7496c7eb-26ef-4f35-8255-d2d00d8e7a39';
 test('custom links open public account routes and protected collection routes', () => {
   assert.deepEqual(parseFoundkeepLink('foundkeep://'), { href: '/(app)/(tabs)/collection', requiresAuth: true });
   assert.deepEqual(parseFoundkeepLink('foundkeep://login'), { href: '/(auth)/sign-in', requiresAuth: false });
-  assert.deepEqual(parseFoundkeepLink('foundkeep:///register'), { href: '/(auth)/register', requiresAuth: false });
-  assert.deepEqual(parseFoundkeepLink('foundkeep://recover'), { href: '/(auth)/recover', requiresAuth: false });
+  // Sign-in is Apple or Google only: the old email links open sign-in.
+  assert.deepEqual(parseFoundkeepLink('foundkeep:///register'), { href: '/(auth)/sign-in', requiresAuth: false });
+  assert.deepEqual(parseFoundkeepLink('foundkeep://recover'), { href: '/(auth)/sign-in', requiresAuth: false });
   assert.deepEqual(parseFoundkeepLink('foundkeep://collection'), { href: '/(app)/(tabs)/collection', requiresAuth: true });
   assert.deepEqual(parseFoundkeepLink(`foundkeep://capture/${captureId}`), {
     href: `/(app)/capture/${captureId}`,
