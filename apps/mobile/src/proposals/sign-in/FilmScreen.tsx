@@ -15,9 +15,9 @@ import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { useMotionAllowed } from '../../components/motion.tsx';
 import { OAUTH_NAMES } from '../../auth-oauth.ts';
-import { SkyBackdrop, useProviders } from './FirstScreen.tsx';
+import { SkyBackdrop, useSignInProviders } from '../../sign-in/FirstScreen.tsx';
 import { FilmView } from './FilmView.tsx';
-import { KeepEveryHeadline, useHeadlineFont } from './Headline.tsx';
+import { KeepEveryHeadline, useHeadlineFont } from '../../sign-in/Headline.tsx';
 
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);
 /** On the sky page the words sit low, over the brightest clouds: a soft shade behind them keeps them readable. */
@@ -36,7 +36,7 @@ export function FilmScreen({ page = 'light', film, pageBlur = 1 }: { page?: 'lig
   const { width: W } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const motion = useMotionAllowed();
-  const providers = useProviders();
+  const { providers } = useSignInProviders();
   // The window is the film's own shape (360 × 400), as wide as the page allows.
   const windowW = Math.min(W - 32, 420), windowH = Math.round(windowW / 0.9);
 

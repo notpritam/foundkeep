@@ -1,6 +1,6 @@
 import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, type TextInputProps, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, type TextInputProps, View } from 'react-native';
 import { AdaptiveTextInput as TextInput } from './AdaptiveTextInput.tsx';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, palettes, typography } from '../theme.ts';
@@ -20,11 +20,6 @@ export function Mark({ size = 38 }: { size?: number }) {
 export function Brand({ compact = false, inverse = false }: { compact?: boolean; inverse?: boolean }) {
   const styles = useThemedStyles(baseStyles);
   return <View style={styles.brand}><Mark size={compact ? 28 : 40} /><Text maxFontSizeMultiplier={1.5} style={[styles.brandName, compact && { fontSize: 19 }, inverse && { color: colors.white }]}>FoundKeep</Text><EnvironmentBadge devOnly /></View>;
-}
-
-export function LegalFooter() {
-  const styles = useThemedStyles(baseStyles);
-  return <Text style={styles.legal}>By continuing, you accept our <Text accessibilityRole="link" style={styles.legalLink} onPress={() => void Linking.openURL('https://foundkeep.app/terms')}>Terms</Text> and <Text accessibilityRole="link" style={styles.legalLink} onPress={() => void Linking.openURL('https://foundkeep.app/privacy')}>Privacy</Text>.</Text>;
 }
 
 export function Button({ label, onPress, loading = false, disabled = false, secondary = false, danger = false, icon }: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean; secondary?: boolean; danger?: boolean; icon?: ReactNode }) {
@@ -49,8 +44,6 @@ const baseStyles = StyleSheet.create({
   fill: { flex: 1 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandName: { color: colors.ink, fontSize: 28, fontWeight: '700', letterSpacing: -1 },
-  legal: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', paddingHorizontal: 10, paddingVertical: 12 },
-  legalLink: { color: colors.ink, textDecorationLine: 'underline' },
   fieldLabel: { color: colors.ink, fontSize: 14, fontWeight: '500' },
   button: { minHeight: 52, borderRadius: 13, paddingHorizontal: 20, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ink },
   buttonSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },

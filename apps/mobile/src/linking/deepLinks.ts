@@ -9,8 +9,9 @@ const protectedRoutes = new Map<string, string>([
 ]);
 const publicRoutes = new Map<string, string>([
   ['login', '/(auth)/sign-in'],
-  ['register', '/(auth)/register'],
-  ['recover', '/(auth)/recover'],
+  // Sign-in is Apple or Google only; old email links open sign-in.
+  ['register', '/(auth)/sign-in'],
+  ['recover', '/(auth)/sign-in'],
 ]);
 
 function resolvePath(raw: string): FoundkeepLink | null {

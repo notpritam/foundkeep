@@ -1,4 +1,4 @@
-// The first screen's words, locked 2026-10-01 (Pritam): "Keep Every" in SF Pro,
+// The sign-in screen's words (Pritam, 2026-10-01): "Keep Every" in SF Pro,
 // the brand face, and the thing you keep in Caveat, tilted, changing through
 // what you come across while browsing. Under it, one quiet line about the
 // other half of FoundKeep: your agent can use it. Caveat: Google Fonts, SIL OFL
@@ -6,14 +6,14 @@
 import { useFonts } from 'expo-font';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
-import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
+import { AdaptiveText as Text } from '../components/AdaptiveText.tsx';
 
 const HAND = 'Caveat-Bold';
 /** SF Pro: the system font on iOS; on the web, the same face through -apple-system (Inter or the system sans elsewhere). */
 const SF = Platform.select({ web: '-apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif', default: undefined });
 
 export function useHeadlineFont() {
-  const [loaded, error] = useFonts({ [HAND]: require('../../../assets/fonts/Caveat-Bold.ttf') });
+  const [loaded, error] = useFonts({ [HAND]: require('../../assets/fonts/Caveat-Bold.ttf') });
   // A font that fails to load falls back to the system face rather than blocking sign-in.
   return loaded || !!error;
 }

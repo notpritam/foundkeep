@@ -1,20 +1,24 @@
-// The app's first screen, locked 2026-10-01 (Pritam): floating cards (GPT-6
-// Astra, like iOS widgets) — what you come across while browsing, and your
-// agent — drift in around a centred headline over the Cumulus sky (blur 1) and
-// keep drifting; the Apple and Google buttons rise last. No email option and
+// The sign-in screen (Pritam, 2026-10-01; version one of the design, chosen on
+// X): floating cards — what you come across while browsing, and your agent —
+// drift in around a centred headline over the Cumulus sky (blur 1) and keep
+// drifting; the Google and Apple buttons rise last. Sign-in is Apple or Google
+// only: no email anywhere. The second version (a film in a window,
+// proposals/sign-in/FilmScreen.tsx) is kept for an A/B test. No email option and
 // no terms line. Real sign-in: the same Apple/Google route as today.
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
-import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
-import { useMotionAllowed } from '../../components/motion.tsx';
-import { useSession } from '../../session/SessionProvider.tsx';
-import { isOAuthProvider, OAUTH_NAMES, type OAuthProvider } from '../../auth-oauth.ts';
+import { AdaptiveText as Text } from '../components/AdaptiveText.tsx';
+import { AdaptiveIcon as Ionicons } from '../components/AdaptiveIcon.tsx';
+import { useMotionAllowed } from '../components/motion.tsx';
+import { useSession } from '../session/SessionProvider.tsx';
+import { OAUTH_NAMES } from '../auth-oauth.ts';
+import { loadSignInProviders, type SignInProviders } from './providers.ts';
 import { KeepEveryHeadline, useHeadlineFont } from './Headline.tsx';
 
-const SKY = require('../../../assets/images/sign-in-backgrounds/sky-cumulus-top-medium.webp');
+const SKY = require('../../assets/images/sign-in-backgrounds/sky-cumulus-top-medium.webp');
 const BLUR = 1;
 /** A gentle shade where the words sit, clear again behind the buttons. */
 const SHADE = 'linear-gradient(180deg, rgba(4,24,48,.18) 0%, rgba(4,24,48,.26) 42%, rgba(4,24,48,.12) 66%, rgba(255,255,255,0) 82%)';
@@ -25,10 +29,10 @@ const BUTTON = { apple: { background: '#0b0c0d', ink: '#ffffff', border: '#0b0c0
  * x and y are fractions of the screen; word: the headline word it stands for. */
 export type Find = { source: ImageSourcePropType; x: number; y: number; size: number; rotate: number; depth: 0 | 1 | 2; delay: number; period: number; word?: string };
 const E = {
-  reel: require('../../../assets/images/elements/reel.webp'), tweet: require('../../../assets/images/elements/tweet.webp'),
-  photoPost: require('../../../assets/images/elements/photo-post.webp'), agentOrb: require('../../../assets/images/elements/agent-orb.webp'),
-  article: require('../../../assets/images/elements/article.webp'), short: require('../../../assets/images/elements/short.webp'),
-  thread: require('../../../assets/images/elements/thread.webp'), agentReply: require('../../../assets/images/elements/agent-reply.webp'),
+  reel: require('../../assets/images/elements/reel.webp'), tweet: require('../../assets/images/elements/tweet.webp'),
+  photoPost: require('../../assets/images/elements/photo-post.webp'), agentOrb: require('../../assets/images/elements/agent-orb.webp'),
+  article: require('../../assets/images/elements/article.webp'), short: require('../../assets/images/elements/short.webp'),
+  thread: require('../../assets/images/elements/thread.webp'), agentReply: require('../../assets/images/elements/agent-reply.webp'),
 };
 /** What you come across while browsing, and your agent, around the edges: the cards (assets/images/elements). */
 export const FINDS: Find[] = [
@@ -81,26 +85,29 @@ export function SkyBackdrop({ blur = BLUR }: { blur?: number }) {
   </>;
 }
 
-export function useProviders(): OAuthProvider[] {
+/** The sign-in providers, loaded once; when they can't be, `failed` and a way to try again. */
+export function useSignInProviders() {
   const { client } = useSession();
-  const [providers, setProviders] = useState<OAuthProvider[]>([]);
-  useEffect(() => {
+  const [state, setState] = useState<SignInProviders & { loading: boolean }>({ providers: [], failed: false, loading: true });
+  const load = useCallback(() => {
     let live = true;
-    void client.oauthProviders().then(value => { if (live && Array.isArray(value.providers)) setProviders(value.providers.filter(isOAuthProvider)); }).catch(() => {});
+    // A retry keeps the message up ("Trying again…") rather than blinking it away.
+    setState(value => ({ ...value, loading: true }));
+    void loadSignInProviders(client).then(result => { if (live) setState({ ...result, loading: false }); });
     return () => { live = false; };
   }, [client]);
-  // Google first, then Apple, as in the reference; any others after.
-  return [...providers].sort((a, b) => ['google', 'apple'].indexOf(a) - ['google', 'apple'].indexOf(b));
+  useEffect(() => load(), [load]);
+  return { ...state, retry: load };
 }
 
-/** movement: how the cards keep moving (a proposal until Pritam picks one). */
+/** movement: how the cards keep moving — drift is the chosen one; the others stay for comparison. */
 export function FirstScreen({ movement = 'drift' }: { movement?: Movement }) {
   const finds = FINDS;
   const fontReady = useHeadlineFont();
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const motion = useMotionAllowed();
-  const providers = useProviders();
+  const { providers, failed, loading, retry } = useSignInProviders();
 
   // Entrance values run 0 → 1 once; drift phases loop 0 → 1 for ever.
   const v = useRef({
@@ -147,6 +154,7 @@ export function FirstScreen({ movement = 'drift' }: { movement?: Movement }) {
   const cx = W / 2, cy = H * 0.42;
 
   return <View style={styles.fill}>
+    <StatusBar style="light" />
     <SkyBackdrop />
 
     {finds.map((find, i) => {
@@ -176,6 +184,13 @@ export function FirstScreen({ movement = 'drift' }: { movement?: Movement }) {
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.column, { paddingTop: insets.top + 12 }]}>
       <View style={styles.center}><KeepEveryHeadline start={fontReady} motion={motion} onWord={onWord} /></View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
+        {/* Apple or Google is the only way in: if neither can be reached, say so and offer to try again. */}
+        {failed ? <Animated.View style={[styles.unavailable, rise(v.buttons[0], 22)]} accessibilityLiveRegion="polite">
+          <Text maxFontSizeMultiplier={1.3} style={styles.unavailableText}>Can't reach Apple or Google sign-in right now.</Text>
+          <Pressable accessibilityRole="button" disabled={loading} onPress={retry} style={({ pressed }): StyleProp<ViewStyle> => [styles.button, { backgroundColor: BUTTON.apple.background, borderColor: BUTTON.apple.border }, pressed ? styles.pressed : null]}>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.buttonLabel, { color: BUTTON.apple.ink }]}>{loading ? 'Trying again…' : 'Try again'}</Text>
+          </Pressable>
+        </Animated.View> : null}
         {providers.map((provider, i) => {
           const tone = provider === 'apple' ? BUTTON.apple : BUTTON.other;
           return <Animated.View key={provider} style={rise(v.buttons[Math.min(i, 1)], 22)}>
@@ -203,4 +218,6 @@ const styles = StyleSheet.create({
   button: { minHeight: 56, paddingHorizontal: 16, borderRadius: 28, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.92 },
   buttonLabel: { fontSize: 16, fontWeight: '600' },
+  unavailable: { gap: 12, padding: 18, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.94)' },
+  unavailableText: { fontSize: 15, lineHeight: 21, color: '#233E4B', textAlign: 'center' },
 });

@@ -9,19 +9,21 @@ cloud). Authoring is complete; **choose where to run** (see below).
 - **The app installed** on the target: `adb install foundkeep-android-1.0.0-*.apk`
   (grab it from https://foundkeep.app/beta or `~/.local/share/foundkeep-beta-artifacts/`).
 - **A test account** on the backend the build points at (the friends APK points at
-  **prod**). Pass creds as env vars — never hard-code them.
+  **prod**). Sign-in is Apple or Google only, so the device needs that Google
+  account added (Settings → Accounts); pass its address as an env var — never
+  hard-code it.
 
 ## Run
 
 ```bash
 # Everything (from apps/mobile/)
-maestro test .maestro --env EMAIL="you@example.com" --env PASSWORD="••••"
+maestro test .maestro --env GOOGLE_ACCOUNT="you@gmail.com"
 
 # Just the fast smoke set
-maestro test .maestro --include-tags smoke --env EMAIL=… --env PASSWORD=…
+maestro test .maestro --include-tags smoke --env GOOGLE_ACCOUNT=…
 
 # A single flow
-maestro test .maestro/02-library.yaml --env EMAIL=… --env PASSWORD=…
+maestro test .maestro/02-library.yaml --env GOOGLE_ACCOUNT=…
 ```
 
 Tags: `smoke` (launch + sign-in), `auth`, `core` (library/new-note/detail/search/
@@ -42,7 +44,8 @@ and `android.intent.action.SEND_MULTIPLE` for batches.
   a plugged-in phone, then `maestro test`. Good for development.
 - **Cloud (recommended for headless/omni & CI):** upload the APK + flows to
   **Maestro Cloud** — runs on real devices, no local emulator:
-  `maestro cloud --apk foundkeep.apk .maestro --env EMAIL=… --env PASSWORD=…`.
+  `maestro cloud --apk foundkeep.apk .maestro --env GOOGLE_ACCOUNT=…` (the cloud device
+  needs the Google account too).
   (EAS also has a Maestro build-time e2e integration if you'd rather run it in EAS.)
 - **omni is headless** (no display/GPU), so running an emulator here is heavy; prefer
   the Mac for local runs or Maestro Cloud for automated runs.
@@ -58,7 +61,7 @@ These flows were authored from `apps/mobile/src` (real testIDs + labels), but th
 app is sparse on testIDs. On the first real run, confirm text selectors and, for
 robustness, add these `testID`s (small app change) — then swap the `text:`/`accessibilityLabel:`
 selectors for `id:`:
-- `sign-in.tsx`: `email-input`, `password-input`, `sign-in-button`
+- `sign-in/FirstScreen.tsx`: `sign-in-google`, `sign-in-apple`
 - `(tabs)/_layout.tsx`: `tab-collection`, `tab-settings`
 - gallery item: `gallery-item` (currently taps `gallery-list` child index 0)
 - `new-note.tsx`: `note-input`, `save-note-button`
