@@ -41,6 +41,8 @@
 .bt-phones-three iframe { height: 860px; }
 .bt-phones-four { grid-template-columns: repeat(4, minmax(0, 360px)); justify-content: center; }
 .bt-phones-four iframe { height: 800px; }
+.bt-phones-five { grid-template-columns: repeat(5, minmax(0, 300px)); justify-content: center; gap: 16px; }
+.bt-phones-five iframe { height: 700px; }
 .bt-states { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px 0; margin: -14px 0 18px; background: var(--bg); }
 .bt-states button { font: 500 14px/1 var(--font); padding: 10px 15px; border-radius: 999px; border: 0; background: var(--panel); color: var(--ink); cursor: pointer; transition: background .2s, color .2s; }
 .bt-states button[aria-pressed="true"] { background: #0b0c0d; color: #fff; }

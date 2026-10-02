@@ -1,3 +1,7 @@
+// Kept as it was proposed, for the design log: Pritam picked "gather" (2026-10-02),
+// built for real in sign-in/Handoff.tsx; the other three looks stay here as the
+// alternatives it was chosen from.
+//
 // The step after "Continue with Google" (proposal, 2026-10-02): FoundKeep opens
 // Google (or Apple) in the browser, waits, and finishes signing in when it comes
 // back. Four ways to show it, each with every sign-in state the real screen

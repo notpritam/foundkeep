@@ -2,7 +2,9 @@ import type { Meta, StoryObj } from '@storybook/react-native-web-vite';
 import { useArgs } from 'storybook/preview-api';
 import { Handoff, HandoffPlaythrough, type HandoffAction, type HandoffLook, type HandoffPhase } from '../../../../apps/mobile/src/proposals/handoff/Handoff.tsx';
 
-// The step after "Continue with Google" (proposal, 2026-10-02): four ways to
+// The step after "Continue with Google" (proposal, 2026-10-02; Pritam picked
+// "the cards gather" — now Current/Sign-in › After Continue with Google, kept here
+// with the others it was chosen from, for the design log): four ways to
 // show FoundKeep opening Google, waiting, and signing in. phase "play" runs the
 // flow on a loop with a pointer; any other phase holds that state, and the
 // buttons move between states as the real ones would. Side by side, with every
@@ -30,5 +32,5 @@ const render = (look: HandoffLook): Story['render'] => function Render() {
 };
 export const OnScreen: Story = { name: 'The buttons become a card', render: render('screen') };
 export const Sheet: Story = { name: 'A sheet over sign-in', render: render('sheet') };
-export const Gather: Story = { name: 'The cards gather round the mark', render: render('gather') };
+export const Gather: Story = { name: 'The cards gather round the mark (picked)', render: render('gather') };
 export const Quiet: Story = { name: 'A calm light page', render: render('quiet') };

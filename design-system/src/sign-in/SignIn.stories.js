@@ -54,23 +54,24 @@ function filmVariations() {
   return el;
 }
 
-/** After "Continue with Google" (2026-10-02): four ways to show the handoff,
- * side by side; the buttons above set every phone to one state at once, live
- * (the phones animate into it — no reload). */
+/** After "Continue with Google" (2026-10-02): the four ways proposed for the
+ * handoff and, last, the one Pritam picked as built in the app; the buttons
+ * above set every phone to one state at once, live (no reload). */
 function handoff() {
   const el = document.createElement('div');
   el.className = 'bt';
   const looks = [
     ['proposals-sign-in-handoff--on-screen', 'The buttons become a card: the sign-in screen stays, and the card says what is happening'],
     ['proposals-sign-in-handoff--sheet', 'A sheet over sign-in, like the system’s own sign-in sheets'],
-    ['proposals-sign-in-handoff--gather', 'The cards gather into a slow ring round Google’s mark'],
+    ['proposals-sign-in-handoff--gather', 'Picked · The cards gather into a slow ring round Google’s mark'],
     ['proposals-sign-in-handoff--quiet', 'A calm light page with Google’s mark, breathing while it waits'],
+    ['current-sign-in--handoff', 'In the app: the picked look, built (sign-in/Handoff.tsx)'],
   ];
   const states = [['play', 'Play it through'], ['choose', 'Sign-in'], ['opening', 'Opening'], ['browser', 'Waiting'], ['finishing', 'Signing in'], ['failed', 'Didn’t finish'], ['link', 'Already have a collection']];
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>After “Continue with Google”</h1><p>The next screen in the flow: FoundKeep opens Google (or Apple) in the browser, waits, and signs you in when you come back — or says why it didn’t, or asks once for the password of a collection you already have. Four ways to show it, all live. Pick a state to see it on all four at once; inside a phone, the buttons work too.</p></div></header>
+    <header class="bt-intro"><div><h1>After “Continue with Google”</h1><p>The next screen in the flow: FoundKeep opens Google (or Apple) in the browser, waits, and signs you in when you come back — or says why it didn’t, or asks once for the password of a collection you already have. Four ways were proposed; Pritam picked the cards gathering (2 October), and the last phone is that look as built in the app. All live. Pick a state to see it on every phone at once; inside a phone, the buttons work too.</p></div></header>
     <div class="bt-states" role="group" aria-label="State">${states.map(([phase, label]) => `<button type="button" data-phase="${phase}" aria-pressed="${phase === 'play'}">${label}</button>`).join('')}<span class="bt-gap"></span>${[['google', 'Google'], ['apple', 'Apple']].map(([provider, label]) => `<button type="button" data-provider="${provider}" aria-pressed="${provider === 'google'}">${label}</button>`).join('')}</div>
-    <div class="bt-phones bt-phones-four">${looks.map(([id, name]) => `<figure>
+    <div class="bt-phones bt-phones-five">${looks.map(([id, name]) => `<figure>
       <iframe loading="lazy" data-story="${id}" title="${name}" src="./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent('device:iphone-17-pro')}"></iframe>
       <figcaption>${name}</figcaption></figure>`).join('')}</div>`;
   const chosen = { phase: 'play', provider: 'google' };
