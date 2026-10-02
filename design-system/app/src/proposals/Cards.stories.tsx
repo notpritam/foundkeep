@@ -7,6 +7,7 @@ import { usePalette } from '../../../../apps/mobile/src/proposals/library/parts.
 import { MarkedCard, PillsCard, QuietCard } from '../../../../apps/mobile/src/proposals/cards/SaveCards.tsx';
 import { ConciseCard, IconsCard } from '../../../../apps/mobile/src/proposals/cards/TodayCards.tsx';
 import { BeforeCard } from '../../../../apps/mobile/src/proposals/cards/BeforeCard.tsx';
+import { GlassEverywhereCard } from '../../../../apps/mobile/src/proposals/cards/GlassEverywhereCard.tsx';
 import { saves } from '../../../fixtures/world.ts';
 import { StoryTabs } from '../StoryTabs.tsx';
 
@@ -25,7 +26,7 @@ const KINDS: [string, keyof typeof saves][] = [
   ['Pin (Pinterest)', 'pin'], ['Photo from the iPhone', 'desk'], ['Post on Instagram', 'poster'], ['Screenshot of a region', 'region'], ['Full-page screenshot', 'fullpage'],
   ['Highlight', 'highlight'], ['Note', 'note'], ['PDF', 'document'], ['Voice memo', 'audio'], ['Saved together', 'batchA'],
 ];
-const COLUMNS: [string, SaveCardComponent][] = [['Before', BeforeCard], ['In the app: concise, glass', GalleryCard], ['Concise (picked)', ConciseCard], ['Icons', IconsCard], ['Quiet', QuietCard], ['With pills', PillsCard], ['Marked', MarkedCard]];
+const COLUMNS: [string, SaveCardComponent][] = [['Before', BeforeCard], ['In the app: concise, glass caption', GalleryCard], ['Glass everywhere (tried)', GlassEverywhereCard], ['Concise (picked)', ConciseCard], ['Icons', IconsCard], ['Quiet', QuietCard], ['With pills', PillsCard], ['Marked', MarkedCard]];
 const open = () => {};
 
 function Kinds() {
