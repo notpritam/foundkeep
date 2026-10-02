@@ -7,14 +7,14 @@
 // no terms line. Real sign-in: the same Apple/Google route as today.
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdaptiveText as Text } from '../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../components/AdaptiveIcon.tsx';
 import { useMotionAllowed } from '../components/motion.tsx';
 import { useSession } from '../session/SessionProvider.tsx';
-import { OAUTH_NAMES } from '../auth-oauth.ts';
+import { OAUTH_NAMES, type OAuthProvider } from '../auth-oauth.ts';
 import { loadSignInProviders, type SignInProviders } from './providers.ts';
 import { KeepEveryHeadline, useHeadlineFont } from './Headline.tsx';
 
@@ -100,26 +100,23 @@ export function useSignInProviders() {
   return { ...state, retry: load };
 }
 
-/** movement: how the cards keep moving — drift is the chosen one; the others stay for comparison. */
-export function FirstScreen({ movement = 'drift' }: { movement?: Movement }) {
+/** The floating cards: they drift in to their places (already there when
+ * settled, for a screen that continues this one) and keep drifting.
+ * word: the headline's word, for spotlight. gather, 0 → 1 → 2: draws them from
+ * their places into a slow ring round the middle, then closer in. */
+export function FloatingFinds({ movement = 'drift', settled = false, word, gather }: { movement?: Movement; settled?: boolean; word?: string; gather?: Animated.Value }) {
   const finds = FINDS;
-  const fontReady = useHeadlineFont();
   const { width: W, height: H } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const motion = useMotionAllowed();
-  const { providers, failed, loading, retry } = useSignInProviders();
-
-  // Entrance values run 0 → 1 once; drift phases loop 0 → 1 for ever.
+  // Entrance values run 0 → 1 once; drift phases (and the ring) loop 0 → 1 for ever.
   const v = useRef({
-    finds: finds.map(() => new Animated.Value(0)),
-    buttons: [0, 1].map(() => new Animated.Value(0)),
+    finds: finds.map(() => new Animated.Value(settled ? 1 : 0)),
     drift: finds.map(() => new Animated.Value(0)),
     focus: finds.map(() => new Animated.Value(0)),
+    ring: new Animated.Value(0),
   }).current;
 
   // Spotlight: the object for the word on screen comes forward; the last one settles back.
-  const [word, setWord] = useState<string>();
-  const onWord = useCallback((next: string) => setWord(next), []);
   useEffect(() => {
     if (movement !== 'spotlight' || !motion) return;
     const run = Animated.parallel(v.focus.map((value, i) => Animated.timing(value, { toValue: finds[i].word === word ? 1 : 0, duration: 700, easing: SETTLE, useNativeDriver: Platform.OS !== 'web' })));
@@ -127,80 +124,115 @@ export function FirstScreen({ movement = 'drift' }: { movement?: Movement }) {
   }, [word, movement, motion, v, finds]);
 
   useEffect(() => {
-    const entrance = [...v.finds, ...v.buttons];
     if (!motion) {
-      // Reduced motion (or not known yet): the finished screen, still.
-      const settle = setTimeout(() => entrance.forEach(value => value.setValue(1)), 120);
+      // Reduced motion (or not known yet): the cards in place, still.
+      const settle = setTimeout(() => v.finds.forEach(value => value.setValue(1)), 120);
       return () => clearTimeout(settle);
     }
-    entrance.forEach(value => value.setValue(0));
+    // Continuing a screen: the cards are already in place, drifting.
+    if (settled) v.finds.forEach(value => value.setValue(1));
     const native = Platform.OS !== 'web';
-    const to = (value: Animated.Value, delay: number, duration: number, easing = SETTLE) => Animated.timing(value, { toValue: 1, delay, duration, easing, useNativeDriver: native });
-    const run = Animated.parallel([
-      ...v.finds.map((value, i) => to(value, finds[i].delay, 1500 + finds[i].depth * 120)),
-      ...v.buttons.map((value, i) => to(value, 980 + i * 80, 850)),
-    ]);
+    const arrive = settled ? null : Animated.parallel(v.finds.map((value, i) => {
+      value.setValue(0);
+      return Animated.timing(value, { toValue: 1, delay: finds[i].delay, duration: 1500 + finds[i].depth * 120, easing: SETTLE, useNativeDriver: native });
+    }));
     // The drift starts with the entrance, so nothing ever stops and restarts;
     // each object has its own period, so they never move in step.
-    const drift = v.drift.map((value, i) => {
+    const loops = [...v.drift.map((value, i) => {
       value.setValue(0);
       return Animated.loop(Animated.timing(value, { toValue: 1, duration: finds[i].period * (movement === 'rise' ? 1800 : 1000), easing: Easing.linear, useNativeDriver: native }));
-    });
-    run.start(); drift.forEach(loop => loop.start());
-    return () => { run.stop(); drift.forEach(loop => loop.stop()); };
-  }, [motion, v, finds, movement]);
+    }), Animated.loop(Animated.timing(v.ring, { toValue: 1, duration: 26000, easing: Easing.linear, useNativeDriver: native }))];
+    arrive?.start(); loops.forEach(loop => loop.start());
+    return () => { arrive?.stop(); loops.forEach(loop => loop.stop()); };
+  }, [motion, settled, v, finds, movement]);
+
+  const cx = W / 2, cy = H * 0.42, radius = Math.min(W * 0.38, 156);
+  const toMiddle = gather?.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 1], extrapolate: 'clamp' });
+  const inRing = gather?.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0.82], extrapolate: 'clamp' });
+  const shrink = gather?.interpolate({ inputRange: [0, 1, 2], outputRange: [1, 0.64, 0.54], extrapolate: 'clamp' });
+  return <>{finds.map((find, i) => {
+    const d = DEPTH[find.depth], entry = v.finds[i], phase = v.drift[i], offset = (i * 0.37) % 1;
+    // Each object drifts in towards its place from beyond it, turning as it settles.
+    const px = find.x * W + find.size / 2, py = find.y * H + find.size / 2, len = Math.hypot(px - cx, py - cy) || 1;
+    const fromX = ((px - cx) / len) * d.travel, fromY = ((py - cy) / len) * d.travel;
+    const move = moving(movement === 'spotlight' ? 'drift' : movement, d, phase, offset);
+    // Gathered: each takes its own place round the ring (a slow, shared turn), from wherever it is.
+    const at = i / finds.length;
+    const ringX = toMiddle && inRing ? Animated.add(Animated.multiply(toMiddle, cx - px), Animated.multiply(inRing, v.ring.interpolate(wave(radius, at + 0.25)))) : 0;
+    const ringY = toMiddle && inRing ? Animated.add(Animated.multiply(toMiddle, cy - py), Animated.multiply(inRing, v.ring.interpolate(wave(radius * 0.94, at)))) : 0;
+    const turn = Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [find.rotate + (fromX > 0 ? 10 : -10), find.rotate] }), move.turn);
+    const shown = entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity, d.opacity] });
+    const scale = Animated.multiply(entry.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }), v.focus[i].interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] }));
+    return <Animated.View key={i} pointerEvents="none" style={[styles.find, { left: find.x * W, top: find.y * H, width: find.size, height: find.size,
+      opacity: move.fade ? Animated.multiply(shown, move.fade) : shown,
+      transform: [
+        { translateX: Animated.add(Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromX, 0] }), move.x), ringX) },
+        { translateY: Animated.add(Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromY, 0] }), move.y), ringY) },
+        { translateY: v.focus[i].interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) },
+        { scale: shrink ? Animated.multiply(scale, shrink) : scale },
+        { rotate: turn.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) },
+      ] }]}>
+      <Image source={find.source} style={styles.img} accessible={false} />
+    </Animated.View>;
+  })}</>;
+}
+
+/** A sign-in button: white for Google, black for Apple. */
+export function ProviderButton({ provider, onPress }: { provider: OAuthProvider; onPress: () => void }) {
+  const tone = provider === 'apple' ? BUTTON.apple : BUTTON.other;
+  return <Pressable accessibilityRole="button" onPress={onPress}
+    style={({ pressed }): StyleProp<ViewStyle> => [styles.button, { backgroundColor: tone.background, borderColor: tone.border }, pressed ? styles.pressed : null]}>
+    <Ionicons name={provider === 'apple' ? 'logo-apple' : provider === 'google' ? 'logo-google' : 'globe-outline'} size={20} color={tone.ink} />
+    <Text maxFontSizeMultiplier={1.3} style={[styles.buttonLabel, { color: tone.ink }]}>Continue with {OAUTH_NAMES[provider]}</Text>
+  </Pressable>;
+}
+
+/** movement: how the cards keep moving — drift is the chosen one; the others stay for comparison.
+ * settled: everything already in place (a screen continuing this one); actions: in place of the buttons. */
+export function FirstScreen({ movement = 'drift', settled = false, actions }: { movement?: Movement; settled?: boolean; actions?: ReactNode }) {
+  const fontReady = useHeadlineFont();
+  const insets = useSafeAreaInsets();
+  const motion = useMotionAllowed();
+  const { providers, failed, loading, retry } = useSignInProviders();
+  const buttons = useRef([0, 1].map(() => new Animated.Value(settled ? 1 : 0))).current;
+  const [word, setWord] = useState<string>();
+  const onWord = useCallback((next: string) => setWord(next), []);
+
+  useEffect(() => {
+    if (!motion || settled) {
+      const settle = setTimeout(() => buttons.forEach(value => value.setValue(1)), settled ? 0 : 120);
+      return () => clearTimeout(settle);
+    }
+    buttons.forEach(value => value.setValue(0));
+    const run = Animated.parallel(buttons.map((value, i) => Animated.timing(value, { toValue: 1, delay: 980 + i * 80, duration: 850, easing: SETTLE, useNativeDriver: Platform.OS !== 'web' })));
+    run.start(); return () => run.stop();
+  }, [motion, settled, buttons]);
 
   const rise = (value: Animated.Value, by = 20) => ({ opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [by, 0] }) }] });
-  const cx = W / 2, cy = H * 0.42;
 
   return <View style={styles.fill}>
     <StatusBar style="light" />
     <SkyBackdrop />
-
-    {finds.map((find, i) => {
-      const d = DEPTH[find.depth], entry = v.finds[i], phase = v.drift[i], offset = (i * 0.37) % 1;
-      // Each object drifts in towards its place from beyond it, turning as it settles.
-      const px = find.x * W + find.size / 2, py = find.y * H + find.size / 2, len = Math.hypot(px - cx, py - cy) || 1;
-      const fromX = ((px - cx) / len) * d.travel, fromY = ((py - cy) / len) * d.travel;
-      const move = moving(movement === 'spotlight' ? 'drift' : movement, d, phase, offset);
-      const turn = Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [find.rotate + (fromX > 0 ? 10 : -10), find.rotate] }), move.turn);
-      const shown = entry.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, d.opacity, d.opacity] });
-      return <Animated.View key={i} pointerEvents="none" style={[styles.find, { left: find.x * W, top: find.y * H, width: find.size, height: find.size,
-        opacity: move.fade ? Animated.multiply(shown, move.fade) : shown,
-        transform: [
-          { translateX: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromX, 0] }), move.x) },
-          { translateY: Animated.add(entry.interpolate({ inputRange: [0, 1], outputRange: [fromY, 0] }), move.y) },
-          { translateY: v.focus[i].interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) },
-          { scale: Animated.multiply(entry.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }), v.focus[i].interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] })) },
-          { rotate: turn.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] }) },
-        ] }]}>
-        <Image source={find.source} style={styles.img} accessible={false} />
-      </Animated.View>;
-    })}
+    <FloatingFinds movement={movement} settled={settled} word={word} />
 
     {/* The words and buttons form a column: the headline centres in the space
         above the buttons; when large text needs more room than the screen has,
         the column scrolls instead of running under the buttons. */}
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.column, { paddingTop: insets.top + 12 }]}>
-      <View style={styles.center}><KeepEveryHeadline start={fontReady} motion={motion} onWord={onWord} /></View>
+      <View style={styles.center}><KeepEveryHeadline start={fontReady} motion={motion} onWord={onWord} settled={settled} /></View>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 18 }]}>
-        {/* Apple or Google is the only way in: if neither can be reached, say so and offer to try again. */}
-        {failed ? <Animated.View style={[styles.unavailable, rise(v.buttons[0], 22)]} accessibilityLiveRegion="polite">
-          <Text maxFontSizeMultiplier={1.3} style={styles.unavailableText}>Can't reach Apple or Google sign-in right now.</Text>
-          <Pressable accessibilityRole="button" disabled={loading} onPress={retry} style={({ pressed }): StyleProp<ViewStyle> => [styles.button, { backgroundColor: BUTTON.apple.background, borderColor: BUTTON.apple.border }, pressed ? styles.pressed : null]}>
-            <Text maxFontSizeMultiplier={1.3} style={[styles.buttonLabel, { color: BUTTON.apple.ink }]}>{loading ? 'Trying again…' : 'Try again'}</Text>
-          </Pressable>
-        </Animated.View> : null}
-        {providers.map((provider, i) => {
-          const tone = provider === 'apple' ? BUTTON.apple : BUTTON.other;
-          return <Animated.View key={provider} style={rise(v.buttons[Math.min(i, 1)], 22)}>
-            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/oauth/complete', params: { provider, intent: 'sign-in' } })}
-              style={({ pressed }): StyleProp<ViewStyle> => [styles.button, { backgroundColor: tone.background, borderColor: tone.border }, pressed ? styles.pressed : null]}>
-              <Ionicons name={provider === 'apple' ? 'logo-apple' : provider === 'google' ? 'logo-google' : 'globe-outline'} size={20} color={tone.ink} />
-              <Text maxFontSizeMultiplier={1.3} style={[styles.buttonLabel, { color: tone.ink }]}>Continue with {OAUTH_NAMES[provider]}</Text>
+        {actions ?? <>
+          {/* Apple or Google is the only way in: if neither can be reached, say so and offer to try again. */}
+          {failed ? <Animated.View style={[styles.unavailable, rise(buttons[0], 22)]} accessibilityLiveRegion="polite">
+            <Text maxFontSizeMultiplier={1.3} style={styles.unavailableText}>Can't reach Apple or Google sign-in right now.</Text>
+            <Pressable accessibilityRole="button" disabled={loading} onPress={retry} style={({ pressed }): StyleProp<ViewStyle> => [styles.button, { backgroundColor: BUTTON.apple.background, borderColor: BUTTON.apple.border }, pressed ? styles.pressed : null]}>
+              <Text maxFontSizeMultiplier={1.3} style={[styles.buttonLabel, { color: BUTTON.apple.ink }]}>{loading ? 'Trying again…' : 'Try again'}</Text>
             </Pressable>
-          </Animated.View>;
-        })}
+          </Animated.View> : null}
+          {providers.map((provider, i) => <Animated.View key={provider} style={rise(buttons[Math.min(i, 1)], 22)}>
+            <ProviderButton provider={provider} onPress={() => router.push({ pathname: '/oauth/complete', params: { provider, intent: 'sign-in' } })} />
+          </Animated.View>)}
+        </>}
       </View>
     </ScrollView>
   </View>;

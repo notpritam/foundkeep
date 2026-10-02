@@ -36,16 +36,17 @@ const rise = (v: Animated.Value, by = 18) => ({ opacity: v, transform: [{ transl
 
 /** "Keep Every Reel." — the word changes every 2.6 s; reduced motion shows "Post." still.
  * onWord: told each time the word changes, so the objects can answer it.
- * tone: white over the sky, or ink on a light page; align: centred, or set left. */
-export function KeepEveryHeadline({ start, motion, onWord, tone = 'sky', align = 'center' }: { start: boolean; motion: boolean; onWord?: (word: string) => void; tone?: 'sky' | 'light'; align?: 'center' | 'left' }) {
-  const entrance = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+ * tone: white over the sky, or ink on a light page; align: centred, or set left.
+ * settled: already in place (a screen continuing this one), the word still turning. */
+export function KeepEveryHeadline({ start, motion, onWord, tone = 'sky', align = 'center', settled = false }: { start: boolean; motion: boolean; onWord?: (word: string) => void; tone?: 'sky' | 'light'; align?: 'center' | 'left'; settled?: boolean }) {
+  const entrance = useRef([0, 1, 2].map(() => new Animated.Value(settled ? 1 : 0))).current;
   useEffect(() => {
     if (!start) return;
-    if (!motion) { entrance.forEach(v => v.setValue(1)); return; }
+    if (!motion || settled) { entrance.forEach(v => v.setValue(1)); return; }
     entrance.forEach(v => v.setValue(0));
     const run = Animated.parallel(entrance.map((v, i) => Animated.timing(v, { toValue: 1, delay: [380, 520, 760][i], duration: 1000, easing: SETTLE, useNativeDriver: native })));
     run.start(); return () => run.stop();
-  }, [start, motion, entrance]);
+  }, [start, motion, settled, entrance]);
 
   const [index, setIndex] = useState(0);
   const turn = useRef(new Animated.Value(1)).current;
