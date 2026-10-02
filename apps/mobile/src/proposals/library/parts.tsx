@@ -14,8 +14,8 @@ import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { CapturePreview, captureLabels } from '../../components/CapturePreview.tsx';
 import { captureTitle } from '../../collection/model.ts';
 import { palettes } from '../../theme.ts';
-import { useDock } from '../../components/FloatingDock.tsx';
 import { ScrollEdge } from '../../components/ScrollEdge';
+import { useScrollEdges } from '../../components/useScrollEdges.ts';
 import { savedAge, sourcePlatform } from '../../../../../packages/shared/src/collection-presentation.ts';
 
 export function usePalette() { const { scheme } = useAppearance(); return { ...palettes[scheme], dark: scheme === 'dark' }; }
@@ -72,10 +72,10 @@ export function useScrollY() {
 export function Edges({ y, title, children }: { y: Animated.Value; title: string; children?: React.ReactNode }) {
   const P = usePalette();
   const insets = useSafeAreaInsets();
-  const { bottomSpace } = useDock();
+  const edges = useScrollEdges(BAR);
   return <>
-    <ScrollEdge edge="bottom" height={Math.max(bottomSpace, insets.bottom + 100) + 24} hold={0.35} color={P.paper} />
-    <ScrollEdge edge="top" height={insets.top + BAR + 44} hold={(insets.top + BAR - 6) / (insets.top + BAR + 44)} color={P.paper} />
+    <ScrollEdge edge="bottom" height={edges.bottom.height} hold={edges.bottom.hold} color={P.paper} />
+    <ScrollEdge edge="top" height={edges.top.height} hold={edges.top.hold} color={P.paper} />
     <View pointerEvents="box-none" style={[styles.bar, { paddingTop: insets.top, height: insets.top + BAR }]}>
       <Animated.Text accessibilityRole="header" style={[styles.barTitle, { color: P.ink, opacity: y.interpolate({ inputRange: [30, 60], outputRange: [0, 1], extrapolate: 'clamp' }) }]}>{title}</Animated.Text>
       <View style={styles.barButtons}>{children}</View>

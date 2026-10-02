@@ -13,16 +13,27 @@ import { useCollection } from '../../../collection/useCollection.ts';
 import { useSession } from '../../../session/SessionProvider.tsx';
 import { createScrollChrome } from '../../../collection/scrollChrome.ts';
 import { useMotionAllowed } from '../../../components/motion.tsx';
-import { colors } from '../../../theme.ts';
-import { useThemedStyles } from '../../../appearance/AppearanceProvider.tsx';
+import { colors, palettes } from '../../../theme.ts';
+import { useAppearance, useThemedStyles } from '../../../appearance/AppearanceProvider.tsx';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollEdge } from '../../../components/ScrollEdge';
+import { useScrollEdges } from '../../../components/useScrollEdges.ts';
 
 const filters: Array<{ type?: CaptureType; label: string }> = [
   { label: 'All' }, { type: 'bookmark', label: 'Links' }, { type: 'image', label: 'Images' }, { type: 'note', label: 'Notes' },
   { type: 'document', label: 'Documents' }, { type: 'selection', label: 'Highlights' }, { type: 'screenshot', label: 'Screenshots' },
   { type: 'audio', label: 'Audio' }, { type: 'video', label: 'Video' }, { type: 'tweet', label: 'Posts' }, { type: 'file', label: 'Files' },
 ];
-export default function CollectionScreen() {
+export default function CollectionRoute() { return <CollectionScreen />; }
+
+/** scrollEdge: the list runs under a see-through top bar and the dock, blurring as it passes
+ * (Pritam's reference, 2026-10-02) — shown in the design system until he picks it. */
+export function CollectionScreen({ scrollEdge = false }: { scrollEdge?: boolean }) {
   const styles = useThemedStyles(baseStyles);
+  const insets = useSafeAreaInsets();
+  const paper = palettes[useAppearance().scheme].paper;
+  const edges = useScrollEdges(TOP_BAR);
+  const headerOffset = scrollEdge ? insets.top + TOP_BAR : 0;
   const { policy, updateRequired } = useSession();
   const [query, setQuery] = useState('');
   const [listReset, setListReset] = useState(0);
@@ -61,18 +72,19 @@ export default function CollectionScreen() {
   useEffect(() => { const timer = setTimeout(() => setSearchQuery(query.trim()), 250); return () => clearTimeout(timer); }, [query]);
   const collection = useCollection({ archived, q: searchQuery || undefined, type, folderId: organization.folderId === null ? 'unfiled' : organization.folderId, tag: organization.userTags[0] });
   const canWrite = policy.capture.note && !updateRequired;
-  return <Screen>
-    <View testID="collection-header" style={[styles.top, compact && styles.topCompact]}>
+  const topBar = <View testID="collection-header" style={[styles.top, compact && styles.topCompact, scrollEdge && [styles.topPinned, { top: insets.top }]]}>
       <Brand compact />
       <View style={styles.actions}>
         <Pressable accessibilityRole="button" accessibilityLabel={archived ? 'Back to collection' : 'Open archive'} accessibilityState={{ selected: archived }} onPress={() => { setArchived(value => !value); setQuery(''); setSearchQuery(''); setType(undefined); setOrganization({ folderId: undefined, userTags: [] }); setListReset(value => value + 1); chrome.reveal(); syncCompact(false); travel.setValue(0); }} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Ionicons name={archived ? 'albums-outline' : 'archive-outline'} size={22} color={archived ? colors.accent : colors.ink} /></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Show search and filters" onPress={revealSearch} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Ionicons name="search-outline" size={22} color={colors.ink} /></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Write a new note" accessibilityState={{ disabled: !canWrite }} disabled={!canWrite} onPress={() => router.push('/(app)/new-note')} style={({ pressed }) => [styles.add, pressed && styles.pressed, !canWrite && { opacity: .4 }]}><Ionicons name="add" size={25} color={colors.ink} /></Pressable>
       </View>
-    </View>
+    </View>;
+  return <Screen top={!scrollEdge}>
+    {scrollEdge ? null : topBar}
     <View style={styles.galleryRegion}>
-      <GalleryList archived={archived} resetKey={listReset} collection={collection} headerSpace={headerHeight} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
-      <Animated.View testID="collection-expanded-controls" pointerEvents={compact ? 'none' : 'auto'} accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[styles.header, { transform: [{ translateY: Animated.multiply(travel, -1) }] }]} onLayout={event => {
+      <GalleryList archived={archived} resetKey={listReset} collection={collection} headerSpace={headerHeight + headerOffset} bottomSpace={bottomSpace} onScroll={onScroll} filtered={Boolean(searchQuery || type || organization.folderId !== undefined || organization.userTags.length)} />
+      <Animated.View testID="collection-expanded-controls" pointerEvents={compact ? 'none' : 'auto'} accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[styles.header, scrollEdge && { top: headerOffset, opacity: travel.interpolate({ inputRange: [0, Math.max(1, headerHeight * 0.55), Math.max(2, headerHeight)], outputRange: [1, 1, 0], extrapolate: 'clamp' }) }, { transform: [{ translateY: Animated.multiply(travel, -1) }] }]} onLayout={event => {
         const next = Math.ceil(event.nativeEvent.layout.height);
         if (next === measuredHeight.current) return;
         measuredHeight.current = next; setHeaderHeight(next); travel.setValue(chrome.resize(next));
@@ -90,14 +102,22 @@ export default function CollectionScreen() {
         </View>
       </Animated.View>
     </View>
+    {scrollEdge ? <>
+      <ScrollEdge edge="bottom" height={edges.bottom.height} hold={edges.bottom.hold} color={paper} />
+      <ScrollEdge edge="top" height={edges.top.height} hold={edges.top.hold} color={paper} />
+      {topBar}
+    </> : null}
   </Screen>;
 }
+/** The top bar's height below the status bar. */
+const TOP_BAR = 64;
 
 const baseStyles = StyleSheet.create({
   galleryRegion: { flex: 1, overflow: 'hidden' },
   header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 16, backgroundColor: colors.paper },
   controls: { gap: 14 },
-  top: { minHeight: 56, marginHorizontal: 20, marginTop: 6, marginBottom: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 3, backgroundColor: colors.paper }, topCompact: { borderColor: colors.line }, actions: { flexDirection: 'row', gap: 4 }, add: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, pressed: { opacity: .65 },
+  top: { minHeight: 56, marginHorizontal: 20, marginTop: 6, marginBottom: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 3, backgroundColor: colors.paper },
+  topPinned: { position: 'absolute', left: 0, right: 0, backgroundColor: 'transparent' }, topCompact: { borderColor: colors.line }, actions: { flexDirection: 'row', gap: 4 }, add: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, pressed: { opacity: .65 },
   heading: { gap: 5, paddingTop: 2, paddingBottom: 2 }, title: { color: colors.ink, fontSize: 32, lineHeight: 37, fontWeight: '600', letterSpacing: -1.1 }, subtitle: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   search: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface }, searchInput: { flex: 1, minHeight: 44, color: colors.ink, fontSize: 16, paddingVertical: 8 },
   filterRow: { flexDirection: 'row', gap: 10, alignItems: 'center' }, filters: { gap: 5 }, filter: { paddingHorizontal: 13, minHeight: 44, justifyContent: 'center', borderRadius: 7, backgroundColor: colors.paper }, filterActive: { backgroundColor: colors.accentSoft }, filterText: { color: colors.muted, fontSize: 13, fontWeight: '600' }, filterTextActive: { color: colors.accent },
