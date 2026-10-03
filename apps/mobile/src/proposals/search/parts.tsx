@@ -52,7 +52,8 @@ export function useRecentSearches(seed = ['ramen', 'kyoto', 'spaced repetition',
 
 const TOP_BAR = 64;
 /** Today's Library — its card, its scroll edge — with `header` above the saves, scrolling with them. */
-export function LibraryShell({ library, header, actions, bottomExtra = 0, children }: { library: ReturnType<typeof useLibrary>; header: ReactNode; actions?: ReactNode; bottomExtra?: number; children?: ReactNode }) {
+/** collection: what the gallery shows instead of the Library (Kit's answer, say). */
+export function LibraryShell({ library, header, actions, bottomExtra = 0, children, collection }: { library: ReturnType<typeof useLibrary>; header: ReactNode; actions?: ReactNode; bottomExtra?: number; children?: ReactNode; collection?: ReturnType<typeof useCollection> }) {
   const P = usePalette();
   const insets = useSafeAreaInsets();
   const edges = useScrollEdges(TOP_BAR);
@@ -60,7 +61,7 @@ export function LibraryShell({ library, header, actions, bottomExtra = 0, childr
   const [headerHeight, setHeaderHeight] = useState(180);
   const dock = useDockOnScroll(headerHeight);
   return <View style={[styles.fill, { backgroundColor: P.paper }]}>
-    <GalleryList collection={library.shown} filtered={Boolean(library.filter)} headerSpace={insets.top + TOP_BAR + headerHeight} bottomSpace={bottomSpace + bottomExtra} onScroll={dock}
+    <GalleryList collection={collection ?? library.shown} filtered={Boolean(library.filter || collection)} headerSpace={insets.top + TOP_BAR + headerHeight} bottomSpace={bottomSpace + bottomExtra} onScroll={dock}
       header={<View style={{ paddingTop: insets.top + TOP_BAR }}><View style={styles.header} onLayout={event => setHeaderHeight(Math.ceil(event.nativeEvent.layout.height))}>{header}</View></View>} />
     <ScrollEdge edge="bottom" height={edges.bottom.height + bottomExtra} hold={edges.bottom.hold} color={P.paper} />
     <ScrollEdge edge="top" height={edges.top.height} hold={edges.top.hold} color={P.paper} />
@@ -131,10 +132,10 @@ export function SearchField({ value, onChange, onSubmit, onFocus, autoFocus = fa
   </View>;
 }
 /** The field as a button (it opens searching): looks the same, so it reads as one thing. */
-export function SearchButton({ onPress, big = false, style }: { onPress: () => void; big?: boolean; style?: StyleProp<ViewStyle> }) {
+export function SearchButton({ onPress, big = false, style, label = 'Search or ask Kit' }: { onPress: () => void; big?: boolean; style?: StyleProp<ViewStyle>; label?: string }) {
   const P = usePalette();
-  return <Pressable accessibilityRole="search" accessibilityLabel="Search or ask Kit" onPress={onPress} style={({ pressed }) => [styles.field, big && styles.fieldBig, { backgroundColor: P.surface, borderColor: P.line }, style, pressed && styles.pressed]}>
-    <Image source={KIT_ORB} style={big ? styles.orbSmall : styles.orbFieldSmall} accessible={false} /><Text style={[styles.buttonText, big && styles.inputBig, { color: P.muted }]}>Search or ask Kit</Text>
+  return <Pressable accessibilityRole="search" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.field, big && styles.fieldBig, { backgroundColor: P.surface, borderColor: P.line }, style, pressed && styles.pressed]}>
+    <Image source={KIT_ORB} style={big ? styles.orbSmall : styles.orbFieldSmall} accessible={false} /><Text style={[styles.buttonText, big && styles.inputBig, { color: P.muted }]}>{label}</Text>
   </Pressable>;
 }
 /** What was found: a line from Kit when it has something to say, then the saves. */

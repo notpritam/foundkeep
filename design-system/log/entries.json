@@ -263,8 +263,8 @@
       "title": "Search, recent folders and tags, and Kit",
       "question": "How do you find what you kept — and where does the agent, Kit, come in?",
       "tried": "The kind tabs (links, images, notes, documents) replaced by the folders and tags your saves went into, worked out from the library, newest first, as chips or as “jump back in” cards with each folder's last saves; recent searches as big rows (one tap to run again, one to remove) or chips; and four places for search and Kit: a round search button beside + in the dock; an ask bar (“Search or ask Kit”) always above the dock; Kit in the dock between Gallery and You, where asking is a conversation and typing still searches; a big search field heading the Library. Each in three states — the Library, searching, Kit answering — light and dark. Kit is a stand-in that reads the library on the phone. Then, at Pritam's direction, one field instead of a search/Kit switch — “Search or ask Kit”: a word finds its matches, a question gets a line from Kit above the same results (the backend decides; a stand-in here) — in four places: a search button beside +, the field above the dock, Search as a dock tab, the field heading the Library. Each in three states: the Library, a word, a question.",
-      "picked": "Not picked yet.",
-      "why": "Pritam: “instead of [links, images, notes, documents] show some of the recent tags … or recent collections, dynamic”; “recent searches more accessible”; “something like the + for search”; “a proper agent button … basic search plus agentic search”. Then: “make the search and Ask Kit the same — whenever a user needs to search they activate Kit itself; normal search is handled by the backend; the UI generic and search-based”.",
+      "picked": "The field always above the dock, opening at the bottom by the thumb — renamed “Ask Kit” (no “Search”); Jump back in heads the Library. Next: the conversation (2026-10-03-ask-kit).",
+      "why": "Pritam: “instead of [links, images, notes, documents] show some of the recent tags … or recent collections, dynamic”; “recent searches more accessible”; “something like the + for search”; “a proper agent button … basic search plus agentic search”. Then: “make the search and Ask Kit the same — whenever a user needs to search they activate Kit itself; normal search is handled by the backend; the UI generic and search-based”. Then: “the search panel at the bottom once you open it is nice, easy to access — change it to Ask Kit itself, no need to have Search”.",
       "live": [
         "search-and-kit--four-ways"
       ]
@@ -280,6 +280,19 @@
       "why": "Pritam: “the jump back in part — collections, tags like cooking — is good; lock this part in all of our designs”.",
       "live": [
         "search-and-kit--four-ways"
+      ]
+    },
+    {
+      "id": "2026-10-03-ask-kit",
+      "date": "2026-10-03",
+      "product": "App",
+      "title": "Ask Kit: a conversation",
+      "question": "How does asking Kit go back and forth — “recent post I saved from Twitter”, then “about cats”?",
+      "tried": "A follow-up keeps what was asked and changes only what it says (what kind, from where, about what, how recent); when nothing fits, Kit says so and offers what it found elsewhere. Four panels, all from the Ask Kit bar, at the bottom: a conversation with the saves in a row of cards; answers laid out like the Library with earlier turns folded to one line; a half sheet where the Library above becomes the answer; and no bubbles — what Kit understood as chips you can take away, the saves as a list. Each with what-to-ask-next chips over the field, in three states: just opened, one question, a follow-up.",
+      "picked": "Not picked yet.",
+      "why": "Pritam: “currently I can't go back and forth … make it conversational; let's design around our search panel now”.",
+      "live": [
+        "ask-kit--four-conversations"
       ]
     }
   ]
