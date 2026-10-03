@@ -12,13 +12,16 @@ import { Field, Head, KIT_ORB, Label, Panel, RecentRows, SaveRows, usePalette } 
 // the bottom, by the thumb, so it's easy to reach and type; above it, before anything's typed,
 // recent searches (big rows) and Jump back in; then the saves that match, newest first, with
 // "Ask Kit about …" to hand the words to Kit.
-export function SearchPanel({ open, onClose, recents, onRecent, onForget, places, selected, onChoose, onAskKit, onOpen, start = '' }: {
+export function SearchPanel({ open, onClose, recents, onRecent, onForget, places, selected, onChoose, onAskKit, onOpen, start = '', typed }: {
   open: boolean; onClose: () => void; recents: string[]; onRecent: (query: string) => void; onForget: (query: string) => void;
   places: { folders: FolderPlace[]; tags: Place[] }; selected: PlaceFilter; onChoose: (place: PlaceFilter) => void;
   onAskKit: (question: string) => void; onOpen: (capture: Capture) => void; start?: string;
+  /** typed: what's in the field, from outside (a playthrough typing it); otherwise the field's own. */
+  typed?: string;
 }) {
   const P = usePalette();
-  const [query, setQuery] = useState(start);
+  const [own, setQuery] = useState(start);
+  const query = typed ?? own;
   const words = query.trim();
   const found = useCollection({ q: words || undefined });
   const close = () => { onClose(); setQuery(''); };

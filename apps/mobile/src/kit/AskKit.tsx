@@ -12,12 +12,15 @@ import { Field, Head, KIT_ORB, Panel, usePalette } from './pieces.tsx';
 // found in a row of the Library's own cards. A follow-up ("about cats") narrows what was asked
 // (kit/conversation). Under the thread, what to ask next; the field at the bottom, by the thumb.
 // Kit here reads the library on the phone; the real one answers on the backend.
-export function AskKit({ open, onClose, questions, onQuestions, captures, tags, onOpen }: {
+export function AskKit({ open, onClose, questions, onQuestions, captures, tags, onOpen, draft }: {
   open: boolean; onClose: () => void; questions: string[]; onQuestions: (questions: string[]) => void;
   captures: Capture[]; tags: string[]; onOpen: (capture: Capture) => void;
+  /** draft: what's in the field, from outside (a playthrough typing it). */
+  draft?: string;
 }) {
   const P = usePalette();
-  const [text, setText] = useState('');
+  const [own, setText] = useState('');
+  const text = draft ?? own;
   const turns = useMemo(() => converse(questions, captures), [questions, captures]);
   const next = followUps(turns[turns.length - 1]?.context ?? null, tags);
   const ask = (question: string) => { const words = question.trim(); if (words) onQuestions([...questions, words]); setText(''); };
