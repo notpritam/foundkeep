@@ -10,7 +10,7 @@ import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Image, Linking, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Capture, RelatedSave } from '../../api/types.ts';
+import type { Capture, Preservation, RelatedSave } from '../../api/types.ts';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { CapturePreview } from '../../components/CapturePreview.tsx';
@@ -37,6 +37,7 @@ export function useSave(id: string) {
   const { client } = useSession();
   const [capture, setCapture] = useState<Capture | null>(null);
   const [related, setRelated] = useState<RelatedSave[]>([]);
+  const [preservation, setPreservation] = useState<{ id: string; value: Preservation | null }>({ id: '', value: null });
   const [error, setError] = useState('');
   useEffect(() => {
     let live = true;
@@ -44,12 +45,14 @@ export function useSave(id: string) {
     const load = (reload = false) => {
       void client.getCapture(id, { reload }).then(value => { if (live) setCapture(value.capture); }).catch(value => { if (live) setError((value as Error).message); });
       void client.relatedCaptures(id, { reload }).then(value => { if (live) setRelated(value.items.filter(item => item.capture.id !== id)); }).catch(() => { if (live) setRelated([]); });
+      // What the server kept of a post — its words, when the save itself has none.
+      void client.getPreservation(id, { reload }).then(value => { if (live) setPreservation({ id, value: value.preservation }); }).catch(() => { if (live) setPreservation({ id, value: null }); });
     };
     load();
     const unsubscribe = client.subscribeInvalidation(() => load(true));
     return () => { live = false; unsubscribe(); };
   }, [client, id]);
-  return { capture: capture?.id === id ? capture : null, related, error, setCapture };
+  return { capture: capture?.id === id ? capture : null, related, preservation: preservation.id === id ? preservation.value : null, error, setCapture };
 }
 export const written = (capture: Capture) => capture.type === 'note' || capture.type === 'selection';
 export const pending = (capture: Capture) => capture.status === 'pending' || capture.status === 'processing';

@@ -13,12 +13,12 @@ function startToFinish() {
     ['final-3-home-search-and-ask-kit--library', '4 · Home: a greeting, Jump back in, the cards'],
     ['final-3-home-search-and-ask-kit--search-word', '5 · Search: from the magnifier, the field at the bottom'],
     ['final-3-home-search-and-ask-kit--follow-up', '6 · Ask Kit: a conversation, one short line per answer'],
-    ['in-the-app-today-save-detail--bookmark', '7 · A save, opened — next to design (today’s screen)'],
+    ['final-6-save-detail--shared-post', '7 · A save, opened: the post’s words, your note, Kit by the thumb'],
     ['in-the-app-today-you--you', '8 · You — not designed yet (today’s screen)'],
   ];
   const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>The app, start to finish</h1><p>Every screen as decided, in the order a person meets it — all live: sign in, the cards gathering while Google opens, first run, home, search, Ask Kit. The last two are the app as it is today, next in line. Each step’s other states are in the App section’s Flow map; how each was chosen is in the Design log.</p></div></header>
+    <header class="bt-intro"><div><h1>The app, start to finish</h1><p>Every screen as decided, in the order a person meets it — all live: sign in, the cards gathering while Google opens, first run, home, search, Ask Kit, a save opened. The last is the app as it is today, next in line. Each step’s other states are in the App section’s Flow map; how each was chosen is in the Design log.</p></div></header>
     <div class="bt-states" role="group" aria-label="Appearance"><button type="button" data-theme="light" aria-pressed="true">Light</button><button type="button" data-theme="dark" aria-pressed="false">Dark</button><span class="bt-gap"></span><a href="./app/?path=/story/flow-map--app" target="_top">The Flow map, every state →</a></div>
     <div class="bt-phones bt-phones-four">${screens.map(([id, name]) => `<figure><iframe loading="lazy" data-story="${id}" title="${name}" src="${src(id, 'light')}"></iframe><figcaption>${name}</figcaption></figure>`).join('')}</div>`;
   el.querySelector('.bt-states').addEventListener('click', event => {
