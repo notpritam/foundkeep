@@ -58,3 +58,9 @@ test('Kit quotes a few words of a long post, cut at a word', () => {
   assert.equal(short('Spaced repetition is not a study hack. It is what remembering looks like when you stop pretending.'), 'Spaced repetition is not a study hack. It is what…');
   assert.equal(short('My cat has learned to open the fridge.'), 'My cat has learned to open the fridge');
 });
+
+test('one save is “a save”, not “1 saves”', () => {
+  const [turn] = converse(['kyoto'], library, NOW);
+  assert.match(turn.reply, /^I found 1 save about kyoto\./);
+  assert.match(converse(['videos about cooking'], library, NOW)[0].reply, /^I found 1 video about cooking\./);
+});

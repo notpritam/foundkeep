@@ -288,9 +288,9 @@
       "product": "App",
       "title": "Ask Kit: a conversation",
       "question": "How does asking Kit go back and forth — “recent post I saved from Twitter”, then “about cats”?",
-      "tried": "A follow-up keeps what was asked and changes only what it says (what kind, from where, about what, how recent); when nothing fits, Kit says so and offers what it found elsewhere. Four panels, all from the Ask Kit bar, at the bottom: a conversation with the saves in a row of cards; answers laid out like the Library with earlier turns folded to one line; a half sheet where the Library above becomes the answer; and no bubbles — what Kit understood as chips you can take away, the saves as a list. Each with what-to-ask-next chips over the field, in three states: just opened, one question, a follow-up.",
+      "tried": "A follow-up keeps what was asked and changes only what it says (what kind, from where, about what, how recent); when nothing fits, Kit says so and offers what it found elsewhere. Four panels, all from the Ask Kit bar, at the bottom: a conversation with the saves in a row of cards; answers laid out like the Library with earlier turns folded to one line; a half sheet where the Library above becomes the answer; and no bubbles — what Kit understood as chips you can take away, the saves as a list. Each with what-to-ask-next chips over the field, in three states: just opened, one question, a follow-up. Then, at Pritam's direction, two ways in instead of the bar: a plain search button on top (the magnifier opens search in the new design — recent searches and Jump back in, then the saves that match, with “Ask Kit about …” to hand the words to Kit), and Kit beside + in the dock — its logo, or a pill that says “Ask Kit”.",
       "picked": "Not picked yet.",
-      "why": "Pritam: “currently I can't go back and forth … make it conversational; let's design around our search panel now”.",
+      "why": "Pritam: “currently I can't go back and forth … make it conversational; let's design around our search panel now”. Then: “give a basic search button on top as well … and Ask Kit or the Kit logo near the + button at the bottom so they can directly go and ask Kit”.",
       "live": [
         "ask-kit--four-conversations"
       ]

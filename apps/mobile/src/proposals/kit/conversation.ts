@@ -34,9 +34,11 @@ export function readAsk(question: string): Ask {
 
 const KIND_NAMES: [Capture['type'][], string][] = [[['tweet', 'image', 'video'], 'posts'], [['tweet'], 'posts'], [['video'], 'videos'], [['image', 'screenshot'], 'photos'], [['bookmark'], 'links'], [['bookmark', 'video'], 'recipes'], [['note'], 'notes'], [['selection'], 'highlights'], [['document'], 'PDFs'], [['audio'], 'voice memos'], [['screenshot'], 'screenshots']];
 const same = (a: string[], b: string[]) => a.length === b.length && a.every(item => b.includes(item));
-/** "posts from X", "videos about cooking", "saves" — what a context covers, in words. */
-export function describe(ask: Pick<Ask, 'kinds' | 'platforms'> & { topic?: string[] }) {
-  const kind = ask.kinds.length ? KIND_NAMES.find(([kinds]) => same(kinds, ask.kinds))?.[1] ?? 'saves' : 'saves';
+const ONE: Record<string, string> = { posts: 'post', videos: 'video', photos: 'photo', links: 'link', recipes: 'recipe', notes: 'note', highlights: 'highlight', PDFs: 'PDF', 'voice memos': 'voice memo', screenshots: 'screenshot', saves: 'save' };
+/** "posts from X", "videos about cooking", "saves" — what a context covers, in words (`count` 1: "a post"…). */
+export function describe(ask: Pick<Ask, 'kinds' | 'platforms'> & { topic?: string[] }, count = 2) {
+  const many = ask.kinds.length ? KIND_NAMES.find(([kinds]) => same(kinds, ask.kinds))?.[1] ?? 'saves' : 'saves';
+  const kind = count === 1 ? ONE[many] ?? many : many;
   return [kind, ask.platforms.length ? `from ${ask.platforms.join(' or ')}` : '', ask.topic?.length ? `about ${ask.topic.join(' ')}` : ''].filter(Boolean).join(' ');
 }
 
@@ -76,7 +78,7 @@ export function converse(questions: string[], captures: Capture[], now = Date.no
       const n = items.length;
       reply = followUp && ask.topic.length && previous
         ? `Of your ${scope}, ${n} ${n === 1 ? 'is' : 'are'} about ${context.topic.join(' ')}: ${quote(items[0], now)}.`
-        : context.topic.length ? `I found ${n} ${describe(context)}. ${n === 1 ? 'It’s' : 'The best match is'} ${quote(items[0], now)}.`
+        : context.topic.length ? `I found ${n} ${describe(context, n)}. ${n === 1 ? 'It’s' : 'The best match is'} ${quote(items[0], now)}.`
         : `Here are your ${scope}, newest first. The latest is ${quote(items[0], now)}.`;
     } else {
       const wider = context.topic.length ? find({ kinds: [], platforms: [], topic: context.topic, recent: context.recent }, captures) : [];
