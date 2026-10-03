@@ -13,8 +13,13 @@
 //             main thing, the folder one row under it.
 // The picture and title of a link come from the iPhone's link previews (LinkPresentation) in the
 // extension; the server names the save again once it's kept. Over a reel in a Reels-style app.
+// Then (Pritam: "one card, one button is good — show a few more like it; drop the edit icon in Add
+// a note; Save is hard to see while you type"): card refined, and three more like it — composer
+// (note and Save as one bar), library (the Library's own card; folders one tap away), bar (Folder
+// and Save in a bar on the keyboard). Each also `typing`: the card folds to a row and Save sits
+// right on the keyboard.
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, TextInput, useWindowDimensions, View, type ImageSourcePropType } from 'react-native';
+import { ActivityIndicator, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View, type ImageSourcePropType, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
@@ -22,7 +27,7 @@ import { useMotionAllowed } from '../../components/motion.tsx';
 import { FILM_PHOTOS, Reel, SCREEN } from '../../first-run/apps.tsx';
 import { usePalette } from '../../kit/pieces.tsx';
 
-export type ShareLook = 'today' | 'card' | 'instant' | 'note';
+export type ShareLook = 'today' | 'card' | 'composer' | 'library' | 'bar' | 'instant' | 'note';
 export type ShareState = 'ready' | 'saving' | 'saved' | 'offline' | 'connect';
 export type ShareKind = 'reel' | 'youtube' | 'post' | 'page' | 'photos' | 'text';
 
@@ -46,7 +51,9 @@ const SHARED: Record<ShareKind, Shared[]> = {
 const FOLDERS = ['Kitchen', 'Reading list', 'Design references', 'Travel'];
 const label = (items: Shared[]) => items.length > 1 ? `${items.length} photos` : items[0]!.type === 'photo' ? 'A photo' : items[0]!.type === 'text' ? 'A highlight' : items[0]!.title ?? 'A link';
 
-export function ShareSheetProposal({ look, kind = 'reel', state = 'ready' }: { look: ShareLook; kind?: ShareKind; state?: ShareState }) {
+/** typing: as it is while you write the note — the keyboard up (the simulator draws it), the card
+ * folded, Save in view. */
+export function ShareSheetProposal({ look, kind = 'reel', state = 'ready', typing = false }: { look: ShareLook; kind?: ShareKind; state?: ShareState; typing?: boolean }) {
   const [now, setNow] = useState<ShareState>(state);
   useEffect(() => { setNow(state); }, [state, kind, look]);
   // Saving, then saved — as the real sheet would, before it closes itself.
@@ -57,7 +64,10 @@ export function ShareSheetProposal({ look, kind = 'reel', state = 'ready' }: { l
     {look === 'today' ? <Today items={items} state={now} onSave={save} />
       : look === 'instant' ? <Instant items={items} state={now === 'ready' ? 'saved' : now} />
       : look === 'note' ? <NoteFirst items={items} state={now} onSave={save} />
-      : <Card items={items} state={now} onSave={save} />}
+      : look === 'composer' ? <Composer items={items} state={now} onSave={save} typing={typing} />
+      : look === 'library' ? <LibraryCard items={items} state={now} onSave={save} typing={typing} />
+      : look === 'bar' ? <KeyboardBar items={items} state={now} onSave={save} typing={typing} />
+      : <Card items={items} state={now} onSave={save} typing={typing} />}
   </View>;
 }
 
@@ -138,13 +148,25 @@ function Pictures({ items, height }: { items: Shared[]; height: number }) {
     {first.site === 'YouTube' || first.site === 'Instagram' ? <View style={styles.play}><Ionicons name="play" size={20} color="#fff" /></View> : null}
   </View>;
 }
-function NoteField({ big = false, placeholder = 'Add a note' }: { big?: boolean; placeholder?: string }) {
+/** The note — no icon, just the words (Pritam, 2026-10-03). `typing` shows it as it is while you
+ * write: focused, with words in it. */
+const TYPED = 'Make this on Sunday — double the garlic';
+function NoteField({ big = false, placeholder = 'Add a note', typing = false, bare = false, style }: { big?: boolean; placeholder?: string; typing?: boolean; bare?: boolean; style?: object }) {
   const P = usePalette();
-  const [text, setText] = useState('');
-  return <View style={[styles.field, big && styles.fieldBig, { backgroundColor: P.surface, borderColor: P.line }]}>
-    {!big ? <Ionicons name="create-outline" size={18} color={P.muted} style={styles.fieldIcon} /> : null}
+  const [text, setText] = useState(typing ? TYPED : '');
+  useEffect(() => { setText(typing ? TYPED : ''); }, [typing]);
+  return <View style={[bare ? styles.fieldBare : [styles.field, big && styles.fieldBig, { backgroundColor: P.surface, borderColor: typing ? P.accent : P.line, borderWidth: typing ? 1.5 : StyleSheet.hairlineWidth }], style]}>
     <TextInput value={text} onChangeText={setText} placeholder={placeholder} placeholderTextColor={P.muted} multiline accessibilityLabel="Note"
-      style={[styles.input, big && styles.inputBig, { color: P.ink }, styles.webInput]} />
+      style={[styles.input, (big || bare) && styles.inputBig, { color: P.ink }, styles.webInput]} />
+  </View>;
+}
+/** What you're saving, small: its picture and title in a row — the card folded while you type. */
+function PreviewRow({ items }: { items: Shared[] }) {
+  const P = usePalette();
+  const first = items[0]!;
+  return <View style={[styles.preview, { backgroundColor: P.surface, borderColor: P.line }]}>
+    {first.type === 'text' ? <View style={[styles.thumb, styles.thumbWords, { backgroundColor: P.accentSoft }]}><Ionicons name="text-outline" size={22} color={P.accentPressed} /></View> : <Image source={first.photo!} style={styles.thumb} accessible={false} />}
+    <View style={styles.previewWords}><Text style={[styles.previewTitle, { color: P.ink }]} numberOfLines={2}>{first.type === 'text' ? first.text : label(items)}</Text><From item={first} size={13} /></View>
   </View>;
 }
 /** The folder, as one small chip; tapping lists the folders. */
@@ -188,28 +210,135 @@ function Close({ label: words = 'Cancel' }: { label?: string }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={words} hitSlop={8} style={({ pressed }) => [styles.close, { backgroundColor: P.surface, borderColor: P.line }, pressed && styles.pressed]}><Ionicons name="close" size={20} color={P.ink} /></Pressable>;
 }
 
-// ——— card: one card, one button ———
+// ——— card: one card, one button (picked as the direction, 2026-10-03) ———
 
-function Card({ items, state, onSave }: { items: Shared[]; state: ShareState; onSave: () => void }) {
+/** The picture large with its title under it — or, while you type, folded into a row so the note
+ * and Save stay in view above the keyboard. */
+function Preview({ items, typing }: { items: Shared[]; typing: boolean }) {
   const P = usePalette();
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const first = items[0]!;
+  if (typing) return <PreviewRow items={items} />;
   const room = width - 40;
   const height = first.type === 'text' ? 0 : items.length > 1 ? room / 3 : Math.min(room / (first.aspect ?? 1.5), 300);
+  return <>
+    <Pictures items={items} height={height} />
+    <View style={styles.cardWords}>
+      <From item={first} />
+      {first.type !== 'text' ? <Text style={[styles.cardTitle, { color: P.ink }]} numberOfLines={3}>{label(items)}</Text> : null}
+    </View>
+  </>;
+}
+/** The sheet's bottom: clear of the home indicator, or right on the keyboard while you type. */
+const useBottom = (typing: boolean) => { const insets = useSafeAreaInsets(); return typing ? 10 : Math.max(insets.bottom, 14); };
+
+/** One card, one button — Save full width by the thumb, riding on the keyboard while you type. */
+function Card({ items, state, onSave, typing = false }: { items: Shared[]; state: ShareState; onSave: () => void; typing?: boolean }) {
+  const bottom = useBottom(typing);
   return <Sheet>
     <View style={styles.cardHead}><Close /></View>
-    <View style={[styles.cardBody, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+    <View style={[styles.cardBody, { paddingBottom: bottom }]}>
       <View style={styles.cardTop}>
-        <Pictures items={items} height={height} />
-        <View style={styles.cardWords}>
-          {items.length === 1 ? <From item={first} /> : <From item={first} />}
-          {first.type !== 'text' ? <Text style={[styles.cardTitle, { color: P.ink }]} numberOfLines={3}>{label(items)}</Text> : null}
-        </View>
-        <NoteField />
+        <Preview items={items} typing={typing} />
+        <NoteField typing={typing} big={typing} />
         <FolderChip />
       </View>
       <View style={styles.cardBottom}><Line state={state} /><SaveButton state={state} onSave={onSave} /></View>
+    </View>
+  </Sheet>;
+}
+
+/** Composer: the note and Save as one bar at the bottom, as Ask Kit's field is — so Save is always
+ * beside what you're writing. */
+function Composer({ items, state, onSave, typing = false }: { items: Shared[]; state: ShareState; onSave: () => void; typing?: boolean }) {
+  const P = usePalette();
+  const bottom = useBottom(typing);
+  return <Sheet>
+    <View style={styles.cardHead}><Close /></View>
+    <View style={[styles.cardBody, { paddingBottom: bottom }]}>
+      <View style={styles.cardTop}><Preview items={items} typing={typing} /><FolderChip /></View>
+      <View style={styles.cardBottom}>
+        <Line state={state} />
+        {state === 'connect' ? <SaveButton state="connect" onSave={() => {}} /> : <View style={styles.composer}>
+          <NoteField typing={typing} style={styles.flex} />
+          <Pressable accessibilityRole="button" accessibilityLabel={state === 'ready' ? 'Save' : state === 'saving' ? 'Saving' : 'Saved'} onPress={onSave} disabled={state !== 'ready'}
+            style={({ pressed }) => [styles.composerSave, { backgroundColor: state === 'ready' ? P.ink : P.accentSoft }, pressed && styles.pressed]}>
+            {state === 'saving' ? <ActivityIndicator color={P.ink} /> : state === 'ready' ? <Text style={[styles.saveText, { color: P.paper }]}>Save</Text> : <Ionicons name="checkmark" size={22} color={P.accentPressed} />}
+          </Pressable>
+        </View>}
+      </View>
+    </View>
+  </Sheet>;
+}
+
+/** The Library's card: the picture with its title on a frosted caption, as it will sit in your
+ * Library; folders as one-tap chips; Save full width. */
+function LibraryCard({ items, state, onSave, typing = false }: { items: Shared[]; state: ShareState; onSave: () => void; typing?: boolean }) {
+  const P = usePalette();
+  const { width } = useWindowDimensions();
+  const bottom = useBottom(typing);
+  const first = items[0]!;
+  const room = width - 40;
+  const height = items.length > 1 ? room / 2.2 : Math.min(room / (first.aspect ?? 1.5), 320);
+  return <Sheet>
+    <View style={styles.cardHead}><Close /></View>
+    <View style={[styles.cardBody, { paddingBottom: bottom }]}>
+      <View style={styles.cardTop}>
+        {typing ? <PreviewRow items={items} /> : first.type === 'text'
+          ? <View style={[styles.libraryWords, { backgroundColor: P.surface, borderColor: P.line }]}><Text style={[styles.quoteText, { color: P.ink }]}>{first.text}</Text><From item={first} size={13} /></View>
+          : <View style={[styles.libraryCard, { height, backgroundColor: P.note }]}>
+            {items.length > 1 ? <View style={[styles.photos, StyleSheet.absoluteFill]}>{items.slice(0, 3).map((item, index) => <Image key={index} source={item.photo!} style={styles.photoTile} accessible={false} />)}</View>
+              : <Image source={first.photo!} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} />}
+            <View style={[styles.caption, { backgroundColor: P.glassCard }, styles.frost]}>
+              <From item={first} size={13} />
+              <Text style={[styles.captionTitle, { color: P.ink }]} numberOfLines={2}>{label(items)}</Text>
+            </View>
+          </View>}
+        <NoteField typing={typing} big={typing} />
+        <FolderChips />
+      </View>
+      <View style={styles.cardBottom}><Line state={state} /><SaveButton state={state} onSave={onSave} /></View>
+    </View>
+  </Sheet>;
+}
+/** Folders one tap away: the recent ones as chips; tap again to take it off. */
+function FolderChips() {
+  const P = usePalette();
+  const [folder, setFolder] = useState<string | null>(null);
+  return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipsRow}>
+    {FOLDERS.map(name => { const on = folder === name; return <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setFolder(on ? null : name)}
+      style={({ pressed }) => [styles.chip, { backgroundColor: on ? P.accentSoft : P.surface, borderColor: on ? P.accentSoft : P.line }, pressed && styles.pressed]}>
+      <Ionicons name={on ? 'checkmark' : 'folder-outline'} size={15} color={on ? P.accentPressed : P.muted} /><Text style={[styles.chipText, { color: on ? P.accentPressed : P.ink }]}>{name}</Text>
+    </Pressable>; })}
+    <Pressable accessibilityRole="button" accessibilityLabel="New folder" style={({ pressed }) => [styles.chip, { borderColor: P.line }, pressed && styles.pressed]}><Ionicons name="add" size={16} color={P.muted} /></Pressable>
+  </ScrollView>;
+}
+
+/** A bar on the keyboard: the note written straight on the sheet; Folder and Save in one bar along
+ * the bottom — on the keyboard while you type, as the iPhone's own compose sheets do. */
+function KeyboardBar({ items, state, onSave, typing = false }: { items: Shared[]; state: ShareState; onSave: () => void; typing?: boolean }) {
+  const P = usePalette();
+  const bottom = useBottom(typing);
+  const words = state === 'saving' ? 'Saving…' : state === 'saved' || state === 'offline' ? 'Saved' : 'Save';
+  return <Sheet>
+    <View style={styles.cardHead}><Close /></View>
+    <View style={styles.barBody}>
+      <View style={styles.cardTop}>
+        <Preview items={items} typing={typing} />
+        {state === 'connect' ? null : <NoteField bare typing={typing} placeholder="Add a note…" />}
+      </View>
+    </View>
+    <View style={[styles.bar, { borderTopColor: P.line, backgroundColor: P.paper, paddingBottom: bottom }]}>
+      <Line state={state} />
+      {state === 'connect' ? <SaveButton state="connect" onSave={() => {}} /> : <View style={styles.barRow}>
+        <FolderChip quiet />
+        <View style={styles.flex} />
+        <Pressable accessibilityRole="button" accessibilityLabel={words} onPress={onSave} disabled={state !== 'ready'}
+          style={({ pressed }) => [styles.barSave, { backgroundColor: state === 'ready' ? P.ink : P.accentSoft }, pressed && styles.pressed]}>
+          {state === 'saving' ? <ActivityIndicator color={P.ink} /> : state !== 'ready' ? <Ionicons name="checkmark" size={18} color={P.accentPressed} /> : null}
+          <Text style={[styles.saveText, { color: state === 'ready' ? P.paper : P.accentPressed }]}>{words}</Text>
+        </Pressable>
+      </View>}
     </View>
   </Sheet>;
 }
@@ -255,7 +384,7 @@ function NoteFirst({ items, state, onSave }: { items: Shared[]; state: ShareStat
     <View style={[styles.nav, { borderBottomColor: P.line }]}>
       <Text style={[styles.navText, { color: P.ink }]} accessibilityRole="button">Cancel</Text>
       <View style={styles.navTitle}><Image source={ICON} style={styles.navMark} accessible={false} /><Text style={[styles.navTitleText, { color: P.ink }]}>FoundKeep</Text></View>
-      <Text style={[styles.navText, styles.bold, { color: state === 'ready' ? P.accentPressed : P.muted, minWidth: 54, textAlign: 'right' }]} accessibilityRole="button" onPress={onSave}>{action}</Text>
+      {action ? <Text style={[styles.navText, styles.bold, { color: state === 'ready' ? P.accentPressed : P.muted, minWidth: 54, textAlign: 'right' }]} accessibilityRole="button" onPress={onSave}>{action}</Text> : <View style={styles.navSpacer} />}
     </View>
     <View style={[styles.noteBody, { paddingBottom: insets.bottom + 16 }]}>
       <View style={[styles.preview, { backgroundColor: P.surface, borderColor: P.line }]}>
@@ -304,9 +433,9 @@ const styles = StyleSheet.create({
   photoTile: { flex: 1, height: '100%' },
   quote: { borderLeftWidth: 3, paddingLeft: 14, paddingVertical: 4 },
   quoteText: { fontSize: 19, lineHeight: 28 },
-  field: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4, minHeight: 50 },
+  field: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 3, minHeight: 50, justifyContent: 'center' },
+  fieldBare: { paddingHorizontal: 2 },
   fieldBig: { minHeight: 170, borderRadius: 18, paddingTop: 8 },
-  fieldIcon: { marginTop: 13 },
   input: { flex: 1, minWidth: 0, fontSize: 16.5, minHeight: 40, paddingVertical: 11 },
   inputBig: { fontSize: 18, lineHeight: 26, minHeight: 150, textAlignVertical: 'top' },
   webInput: { outlineStyle: 'none' } as object,
@@ -327,6 +456,19 @@ const styles = StyleSheet.create({
   cardWords: { gap: 6 },
   cardTitle: { fontSize: 21, lineHeight: 27, fontWeight: '700', letterSpacing: -0.3 },
   cardBottom: { gap: 10 },
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  composerSave: { height: 50, minWidth: 80, borderRadius: 25, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
+  libraryCard: { borderRadius: 26, overflow: 'hidden', width: '100%' },
+  libraryWords: { borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, padding: 16, gap: 10 },
+  caption: { position: 'absolute', left: 8, right: 8, bottom: 8, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 10, gap: 4 },
+  captionTitle: { fontSize: 17, lineHeight: 22, fontWeight: '700' },
+  frost: (Platform.OS === 'web' ? { backdropFilter: 'blur(14px) saturate(140%)', WebkitBackdropFilter: 'blur(14px) saturate(140%)' } : {}) as ViewStyle,
+  chipsRow: { flexGrow: 0, marginHorizontal: -20 },
+  chips: { gap: 8, paddingHorizontal: 20 },
+  barBody: { flex: 1, paddingHorizontal: 20, paddingTop: 10 },
+  bar: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 10, gap: 8 },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  barSave: { height: 44, borderRadius: 22, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   // instant
   instant: { padding: 16, gap: 14 },
   instantHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -341,6 +483,7 @@ const styles = StyleSheet.create({
   // note
   nav: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: StyleSheet.hairlineWidth },
   navText: { fontSize: 17 },
+  navSpacer: { minWidth: 54 },
   navTitle: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   navMark: { width: 22, height: 22, borderRadius: 5 },
   navTitleText: { fontSize: 17, fontWeight: '700' },
