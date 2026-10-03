@@ -51,3 +51,14 @@ export function preservedAssetSource(captureId: string, assetId: string, token: 
 export function galleryColumns(width: number, fontScale: number): 1 | 2 {
   return width < 340 || fontScale >= 1.3 ? 1 : 2;
 }
+
+/** A card's picture, as a share of the card's width (Pritam, 2026-10-03): a fixed height for a
+ * page, a PDF or a full-page screenshot; a photo or a video at least that tall, taller for a tall
+ * one, never past the most. */
+export const PREVIEW = { fixed: 0.72, most: 1.35 };
+export function previewAspect(capture: Partial<Pick<Capture, 'type' | 'width' | 'height' | 'provenance'>>): number {
+  const page = capture.type === 'bookmark' || capture.type === 'document' || capture.type === 'file' || capture.provenance?.captureMethod === 'extension-full-page';
+  if (page || !capture.width || !capture.height) return 1 / PREVIEW.fixed;
+  const tall = capture.height / capture.width;
+  return 1 / Math.min(PREVIEW.most, Math.max(PREVIEW.fixed, tall));
+}

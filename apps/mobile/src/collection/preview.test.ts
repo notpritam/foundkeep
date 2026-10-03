@@ -44,3 +44,19 @@ test('preservedAssetSource builds only the owned mobile asset route with a beare
   assert.equal(preservedAssetSource('cap-1', 'asset-9', null, 'acc-a', 42), null);
   assert.equal(preservedAssetSource('cap-1', '', 'tok', 'acc-a', 42), null);
 });
+
+test('a page, a PDF or a full-page screenshot shows at one fixed height', async () => {
+  const { previewAspect, PREVIEW } = await import('./preview.ts');
+  assert.equal(previewAspect({ type: 'bookmark', width: 780, height: 400 }), 1 / PREVIEW.fixed);
+  assert.equal(previewAspect({ type: 'document', width: 1280, height: 1787 }), 1 / PREVIEW.fixed);
+  assert.equal(previewAspect({ type: 'screenshot', width: 1280, height: 1787, provenance: { captureMethod: 'extension-full-page' } }), 1 / PREVIEW.fixed);
+});
+
+test('a picture is at least that tall, grows with a tall image, and stops at the most', async () => {
+  const { previewAspect, PREVIEW } = await import('./preview.ts');
+  assert.equal(previewAspect({ type: 'image', width: 1600, height: 600 }), 1 / PREVIEW.fixed);
+  assert.equal(previewAspect({ type: 'image', width: 800, height: 800 }), 1);
+  assert.equal(previewAspect({ type: 'image', width: 600, height: 2400 }), 1 / PREVIEW.most);
+  assert.equal(previewAspect({ type: 'video', width: 1080, height: 1920 }), 1 / PREVIEW.most);
+  assert.equal(previewAspect({ type: 'image' }), 1 / PREVIEW.fixed);
+});

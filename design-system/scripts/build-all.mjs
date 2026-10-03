@@ -15,7 +15,10 @@ const only = process.argv.slice(2);
 for (const [name, cwd, args] of steps) {
   if (only.length && !only.includes(name)) continue;
   const started = Date.now();
-  const run = spawnSync('/usr/bin/node', [path.join(cwd, 'node_modules/.bin/storybook'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, STORYBOOK_DISABLE_TELEMETRY: '1' } });
+  const build = () => spawnSync('/usr/bin/node', [path.join(cwd, 'node_modules/.bin/storybook'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, STORYBOOK_DISABLE_TELEMETRY: '1' } });
+  let run = build();
+  // Storybook sometimes races itself creating dist/assets (EEXIST); once more, and it builds.
+  if (run.status !== 0 && /EEXIST/.test(run.stdout + run.stderr)) run = build();
   if (run.status !== 0) { process.stderr.write(run.stdout + run.stderr); console.error(`✖ ${name} failed`); process.exit(1); }
   console.log(`✓ ${name} built in ${Math.round((Date.now() - started) / 1000)}s`);
 }

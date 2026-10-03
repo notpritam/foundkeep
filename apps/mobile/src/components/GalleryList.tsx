@@ -2,9 +2,9 @@ import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { router } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
-import { masonryLayout, previewRatio } from '../../../../packages/shared/src/collection-presentation.ts';
+import { masonryLayout } from '../../../../packages/shared/src/collection-presentation.ts';
 import { captureTitle } from '../collection/model.ts';
-import { galleryColumns } from '../collection/preview.ts';
+import { galleryColumns, previewAspect } from '../collection/preview.ts';
 import { useCollection } from '../collection/useCollection.ts';
 import { MotionBoundary } from './motion.tsx';
 import { useScreenReader } from './useScreenReader.ts';
@@ -40,7 +40,7 @@ export function GalleryList({ collection, archived = false, filtered = false, he
     if (cached?.key === keys[index]) return cached.height;
     const written = item.type === 'note' || item.type === 'selection';
     const textLines = Math.min(4, Math.ceil(captureTitle(item).length / Math.max(10, (itemWidth - 44) / (8 * fontScale))));
-    return (written ? 0 : (itemWidth - 12) / previewRatio(item.width, item.height) - 26) + 110 + textLines * 21 * fontScale + (item.folder ? 22 * fontScale : 0) + (item.userTags?.length ? 24 * fontScale : 0);
+    return (written ? 0 : (itemWidth - 12) / previewAspect(item) - 26) + 110 + textLines * 21 * fontScale + (item.folder ? 22 * fontScale : 0) + (item.userTags?.length ? 24 * fontScale : 0);
   }), contentWidth, columns, 12);
   const previous = useRef<{ captures: Capture[]; layout: typeof layout; headerSpace: number; width: number } | null>(null);
   // Keep the visible save anchored when a background refresh prepends new items,

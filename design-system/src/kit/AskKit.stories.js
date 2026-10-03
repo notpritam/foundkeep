@@ -64,13 +64,13 @@ function finalAndVariations() {
   const el = document.createElement('div');
   el.className = 'bt';
   const home = [
-    ['proposals-home-and-ask-kit--home-final', 'Final: “The collection.”, Jump back in, the cards; the magnifier on top, Kit’s orb beside +'],
-    ['proposals-home-and-ask-kit--home-greeting', 'A greeting: “Good evening, Lena” and your counts, in place of “The collection.”'],
+    ['proposals-home-and-ask-kit--home-final', 'Final: a greeting — “Good morning, Lena”, “Hey Lena”, “Welcome back, Lena”, steady through each part of the day — then Jump back in and the cards'],
+    ['proposals-home-and-ask-kit--home-greeting', '“The collection.”, the first final'],
     ['proposals-home-and-ask-kit--home-compact', 'Compact: no big title — Jump back in right under the top bar, more saves in view'],
     ['proposals-home-and-ask-kit--home-nudge', 'A nudge: a small card under Jump back in that asks Kit an example question'],
   ];
   const kit = [
-    ['proposals-home-and-ask-kit--kit-final', 'Final: one short line per answer, the saves in a row of cards'],
+    ['proposals-home-and-ask-kit--kit-final', 'Final: one short line per answer, the saves as cards that take the width; the thread blurs under the header and above the field'],
     ['proposals-home-and-ask-kit--kit-list', 'The saves as a list under each answer: quicker to scan'],
     ['proposals-home-and-ask-kit--kit-lead', 'The best match large, the rest in a row'],
     ['proposals-home-and-ask-kit--kit-thinking', 'A thinking moment: “Looking through your saves…” before each answer'],
@@ -78,7 +78,7 @@ function finalAndVariations() {
   const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
   const row = list => `<div class="bt-phones bt-phones-four">${list.map(([id, name]) => `<figure><iframe loading="lazy" data-story="${id}" title="${name}" src="${src(id, 'light')}"></iframe><figcaption>${name}</figcaption></figure>`).join('')}</div>`;
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>Home and Ask Kit: final, and variations</h1><p>Both closed. The first phone in each row is the final — the home screen as locked, and Ask Kit as a conversation with one short line per answer. Beside each, variations of it. Every phone is live: tap the magnifier, tap Kit’s orb, type a follow-up.</p></div></header>
+    <header class="bt-intro"><div><h1>Home and Ask Kit: final, and variations</h1><p>Both locked. The first phone in each row is the final — home with a greeting (it changes with the day and its part, and never runs past one line), and Ask Kit as a conversation: one short line per answer, the saves as cards that take the width, the thread blurring under the header and above the field. Card pictures keep one height for pages and PDFs and grow for tall photos, up to a most. Beside each final, variations of it. Every phone is live.</p></div></header>
     <div class="bt-states" role="group" aria-label="Appearance"><button type="button" data-theme="light" aria-pressed="true">Light</button><button type="button" data-theme="dark" aria-pressed="false">Dark</button><span class="bt-gap"></span><button type="button" data-restart>Play again</button></div>
     <h2 class="bt-part">Home</h2>${row(home)}
     <h2 class="bt-part">Ask Kit</h2>${row(kit)}`;
