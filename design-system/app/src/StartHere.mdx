@@ -7,15 +7,20 @@ import { Meta } from '@storybook/addon-docs/blocks';
 Every screen here is the real app — its React Native components, rendered on the
 web — running on a sample library (one account, a save of every kind).
 
-**<a href="/app/?path=/story/current-library--library" target="_top">Open the app simulator ↗</a>**
+**<a href="/app/?path=/story/flow-map--app" target="_top">Open the app simulator ↗</a>**
 — the toolbar there switches the device (iPhone 17 Pro, iPhone SE, Pixel 9, iPad),
 light and dark, text size (100 / 135 / 200%), reduced motion and reduced
 transparency. Inside the combined design system these switches are not
 available: Storybook does not pass them to a composed section.
 
-- **Current** — today's screens, the baseline every proposal is compared with.
-- **Proposals** — variants to choose from, flow by flow. Picked ones become
-  the real screen and the proposals are removed.
+- **Flow map** — every screen in the order a person meets it.
+- **Final** — the design as decided, in flow order: sign in, first run, home,
+  search and Ask Kit, the Library card for every kind of save, Jump back in.
+- **In the app today** — screens not designed yet (save detail, saving, You,
+  links), and the Library as the app still shows it.
+- **Open** — choices not made yet.
+- **Tried** — every variation that was tried and set aside, kept so the story
+  of how each screen was chosen can be told (the Design log tells it).
 
 The web version is close to iOS but not exact: fonts, blur, native sheets and
 the share sheet differ. The last check on every flow is TestFlight and the

@@ -40,9 +40,9 @@ function brand() {
     <h2 class="bt-part">In the app</h2>
     <p>iOS draws SF Pro on its own: the app sets no family.</p>
     <div class="bt-phones">
-      ${screen('app', 'current-library--library', 'Library')}
-      ${screen('app', 'current-save-detail--full-page', 'A saved page')}
-      ${screen('app', 'current-you--you', 'You')}
+      ${screen('app', 'in-the-app-today-library--library', 'Library')}
+      ${screen('app', 'in-the-app-today-save-detail--full-page', 'A saved page')}
+      ${screen('app', 'in-the-app-today-you--you', 'You')}
     </div>
     <h2 class="bt-part">On the web</h2>
     <p>foundkeep.app and the dashboard, through <code>--fk-font-sans</code>.</p>

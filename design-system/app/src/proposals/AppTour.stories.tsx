@@ -4,7 +4,7 @@ import type { KitLook } from '../../../../apps/mobile/src/proposals/kit/Kit.tsx'
 
 // The app, start to finish, playing by itself (2026-10-03) — one tour per Kit design, for the video
 // and the poll on X. Board: App tour / Four versions. Filmed with scripts/capture-story.mjs.
-const meta: Meta = { title: 'Proposals/App tour', parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/sign-in', params: {} } } };
+const meta: Meta = { title: 'Open/App tour', parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/sign-in', params: {} } } };
 // Signed in throughout: the sign-in screen doesn't mind, and the Library needs it to load pictures.
 export default meta;
 type Story = StoryObj;

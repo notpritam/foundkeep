@@ -3,7 +3,7 @@ import { SearchAndKit } from '../../../../apps/mobile/src/proposals/kit/Locked.t
 
 // Home and Ask Kit, closed 2026-10-03: the final of each, then variations of it. Board: Home and
 // Ask Kit / Final, and variations. The final's every state: Current/Search and Ask Kit.
-const meta: Meta = { title: 'Proposals/Home and Ask Kit', parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/collection', params: {} } } };
+const meta: Meta = { title: 'Tried/Home and Ask Kit', parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/collection', params: {} } } };
 export default meta;
 type Story = StoryObj;
 // The greeting became the final (2026-10-03); "The collection.", the first final, is a variation now.

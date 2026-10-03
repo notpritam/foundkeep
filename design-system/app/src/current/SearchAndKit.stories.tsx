@@ -4,7 +4,7 @@ import { SearchAndKit, type LockedState } from '../../../../apps/mobile/src/prop
 // Search and Ask Kit, locked 2026-10-03 (Pritam): the magnifier on top opens Search, its field at the
 // bottom; Kit's orb beside + opens Ask Kit, a conversation with one short line per answer. Every
 // state, to look at and refine one by one. The tried versions: Proposals/Ask Kit, Proposals/Search and Kit.
-const meta: Meta = { title: 'Current/Search and Ask Kit', parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/collection', params: {} } } };
+const meta: Meta = { title: 'Final/3 Home, search and Ask Kit', parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/collection', params: {} } } };
 export default meta;
 type Story = StoryObj;
 const at = (state: LockedState): Story => ({ render: () => <SearchAndKit state={state} /> });

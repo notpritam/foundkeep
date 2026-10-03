@@ -4,7 +4,7 @@ import CollectionScreen, { CollectionScreen as Collection } from '../../../../ap
 import { StoryTabs } from '../StoryTabs.tsx';
 
 const meta: Meta = {
-  title: 'Current/Library',
+  title: 'In the app today/Library',
   parameters: { simulator: true, layout: 'fullscreen', route: { pathname: '/collection', params: {} }, docs: { description: { component: 'Today’s Library tab, on the sample world.' } } },
   render: () => <StoryTabs active="collection"><CollectionScreen /></StoryTabs>,
 };

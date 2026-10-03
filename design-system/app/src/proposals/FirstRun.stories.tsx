@@ -13,7 +13,7 @@ import { PointerPath } from '../Playthrough.tsx';
 // Android's share menu. Side by side: First run / Four ways on the page.
 type Args = { os: 'ios' | 'android'; play: boolean };
 const meta: Meta<Args> = {
-  title: 'Proposals/First run',
+  title: 'Tried/First run',
   parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/onboarding', params: {} } },
   args: { os: 'ios', play: true },
   argTypes: { os: { options: ['ios', 'android'] }, play: { control: 'boolean' } },

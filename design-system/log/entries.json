@@ -158,7 +158,7 @@
       "picked": "Drift, in the app for now — still open.",
       "why": "Not picked yet; drift is what the app uses.",
       "live": [
-        "sign-in--movement"
+        "decided-sign-in--movement"
       ]
     },
     {
@@ -171,9 +171,9 @@
       "picked": "Version one, in the app. Versions two and three kept for an A/B test.",
       "why": "On X, people said version one was much better.",
       "live": [
-        "sign-in--pick-one",
-        "sign-in--two-versions",
-        "sign-in--film-variations"
+        "decided-sign-in--pick-one",
+        "decided-sign-in--two-versions",
+        "decided-sign-in--film-variations"
       ]
     },
     {
@@ -201,7 +201,7 @@
       "picked": "The cards gather — and go back to their places if it didn't finish. Then, on review: three or four words inside the ring, smaller, and a wider ring, so the cards never crowd the text.",
       "why": "Pritam: “this is good”; then “they are very near the text … we don't need to write that much”.",
       "live": [
-        "sign-in--handoff"
+        "decided-sign-in--handoff"
       ]
     },
     {
@@ -214,7 +214,7 @@
       "picked": "Watch it happen — remade for the app with an X-style post (FoundKeep right in the share sheet's row) and a reel (slide to More, then FoundKeep), the iOS 26 share sheet and FoundKeep's own save sheet; each save leaves as one of the sign-in screen's floating cards. Shown once on each device after signing in. Provisional: once the other screens are designed, Pritam records the real flow and it is remade from that recording.",
       "why": "Pritam: watch it happen, with better post and reel screens, FoundKeep straight from the row or through More, playing by itself — “once we are done with all of our designs of the other screens, I will record and share the video … and make it much more real”.",
       "live": [
-        "first-run--four-ways"
+        "decided-first-run--four-ways"
       ]
     },
     {
@@ -227,7 +227,7 @@
       "picked": "Today's layout, with the scroll edge (on in the app). Next: the cards — how each kind of save looks, with its platform, tags and folder, to make it clean.",
       "why": "Pritam picked “Today, with the scroll edge” — and “we will work on our cards design … for each type of save … to clear out everything and make our UI clean”.",
       "live": [
-        "library--four-ways"
+        "decided-library--four-ways"
       ]
     },
     {
@@ -240,7 +240,7 @@
       "picked": "A progressive blur at the top and bottom of scrolling screens, placed as in the reference: full strength over the status bar and the pinned top bar, clearing in a short strip just below it; at the bottom, starting at the dock's middle so what's above it stays sharp. On the phone, expo-backdrop's native ProgressiveBlurView (public UIKit and Android APIs; fades in once content is under it); on the web, stacked CSS backdrop blurs. Shown on today's Library (behind a switch, off in the app until picked) and the Library proposals.",
       "why": "Pritam: “now in our scroll we will have progress blur in our app”, with the recording; then “positioning of blur is wrong — show me how it will look on today's collection page”. The first try blurred too far below the bar and started well above the dock.",
       "live": [
-        "library--four-ways"
+        "decided-library--four-ways"
       ]
     },
     {
@@ -253,7 +253,7 @@
       "picked": "Today's style, concise — icons instead of words (the platform's own mark, a phone for “iPhone”, a laptop for the browser extension, a folder; a shimmer while it's prepared) and no tags — clean and white, with glass only on the caption: frosted white, the picture softly blurred through it where it overlaps. Glass on the whole card, with colour fields under saves without a picture, was tried and set aside (kept: proposals/cards/GlassEverywhereCard); the card replaced is proposals/cards/BeforeCard. Locked 2026-10-03, with a story for every kind of save (Current/Library card) to refine each later.",
       "why": "Pritam: “Today, concise looks good — let's use that, with glass”; then “make the other things colourful”; then “the glass should be white, only on the caption — small kitchen, weeknight tomato rigatoni, 3 days ago kitchen — the rest clean, not a lot of colours”.",
       "live": [
-        "library--cards"
+        "decided-library--cards"
       ]
     },
     {
@@ -266,7 +266,7 @@
       "picked": "The field always above the dock, opening at the bottom by the thumb — renamed “Ask Kit” (no “Search”); Jump back in heads the Library. Next: the conversation (2026-10-03-ask-kit).",
       "why": "Pritam: “instead of [links, images, notes, documents] show some of the recent tags … or recent collections, dynamic”; “recent searches more accessible”; “something like the + for search”; “a proper agent button … basic search plus agentic search”. Then: “make the search and Ask Kit the same — whenever a user needs to search they activate Kit itself; normal search is handled by the backend; the UI generic and search-based”. Then: “the search panel at the bottom once you open it is nice, easy to access — change it to Ask Kit itself, no need to have Search”.",
       "live": [
-        "search-and-kit--four-ways"
+        "decided-search-and-kit--four-ways"
       ]
     },
     {
@@ -279,7 +279,7 @@
       "picked": "Jump back in — locked, in every Library design (components/JumpBackIn, collection/places, tested).",
       "why": "Pritam: “the jump back in part — collections, tags like cooking — is good; lock this part in all of our designs”.",
       "live": [
-        "search-and-kit--four-ways"
+        "decided-search-and-kit--four-ways"
       ]
     },
     {
@@ -292,8 +292,8 @@
       "picked": "A conversation — your questions and Kit's answers, each answer one short line, a touch larger (“3 posts from X, newest first.” → “1 of them is about cats.”), the saves in a row of the Library's cards — headed “Ask Kit” with the orb, opened from Kit's orb (the logo only) beside + in the dock. Search, from the magnifier on top, locked with its field moved to the bottom. Locked as app components: kit/AskKit, kit/SearchPanel, kit/conversation (tested); not yet in the app's live Library.",
       "why": "Pritam: “currently I can't go back and forth … make it conversational; let's design around our search panel now”. Then: “give a basic search button on top as well … and Ask Kit or the Kit logo near the + button at the bottom so they can directly go and ask Kit”. Then: “lock the search panel but move the search bar to the bottom … for Ask Kit we go with A conversation … header Ask Kit with the logo … agent response text short, no clutter, slightly bigger … on our home page the Kit logo only”.",
       "live": [
-        "ask-kit--locked",
-        "ask-kit--four-conversations"
+        "decided-ask-kit--locked",
+        "decided-ask-kit--four-conversations"
       ]
     },
     {
@@ -306,7 +306,7 @@
       "picked": "Not picked yet — the four versions go to a poll on X.",
       "why": "Pritam: “create a video of our app from auth page to homepage loading, user searching and interacting with Kit … 4 variations, each with their own Kit UI … showing in Storybook first … I'll post on Twitter to keep users engaged”.",
       "live": [
-        "app-tour--four-versions"
+        "open-app-tour--four-versions"
       ]
     },
     {
@@ -319,7 +319,7 @@
       "picked": "Locked. Home: a greeting by name — the time of day, “Hey Lena”, “Welcome back, Lena” — chosen from the day and its part so it holds steady, never past one line (home/greeting, tested), then your counts, Jump back in and the cards; the magnifier on top for Search, Kit's orb beside + for Ask Kit. Ask Kit: a conversation, one short line per answer, the saves as cards that take the width (one spans the row, two share it, more scroll with a hint of the next), the thread blurring under the header and above the field (as the Library's scroll edge; the search panel too). “The collection.” — the first final — and the other variations stay as options.",
       "why": "Pritam: “let's close our Ask Kit page design and home screen now — you got both right; give me the final version and some variations as well”. The app tour video is paused for later. Then: “Good morning, Lena is clean, we'll use that — random time-of-day greetings, ‘Hey Pritam’, ‘Welcome back, Pritam’, deterministic, never overflowing; the header/footer progressive blur in Ask Kit too; cards that take the width; and now let's lock this”.",
       "live": [
-        "ask-kit--final-and-variations"
+        "decided-ask-kit--final-and-variations"
       ]
     },
     {
@@ -332,7 +332,7 @@
       "picked": "A fixed height for a page, a PDF or a full-page screenshot (0.72 of the card's width); a photo or a video at least that tall, taller when it's tall, up to a most (1.35) — collection/preview previewAspect, tested. A post with only words shows its words, not an empty picture.",
       "why": "Pritam: “in our card preview let's have a fixed height for image, PDF or page; it expands if there's a very big image, with a max height on it”.",
       "live": [
-        "ask-kit--final-and-variations"
+        "decided-ask-kit--final-and-variations"
       ]
     }
   ]

@@ -3,7 +3,7 @@ import CaptureDetail from '../../../../apps/mobile/src/app/(app)/capture/[id].ts
 import SavedTogether from '../../../../apps/mobile/src/app/(app)/batch/[id].tsx';
 import { saves } from '../../../fixtures/world.ts';
 
-const meta: Meta = { title: 'Current/Save detail', parameters: { simulator: true, layout: 'fullscreen' }, render: () => <CaptureDetail /> };
+const meta: Meta = { title: 'In the app today/Save detail', parameters: { simulator: true, layout: 'fullscreen' }, render: () => <CaptureDetail /> };
 export default meta;
 type Story = StoryObj;
 const detail = (id: string, name: string): Story => ({ name, parameters: { route: { pathname: '/capture/' + id, params: { id }, header: 'Saved item' } } });

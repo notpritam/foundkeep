@@ -8,7 +8,7 @@ import { KitProposal, type KitEntry, type KitLook, type KitState } from '../../.
 // Ask Kit / Four conversations switches every phone at once. You can type and tap in any of them.
 type Args = { state: KitState; entry: KitEntry };
 const meta: Meta<Args> = {
-  title: 'Proposals/Ask Kit',
+  title: 'Tried/Ask Kit',
   parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/collection', params: {} } },
   args: { state: 'followup', entry: 'orb' },
   argTypes: { state: { options: ['library', 'search', 'open', 'first', 'followup'] }, entry: { options: ['orb', 'pill'] } },

@@ -19,7 +19,7 @@ import { useMotionAllowed } from '../../components/motion.tsx';
 import { GlassSurface } from '../../components/ScenicSurface.tsx';
 import { ScrollEdge } from '../../components/ScrollEdge';
 import { Brand } from '../../components/ui.tsx';
-import { useScrollEdges } from '../../components/useScrollEdges.ts';
+import { EDGE_FADE, useScrollEdges } from '../../components/useScrollEdges.ts';
 import { captureTitle } from '../../collection/model.ts';
 import { origin } from '../../collection/origin.ts';
 import { useCollection } from '../../collection/useCollection.ts';
@@ -61,8 +61,8 @@ export function LibraryShell({ library, header, actions, bottomExtra = 0, childr
   const [headerHeight, setHeaderHeight] = useState(180);
   const dock = useDockOnScroll(headerHeight);
   return <View style={[styles.fill, { backgroundColor: P.paper }]}>
-    <GalleryList collection={collection ?? library.shown} filtered={Boolean(library.filter || collection)} headerSpace={insets.top + TOP_BAR + headerHeight} bottomSpace={bottomSpace + bottomExtra} onScroll={dock}
-      header={<View style={{ paddingTop: insets.top + TOP_BAR }}><View style={styles.header} onLayout={event => setHeaderHeight(Math.ceil(event.nativeEvent.layout.height))}>{header}</View></View>} />
+    <GalleryList collection={collection ?? library.shown} filtered={Boolean(library.filter || collection)} headerSpace={insets.top + TOP_BAR + EDGE_FADE + 4 + headerHeight} bottomSpace={bottomSpace + bottomExtra} onScroll={dock}
+      header={<View style={{ paddingTop: insets.top + TOP_BAR + EDGE_FADE + 4 }}><View style={styles.header} onLayout={event => setHeaderHeight(Math.ceil(event.nativeEvent.layout.height))}>{header}</View></View>} />
     <ScrollEdge edge="bottom" height={edges.bottom.height + bottomExtra} hold={edges.bottom.hold} color={P.paper} />
     <ScrollEdge edge="top" height={edges.top.height} hold={edges.top.hold} color={P.paper} />
     <View style={[styles.topBar, { top: insets.top }]}><Brand compact /><View style={styles.actions}>{actions}</View></View>

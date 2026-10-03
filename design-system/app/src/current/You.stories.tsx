@@ -5,7 +5,7 @@ import Subscription from '../../../../apps/mobile/src/app/(app)/subscription.tsx
 import { plans } from '../../../fixtures/world.ts';
 import { StoryTabs } from '../StoryTabs.tsx';
 
-const meta: Meta = { title: 'Current/You', parameters: { simulator: true, layout: 'fullscreen' } };
+const meta: Meta = { title: 'In the app today/You', parameters: { simulator: true, layout: 'fullscreen' } };
 export default meta;
 type Story = StoryObj;
 const pro = { msw: { handlers: { story: [http.get('*/api/plan', () => HttpResponse.json(plans.pro))] } } };
