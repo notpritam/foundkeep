@@ -11,7 +11,7 @@ import { Handoff, HandoffPlaythrough, type HandoffAction, type HandoffLook, type
 // state one click away: Sign in / Handoff on the design system's page.
 type Args = { phase: 'play' | HandoffPhase; provider: 'google' | 'apple' };
 const meta: Meta<Args> = {
-  title: 'Proposals/Sign-in handoff',
+  title: 'Tried/Sign-in handoff',
   parameters: { simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/oauth/complete', params: {} }, controls: { disable: true } },
   args: { phase: 'play', provider: 'google' },
   argTypes: { phase: { options: ['play', 'choose', 'opening', 'browser', 'finishing', 'failed', 'link'] }, provider: { options: ['google', 'apple'] } },

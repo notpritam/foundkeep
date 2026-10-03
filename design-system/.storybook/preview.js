@@ -35,6 +35,6 @@ export default {
         desktop: viewport('Desktop (1600)', 1600, 1000),
       },
     },
-    options: { storySort: { order: ['Welcome', 'Design log', 'Sign in', 'First run', 'App tour', 'Library', 'Ask Kit', 'Search and Kit', 'Brand type', 'Foundations', ['Color', 'Typography', 'Spacing', 'Radius', 'Elevation', 'Iconography'], 'Components', 'Extension', ['Add details card'], 'Web', '*'] } },
+    options: { storySort: { order: ['Welcome', 'The app', 'Design log', 'Open', 'Decided', ['Sign in', 'First run', 'Library', 'Search and Kit', 'Ask Kit'], 'Brand type', 'Foundations', ['Color', 'Typography', 'Spacing', 'Radius', 'Elevation', 'Iconography'], 'Components', 'Extension', ['Add details card'], 'Web', '*'] } },
   },
 };

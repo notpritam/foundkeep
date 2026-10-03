@@ -3,7 +3,7 @@ import { FirstScreen as Screen } from '../../../../apps/mobile/src/sign-in/First
 
 // How the floating cards keep moving on the sign-in screen: the app uses drift;
 // the others stay for comparison. Side by side: Sign in / Movement on the page.
-const meta: Meta = { title: 'Proposals/Sign-in movement', parameters: { controls: { disable: true }, simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/sign-in', params: {} } } };
+const meta: Meta = { title: 'Tried/Sign-in movement', parameters: { controls: { disable: true }, simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/sign-in', params: {} } } };
 export default meta;
 type Story = StoryObj;
 export const Drift: Story = { name: 'Drift (in the app)', render: () => <Screen movement="drift" /> };

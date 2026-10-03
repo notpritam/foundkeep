@@ -17,7 +17,7 @@ import { colors, palettes } from '../../../theme.ts';
 import { useAppearance, useThemedStyles } from '../../../appearance/AppearanceProvider.tsx';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollEdge } from '../../../components/ScrollEdge';
-import { useScrollEdges } from '../../../components/useScrollEdges.ts';
+import { EDGE_FADE, useScrollEdges } from '../../../components/useScrollEdges.ts';
 
 const filters: Array<{ type?: CaptureType; label: string }> = [
   { label: 'All' }, { type: 'bookmark', label: 'Links' }, { type: 'image', label: 'Images' }, { type: 'note', label: 'Notes' },
@@ -34,7 +34,8 @@ export function CollectionScreen({ scrollEdge = false, card }: { scrollEdge?: bo
   const insets = useSafeAreaInsets();
   const paper = palettes[useAppearance().scheme].paper;
   const edges = useScrollEdges(TOP_BAR);
-  const headerOffset = scrollEdge ? insets.top + TOP_BAR : 0;
+  // Clear of the top edge's fade, so the title is never blurred at rest.
+  const headerOffset = scrollEdge ? insets.top + TOP_BAR + EDGE_FADE : 0;
   const { policy, updateRequired } = useSession();
   const [query, setQuery] = useState('');
   const [listReset, setListReset] = useState(0);

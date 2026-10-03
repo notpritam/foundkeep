@@ -16,7 +16,7 @@ import { StoryTabs } from '../StoryTabs.tsx';
 // it replaced, the concise proposal as picked, the icons arrangement, and the three clean ones
 // first proposed (quiet, with pills, marked), kept for the log. Each kind side by
 // side, and each inside today's Library. Board: Library / Cards for every kind of save.
-const meta: Meta = { title: 'Proposals/Cards', parameters: { controls: { disable: true } } };
+const meta: Meta = { title: 'Tried/Cards', parameters: { controls: { disable: true } } };
 export default meta;
 type Story = StoryObj;
 

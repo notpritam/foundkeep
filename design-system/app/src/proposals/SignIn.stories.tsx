@@ -5,7 +5,7 @@ import { FilmScreen } from '../../../../apps/mobile/src/proposals/sign-in/FilmSc
 // now (Current/Sign-in). These are versions two and three — a film of
 // FoundKeep at work in a window — kept for an A/B test later.
 const meta: Meta = {
-  title: 'Proposals/Sign in',
+  title: 'Tried/Sign in',
   parameters: { simulator: true, layout: 'fullscreen', session: 'signed-out', route: { pathname: '/sign-in', params: {} }, controls: { disable: true },
     docs: { description: { component: 'Versions two and three of the sign-in screen, kept for an A/B test against the one in the app. Press ↻ (Remount) to replay the entrance.' } } },
 };

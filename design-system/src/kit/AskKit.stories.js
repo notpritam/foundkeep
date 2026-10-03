@@ -6,10 +6,10 @@ function fourConversations() {
   const el = document.createElement('div');
   el.className = 'bt';
   const looks = [
-    ['proposals-ask-kit--chat', 'Picked · A conversation: your questions and Kit’s answers, the saves it found in a row of cards'],
-    ['proposals-ask-kit--grid', 'Answers laid out like the Library; earlier turns fold to one line'],
-    ['proposals-ask-kit--half', 'A half sheet: the Library above becomes Kit’s answer, the conversation stays below'],
-    ['proposals-ask-kit--trail', 'No bubbles: what Kit understood, as chips you can take away; the saves as a list'],
+    ['tried-ask-kit--chat', 'Picked · A conversation: your questions and Kit’s answers, the saves it found in a row of cards'],
+    ['tried-ask-kit--grid', 'Answers laid out like the Library; earlier turns fold to one line'],
+    ['tried-ask-kit--half', 'A half sheet: the Library above becomes Kit’s answer, the conversation stays below'],
+    ['tried-ask-kit--trail', 'No bubbles: what Kit understood, as chips you can take away; the saves as a list'],
   ];
   const src = (id, theme, state, entry) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}&args=${encodeURIComponent(`state:${state};entry:${entry}`)}`;
   el.innerHTML = `
@@ -38,12 +38,12 @@ function locked() {
   const el = document.createElement('div');
   el.className = 'bt';
   const states = [
-    ['current-search-and-ask-kit--library', 'The Library: the magnifier on top for Search; Kit’s orb beside + for Ask Kit'],
-    ['current-search-and-ask-kit--search', 'Search, just opened: Jump back in and recent searches; the field at the bottom'],
-    ['current-search-and-ask-kit--search-word', 'Search for a word: the saves that match, and “Ask Kit about …”'],
-    ['current-search-and-ask-kit--kit', 'Ask Kit, just opened: what to ask, the field at the bottom'],
-    ['current-search-and-ask-kit--question', 'One question: Kit’s one-line answer, the saves in a row of cards'],
-    ['current-search-and-ask-kit--follow-up', 'A follow-up: “about cats” narrows the posts from X'],
+    ['final-3-home-search-and-ask-kit--library', 'The Library: the magnifier on top for Search; Kit’s orb beside + for Ask Kit'],
+    ['final-3-home-search-and-ask-kit--search', 'Search, just opened: Jump back in and recent searches; the field at the bottom'],
+    ['final-3-home-search-and-ask-kit--search-word', 'Search for a word: the saves that match, and “Ask Kit about …”'],
+    ['final-3-home-search-and-ask-kit--kit', 'Ask Kit, just opened: what to ask, the field at the bottom'],
+    ['final-3-home-search-and-ask-kit--question', 'One question: Kit’s one-line answer, the saves in a row of cards'],
+    ['final-3-home-search-and-ask-kit--follow-up', 'A follow-up: “about cats” narrows the posts from X'],
   ];
   const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
   el.innerHTML = `
@@ -64,16 +64,16 @@ function finalAndVariations() {
   const el = document.createElement('div');
   el.className = 'bt';
   const home = [
-    ['proposals-home-and-ask-kit--home-final', 'Final: a greeting — “Good morning, Lena”, “Hey Lena”, “Welcome back, Lena”, steady through each part of the day — then Jump back in and the cards'],
-    ['proposals-home-and-ask-kit--home-greeting', '“The collection.”, the first final'],
-    ['proposals-home-and-ask-kit--home-compact', 'Compact: no big title — Jump back in right under the top bar, more saves in view'],
-    ['proposals-home-and-ask-kit--home-nudge', 'A nudge: a small card under Jump back in that asks Kit an example question'],
+    ['tried-home-and-ask-kit--home-final', 'Final: a greeting — “Good morning, Lena”, “Hey Lena”, “Welcome back, Lena”, steady through each part of the day — then Jump back in and the cards'],
+    ['tried-home-and-ask-kit--home-greeting', '“The collection.”, the first final'],
+    ['tried-home-and-ask-kit--home-compact', 'Compact: no big title — Jump back in right under the top bar, more saves in view'],
+    ['tried-home-and-ask-kit--home-nudge', 'A nudge: a small card under Jump back in that asks Kit an example question'],
   ];
   const kit = [
-    ['proposals-home-and-ask-kit--kit-final', 'Final: one short line per answer, the saves as cards that take the width; the thread blurs under the header and above the field'],
-    ['proposals-home-and-ask-kit--kit-list', 'The saves as a list under each answer: quicker to scan'],
-    ['proposals-home-and-ask-kit--kit-lead', 'The best match large, the rest in a row'],
-    ['proposals-home-and-ask-kit--kit-thinking', 'A thinking moment: “Looking through your saves…” before each answer'],
+    ['tried-home-and-ask-kit--kit-final', 'Final: one short line per answer, the saves as cards that take the width; the thread blurs under the header and above the field'],
+    ['tried-home-and-ask-kit--kit-list', 'The saves as a list under each answer: quicker to scan'],
+    ['tried-home-and-ask-kit--kit-lead', 'The best match large, the rest in a row'],
+    ['tried-home-and-ask-kit--kit-thinking', 'A thinking moment: “Looking through your saves…” before each answer'],
   ];
   const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
   const row = list => `<div class="bt-phones bt-phones-four">${list.map(([id, name]) => `<figure><iframe loading="lazy" data-story="${id}" title="${name}" src="${src(id, 'light')}"></iframe><figcaption>${name}</figcaption></figure>`).join('')}</div>`;
@@ -94,7 +94,7 @@ function finalAndVariations() {
   return el;
 }
 
-export default { title: 'Ask Kit', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
+export default { title: 'Decided/Ask Kit', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
 export const FinalAndVariations = { name: 'Home and Ask Kit: final, and variations', render: finalAndVariations };
 export const Locked = { name: 'Search and Ask Kit, as locked', render: locked };
 export const FourConversations = { name: 'Four conversations', render: fourConversations };

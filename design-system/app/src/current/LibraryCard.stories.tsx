@@ -6,7 +6,7 @@ import { saves } from '../../../fixtures/world.ts';
 // The Library's card, locked 2026-10-03 (Pritam): today's style, concise — icons, no tags — with
 // a glass caption. One story for each kind of save, so each can be looked at and refined on its
 // own later; all of them side by side: Proposals/Cards › Every kind of save.
-const meta: Meta = { title: 'Current/Library card', parameters: { layout: 'centered', controls: { disable: true } } };
+const meta: Meta = { title: 'Final/4 Library card', parameters: { layout: 'centered', controls: { disable: true } } };
 export default meta;
 type Story = StoryObj;
 const card = (key: keyof typeof saves): Story => ({ render: () => <View style={{ width: 178 }}><GalleryCard capture={saves[key]} onOpen={() => {}} /></View> });

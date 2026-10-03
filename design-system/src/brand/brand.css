@@ -46,6 +46,7 @@
 .bt-states { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px 0; margin: -14px 0 18px; background: var(--bg); }
 .bt-states button { font: 500 14px/1 var(--font); padding: 10px 15px; border-radius: 999px; border: 0; background: var(--panel); color: var(--ink); cursor: pointer; transition: background .2s, color .2s; }
 .bt-states button[aria-pressed="true"] { background: #0b0c0d; color: #fff; }
+.bt-states a { font: 500 14px/1 var(--font); color: var(--ink); text-decoration: none; padding: 10px 4px; }
 .bt-states .bt-gap { width: 14px; }
 .bt-screens iframe { height: 520px; }
 .bt-screens .bt-wide iframe { height: 760px; }

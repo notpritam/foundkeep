@@ -4,11 +4,12 @@
 // or a serious accessibility violation.
 //
 //   /usr/bin/node design-system/scripts/render-check.mjs http://127.0.0.1:8814/app \
-//     [--globals theme:dark,textSize:2] [--only library] [--jobs 4]
+//     [--globals theme:dark,textSize:2] [--only library] [--jobs 4] [--why]
 //
 // Accessibility (axe-core, serious and critical) fails every story except the
-// ones titled */Current/*: those are today's screens, kept as the baseline,
-// so their violations are reported, not fatal.
+// ones titled In the app today/*: those are today's screens, not designed yet,
+// kept as the baseline, so their violations are reported, not fatal. Final/*
+// — the design as decided — is held to the full standard.
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { chromium } from 'playwright-core';
@@ -19,6 +20,8 @@ const option = name => { const i = args.indexOf('--' + name); return i >= 0 ? ar
 if (!base) { console.error('usage: render-check.mjs <storybook-url> [--globals k:v,k:v] [--only text] [--jobs n]'); process.exit(2); }
 const globals = option('globals') ? option('globals').split(',').join(';') : '';
 const only = option('only');
+// --why: print each failing element and the reason, not just the rule and a count.
+const why = process.argv.includes('--why');
 const jobs = Number(option('jobs') || 4);
 // --inner: load framed screens directly at phone size (the screen, not the device
 // frame), so the accessibility check reaches the screen itself.
@@ -51,13 +54,13 @@ async function check(story) {
       errors.push('Rendered nothing');
     await page.waitForTimeout(250);
     await page.addScriptTag({ content: axeSource });
-    a11y = await page.evaluate(async () => {
+    a11y = await page.evaluate(async why => {
       const r = await window.axe.run(document.querySelector('#storybook-root') || document.body, { resultTypes: ['violations'] });
-      return r.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => `${v.id} (${v.nodes.length})`);
-    });
+      return r.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => `${v.id} (${v.nodes.length})${why ? v.nodes.map(n => `\n           ${n.html.slice(0, 140)}\n           → ${(n.any[0] || n.all[0] || n.none[0])?.message || ''}`).join('') : ''}`);
+    }, why);
   } catch (error) { errors.push(String(error.message || error).split('\n')[0]); }
   await page.close();
-  const baseline = /(^|\/)Current\//.test(story.title);
+  const baseline = /^In the app today\//.test(story.title);
   results.push({ story, errors, a11y, failed: errors.length > 0 || (a11y.length > 0 && !baseline) });
 }
 const queue = [...stories];
@@ -69,7 +72,7 @@ for (const { story, errors, a11y, failed } of results) {
   if (!errors.length && !a11y.length) continue;
   console.log(`${failed ? '✖' : '·'} ${story.title} / ${story.name}`);
   for (const e of errors) console.log('    error  ' + e);
-  if (a11y.length) console.log(`    a11y   ${a11y.join(', ')}${failed && !errors.length ? '' : /(^|\/)Current\//.test(story.title) ? '  (baseline, not fatal)' : ''}`);
+  if (a11y.length) console.log(`    a11y   ${a11y.join(', ')}${failed && !errors.length ? '' : /^In the app today\//.test(story.title) ? '  (baseline, not fatal)' : ''}`);
 }
 const failed = results.filter(r => r.failed).length;
 console.log(`render-check ${base}${globals ? ' [' + globals + ']' : ''}: ${results.length - failed}/${results.length} stories clean`);

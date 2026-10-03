@@ -4,7 +4,7 @@ import { GalleryCard } from '../../../apps/mobile/src/components/GalleryCard.tsx
 import { saves } from '../../fixtures/world.ts';
 
 const meta: Meta<typeof GalleryCard> = {
-  title: 'Proof/Gallery card',
+  title: 'Components/Gallery card',
   component: GalleryCard,
   args: { capture: saves.bookmark, onOpen: () => {} },
   decorators: [Story => <View style={{ width: 180 }}><Story /></View>],

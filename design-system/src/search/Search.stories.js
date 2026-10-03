@@ -7,10 +7,10 @@ function fourWays() {
   const el = document.createElement('div');
   el.className = 'bt';
   const looks = [
-    ['proposals-search-and-kit--dock-search', 'Search beside + in the dock: a round button, opening the field at the top'],
-    ['proposals-search-and-kit--ask-bar', '“Search or ask Kit”, always above the dock: the field opens at the bottom, by the thumb'],
-    ['proposals-search-and-kit--search-tab', 'Search as a tab, between Gallery and You'],
-    ['proposals-search-and-kit--search-first', 'The field heading the Library, recent searches right under it'],
+    ['tried-search-and-kit--dock-search', 'Search beside + in the dock: a round button, opening the field at the top'],
+    ['tried-search-and-kit--ask-bar', '“Search or ask Kit”, always above the dock: the field opens at the bottom, by the thumb'],
+    ['tried-search-and-kit--search-tab', 'Search as a tab, between Gallery and You'],
+    ['tried-search-and-kit--search-first', 'The field heading the Library, recent searches right under it'],
   ];
   const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
   el.innerHTML = `
@@ -33,5 +33,5 @@ function fourWays() {
   return el;
 }
 
-export default { title: 'Search and Kit', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
+export default { title: 'Decided/Search and Kit', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
 export const FourWays = { name: 'Four ways', render: fourWays };

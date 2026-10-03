@@ -10,7 +10,7 @@ import path from 'node:path';
 
 const here = import.meta.dirname, frames = path.join(homedir(), '.cache/fk-tour');
 const chosen = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
-const TOURS = chosen.length ? chosen : ['proposals-app-tour--conversation', 'proposals-app-tour--grid', 'proposals-app-tour--half', 'proposals-app-tour--trail'];
+const TOURS = chosen.length ? chosen : ['open-app-tour--conversation', 'open-app-tour--grid', 'open-app-tour--half', 'open-app-tour--trail'];
 const capture = (id, i) => new Promise((done, fail) => spawn('/usr/bin/node', [path.join(here, '../scripts/capture-story.mjs'), 'http://localhost:8814/app', id, path.join(frames, String(i + 1)), '--seconds', '23.5'], { stdio: 'inherit' }).on('exit', code => code === 0 ? done() : fail(new Error(`${id}: ${code}`))));
 if (!process.argv.includes('--skip-capture')) await Promise.all(TOURS.map(capture));
 for (const [id, name, crf] of [['AppTourPoll', 'app-tour-1080p', 14], ['AppTourReel', 'app-tour-reel-1080x1920', 14], ['AppTourPoll4K', 'app-tour-4k', 12], ['AppTourReel4K', 'app-tour-reel-4k', 12]]) {

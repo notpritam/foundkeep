@@ -7,7 +7,7 @@ import { SearchProposal, type SearchLook, type SearchState } from '../../../../a
 // (Search and Kit / Four ways) switches every phone between the states at once.
 type Args = { state: SearchState };
 const meta: Meta<Args> = {
-  title: 'Proposals/Search and Kit',
+  title: 'Tried/Search and Kit',
   parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/collection', params: {} } },
   args: { state: 'library' },
   argTypes: { state: { options: ['library', 'word', 'question'] } },

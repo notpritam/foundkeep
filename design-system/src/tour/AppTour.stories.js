@@ -6,10 +6,10 @@ function fourVersions() {
   const el = document.createElement('div');
   el.className = 'bt';
   const tours = [
-    ['proposals-app-tour--conversation', '1 · A conversation, as locked: Kit’s one-line answers, the saves in a row of cards'],
-    ['proposals-app-tour--grid', '2 · Answers laid out like the Library: each answer a grid of cards'],
-    ['proposals-app-tour--half', '3 · A half sheet: the Library above becomes Kit’s answer'],
-    ['proposals-app-tour--trail', '4 · What Kit understood, as chips you can take away'],
+    ['open-app-tour--conversation', '1 · A conversation, as locked: Kit’s one-line answers, the saves in a row of cards'],
+    ['open-app-tour--grid', '2 · Answers laid out like the Library: each answer a grid of cards'],
+    ['open-app-tour--half', '3 · A half sheet: the Library above becomes Kit’s answer'],
+    ['open-app-tour--trail', '4 · What Kit understood, as chips you can take away'],
   ];
   const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
   el.innerHTML = `
@@ -28,5 +28,5 @@ function fourVersions() {
   return el;
 }
 
-export default { title: 'App tour', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
+export default { title: 'Open/App tour', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
 export const FourVersions = { name: 'Four versions', render: fourVersions };

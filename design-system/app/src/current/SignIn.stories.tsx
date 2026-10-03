@@ -9,7 +9,7 @@ import type { HandoffPhase } from '../../../../apps/mobile/src/sign-in/handoffWo
 import { Playthrough } from '../Playthrough.tsx';
 
 // Sign-in is Apple or Google only (Pritam, 2026-10-01): no email, so no create-account or recover screens.
-const meta: Meta = { title: 'Current/Sign-in', parameters: { simulator: true, layout: 'fullscreen', session: 'signed-out' } };
+const meta: Meta = { title: 'Final/1 Sign in', parameters: { simulator: true, layout: 'fullscreen', session: 'signed-out' } };
 export default meta;
 type Story = StoryObj;
 export const SignInScreen: Story = { name: 'Sign in', render: () => <SignIn />, parameters: { route: { pathname: '/sign-in', params: {} } } };

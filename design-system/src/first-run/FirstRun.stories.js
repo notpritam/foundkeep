@@ -7,11 +7,11 @@ function fourWays() {
   const el = document.createElement('div');
   el.className = 'bt';
   const looks = [
-    ['proposals-first-run--watch', 'Picked · Watch it happen: a post goes Share → FoundKeep → into your library, on a loop'],
-    ['proposals-first-run--steps', 'Three steps: Tap Share · Pick FoundKeep · It’s kept, ready for your agent'],
-    ['proposals-first-run--closeup', 'The share sheet up close, with the step people miss on iPhone: More, then add FoundKeep'],
-    ['proposals-first-run--try', 'Try it once: share a sample post to FoundKeep, here, and watch it land'],
-    ['current-onboarding--save-from-anywhere', 'In the app, for now: an X-style post (FoundKeep in the row) and a reel (More, then FoundKeep), each landing as a floating card'],
+    ['tried-first-run--watch', 'Picked · Watch it happen: a post goes Share → FoundKeep → into your library, on a loop'],
+    ['tried-first-run--steps', 'Three steps: Tap Share · Pick FoundKeep · It’s kept, ready for your agent'],
+    ['tried-first-run--closeup', 'The share sheet up close, with the step people miss on iPhone: More, then add FoundKeep'],
+    ['tried-first-run--try', 'Try it once: share a sample post to FoundKeep, here, and watch it land'],
+    ['final-2-first-run--save-from-anywhere', 'In the app, for now: an X-style post (FoundKeep in the row) and a reel (More, then FoundKeep), each landing as a floating card'],
   ];
   el.innerHTML = `
     <header class="bt-intro"><div><h1>First run</h1><p>The screen right after someone first signs in: how to save from any app. Today it is three paragraphs in a sheet — and people who sign in with Apple or Google never see it. Four ways were proposed; Pritam picked Watch it happen (2 October), and the last phone is it remade for the app with an X-style post and a reel, the iOS 26 share sheet and FoundKeep’s own save sheet. It is provisional: once the other screens are designed, Pritam records the real flow and it is remade from that. All live; the posts are the film’s generated photographs.</p></div></header>
@@ -35,5 +35,5 @@ function fourWays() {
   return el;
 }
 
-export default { title: 'First run', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
+export default { title: 'Decided/First run', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
 export const FourWays = { name: 'Four ways', render: fourWays };

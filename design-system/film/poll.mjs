@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 
 const here = import.meta.dirname, frames = path.join(homedir(), '.cache/fk-poll');
-const SCREENS = [['1', 'current-sign-in--sign-in-screen'], ['2', 'proposals-sign-in--with-film'], ['3', 'proposals-sign-in--with-film-on-sky']];
+const SCREENS = [['1', 'final-1-sign-in--sign-in-screen'], ['2', 'tried-sign-in--with-film'], ['3', 'tried-sign-in--with-film-on-sky']];
 const capture = ([dir, id]) => new Promise((done, fail) => spawn('/usr/bin/node', [path.join(here, '../scripts/capture-story.mjs'), 'http://localhost:8814/app', id, path.join(frames, dir), '--seconds', '13'], { stdio: 'inherit' }).on('exit', code => code === 0 ? done() : fail(new Error(`${id}: ${code}`))));
 if (!process.argv.includes('--skip-capture')) await Promise.all(SCREENS.map(capture));
 for (const [id, name, crf] of [['SignInPoll', 'sign-in-poll-1080p', 14], ['SignInPoll4K', 'sign-in-poll-4k', 12], ['SignInReel', 'sign-in-reel-1080x1920', 14], ['SignInReel4K', 'sign-in-reel-4k', 12]]) {

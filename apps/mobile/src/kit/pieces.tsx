@@ -10,6 +10,7 @@ import { AdaptiveIcon as Ionicons } from '../components/AdaptiveIcon.tsx';
 import { CapturePreview } from '../components/CapturePreview.tsx';
 import { useMotionAllowed } from '../components/motion.tsx';
 import { ScrollEdge } from '../components/ScrollEdge';
+import { EDGE_FADE } from '../components/useScrollEdges.ts';
 import { captureTitle } from '../collection/model.ts';
 import { origin } from '../collection/origin.ts';
 import { palettes } from '../theme.ts';
@@ -64,9 +65,9 @@ export function Scrolling({ children, scrollRef, bottomAligned = true }: { child
   const insets = useSafeAreaInsets();
   const head = insets.top + HEAD;
   return <View style={styles.middle}>
-    <ScrollView ref={scrollRef} style={StyleSheet.absoluteFill} contentContainerStyle={[styles.scroll, bottomAligned && styles.bottomAligned, { paddingTop: head + 8 }]}
+    <ScrollView ref={scrollRef} style={StyleSheet.absoluteFill} contentContainerStyle={[styles.scroll, bottomAligned && styles.bottomAligned, { paddingTop: head + EDGE_FADE + 4 }]}
       onContentSizeChange={() => { if (bottomAligned && scrollRef && 'current' in scrollRef) scrollRef.current?.scrollToEnd({ animated: false }); }} keyboardShouldPersistTaps="handled">{children}</ScrollView>
-    <ScrollEdge edge="top" height={head + 18} hold={(head - 6) / (head + 18)} color={P.paper} />
+    <ScrollEdge edge="top" height={head + EDGE_FADE} hold={head / (head + EDGE_FADE)} color={P.paper} />
     <ScrollEdge edge="bottom" height={34} hold={0.15} color={P.paper} />
   </View>;
 }
