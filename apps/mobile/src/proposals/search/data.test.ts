@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Capture } from '../../api/types.ts';
-import { askKit, recentPlaces } from './data.ts';
+import { askKit, findSaves, recentPlaces } from './data.ts';
 
 const at = (hours: number) => Date.parse('2026-10-03T09:00:00Z') - hours * 3_600_000;
 const save = (id: string, hours: number, fields: Partial<Capture>) => ({ id, type: 'bookmark', status: 'done', capturedAt: at(hours), userTags: [], folder: null, provenance: null, sourceUrl: null, sourceTitle: null, summary: null, noteText: null, selectionText: null, ...fields }) as Capture;
@@ -31,4 +31,14 @@ test('Kit searches tags and folders too, and says when nothing matches', () => {
   const none = askKit('sailing', library);
   assert.equal(none.items.length, 0);
   assert.match(none.reply, /couldn’t find/);
+});
+
+test('one field: a word finds matches; a sentence or a question gets Kit’s note too', () => {
+  const matches = [library[0]];
+  assert.deepEqual(findSaves('ramen', library, matches), { note: null, items: matches });
+  const asked = findSaves('that ramen video I saved', library, []);
+  assert.deepEqual(asked.items.map(c => c.id), ['reel']);
+  assert.match(asked.note ?? '', /Found it/);
+  assert.ok(findSaves('kyoto?', library, []).note);
+  assert.deepEqual(findSaves('  ', library, matches), { note: null, items: [] });
 });
