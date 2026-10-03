@@ -2,9 +2,20 @@
 // magnifier in the top bar opens Search (its field at the bottom); Kit's orb — the logo only —
 // beside + in the dock opens Ask Kit, a conversation. Composed on the proposals' Library shell
 // and dock until the app's own Library takes them.
+//
+// Closed 2026-10-03 (Pritam: "you got both right — the final version, and some variations"). The
+// final is the default; the variations, kept as options: `home` — final, greeting ("Good evening,
+// Lena" and your counts instead of "The collection."), compact (no big title: Jump back in right
+// under the top bar), nudge (a small card inviting a question to Kit); and Ask Kit's own
+// (`answers`, `thinking`: see kit/AskKit).
 import { useState } from 'react';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
+import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { DockProvider } from '../../components/FloatingDock.tsx';
-import { AskKit } from '../../kit/AskKit.tsx';
+import { useSession } from '../../session/SessionProvider.tsx';
+import { AskKit, type KitAnswers } from '../../kit/AskKit.tsx';
+import { KIT_ORB, usePalette } from '../../kit/pieces.tsx';
 import { SearchPanel } from '../../kit/SearchPanel.tsx';
 import { openSave } from '../library/parts.tsx';
 import { IconAction, JumpBackIn, LibraryShell, ProposalDock, Title, useLibrary, useRecentSearches } from '../search/parts.tsx';
@@ -12,22 +23,66 @@ import { IconAction, JumpBackIn, LibraryShell, ProposalDock, Title, useLibrary, 
 export type LockedState = 'library' | 'search' | 'word' | 'kit' | 'question' | 'followup';
 const SEED: Partial<Record<LockedState, string[]>> = { question: ['recent post I saved from twitter'], followup: ['recent post I saved from twitter', 'about cats'] };
 
-export function SearchAndKit({ state = 'library' }: { state?: LockedState }) {
-  return <DockProvider><Screen state={state} /></DockProvider>;
+export type HomeLook = 'final' | 'greeting' | 'compact' | 'nudge';
+type Options = { home?: HomeLook; answers?: KitAnswers; thinking?: boolean };
+export function SearchAndKit({ state = 'library', ...options }: { state?: LockedState } & Options) {
+  return <DockProvider><Screen state={state} {...options} /></DockProvider>;
 }
-function Screen({ state }: { state: LockedState }) {
+function Screen({ state, home = 'final', answers, thinking }: { state: LockedState } & Options) {
   const library = useLibrary();
   const recents = useRecentSearches();
   const [searching, setSearching] = useState(state === 'search' || state === 'word');
   const [asking, setAsking] = useState(state === 'kit' || state === 'question' || state === 'followup');
   const [questions, setQuestions] = useState<string[]>(SEED[state] ?? []);
-  return <LibraryShell library={library} header={<><Title /><JumpBackIn library={library} /></>}
+  const askKit = (question: string) => { setQuestions([question]); setAsking(true); };
+  const header = home === 'compact' ? <View style={styles.compact}><JumpBackIn library={library} /></View>
+    : <>{home === 'greeting' ? <Greeting saves={library.all.total} folders={library.places.folders.length} /> : <Title />}<JumpBackIn library={library} />{home === 'nudge' ? <KitNudge onAsk={askKit} tag={library.places.tags[0]?.name} /> : null}</>;
+  return <LibraryShell library={library} header={header}
     actions={<><IconAction icon="search" label="Search your saves" onPress={() => setSearching(true)} /><IconAction icon="archive-outline" label="Open archive" /></>}>
     <ProposalDock buttons={[{ key: 'kit', label: 'Ask Kit', orb: true, onPress: () => setAsking(true) }, { key: 'add', label: 'Create a note', icon: 'add' }]} />
     <SearchPanel open={searching} onClose={() => setSearching(false)} start={state === 'word' ? 'ramen' : ''} recents={recents.list} onRecent={recents.add} onForget={recents.remove}
       places={library.places} selected={library.filter} onChoose={library.toggle} onOpen={openSave}
       onAskKit={question => { setSearching(false); setQuestions([question]); setAsking(true); }} />
     <AskKit open={asking} onClose={() => { setAsking(false); setQuestions([]); }} questions={questions} onQuestions={setQuestions}
-      captures={library.all.captures} tags={library.places.tags.map(tag => tag.name)} onOpen={openSave} />
+      captures={library.all.captures} tags={library.places.tags.map(tag => tag.name)} onOpen={openSave} answers={answers} thinking={thinking} />
   </LibraryShell>;
 }
+
+/** Greeting: the time of day and your name, then how much you've kept. */
+function Greeting({ saves, folders }: { saves: number; folders: number }) {
+  const P = usePalette();
+  const { account } = useSession();
+  const hour = new Date().getHours();
+  const part = hour < 5 ? 'evening' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  const name = account?.name?.split(' ')[0];
+  return <View style={styles.greeting}>
+    <Text style={[styles.greetingText, { color: P.ink }]}>Good {part}{name ? `, ${name}` : ''}</Text>
+    <Text style={[styles.greetingLine, { color: P.muted }]}>{saves} saves · {folders} folders</Text>
+  </View>;
+}
+/** Kit nudge: a small card under Jump back in; tapping it asks Kit the example. */
+function KitNudge({ onAsk, tag }: { onAsk: (question: string) => void; tag?: string }) {
+  const P = usePalette();
+  const example = tag ? `videos about ${tag.toLowerCase()}` : 'recent post I saved from twitter';
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Ask Kit: ${example}`} onPress={() => onAsk(example)} style={({ pressed }) => [styles.nudge, { backgroundColor: P.accentSoft }, pressed && styles.pressed]}>
+    <Image source={KIT_ORB} style={styles.nudgeOrb} accessible={false} />
+    <View style={styles.nudgeWords}>
+      <Text style={[styles.nudgeTitle, { color: P.ink }]}>Ask Kit about anything you saved</Text>
+      <Text style={[styles.nudgeLine, { color: P.muted }]} numberOfLines={1}>Try “{example}”</Text>
+    </View>
+    <Ionicons name="arrow-forward" size={18} color={P.ink} />
+  </Pressable>;
+}
+
+const styles = StyleSheet.create({
+  pressed: { opacity: 0.75 },
+  compact: { paddingTop: 4 },
+  greeting: { paddingHorizontal: 20, gap: 5 },
+  greetingText: { fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: -0.9 },
+  greetingLine: { fontSize: 14.5, lineHeight: 20 },
+  nudge: { marginHorizontal: 16, borderRadius: 20, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  nudgeOrb: { width: 38, height: 38 },
+  nudgeWords: { flex: 1, gap: 2 },
+  nudgeTitle: { fontSize: 15.5, fontWeight: '700' },
+  nudgeLine: { fontSize: 13.5 },
+});

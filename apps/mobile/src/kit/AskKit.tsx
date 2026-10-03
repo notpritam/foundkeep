@@ -1,23 +1,29 @@
-import { useMemo, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import type { Capture } from '../api/types.ts';
 import { AdaptiveText as Text } from '../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../components/AdaptiveIcon.tsx';
 import { GalleryCard } from '../components/GalleryCard.tsx';
+import { ShimmerText } from '../components/Shimmer.tsx';
 import { converse, followUps } from './conversation.ts';
-import { Field, Head, KIT_ORB, Panel, usePalette } from './pieces.tsx';
+import { Field, Head, KIT_ORB, Panel, SaveRows, usePalette } from './pieces.tsx';
 
 // Ask Kit (Pritam, 2026-10-03, locked): opened from Kit's orb beside + in the dock. A conversation
 // — your questions and Kit's answers, each answer one short line (a touch larger) and the saves it
 // found in a row of the Library's own cards. A follow-up ("about cats") narrows what was asked
 // (kit/conversation). Under the thread, what to ask next; the field at the bottom, by the thumb.
 // Kit here reads the library on the phone; the real one answers on the backend.
-export function AskKit({ open, onClose, questions, onQuestions, captures, tags, onOpen, draft }: {
+// Variations, kept as options (2026-10-03; the final is the default): `answers` — the saves as a row of
+// cards (final), as rows (list), or the best match large with the rest in a row (lead); `thinking` —
+// a moment of "Looking through your saves…" before each answer.
+export type KitAnswers = 'cards' | 'list' | 'lead';
+export function AskKit({ open, onClose, questions, onQuestions, captures, tags, onOpen, draft, answers = 'cards', thinking = false }: {
   open: boolean; onClose: () => void; questions: string[]; onQuestions: (questions: string[]) => void;
   captures: Capture[]; tags: string[]; onOpen: (capture: Capture) => void;
   /** draft: what's in the field, from outside (a playthrough typing it). */
-  draft?: string;
+  draft?: string; answers?: KitAnswers; thinking?: boolean;
 }) {
+  const { width } = useWindowDimensions();
   const P = usePalette();
   const [own, setText] = useState('');
   const text = draft ?? own;
@@ -25,6 +31,14 @@ export function AskKit({ open, onClose, questions, onQuestions, captures, tags, 
   const next = followUps(turns[turns.length - 1]?.context ?? null, tags);
   const ask = (question: string) => { const words = question.trim(); if (words) onQuestions([...questions, words]); setText(''); };
   const thread = useRef<ScrollView>(null);
+  // With a thinking moment, the newest answer waits a beat behind "Looking through your saves…".
+  const [revealed, setRevealed] = useState(thinking ? Math.max(0, turns.length - 1) : turns.length);
+  useEffect(() => {
+    if (!thinking || turns.length <= revealed) { if (turns.length < revealed) setRevealed(turns.length); return; }
+    const timer = setTimeout(() => setRevealed(turns.length), 1200);
+    return () => clearTimeout(timer);
+  }, [thinking, turns.length, revealed]);
+  const shown = thinking ? revealed : turns.length;
   return <Panel open={open}>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Head title="Ask Kit" orb onClose={() => { onClose(); setText(''); }} action={turns.length ? <Pressable accessibilityRole="button" accessibilityLabel="Start over" onPress={() => onQuestions([])} hitSlop={8}><Ionicons name="create-outline" size={20} color={P.ink} /></Pressable> : null} />
@@ -33,11 +47,17 @@ export function AskKit({ open, onClose, questions, onQuestions, captures, tags, 
           <View style={[styles.you, { backgroundColor: P.ink }]}><Text style={[styles.youText, { color: P.paper }]}>{turn.question}</Text></View>
           <View style={styles.kit} accessibilityLiveRegion={i === turns.length - 1 ? 'polite' : 'none'}>
             <Image source={KIT_ORB} style={styles.kitOrb} accessible={false} />
-            <Text style={[styles.kitText, { color: P.ink }]}>{turn.reply}</Text>
+            {i < shown ? <Text style={[styles.kitText, { color: P.ink }]}>{turn.reply}</Text>
+              : <ShimmerText style={styles.thinking} color={P.muted} highlight={P.ink}>Looking through your saves…</ShimmerText>}
           </View>
-          {turn.items.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards}>
-            {turn.items.slice(0, 8).map(capture => <View key={capture.id} style={styles.card}><GalleryCard capture={capture} onOpen={onOpen} /></View>)}
-          </ScrollView> : null}
+          {i >= shown || !turn.items.length ? null
+            : answers === 'list' ? <View style={styles.list}><SaveRows items={turn.items} onOpen={onOpen} limit={4} /></View>
+            : <>
+              {answers === 'lead' ? <View style={[styles.lead, { width: width - 54 - 16 }]}><GalleryCard capture={turn.items[0]} onOpen={onOpen} /></View> : null}
+              {(answers === 'lead' ? turn.items.slice(1) : turn.items).length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards}>
+                {(answers === 'lead' ? turn.items.slice(1) : turn.items).slice(0, 8).map(capture => <View key={capture.id} style={answers === 'lead' ? styles.smallCard : styles.card}><GalleryCard capture={capture} onOpen={onOpen} /></View>)}
+              </ScrollView> : null}
+            </>}
         </View>) : <View style={styles.hello}>
           <Image source={KIT_ORB} style={styles.helloOrb} accessible={false} />
           <Text style={[styles.helloTitle, { color: P.ink }]}>What are you looking for?</Text>
@@ -67,6 +87,10 @@ const styles = StyleSheet.create({
   kitText: { flex: 1, fontSize: 17.5, lineHeight: 24, fontWeight: '500', letterSpacing: -0.2 },
   cards: { gap: 10, paddingLeft: 54, paddingRight: 16 },
   card: { width: 158 },
+  smallCard: { width: 132 },
+  lead: { marginLeft: 54 },
+  list: { paddingLeft: 38 },
+  thinking: { fontSize: 16, lineHeight: 24 },
   hello: { alignItems: 'center', gap: 8, paddingHorizontal: 32, paddingBottom: 8 },
   helloOrb: { width: 64, height: 64, marginBottom: 4 },
   helloTitle: { fontSize: 21, fontWeight: '700', letterSpacing: -0.3, textAlign: 'center' },

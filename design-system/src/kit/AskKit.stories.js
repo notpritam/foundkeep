@@ -59,6 +59,42 @@ function locked() {
   return el;
 }
 
+/** Closed (2026-10-03): the final home and Ask Kit, then variations of each, live. */
+function finalAndVariations() {
+  const el = document.createElement('div');
+  el.className = 'bt';
+  const home = [
+    ['proposals-home-and-ask-kit--home-final', 'Final: “The collection.”, Jump back in, the cards; the magnifier on top, Kit’s orb beside +'],
+    ['proposals-home-and-ask-kit--home-greeting', 'A greeting: “Good evening, Lena” and your counts, in place of “The collection.”'],
+    ['proposals-home-and-ask-kit--home-compact', 'Compact: no big title — Jump back in right under the top bar, more saves in view'],
+    ['proposals-home-and-ask-kit--home-nudge', 'A nudge: a small card under Jump back in that asks Kit an example question'],
+  ];
+  const kit = [
+    ['proposals-home-and-ask-kit--kit-final', 'Final: one short line per answer, the saves in a row of cards'],
+    ['proposals-home-and-ask-kit--kit-list', 'The saves as a list under each answer: quicker to scan'],
+    ['proposals-home-and-ask-kit--kit-lead', 'The best match large, the rest in a row'],
+    ['proposals-home-and-ask-kit--kit-thinking', 'A thinking moment: “Looking through your saves…” before each answer'],
+  ];
+  const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
+  const row = list => `<div class="bt-phones bt-phones-four">${list.map(([id, name]) => `<figure><iframe loading="lazy" data-story="${id}" title="${name}" src="${src(id, 'light')}"></iframe><figcaption>${name}</figcaption></figure>`).join('')}</div>`;
+  el.innerHTML = `
+    <header class="bt-intro"><div><h1>Home and Ask Kit: final, and variations</h1><p>Both closed. The first phone in each row is the final — the home screen as locked, and Ask Kit as a conversation with one short line per answer. Beside each, variations of it. Every phone is live: tap the magnifier, tap Kit’s orb, type a follow-up.</p></div></header>
+    <div class="bt-states" role="group" aria-label="Appearance"><button type="button" data-theme="light" aria-pressed="true">Light</button><button type="button" data-theme="dark" aria-pressed="false">Dark</button><span class="bt-gap"></span><button type="button" data-restart>Play again</button></div>
+    <h2 class="bt-part">Home</h2>${row(home)}
+    <h2 class="bt-part">Ask Kit</h2>${row(kit)}`;
+  let theme = 'light';
+  const reload = () => el.querySelectorAll('iframe[data-story]').forEach(frame => { frame.src = src(frame.dataset.story, theme); });
+  el.querySelector('.bt-states').addEventListener('click', event => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    if ('restart' in button.dataset) { reload(); return; }
+    el.querySelectorAll('.bt-states button[data-theme]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+    theme = button.dataset.theme; reload();
+  });
+  return el;
+}
+
 export default { title: 'Ask Kit', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
+export const FinalAndVariations = { name: 'Home and Ask Kit: final, and variations', render: finalAndVariations };
 export const Locked = { name: 'Search and Ask Kit, as locked', render: locked };
 export const FourConversations = { name: 'Four conversations', render: fourConversations };

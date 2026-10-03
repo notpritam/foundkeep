@@ -295,6 +295,32 @@
         "ask-kit--locked",
         "ask-kit--four-conversations"
       ]
+    },
+    {
+      "id": "2026-10-03-app-tour",
+      "date": "2026-10-03",
+      "product": "App",
+      "title": "The app tour, for a poll on X",
+      "question": "Which Kit design do people prefer, seen in the whole flow rather than one screen?",
+      "tried": "The app start to finish, playing by itself in about 24 seconds — sign in with Google, the cards gather while Google opens, the Library loads, a search for “ramen”, then Kit: “recent post I saved from twitter”, then “about cats” — in four versions, one per Kit design: the conversation as locked, answers as a grid, the half sheet, the chips. Filmed frame by frame into one video, four phones side by side (wide) or two by two (tall).",
+      "picked": "Not picked yet — the four versions go to a poll on X.",
+      "why": "Pritam: “create a video of our app from auth page to homepage loading, user searching and interacting with Kit … 4 variations, each with their own Kit UI … showing in Storybook first … I'll post on Twitter to keep users engaged”.",
+      "live": [
+        "app-tour--four-versions"
+      ]
+    },
+    {
+      "id": "2026-10-03-home-and-kit-closed",
+      "date": "2026-10-03",
+      "product": "App",
+      "title": "Home and Ask Kit, closed",
+      "question": "What are the final home screen and Ask Kit — and what variations of them are worth keeping?",
+      "tried": "The finals, then variations of each. Home: a greeting (“Good evening, Lena” and your counts in place of “The collection.”), compact (no big title, Jump back in right under the top bar), a nudge (a small card under Jump back in that asks Kit an example question). Ask Kit: the saves as a list under each answer, the best match large with the rest in a row, and a thinking moment (“Looking through your saves…”) before each answer.",
+      "picked": "Closed. Home: today's Library — “The collection.”, Jump back in, the concise glass cards, the scroll edge; the magnifier on top for Search, Kit's orb beside + for Ask Kit. Ask Kit: a conversation, one short line per answer, the saves in a row of cards. The variations stay as options (proposals/kit/Locked `home`, kit/AskKit `answers`, `thinking`).",
+      "why": "Pritam: “let's close our Ask Kit page design and home screen now — you got both right; give me the final version and some variations as well”. The app tour video is paused for later.",
+      "live": [
+        "ask-kit--final-and-variations"
+      ]
     }
   ]
 }
