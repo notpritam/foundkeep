@@ -2,13 +2,14 @@ import { AdaptiveText as Text } from './AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from './AdaptiveIcon.tsx';
 import { router, Tabs } from 'expo-router';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, Keyboard, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Keyboard, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '../session/SessionProvider.tsx';
 import { colors } from '../theme.ts';
 import { useMotionAllowed } from './motion.tsx';
 import { GlassSurface } from './ScenicSurface.tsx';
 import { createDockMotion, dockSpring } from './dockMotion.ts';
+import { useScreenReader } from './useScreenReader.ts';
 import { useThemedStyles } from '../appearance/AppearanceProvider.tsx';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -26,24 +27,13 @@ export function DockProvider({ children }: { children: ReactNode }) {
 }
 export const useDock = () => useContext(DockContext);
 
-function useDockScreenReader() {
-  const [screenReader, setScreenReader] = useState(false);
-  useEffect(() => {
-    let live = true;
-    void AccessibilityInfo.isScreenReaderEnabled().then(value => { if (live) setScreenReader(value); }).catch(() => {});
-    const reader = AccessibilityInfo.addEventListener('screenReaderChanged', setScreenReader);
-    return () => { live = false; reader.remove(); };
-  }, []);
-  return screenReader;
-}
-
 /** A floating tab bar: its absolute frame leaves the collection behind the glass. */
 export function FloatingDock({ state, descriptors, navigation, insets }: TabBarProps) {
   const styles = useThemedStyles(baseStyles);
   const { collapsed, height } = useDock();
   const { width, fontScale } = useWindowDimensions();
   const { policy, updateRequired } = useSession();
-  const screenReader = useDockScreenReader();
+  const screenReader = useScreenReader();
   const motion = useMotionAllowed();
   const [keyboard, setKeyboard] = useState(Keyboard.isVisible());
   const progress = useRef(new Animated.Value(0)).current;

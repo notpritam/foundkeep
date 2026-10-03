@@ -51,3 +51,16 @@ export function askKit(question: string, captures: Capture[]) {
   const first = items[0], where = `${origin(first).name}, saved ${savedAge(first)}${first.folder ? ` in ${first.folder.name}` : ''}`;
   return { reply: items.length === 1 ? `Found it: “${captureTitle(first)}” — ${where}.` : `I found ${items.length} saves about “${about}”. The newest is “${captureTitle(first)}” — ${where}.`, items };
 }
+
+/** A sentence or a question, rather than a word or two to look for. */
+export const isQuestion = (query: string) => /\?\s*$/.test(query) || query.trim().split(/\s+/).length >= 3;
+
+/** One field for searching and asking Kit (Pritam, 2026-10-03): a word or two finds its matches
+ * (`matches`, the search the app already runs); a sentence or a question is Kit's, which also
+ * says what it found. In the app the backend makes this call; this stands in for it. */
+export function findSaves(query: string, captures: Capture[], matches: Capture[]): { note: string | null; items: Capture[] } {
+  if (!query.trim()) return { note: null, items: [] };
+  if (!isQuestion(query)) return { note: null, items: matches };
+  const answer = askKit(query, captures);
+  return { note: answer.reply, items: answer.items };
+}

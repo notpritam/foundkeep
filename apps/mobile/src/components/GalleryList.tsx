@@ -1,12 +1,13 @@
 import { AdaptiveText as Text } from './AdaptiveText.tsx';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { router } from 'expo-router';
-import { AccessibilityInfo, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { masonryLayout, previewRatio } from '../../../../packages/shared/src/collection-presentation.ts';
 import { captureTitle } from '../collection/model.ts';
 import { galleryColumns } from '../collection/preview.ts';
 import { useCollection } from '../collection/useCollection.ts';
 import { MotionBoundary } from './motion.tsx';
+import { useScreenReader } from './useScreenReader.ts';
 import { GalleryCard } from './GalleryCard.tsx';
 import { GallerySkeleton } from './Shimmer.tsx';
 import { Button, Message } from './ui.tsx';
@@ -16,13 +17,14 @@ import { useAppearance, useThemedStyles } from '../appearance/AppearanceProvider
 
 /** A card for one save in the gallery (GalleryCard; the design system tries others). */
 export type SaveCardComponent = ComponentType<{ capture: Capture; onOpen: (capture: Capture) => void }>;
-export function GalleryList({ collection, archived = false, filtered = false, headerSpace = 0, bottomSpace = 24, resetKey = 0, onScroll, Card = GalleryCard }: { collection: ReturnType<typeof useCollection>; archived?: boolean; filtered?: boolean; headerSpace?: number; bottomSpace?: number; resetKey?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void; Card?: SaveCardComponent }) {
+/** header: drawn inside the list, in the headerSpace above the saves, so it scrolls with them. */
+export function GalleryList({ collection, archived = false, filtered = false, headerSpace = 0, bottomSpace = 24, resetKey = 0, onScroll, Card = GalleryCard, header }: { collection: ReturnType<typeof useCollection>; archived?: boolean; filtered?: boolean; headerSpace?: number; bottomSpace?: number; resetKey?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void; Card?: SaveCardComponent; header?: ReactNode }) {
   const styles = useThemedStyles(baseStyles);
   const palette = palettes[useAppearance().scheme];
   const { width, height, fontScale } = useWindowDimensions();
   const [viewport, setViewport] = useState({ width, height: height / 2 });
   const [windowTop, setWindowTop] = useState(0);
-  const [reader, setReader] = useState(false);
+  const reader = useScreenReader();
   const [, measured] = useState(0);
   const sizes = useRef(new Map<string, { key: string; height: number }>());
   const frame = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
@@ -56,12 +58,7 @@ export function GalleryList({ collection, archived = false, filtered = false, he
     }
     previous.current = { captures, layout, headerSpace, width: contentWidth };
   });
-  useEffect(() => {
-    let live = true;
-    void AccessibilityInfo.isScreenReaderEnabled().then(value => { if (live) setReader(value); });
-    const listener = AccessibilityInfo.addEventListener('screenReaderChanged', setReader);
-    return () => { live = false; listener.remove(); if (frame.current !== null) cancelAnimationFrame(frame.current); };
-  }, []);
+  useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current); }, []);
   useEffect(() => { const ids = new Set(captures.map(item => item.id)); for (const id of sizes.current.keys()) if (!ids.has(id)) sizes.current.delete(id); }, [captures]);
   useEffect(() => { offset.current = 0; setWindowTop(0); previous.current = null; scroll.current?.scrollTo({ y: 0, animated: false }); }, [resetKey]);
   const open = useCallback((capture: Capture) => router.push({ pathname: '/(app)/capture/[id]', params: { id: capture.id } }), []);
@@ -77,7 +74,7 @@ export function GalleryList({ collection, archived = false, filtered = false, he
       onScroll?.(event);
     }} scrollEventThrottle={16} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={palette.accent} progressViewOffset={headerSpace} />}>
-    <View style={{ height: headerSpace }} />
+    <View style={{ height: headerSpace }}>{header}</View>
     {captures.length && error ? <View style={styles.error}><Message error>{error}</Message><Button secondary label="Try again" onPress={() => void refresh()} /></View> : null}
     {captures.length ? <View testID="masonry-gallery" style={{ height: layout.height }}>
       {captures.map((capture, index) => {

@@ -16,6 +16,7 @@ import { captureTitle } from '../../collection/model.ts';
 import { palettes } from '../../theme.ts';
 import { ScrollEdge } from '../../components/ScrollEdge';
 import { useScrollEdges } from '../../components/useScrollEdges.ts';
+import { useDockOnScroll } from '../../components/useDockOnScroll.ts';
 import { savedAge, sourcePlatform } from '../../../../../packages/shared/src/collection-presentation.ts';
 
 export function usePalette() { const { scheme } = useAppearance(); return { ...palettes[scheme], dark: scheme === 'dark' }; }
@@ -67,7 +68,8 @@ export function byDay(captures: Capture[]) {
 export const BAR = 52;
 export function useScrollY() {
   const y = useRef(new Animated.Value(0)).current;
-  return { y, onScroll: Animated.event([{ nativeEvent: { contentOffset: { y } } }], { useNativeDriver: false }) };
+  const dock = useDockOnScroll();
+  return { y, onScroll: Animated.event([{ nativeEvent: { contentOffset: { y } } }], { useNativeDriver: false, listener: dock }) };
 }
 export function Edges({ y, title, children }: { y: Animated.Value; title: string; children?: React.ReactNode }) {
   const P = usePalette();
