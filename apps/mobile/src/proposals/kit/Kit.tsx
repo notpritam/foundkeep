@@ -16,37 +16,48 @@ import type { Capture } from '../../api/types.ts';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
 import { GalleryCard } from '../../components/GalleryCard.tsx';
-import { useCollection } from '../../collection/useCollection.ts';
+import type { useCollection } from '../../collection/useCollection.ts';
 import { openSave, usePalette } from '../library/parts.tsx';
-import { IconAction, JumpBackIn, KIT_ORB, LibraryShell, ProposalDock, RecentSearches, Results, Sheet, Title, useLibrary, useRecentSearches } from '../search/parts.tsx';
+import { IconAction, JumpBackIn, KIT_ORB, LibraryShell, ProposalDock, Results, Sheet, Title, useLibrary, useRecentSearches } from '../search/parts.tsx';
 import { converse, describe, followUps, savesFor, type Ask, type Turn } from './conversation.ts';
+import { AskKit } from '../../kit/AskKit.tsx';
+import { SearchPanel } from '../../kit/SearchPanel.tsx';
 
-export type KitLook = 'chat' | 'grid' | 'half' | 'trail';
+/** locked: the chosen conversation, as built (kit/AskKit); chat: as it was proposed. */
+export type KitLook = 'locked' | 'chat' | 'grid' | 'half' | 'trail';
 export type KitState = 'library' | 'search' | 'open' | 'first' | 'followup';
 /** How Kit sits beside + in the dock: its logo alone, or a pill that says "Ask Kit". */
 export type KitEntry = 'orb' | 'pill';
 const SEED: Record<KitState, string[]> = { library: [], search: [], open: [], first: ['recent post I saved from twitter'], followup: ['recent post I saved from twitter', 'about cats'] };
 
-export function KitProposal({ look, state = 'library', entry = 'orb' }: { look: KitLook; state?: KitState; entry?: KitEntry }) {
-  const k = useKit(state);
+/** A playthrough's say over the screen: what's open, what's typed, what's been asked, and
+ * whether the Library is still loading (the app tour drives these frame by frame). */
+export type KitScript = { loading?: boolean; searching?: boolean; query?: string; asking?: boolean; questions?: string[]; draft?: string };
+
+export function KitProposal({ look, state = 'library', entry = 'orb', script }: { look: KitLook; state?: KitState; entry?: KitEntry; script?: KitScript }) {
+  const k = useKit(state, script);
   const half = look === 'half' && k.open && k.turns.length > 0;
-  return <LibraryShell library={k.library} collection={half ? k.answerCollection : undefined}
+  return <LibraryShell library={k.library} collection={script?.loading ? collectionOf([], true) : half ? k.answerCollection : undefined}
     header={half ? <View style={{ height: 52 }} /> : <><Title /><JumpBackIn library={k.library} /></>}
     actions={<><IconAction icon="search" label="Search your saves" onPress={() => k.setSearching(true)} /><IconAction icon="archive-outline" label="Open archive" /></>}>
     {/* Kit beside + in the dock: its logo, or "Ask Kit". */}
     <ProposalDock buttons={[{ key: 'kit', label: 'Ask Kit', orb: true, text: entry === 'pill' ? 'Ask Kit' : undefined, onPress: () => k.setOpen(true) }, { key: 'add', label: 'Create a note', icon: 'add' }]} />
-    {look === 'chat' ? <Chat k={k} /> : look === 'grid' ? <GridAnswers k={k} /> : look === 'half' ? <HalfSheet k={k} /> : <Trail k={k} />}
-    <SearchSheet k={k} start={state === 'search' ? 'ramen' : ''} />
+    {look === 'locked' ? <AskKit open={k.open} onClose={k.close} questions={k.questions} onQuestions={k.setQuestions} captures={k.library.all.captures} tags={k.library.places.tags.map(tag => tag.name)} onOpen={openSave} draft={script?.draft} />
+      : look === 'chat' ? <Chat k={k} /> : look === 'grid' ? <GridAnswers k={k} /> : look === 'half' ? <HalfSheet k={k} /> : <Trail k={k} />}
+    {/* Search, as locked: the field at the bottom. */}
+    <SearchPanel open={k.searching} onClose={() => k.setSearching(false)} start={state === 'search' ? 'ramen' : ''} typed={script?.query} recents={k.recents.list} onRecent={k.recents.add} onForget={k.recents.remove}
+      places={k.library.places} selected={k.library.filter} onChoose={k.library.toggle} onOpen={openSave} onAskKit={k.askInstead} />
   </LibraryShell>;
 }
 
 /** The conversation (the questions so far, Kit's turns, asking, starting over) and plain search. */
-function useKit(state: KitState) {
+function useKit(state: KitState, script?: KitScript) {
   const library = useLibrary();
   const recents = useRecentSearches();
-  const [open, setOpen] = useState(state === 'open' || state === 'first' || state === 'followup');
-  const [searching, setSearching] = useState(state === 'search');
-  const [questions, setQuestions] = useState<string[]>(SEED[state]);
+  const [ownOpen, setOpen] = useState(state === 'open' || state === 'first' || state === 'followup');
+  const [ownSearching, setSearching] = useState(state === 'search');
+  const [ownQuestions, setQuestions] = useState<string[]>(SEED[state]);
+  const open = script?.asking ?? ownOpen, searching = script?.searching ?? ownSearching, questions = script?.questions ?? ownQuestions;
   const turns = useMemo(() => converse(questions, library.all.captures), [questions, library.all.captures]);
   const last: Turn | undefined = turns[turns.length - 1];
   const ask = (text: string) => { const words = text.trim(); if (words) setQuestions(list => [...list, words]); };
@@ -56,48 +67,15 @@ function useKit(state: KitState) {
   const askInstead = (text: string) => { setSearching(false); setQuestions([text.trim()]); setOpen(true); };
   const suggestions = followUps(last?.context ?? null, library.places.tags.map(tag => tag.name));
   const answerCollection = collectionOf(last?.items ?? []);
-  return { library, recents, open, setOpen, searching, setSearching, questions, turns, last, ask, restart, close, askInstead, suggestions, answerCollection };
+  return { library, recents, open, setOpen, searching, setSearching, questions, setQuestions, turns, last, ask, restart, close, askInstead, suggestions, answerCollection, draft: script?.draft };
 }
 type Kit = ReturnType<typeof useKit>;
 
-/** Search, from the top bar: a plain field at the top; recent searches and Jump back in before
- * anything's typed; then the saves that match, and a line to ask Kit instead. */
-function SearchSheet({ k, start }: { k: Kit; start: string }) {
-  const P = usePalette();
-  const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState(start);
-  const words = query.trim();
-  const found = useCollection({ q: words || undefined });
-  const close = () => { k.setSearching(false); setQuery(''); };
-  const run = (text: string) => { setQuery(text); k.recents.add(text); };
-  return <Sheet open={k.searching}>
-    <View style={[styles.searchTop, { paddingTop: insets.top + 10 }]}>
-      <View style={[styles.searchField, { backgroundColor: P.surface, borderColor: P.line }]}>
-        <Ionicons name="search" size={18} color={P.muted} />
-        <TextInput key={k.searching ? 'open' : 'shut'} value={query} onChangeText={setQuery} onSubmitEditing={() => words && k.recents.add(words)} autoFocus={k.searching && !start} returnKeyType="search"
-          placeholder="Search your saves" placeholderTextColor={P.muted} style={[styles.input, { color: P.ink }]} accessibilityLabel="Search your saves" autoCorrect={false} />
-        {query ? <Pressable accessibilityRole="button" accessibilityLabel="Clear" onPress={() => setQuery('')} hitSlop={8}><Ionicons name="close-circle" size={19} color={P.muted} /></Pressable> : null}
-      </View>
-      <Pressable accessibilityRole="button" onPress={close} hitSlop={8}><Text style={[styles.cancel, { color: P.accent }]}>Cancel</Text></Pressable>
-    </View>
-    <ScrollView contentContainerStyle={[styles.searchBody, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
-      {words ? <>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Ask Kit about ${words}`} onPress={() => k.askInstead(words)} style={({ pressed }) => [styles.askInstead, { backgroundColor: P.accentSoft }, pressed && styles.pressed]}>
-          <Image source={KIT_ORB} style={styles.fieldOrb} accessible={false} /><Text style={[styles.askText, { color: P.ink }]} numberOfLines={1}>Ask Kit about “{words}”</Text><Ionicons name="arrow-forward" size={17} color={P.ink} />
-        </Pressable>
-        <Text style={[styles.label, { color: P.muted }]}>{found.loading ? 'Searching…' : `${found.total} ${found.total === 1 ? 'save' : 'saves'}`}</Text>
-        <Results items={found.captures} />
-      </> : <>
-        {k.recents.list.length ? <><Text style={[styles.label, { color: P.muted }]}>Recent</Text><RecentSearches recents={k.recents} onRun={run} /></> : null}
-        <JumpBackIn library={k.library} />
-      </>}
-    </ScrollView>
-  </Sheet>;
-}
+// The first search sheet here (its field at the top) gave way to the locked SearchPanel; it's in git.
 
 /** A list of saves shaped like the Library's data, so the gallery can show Kit's answer. */
-function collectionOf(items: Capture[]): ReturnType<typeof useCollection> {
-  return { captures: items, loading: false, refreshing: false, loadingMore: false, total: items.length, error: '', refresh: async () => {}, loadMore: async () => {} };
+function collectionOf(items: Capture[], loading = false): ReturnType<typeof useCollection> {
+  return { captures: items, loading, refreshing: false, loadingMore: false, total: items.length, error: '', refresh: async () => {}, loadMore: async () => {} };
 }
 
 // ——— What every panel shares ———
@@ -132,7 +110,8 @@ function Next({ k }: { k: Kit }) {
 function Composer({ k }: { k: Kit }) {
   const P = usePalette();
   const insets = useSafeAreaInsets();
-  const [text, setText] = useState('');
+  const [own, setText] = useState('');
+  const text = k.draft ?? own;
   const send = () => { k.ask(text); setText(''); };
   return <View style={[styles.composer, { paddingBottom: insets.bottom + 10 }]}>
     <View style={[styles.field, { backgroundColor: P.surface, borderColor: P.line }]}>
@@ -266,13 +245,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   pressed: { opacity: 0.75 },
   hidden: { opacity: 0 },
-  searchTop: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 10 },
-  searchField: { flex: 1, minHeight: 48, borderRadius: 24, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
-  cancel: { fontSize: 16, fontWeight: '600' },
-  searchBody: { gap: 12, paddingTop: 6 },
-  label: { fontSize: 13, fontWeight: '600', paddingHorizontal: 20, marginTop: 4 },
-  askInstead: { marginHorizontal: 16, height: 48, borderRadius: 24, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 },
-  askText: { flex: 1, fontSize: 15, fontWeight: '600' },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 6 },
   headTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headOrb: { width: 24, height: 24 },
