@@ -6,7 +6,7 @@ function fourConversations() {
   const el = document.createElement('div');
   el.className = 'bt';
   const looks = [
-    ['proposals-ask-kit--chat', 'A conversation: your questions and Kit’s answers, the saves it found in a row of cards'],
+    ['proposals-ask-kit--chat', 'Picked · A conversation: your questions and Kit’s answers, the saves it found in a row of cards'],
     ['proposals-ask-kit--grid', 'Answers laid out like the Library; earlier turns fold to one line'],
     ['proposals-ask-kit--half', 'A half sheet: the Library above becomes Kit’s answer, the conversation stays below'],
     ['proposals-ask-kit--trail', 'No bubbles: what Kit understood, as chips you can take away; the saves as a list'],
@@ -33,5 +33,32 @@ function fourConversations() {
   return el;
 }
 
+/** As locked (2026-10-03): every state of Search and Ask Kit, live. */
+function locked() {
+  const el = document.createElement('div');
+  el.className = 'bt';
+  const states = [
+    ['current-search-and-ask-kit--library', 'The Library: the magnifier on top for Search; Kit’s orb beside + for Ask Kit'],
+    ['current-search-and-ask-kit--search', 'Search, just opened: Jump back in and recent searches; the field at the bottom'],
+    ['current-search-and-ask-kit--search-word', 'Search for a word: the saves that match, and “Ask Kit about …”'],
+    ['current-search-and-ask-kit--kit', 'Ask Kit, just opened: what to ask, the field at the bottom'],
+    ['current-search-and-ask-kit--question', 'One question: Kit’s one-line answer, the saves in a row of cards'],
+    ['current-search-and-ask-kit--follow-up', 'A follow-up: “about cats” narrows the posts from X'],
+  ];
+  const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
+  el.innerHTML = `
+    <header class="bt-intro"><div><h1>Search and Ask Kit, as locked</h1><p>The magnifier on top opens Search — its field at the bottom, by the thumb. Kit’s orb (the logo only) beside + opens Ask Kit: a conversation, each answer one short line, a touch larger, with the saves it found in a row of the Library’s cards. Every state, live; type and tap in any phone. Not in the app’s Library yet.</p></div></header>
+    <div class="bt-states" role="group" aria-label="Appearance"><button type="button" data-theme="light" aria-pressed="true">Light</button><button type="button" data-theme="dark" aria-pressed="false">Dark</button></div>
+    <div class="bt-phones bt-phones-three">${states.map(([id, name]) => `<figure><iframe loading="lazy" data-story="${id}" title="${name}" src="${src(id, 'light')}"></iframe><figcaption>${name}</figcaption></figure>`).join('')}</div>`;
+  el.querySelector('.bt-states').addEventListener('click', event => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    el.querySelectorAll('.bt-states button').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+    el.querySelectorAll('iframe[data-story]').forEach(frame => { frame.src = src(frame.dataset.story, button.dataset.theme); });
+  });
+  return el;
+}
+
 export default { title: 'Ask Kit', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
+export const Locked = { name: 'Search and Ask Kit, as locked', render: locked };
 export const FourConversations = { name: 'Four conversations', render: fourConversations };

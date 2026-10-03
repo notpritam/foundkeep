@@ -16,7 +16,7 @@ const meta: Meta<Args> = {
 export default meta;
 type Story = StoryObj<Args>;
 const look = (name: KitLook): Story['render'] => args => <DockProvider><KitProposal key={args.state} look={name} state={args.state} entry={args.entry} /></DockProvider>;
-export const Chat: Story = { name: 'A conversation', render: look('chat') };
+export const Chat: Story = { name: 'A conversation (picked)', render: look('chat') };
 export const Grid: Story = { name: 'Answers laid out like the Library', render: look('grid') };
 export const Half: Story = { name: 'A half sheet; the Library is the answer', render: look('half') };
 export const Trail: Story = { name: 'What Kit understood, as chips', render: look('trail') };
