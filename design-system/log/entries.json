@@ -295,6 +295,19 @@
         "ask-kit--locked",
         "ask-kit--four-conversations"
       ]
+    },
+    {
+      "id": "2026-10-03-app-tour",
+      "date": "2026-10-03",
+      "product": "App",
+      "title": "The app tour, for a poll on X",
+      "question": "Which Kit design do people prefer, seen in the whole flow rather than one screen?",
+      "tried": "The app start to finish, playing by itself in about 24 seconds — sign in with Google, the cards gather while Google opens, the Library loads, a search for “ramen”, then Kit: “recent post I saved from twitter”, then “about cats” — in four versions, one per Kit design: the conversation as locked, answers as a grid, the half sheet, the chips. Filmed frame by frame into one video, four phones side by side (wide) or two by two (tall).",
+      "picked": "Not picked yet — the four versions go to a poll on X.",
+      "why": "Pritam: “create a video of our app from auth page to homepage loading, user searching and interacting with Kit … 4 variations, each with their own Kit UI … showing in Storybook first … I'll post on Twitter to keep users engaged”.",
+      "live": [
+        "app-tour--four-versions"
+      ]
     }
   ]
 }

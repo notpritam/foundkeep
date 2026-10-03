@@ -13,7 +13,7 @@ function fourVersions() {
   ];
   const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>The app, start to finish</h1><p>Each phone plays the whole flow by itself, in about 24 seconds: sign in with Google, the cards gather while Google opens, the Library loads, a search for “ramen”, then Kit — “recent post I saved from twitter”, then “about cats”. The four differ in how Kit answers. Pick the ones for the video and the poll on X; the video is rendered from these, frame by frame.</p></div></header>
+    <header class="bt-intro"><div><h1>The app, start to finish</h1><p>Each phone plays the whole flow by itself, in about 24 seconds: sign in with Google, the cards gather while Google opens, the Library loads, a search for “ramen”, then Kit — “recent post I saved from twitter”, then “about cats”. The four differ in how Kit answers. Pick the ones for the video and the poll on X; the video comes later, rendered from these frame by frame (design-system/film/tour.mjs).</p></div></header>
     <div class="bt-states" role="group" aria-label="Appearance"><button type="button" data-theme="light" aria-pressed="true">Light</button><button type="button" data-theme="dark" aria-pressed="false">Dark</button><span class="bt-gap"></span><button type="button" data-restart>Play from the start</button></div>
     <div class="bt-phones bt-phones-four">${tours.map(([id, name]) => `<figure><iframe loading="lazy" data-story="${id}" title="${name}" src="${src(id, 'light')}"></iframe><figcaption>${name}</figcaption></figure>`).join('')}</div>`;
   let theme = 'light';

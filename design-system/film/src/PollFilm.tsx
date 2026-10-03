@@ -11,7 +11,10 @@ import { loadFont } from '@remotion/google-fonts/Inter';
 const { fontFamily } = loadFont('normal', { weights: ['600'], subsets: ['latin'] });
 
 export const POLL = { fps: 30, frames: 390 };
-export type PollProps = { shape: 'wide' | 'tall'; scale: number };
+/** count: how many phones (3 for the sign-in poll, 4 for the app tour: a row when wide, 2 × 2 when tall);
+ * frames: how long; skyUntil: the frame before which the screens show the sky (a white status bar after
+ * which it turns dark) — for the app tour, which starts on sign-in and moves to the Library. */
+export type PollProps = { shape: 'wide' | 'tall'; scale: number; count?: number; frames?: number; skyUntil?: number };
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);
 const ramp = (f: number, a: number, b: number) => interpolate(f, [a, b], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: SETTLE });
 
@@ -23,6 +26,8 @@ const SHAPES = {
   tall: { w: 1080, h: 1920, phone: 0.7, gap: 34 },
 };
 const SCREENS = [{ dir: '1', light: true }, { dir: '2', light: false }, { dir: '3', light: true }];
+/** Four phones: a row when wide, two by two when tall. */
+const FOUR = { wide: { phone: 0.92, gap: 40 }, tall: { phone: 0.93, gap: 60 } };
 
 /** Soft colour fields drifting on slow loops — sky blues with a little lilac, mint and peach. Positions are fractions of the frame. */
 const FIELDS = [
@@ -32,8 +37,8 @@ const FIELDS = [
   { color: '#ffc9ae', size: 0.75, x: 0.78, y: 0.86, dx: 0.09, dy: 0.08, speed: 1, phase: 0.8 },
   { color: '#2f7fd6', size: 0.69, x: 0.5, y: 0.45, dx: 0.14, dy: 0.10, speed: 2, phase: 0.15 },
 ];
-function Gradient({ f, w, h }: { f: number; w: number; h: number }) {
-  const t = (f / POLL.frames) * Math.PI * 2, unit = Math.max(w, h) * 0.57;
+function Gradient({ f, w, h, frames = POLL.frames }: { f: number; w: number; h: number; frames?: number }) {
+  const t = (f / frames) * Math.PI * 2, unit = Math.max(w, h) * 0.57;
   return <AbsoluteFill style={{ background: 'linear-gradient(160deg, #dcecfb 0%, #eaf2fb 45%, #f2eefb 100%)', overflow: 'hidden' }}>
     {FIELDS.map((field, i) => {
       const size = field.size * unit;
@@ -45,18 +50,23 @@ function Gradient({ f, w, h }: { f: number; w: number; h: number }) {
   </AbsoluteFill>;
 }
 
-export function PollFilm({ shape, scale }: PollProps) {
+export function PollFilm({ shape, scale, count = 3, frames = POLL.frames, skyUntil }: PollProps) {
   const f = useCurrentFrame();
-  const S = SHAPES[shape], pw = PHONE.w * S.phone, ph = PHONE.h * S.phone;
-  const left = (S.w - (pw * 3 + S.gap * 2)) / 2, top = (S.h - ph) / 2;
+  const S = SHAPES[shape], four = count === 4 ? FOUR[shape] : null;
+  const phone = four?.phone ?? S.phone, gap = four?.gap ?? S.gap, pw = PHONE.w * phone, ph = PHONE.h * phone;
+  const grid = shape === 'tall' && count === 4;
+  const across = grid ? 2 : count, down = grid ? 2 : 1;
+  const left = (S.w - (pw * across + gap * (across - 1))) / 2, top = (S.h - (ph * down + gap * (down - 1))) / 2;
+  const screens = count === 3 && skyUntil === undefined ? SCREENS : Array.from({ length: count }, (_, i) => ({ dir: String(i + 1), light: skyUntil !== undefined && f < skyUntil }));
   return <AbsoluteFill style={{ fontFamily, backgroundColor: '#e6f0fa' }}>
     <div style={{ width: S.w, height: S.h, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'relative', overflow: 'hidden' }}>
-      <Gradient f={f} w={S.w} h={S.h} />
-      {SCREENS.map((screen, i) => {
+      <Gradient f={f} w={S.w} h={S.h} frames={frames} />
+      {screens.map((screen, i) => {
         const enter = ramp(f, i * 4, 18 + i * 4);
-        const frame = String(Math.min(f, POLL.frames - 1)).padStart(4, '0');
+        const frame = String(Math.min(f, frames - 1)).padStart(4, '0');
         const ink = screen.light ? '#ffffff' : '#233E4B';
-        return <div key={screen.dir} style={{ position: 'absolute', left: left + i * (pw + S.gap), top: top + (1 - enter) * 26, width: PHONE.w, height: PHONE.h, opacity: enter, transform: `scale(${S.phone})`, transformOrigin: 'top left' }}>
+        const col = i % across, row = Math.floor(i / across);
+        return <div key={screen.dir} style={{ position: 'absolute', left: left + col * (pw + gap), top: top + row * (ph + gap) + (1 - enter) * 26, width: PHONE.w, height: PHONE.h, opacity: enter, transform: `scale(${phone})`, transformOrigin: 'top left' }}>
           <div style={{ width: PHONE.w, height: PHONE.h, borderRadius: 70, background: '#0f1011', padding: BEZEL, boxSizing: 'border-box', boxShadow: '0 40px 90px rgba(20,48,84,0.28), 0 0 0 2px #3b3d40 inset' }}>
             <div style={{ position: 'relative', width: SCREEN.w, height: SCREEN.h, borderRadius: 58, overflow: 'hidden', background: '#000' }}>
               <Img src={staticFile(`${screen.dir}/${frame}.jpg`)} style={{ width: '100%', height: '100%', display: 'block' }} />

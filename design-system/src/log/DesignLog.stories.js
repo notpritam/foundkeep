@@ -10,7 +10,7 @@ import log from '../../log/entries.json';
 
 const sheets = import.meta.glob('../../log/*/sheet.jpg', { eager: true, query: '?url', import: 'default' });
 const sheetFor = id => sheets[`../../log/${id}/sheet.jpg`];
-const STORY_TITLES = { 'sign-in--movement': 'Movement on the page', 'sign-in--pick-one': 'Pick one', 'sign-in--two-versions': 'Versions', 'sign-in--film-variations': 'Film variations', 'sign-in--handoff': 'After Continue with Google', 'first-run--four-ways': 'First run · Four ways', 'library--four-ways': 'Library · Four ways', 'library--cards': 'Library · Cards for every kind of save', 'search-and-kit--four-ways': 'Search and Kit · Four ways', 'ask-kit--four-conversations': 'Ask Kit · Four conversations', 'ask-kit--locked': 'Search and Ask Kit, as locked' };
+const STORY_TITLES = { 'sign-in--movement': 'Movement on the page', 'sign-in--pick-one': 'Pick one', 'sign-in--two-versions': 'Versions', 'sign-in--film-variations': 'Film variations', 'sign-in--handoff': 'After Continue with Google', 'first-run--four-ways': 'First run · Four ways', 'library--four-ways': 'Library · Four ways', 'library--cards': 'Library · Cards for every kind of save', 'search-and-kit--four-ways': 'Search and Kit · Four ways', 'ask-kit--four-conversations': 'Ask Kit · Four conversations', 'ask-kit--locked': 'Search and Ask Kit, as locked', 'app-tour--four-versions': 'App tour · Four versions' };
 const day = (date, month = 'long') => new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month, year: 'numeric' });
 const esc = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
