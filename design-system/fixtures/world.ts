@@ -68,12 +68,29 @@ export const saves = {
   ridge: { ...base, ...at(110), id: 'cap-ridge', type: 'video', savedVia: 'iphone', sourceTitle: 'A ridge walk worth the climb', sourceUrl: 'https://www.tiktok.com/@sample.trails/video/1', previewUrl: 'preview', width: 800, height: 800, userTags: ['Travel'], provenance: { siteName: 'TikTok', captureMethod: 'ios-share-url' } },
 } satisfies Record<string, Capture & { savedVia?: Capture['savedVia'] }>;
 
+/** Saves shaped like real ones from the 2026-10-03 audit (the words are made up), for the save's
+ * detail — kept out of the Library so its locked screens don't change: a post shared from the
+ * iPhone (a bare link and the person's note; the post itself kept on the server), one whose words
+ * were never kept, and a YouTube link that another app shared as text. */
+export const realShapes = {
+  sharedPost: { ...base, ...at(5), id: 'cap-shared-post', type: 'bookmark', savedVia: 'iphone', sourceUrl: 'https://x.com/marawrites/status/1843000000000000000?s=12', noteText: 'Make a video on this', summary: 'Make a video on this', userTags: ['Ideas'], provenance: { captureMethod: 'ios-share-url' } },
+  postNotKept: { ...base, ...at(300), id: 'cap-post-not-kept', type: 'bookmark', savedVia: 'iphone', sourceUrl: 'https://x.com/jonnybuilds/status/1840100000000000000?s=12', noteText: 'Seo of app', summary: 'Seo of app', provenance: { captureMethod: 'ios-share-url' } },
+  sharedLink: { ...base, ...at(9), ...folder('f-kitchen'), id: 'cap-shared-link', type: 'selection', savedVia: 'iphone', selectionText: 'https://youtube.com/shorts/kXy12abcd90?si=Abc123', noteText: 'Protein source', summary: 'https://youtube.com/shorts/kXy12abcd90?si=Abc123', provenance: { captureMethod: 'ios-share-text' } },
+} satisfies Record<string, Capture & { savedVia?: Capture['savedVia'] }>;
+/** What the server kept of a post (the preservation API). */
+export const preservations: Record<string, unknown> = {
+  'cap-shared-post': { status: 'ready', error: null, updatedAt: hours(5), assets: [
+    { id: 'asset-post', kind: 'post', title: 'Saved post', mime: 'text/plain', bytes: 240, text: 'Mara Lind (@marawrites)\n2026-09-29T04:00:00.000Z\nhttps://x.com/marawrites/status/1843000000000000000\n\nI kept a notebook of every idea I had for a year.\n\nMost were bad. The good ones came back three times before I noticed them.' },
+    { id: 'asset-photo', kind: 'image', title: 'Photo 1', mime: 'image/jpeg', bytes: 120_000, text: null },
+  ] },
+};
+
 export type SaveKind = keyof typeof saves;
 export const allSaves: Capture[] = Object.values(saves);
 export const library: Capture[] = allSaves.filter(c => !c.archivedAt).sort((a, b) => b.capturedAt - a.capturedAt);
 
 /** The film's photographs, for the saves people make from their phones. */
-const FILM: Record<string, string> = { 'cap-reel': 'ramen', 'cap-photo-post': 'kyoto', 'cap-recipe': 'pasta', 'cap-product': 'sneaker', 'cap-pin': 'lake', 'cap-short': 'tacos', 'cap-pour-over': 'coffee', 'cap-desk': 'desk', 'cap-plant': 'plant', 'cap-poster': 'poster', 'cap-chair': 'chair', 'cap-ridge': 'trail' };
+const FILM: Record<string, string> = { 'cap-shared-post': 'desk', 'cap-reel': 'ramen', 'cap-photo-post': 'kyoto', 'cap-recipe': 'pasta', 'cap-product': 'sneaker', 'cap-pin': 'lake', 'cap-short': 'tacos', 'cap-pour-over': 'coffee', 'cap-desk': 'desk', 'cap-plant': 'plant', 'cap-poster': 'poster', 'cap-chair': 'chair', 'cap-ridge': 'trail' };
 
 /** Which sample image stands in for a save's bytes (blob, file or preview). */
 export function sampleFor(capture: Pick<Capture, 'id' | 'height' | 'width'>): string {

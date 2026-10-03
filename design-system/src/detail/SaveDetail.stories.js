@@ -1,28 +1,33 @@
-// A save, opened (2026-10-03): four shapes for the detail screen, side by side and live. The
-// buttons switch every phone to another kind of save (no reload), or to light or dark.
+// A save, opened — locked 2026-10-03: With Kit, cleaned, then the four shapes it was picked from,
+// side by side and live. The buttons switch every phone to another kind of save (no reload) —
+// including three shaped like real saves from the audit — or to light or dark.
 import '../brand/brand.css';
 
-const LOOKS = [
-  ['open-save-detail--picture-first', 'Picture first: the picture, then the words; the save’s one action by the thumb (“Open on X”, “Open the PDF”), Kit’s orb, and more'],
-  ['open-save-detail--reader', 'Reader: the words first, set for reading, a smaller picture; the actions on top'],
-  ['open-save-detail--sheet', 'A sheet over the Library: rises from the card you tapped, the Library stays behind; tap any card behind it'],
-  ['open-save-detail--with-kit', 'With Kit, always there: ready prompts and “Ask Kit about this save” by the thumb, the answers on the page'],
-];
 const KINDS = [
-  ['article', 'An article'], ['recipe', 'A recipe'], ['post', 'A post on X'], ['photoPost', 'A post with a photo'], ['reel', 'A reel'], ['video', 'A video'],
-  ['photo', 'A photo'], ['screenshot', 'A screenshot'], ['fullPage', 'A full page'], ['note', 'A note'], ['highlight', 'A highlight'], ['pdf', 'A PDF'],
-  ['voiceMemo', 'A voice memo'], ['preparing', 'Still being read'], ['failed', 'Couldn’t be read'],
+  ['article', 'An article'], ['post', 'A post on X'], ['sharedPost', 'A post shared from the iPhone'], ['postNotKept', 'A post whose words weren’t kept'],
+  ['sharedLink', 'A link shared as text'], ['photoPost', 'A post with a photo'], ['reel', 'A reel'], ['recipe', 'A recipe'], ['video', 'A video'], ['photo', 'A photo'],
+  ['screenshot', 'A screenshot'], ['fullPage', 'A full page'], ['note', 'A note'], ['highlight', 'A highlight'], ['pdf', 'A PDF'], ['voiceMemo', 'A voice memo'],
+  ['preparing', 'Still being read'], ['failed', 'Couldn’t be read'],
+];
+const FINAL = ['final-6-save-detail--article', 'Final: With Kit, cleaned — the mark, who and when open the original; the post’s words lead; your note as yours; tags and the rest quietly at the bottom; Kit by the thumb'];
+const TRIED = [
+  ['tried-save-detail--with-kit', 'With Kit, as first shown (picked)'],
+  ['tried-save-detail--picture-first', 'Picture first, actions by the thumb'],
+  ['tried-save-detail--reader', 'Reader: the words first'],
+  ['tried-save-detail--sheet', 'A sheet over the Library'],
 ];
 
-function fourShapes() {
+function finalAndShapes() {
   const el = document.createElement('div');
   el.className = 'bt';
   const src = (id, theme, kind) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}&args=${encodeURIComponent(`kind:${kind}`)}`;
+  const phones = list => `<div class="bt-phones bt-phones-four">${list.map(([id, name]) => `<figure><iframe loading="lazy" data-story="${id}" title="${name}" src="${src(id, 'light', 'article')}"></iframe><figcaption>${name}</figcaption></figure>`).join('')}</div>`;
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>A save, opened</h1><p>Today’s screen crops a page’s picture at the sides, puts each part in its own frosted panel under uppercase labels, folds where it came from into “Original source”, and has four small icons on top and no Kit. Four shapes in the locked language — the platform’s mark and short lines in icons, the scroll edge, actions by the thumb, Kit’s orb. Pick a kind of save to switch every phone; tap the picture, the tags, a related save, Kit’s orb or ••• in any of them.</p></div></header>
+    <header class="bt-intro"><div><h1>A save, opened</h1><p>Locked: With Kit, cleaned. Where it came from and opening it are one line (the platform’s mark, who, when, ↗). A post’s own words lead it — from the copy kept on the server when the save has none — and your note sits under them as yours, never as the title. A summary leads only when it says something new. Tags, the date, how it was saved and the folder are one quiet block at the bottom. Kit stays by the thumb: Sum it up, More like it, Where is it from?, or your own question. Beside it, the four shapes it was picked from. Pick a kind of save to switch every phone.</p></div></header>
     <div class="bt-states" role="group" aria-label="Kind of save">${KINDS.map(([kind, name], index) => `<button type="button" data-kind="${kind}" aria-pressed="${index === 0}">${name}</button>`).join('')}</div>
     <div class="bt-states" role="group" aria-label="Appearance"><button type="button" data-theme="light" aria-pressed="true">Light</button><button type="button" data-theme="dark" aria-pressed="false">Dark</button></div>
-    <div class="bt-phones bt-phones-four">${LOOKS.map(([id, name]) => `<figure><iframe loading="lazy" data-story="${id}" title="${name}" src="${src(id, 'light', 'article')}"></iframe><figcaption>${name}</figcaption></figure>`).join('')}</div>`;
+    <h2 class="bt-part">Final</h2>${phones([FINAL])}
+    <h2 class="bt-part">The shapes it was picked from</h2>${phones(TRIED)}`;
   let theme = 'light', kind = 'article';
   el.querySelectorAll('.bt-states').forEach(group => group.addEventListener('click', event => {
     const button = event.target.closest('button');
@@ -36,5 +41,5 @@ function fourShapes() {
   return el;
 }
 
-export default { title: 'Open/Save detail', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
-export const FourShapes = { name: 'Four shapes, every kind of save', render: fourShapes };
+export default { title: 'Decided/Save detail', tags: ['!autodocs'], parameters: { layout: 'fullscreen' } };
+export const FinalAndShapes = { name: 'Final, and the shapes it was picked from', render: finalAndShapes };

@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import * as world from '../../fixtures/world.ts';
 import type { Capture } from '../../../apps/mobile/src/api/types.ts';
 
-const byId = (id: string) => world.allSaves.find(c => c.id === id);
+const byId = (id: string) => world.allSaves.find(c => c.id === id) ?? (Object.values(world.realShapes) as Capture[]).find(c => c.id === id);
 const page = (captures: Capture[]) => ({ captures, nextCursor: null, total: captures.length });
 const sample = (capture: Capture) => new URL(world.sampleFor(capture), location.href).href;
 
@@ -47,7 +47,11 @@ export const appHandlers = [
   http.get('*/api/mobile/me', () => HttpResponse.json({ account: world.account, connectionId: 'con-iphone', usage: world.usage })),
   http.get('*/api/mobile/captures', ({ request }) => HttpResponse.json(page(listFor(new URL(request.url))))),
   http.get('*/api/mobile/captures/:id/related', ({ params }) => HttpResponse.json({ items: relatedTo(String(params.id)) })),
-  http.get('*/api/mobile/captures/:id/preservation', () => HttpResponse.json({ preservation: null })),
+  http.get('*/api/mobile/captures/:id/preservation', ({ params }) => HttpResponse.json({ preservation: world.preservations[String(params.id)] ?? null })),
+  http.get('*/api/mobile/captures/:id/assets/:asset', ({ params }) => {
+    const capture = byId(String(params.id));
+    return capture ? HttpResponse.redirect(sample(capture), 302) : new HttpResponse(null, { status: 404 });
+  }),
   http.get('*/api/mobile/captures/:id/:kind', ({ params }) => {
     const capture = byId(String(params.id));
     return capture ? HttpResponse.redirect(sample(capture), 302) : new HttpResponse(null, { status: 404 });

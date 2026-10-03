@@ -46,6 +46,6 @@ const preview: Preview = {
   decorators: [simulator],
   globalTypes: simulatorGlobals(APP_DEVICES, { ...textSizeGlobal, ...accessibilityGlobals }),
   initialGlobals: { device: 'iphone-17-pro', theme: 'light', textSize: '1', motion: 'full', transparency: 'full' },
-  parameters: { options: { storySort: { order: ['Start here', 'Flow map', 'Final', ['1 Sign in', '2 First run', '3 Home, search and Ask Kit', '4 Library card', '5 Jump back in'], 'In the app today', ['Library', 'Save detail', 'Saving', 'You', 'Links'], 'Open', 'Tried', ['Sign in', 'Sign-in handoff', 'Sign-in movement', 'First run', 'Library', 'Cards', 'Search and Kit', 'Ask Kit', 'Home and Ask Kit'], 'Live', 'Components', '*'] } }, layout: 'centered', msw: { handlers: { story: [], world: appHandlers } } },
+  parameters: { options: { storySort: { order: ['Start here', 'Flow map', 'Final', ['1 Sign in', '2 First run', '3 Home, search and Ask Kit', '4 Library card', '5 Jump back in', '6 Save detail'], 'In the app today', ['Library', 'Save detail', 'Saving', 'You', 'Links'], 'Open', 'Tried', ['Sign in', 'Sign-in handoff', 'Sign-in movement', 'First run', 'Library', 'Cards', 'Search and Kit', 'Ask Kit', 'Home and Ask Kit', 'Save detail'], 'Live', 'Components', '*'] } }, layout: 'centered', msw: { handlers: { story: [], world: appHandlers } } },
 };
 export default preview;
