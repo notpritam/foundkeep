@@ -384,11 +384,13 @@ test('details: keyboard — Add details moves focus into the card, and Esc retur
   await card.waitForSelector('#detailsForm[data-ready="true"]', { timeout: 8000 });
   await dock.waitFor("__foundkeepDock.focused() === 'card'");
   const deadline = Date.now() + 5000;
-  while (Date.now() < deadline && await card.evaluate(() => document.activeElement?.id) !== 'detailsTitle') await new Promise(r => setTimeout(r, 50));
-  assert.equal(await card.evaluate(() => document.activeElement?.id), 'detailsTitle');
-  await web.keyboard.press('End');
-  await web.keyboard.type(' (typed)');
-  assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture (typed)');
+  // The note, not the title: in real saves, words typed straight away were a note ("Write a blog
+  // on this", "AI UGC") and replaced the post's title (2026-10-03 audit).
+  while (Date.now() < deadline && await card.evaluate(() => document.activeElement?.id) !== 'detailsNote') await new Promise(r => setTimeout(r, 50));
+  assert.equal(await card.evaluate(() => document.activeElement?.id), 'detailsNote');
+  await web.keyboard.type('Write a blog on this');
+  assert.equal(await card.inputValue('#detailsNote'), 'Write a blog on this');
+  assert.equal(await card.inputValue('#detailsTitle'), 'Details fixture', 'the title is left as saved');
   await web.keyboard.press('Escape');
   await dock.waitFor("__foundkeepDock.state() === 'expanded'");
   await dock.waitFor("__foundkeepDock.focused() === 'savepage'");

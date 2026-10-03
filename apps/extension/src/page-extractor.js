@@ -78,8 +78,19 @@ export async function extractPageDocument(options = {}) {
     }
     liveNodes.forEach((node, index) => {
       const style = getComputedStyle(node);
+      const copy = clonedNodes[index];
+      // Transparent below the fold is a section waiting to fade in as you scroll (Framer,
+      // Webflow); transparent in plain view is hidden.
+      const waiting = Number(style.opacity) === 0 && node.getBoundingClientRect().top >= innerHeight - 1;
       if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" ||
-          style.contentVisibility === "hidden" || Number(style.opacity) === 0) clonedNodes[index]?.remove();
+          style.contentVisibility === "hidden" || (Number(style.opacity) === 0 && !waiting)) return copy?.remove();
+      // How the page lays each element out, so the text can be read the way it looks: blocks
+      // as paragraphs, inline-blocks and the items of a flex row as words on one line.
+      const apart = (side) => parseFloat(style[`margin${side}`]) + parseFloat(style[`padding${side}`]) >= 4;
+      copy?.setAttribute("data-foundkeep-flow", style.display === "contents" ? "contents"
+        : /^inline-(block|flex|grid|table)$/.test(style.display) ? "gap"
+        : style.display === "inline" ? (apart("Left") || apart("Right") ? "gap" : "inline") : "block");
+      if (/flex$/.test(style.display) && !/column/.test(style.flexDirection)) copy?.setAttribute("data-foundkeep-row", "");
     });
     const discard = [
       "script", "style", "noscript", "nav", "footer", "header", "aside", "form", "button",
@@ -89,24 +100,86 @@ export async function extractPageDocument(options = {}) {
     clone.querySelectorAll(discard).forEach((node) => node.remove());
     clone.querySelectorAll("[class], [id]").forEach((node) => {
       const marker = `${node.id || ""} ${node.className || ""}`;
-      if (/(^|[\s_-])(advert|ads?|newsletter|subscribe|cookie|promo|social|share|related)([\s_-]|$)/i.test(marker)) node.remove();
+      if (/(^|[\s_-])(advert|ads?|newsletter|subscribe|cookie|promo|social|share|related|sponsors?|sponsored)([\s_-]|$)/i.test(marker)) node.remove();
     });
   }
   const articleLimit = Number.isSafeInteger(options.maxArticleCharacters)
     ? Math.max(10_000, Math.min(500_000, options.maxArticleCharacters))
     : 500_000;
-  const rawArticleText = options.readableText === false
-    ? ""
-    : (clone?.innerText || clone?.textContent || "").replace(/\s+/g, " ").trim();
+  // A copy taken out of the page has no layout, so its innerText runs every element together
+  // ("habitsBuild"). Read it as the page lays it out instead (data-foundkeep-flow, above; by
+  // tag past the styled limit): a paragraph per block, a space between words drawn as separate
+  // elements, and a label drawn twice for a hover effect kept once.
+  const BLOCK_TAGS = /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|CAPTION|DD|DETAILS|DIV|DL|DT|FIGCAPTION|FIGURE|FOOTER|H[1-6]|HEADER|HR|LI|MAIN|NAV|OL|P|PRE|SECTION|SUMMARY|TABLE|TBODY|TD|TFOOT|TH|THEAD|TR|UL)$/;
+  const ownFlow = (node) => node.getAttribute("data-foundkeep-flow") || (BLOCK_TAGS.test(node.tagName) ? "block" : "inline");
+  const parentOf = (node) => { let up = node.parentElement; while (up && ownFlow(up) === "contents") up = up.parentElement; return up; };
+  // One line of words: a short item with at most one block that holds text.
+  const oneLine = (node) => (node.textContent || "").trim().length <= 80 &&
+    [node, ...node.querySelectorAll("*")].filter((each) => ownFlow(each) === "block" &&
+      [...each.childNodes].some((child) => child.nodeType === 3 && child.data.trim())).length <= 1;
+  // The items of a flex row sit side by side (seen through display: contents wrappers): a word or
+  // a label each, unless they hold paragraphs of their own (cards side by side).
+  const rowItem = (node) => Boolean(parentOf(node)?.hasAttribute("data-foundkeep-row")) && oneLine(node);
+  const flowOf = (node) => {
+    const own = ownFlow(node);
+    return own === "block" && rowItem(node) ? "gap" : own;
+  };
+  const readable = (from) => {
+    const lines = [];
+    let line = "";
+    const end = () => { const text = line.replace(/\s+/g, " ").trim(); if (text) lines.push(text); line = ""; };
+    // Inside a word or label (`unit`), its own blocks don't break the line.
+    const visit = (node, unit) => {
+      if (node.nodeType === 3) { line += node.data; return; }
+      if (node.nodeType !== 1) return;
+      if (node.tagName === "BR") return unit ? void (line += " ") : end();
+      const flow = flowOf(node);
+      const breaks = flow === "block" && !unit;
+      const spaced = !breaks && (flow === "gap" || flow === "block");
+      if (breaks) end(); else if (spaced) line += " ";
+      const inner = unit || (flow === "gap" && oneLine(node));
+      node.childNodes.forEach((child) => visit(child, inner));
+      if (breaks) end(); else if (spaced) line += " ";
+    };
+    visit(from, false);
+    end();
+    const kept = [];
+    for (const each of lines) {
+      // Only labels (a button, a link) are drawn twice; a long passage that repeats is the page's own.
+      const text = each.length <= 160 ? each.replace(/^(.{6,}?) ?\1$/, "$1") : each;
+      if (kept[kept.length - 1] !== text) kept.push(text);
+    }
+    return kept.join("\n\n");
+  };
+  // The flex row a heading sits in as one of its words, if it does.
+  const wordRow = (node) => {
+    for (let item = node; ;) {
+      const up = parentOf(item);
+      if (!up) return null;
+      if (up.hasAttribute("data-foundkeep-row")) return rowItem(item) ? up : null;
+      if (up.children.length !== 1) return null;
+      item = up;
+    }
+  };
+  const rawArticleText = options.readableText === false || !clone ? "" : readable(clone);
   const articleWasTruncated = rawArticleText.length > articleLimit;
   const articleText = rawArticleText ? rawArticleText.slice(0, articleLimit) : null;
-  const headings = options.headings === false || !clone?.querySelectorAll
-    ? []
-    : [...clone.querySelectorAll("h1,h2,h3")]
-        .map((node) => normalize(node.textContent, 500))
-        .filter(Boolean)
-        .filter((value, index, values) => values.indexOf(value) === index)
-        .slice(0, 20);
+  // A heading drawn one word per element (text effects) is one heading, not a heading per word.
+  const headingTexts = [];
+  if (options.headings !== false && clone?.querySelectorAll) {
+    let previous = null;
+    for (const node of clone.querySelectorAll("h1,h2,h3")) {
+      const text = normalize(readable(node), 500);
+      if (!text) continue;
+      const row = wordRow(node);
+      if (previous && ((previous.nextElementSibling === node && flowOf(node) !== "block" && flowOf(previous) !== "block") ||
+          (row && row === wordRow(previous))))
+        headingTexts[headingTexts.length - 1] = normalize(`${headingTexts[headingTexts.length - 1]} ${text}`, 500);
+      else headingTexts.push(text);
+      previous = node;
+    }
+  }
+  const headings = headingTexts.filter((value, index, values) => values.indexOf(value) === index).slice(0, 20);
   const extended = options.extendedMetadata !== false;
   const pageTitle = normalize(
     structured.headline || meta('meta[property="og:title"]', 'meta[name="twitter:title"]') || document.title,

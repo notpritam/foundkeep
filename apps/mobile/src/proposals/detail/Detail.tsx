@@ -94,8 +94,9 @@ function Page({ id: start, look }: { id: string; look: Exclude<DetailLook, 'shee
   </View>;
 }
 
-/** Picture first: the picture, where it came from, the title, tags; the words; the file; a few
- * facts; related saves. */
+/** Picture first: the picture, where it came from, the title; the words; the file; then tags and
+ * a few facts, quietly at the bottom (as in Reader — Pritam, 2026-10-03: tags aren't what a person
+ * opens a save for); related saves. */
 function Body({ capture, related, actions, onOpen, inlinePrimary = false }: { capture: Capture; related: RelatedSave[]; actions: Actions; onOpen: (capture: Capture) => void; inlinePrimary?: boolean }) {
   return <View style={styles.body}>
     <Picture capture={capture} style={styles.picture} onView={() => actions.setViewing(true)} />
@@ -103,11 +104,10 @@ function Body({ capture, related, actions, onOpen, inlinePrimary = false }: { ca
       <SourceLine capture={capture} />
       <Title capture={capture} size={capture.type === 'tweet' ? 22 : 25} />
       <State capture={capture} />
-      <Tags capture={capture} onEdit={() => actions.setEditing(true)} />
       {inlinePrimary ? <InlinePrimary capture={capture} actions={actions} /> : null}
     </View>
     {hasBody(capture) ? <Section><Words capture={capture} /><FileRow capture={capture} onOpen={() => void actions.openFile()} /></Section> : null}
-    <Section><Facts capture={capture} /></Section>
+    <Section><Tags capture={capture} onEdit={() => actions.setEditing(true)} /><Facts capture={capture} /></Section>
     <Related items={related} onOpen={onOpen} />
   </View>;
 }

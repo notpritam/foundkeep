@@ -114,3 +114,55 @@ test("respects bookmark content preferences while retaining origin fields", asyn
   assert.deepEqual(result.provenance.headings, []);
   assert.equal(result.provenance.contentHash, null);
 });
+
+// Seen in a real save (2026-10-03): a Framer page came back as "NewA calmer way to build
+// habitsBuild habits…Start tracking for freeStart tracking for free", one line, its headings one
+// word each. Pages built from many small elements must keep their words and paragraphs apart.
+test("keeps words and paragraphs apart when a page builds them from separate elements", async (t) => {
+  const result = await extract(t, `<!doctype html><html><head><title>Habitline</title></head><body><main>
+    <div style="display:flex;flex-direction:column"><p>New</p><h1>A calmer way to build habits</h1></div>
+    <div><h2 style="display:inline-block">Build</h2><h2 style="display:inline-block">steady</h2><h2 style="display:inline-block">daily</h2><h2 style="display:inline-block">habits</h2></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px"><span>with</span><span>a</span><span>layout</span><span>that</span><span>keeps</span><span>focus</span></div>
+    <div style="display:flex;gap:8px"><span>Revenue</span><span>48</span></div>
+    <a href="/start" style="display:block;overflow:hidden;height:20px"><div>Start tracking for free</div><div>Start tracking for free</div></a>
+    <p>You see the right habits at the right time.</p><p>Stay consistent with a system that fits into real life.</p>
+    <ul><li>Morning walk</li><li>Focus session</li></ul>
+    <div class="sponsors"><a href="https://fonts.example">Fontbase Too many fonts to handle?</a></div>
+  </main></body></html>`, "/habits");
+
+  assert.match(result.articleText, /New\n\nA calmer way to build habits/);
+  assert.match(result.articleText, /Build steady daily habits/);
+  assert.match(result.articleText, /with a layout that keeps focus/, "words laid out in a flex row stay one line");
+  assert.match(result.articleText, /Revenue 48/);
+  assert.equal(result.articleText.match(/Start tracking for free/g)?.length, 1, "a label drawn twice for a hover effect is kept once");
+  assert.match(result.articleText, /You see the right habits at the right time\.\n\nStay consistent/);
+  assert.doesNotMatch(result.articleText, /habitsBuild|walkFocus|freeYou/);
+  assert.doesNotMatch(result.articleText, /Fontbase/, "sponsor blocks are left out");
+  assert.ok(result.provenance.headings.includes("Build steady daily habits"));
+  assert.ok(!result.provenance.headings.includes("Build"), "a heading drawn one word per element stays one heading");
+});
+
+// Framer and Webflow pages fade sections in as they scroll into view; until then they sit at
+// opacity 0 below the fold. Saved without scrolling, those sections must still be kept — while
+// something transparent in plain view stays out (the first test).
+test("keeps sections that wait below the fold to fade in, and reads headings as laid out", async (t) => {
+  const result = await extract(t, `<!doctype html><html><head><title>Commit History</title></head><body><main>
+    <h1>A calmer way to build habits</h1><p>The opening paragraph is in view.</p>
+    <div style="height:2400px"></div>
+    <section style="opacity:0;transform:translateY(40px)"><h2>Habits with structure</h2><p>A layout that keeps your day clear, revealed on scroll.</p></section>
+    <h2><span>All-time</span><span style="display:inline-block">Commit</span><span style="display:inline-block">leaderboard</span></h2>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">${["Build", "steady", "daily", "habits"].map(word => `<div style="display:contents"><div style="display:flex;flex-direction:column"><h2>${word}</h2></div></div>`).join("")}</div>
+    <div style="display:flex;gap:12px"><div><h3>Habits with structure</h3><p>Clean cards and realistic progress.</p></div><div><h3>Flexible streaks</h3><p>Miss a day without losing the streak.</p></div></div>
+    <p><a href="/u/felix">felixonmars</a><span style="margin-left:6px">Felix Yan</span></p>
+  </main></body></html>`, "/reveal");
+
+  assert.match(result.articleText, /A layout that keeps your day clear, revealed on scroll\./);
+  assert.ok(result.provenance.headings.includes("Habits with structure"));
+  assert.ok(result.provenance.headings.includes("All-time Commit leaderboard"));
+  // Framer draws a sentence one word per heading, each wrapped (display: contents, a column) in a flex row.
+  assert.match(result.articleText, /Build steady daily habits/);
+  assert.ok(result.provenance.headings.includes("Build steady daily habits"));
+  // Cards side by side in a row keep their own paragraphs.
+  assert.match(result.articleText, /Habits with structure\n\nClean cards and realistic progress\./);
+  assert.match(result.articleText, /felixonmars Felix Yan/, "an inline name set apart by a margin is a separate word");
+});
