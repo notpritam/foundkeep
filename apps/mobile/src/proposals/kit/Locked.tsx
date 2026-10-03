@@ -8,7 +8,8 @@
 // Lena" and your counts), collection ("The collection.", the first final), compact (no big title: Jump back in right
 // under the top bar), nudge (a small card inviting a question to Kit); and Ask Kit's own
 // (`answers`, `thinking`: see kit/AskKit).
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import type { Capture } from '../../api/types.ts';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { AdaptiveText as Text } from '../../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../../components/AdaptiveIcon.tsx';
@@ -26,11 +27,12 @@ const SEED: Partial<Record<LockedState, string[]>> = { question: ['recent post I
 
 /** greeting is the final (Pritam, 2026-10-03: "clean, we'll use that"); collection was the first final. */
 export type HomeLook = 'greeting' | 'collection' | 'compact' | 'nudge';
-type Options = { home?: HomeLook; answers?: KitAnswers; thinking?: boolean };
+/** onOpen and overlay: for screens shown over the Library (the save-detail sheet, say). */
+type Options = { home?: HomeLook; answers?: KitAnswers; thinking?: boolean; onOpen?: (capture: Capture) => void; overlay?: ReactNode };
 export function SearchAndKit({ state = 'library', ...options }: { state?: LockedState } & Options) {
   return <DockProvider><Screen state={state} {...options} /></DockProvider>;
 }
-function Screen({ state, home = 'greeting', answers, thinking }: { state: LockedState } & Options) {
+function Screen({ state, home = 'greeting', answers, thinking, onOpen = openSave, overlay }: { state: LockedState } & Options) {
   const library = useLibrary();
   const recents = useRecentSearches();
   const [searching, setSearching] = useState(state === 'search' || state === 'word');
@@ -39,14 +41,15 @@ function Screen({ state, home = 'greeting', answers, thinking }: { state: Locked
   const askKit = (question: string) => { setQuestions([question]); setAsking(true); };
   const header = home === 'compact' ? <View style={styles.compact}><JumpBackIn library={library} /></View>
     : <>{home === 'collection' ? <Title /> : <Greeting saves={library.all.total} folders={library.places.folders.length} />}<JumpBackIn library={library} />{home === 'nudge' ? <KitNudge onAsk={askKit} tag={library.places.tags[0]?.name} /> : null}</>;
-  return <LibraryShell library={library} header={header}
+  return <LibraryShell library={library} header={header} onOpen={onOpen}
     actions={<><IconAction icon="search" label="Search your saves" onPress={() => setSearching(true)} /><IconAction icon="archive-outline" label="Open archive" /></>}>
     <ProposalDock buttons={[{ key: 'kit', label: 'Ask Kit', orb: true, onPress: () => setAsking(true) }, { key: 'add', label: 'Create a note', icon: 'add' }]} />
     <SearchPanel open={searching} onClose={() => setSearching(false)} start={state === 'word' ? 'ramen' : ''} recents={recents.list} onRecent={recents.add} onForget={recents.remove}
-      places={library.places} selected={library.filter} onChoose={library.toggle} onOpen={openSave}
+      places={library.places} selected={library.filter} onChoose={library.toggle} onOpen={onOpen}
       onAskKit={question => { setSearching(false); setQuestions([question]); setAsking(true); }} />
     <AskKit open={asking} onClose={() => { setAsking(false); setQuestions([]); }} questions={questions} onQuestions={setQuestions}
-      captures={library.all.captures} tags={library.places.tags.map(tag => tag.name)} onOpen={openSave} answers={answers} thinking={thinking} />
+      captures={library.all.captures} tags={library.places.tags.map(tag => tag.name)} onOpen={onOpen} answers={answers} thinking={thinking} />
+    {overlay}
   </LibraryShell>;
 }
 

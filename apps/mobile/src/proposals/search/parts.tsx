@@ -53,7 +53,7 @@ export function useRecentSearches(seed = ['ramen', 'kyoto', 'spaced repetition',
 const TOP_BAR = 64;
 /** Today's Library — its card, its scroll edge — with `header` above the saves, scrolling with them. */
 /** collection: what the gallery shows instead of the Library (Kit's answer, say). */
-export function LibraryShell({ library, header, actions, bottomExtra = 0, children, collection }: { library: ReturnType<typeof useLibrary>; header: ReactNode; actions?: ReactNode; bottomExtra?: number; children?: ReactNode; collection?: ReturnType<typeof useCollection> }) {
+export function LibraryShell({ library, header, actions, bottomExtra = 0, children, collection, onOpen }: { library: ReturnType<typeof useLibrary>; header: ReactNode; actions?: ReactNode; bottomExtra?: number; children?: ReactNode; collection?: ReturnType<typeof useCollection>; onOpen?: (capture: Capture) => void }) {
   const P = usePalette();
   const insets = useSafeAreaInsets();
   const edges = useScrollEdges(TOP_BAR);
@@ -61,7 +61,7 @@ export function LibraryShell({ library, header, actions, bottomExtra = 0, childr
   const [headerHeight, setHeaderHeight] = useState(180);
   const dock = useDockOnScroll(headerHeight);
   return <View style={[styles.fill, { backgroundColor: P.paper }]}>
-    <GalleryList collection={collection ?? library.shown} filtered={Boolean(library.filter || collection)} headerSpace={insets.top + TOP_BAR + EDGE_FADE + 4 + headerHeight} bottomSpace={bottomSpace + bottomExtra} onScroll={dock}
+    <GalleryList collection={collection ?? library.shown} filtered={Boolean(library.filter || collection)} headerSpace={insets.top + TOP_BAR + EDGE_FADE + 4 + headerHeight} bottomSpace={bottomSpace + bottomExtra} onScroll={dock} onOpen={onOpen}
       header={<View style={{ paddingTop: insets.top + TOP_BAR + EDGE_FADE + 4 }}><View style={styles.header} onLayout={event => setHeaderHeight(Math.ceil(event.nativeEvent.layout.height))}>{header}</View></View>} />
     <ScrollEdge edge="bottom" height={edges.bottom.height + bottomExtra} hold={edges.bottom.hold} color={P.paper} />
     <ScrollEdge edge="top" height={edges.top.height} hold={edges.top.hold} color={P.paper} />
@@ -187,13 +187,13 @@ export function ProposalDock({ tabs = TABS, buttons, selected = 'collection' }: 
     spring.start(); return () => spring.stop();
   }, [compact, motion, progress]);
   return <View pointerEvents="box-none" style={[styles.dock, { bottom: Math.max(insets.bottom, 12) }]}>
-    <GlassSurface style={[styles.dockSurface, styles.dockTabs]}>
+    <GlassSurface accessibilityRole="tablist" style={[styles.dockSurface, styles.dockTabs]}>
       {tabs.map(item => { const on = item.key === selected; return <Animated.View key={item.key} style={{ width: tabWidth, height: 48 }}>
         <Pressable accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected: on }} onPress={item.onPress}
           style={({ pressed }) => [styles.dockTab, (on || pressed) && { backgroundColor: P.accentSoft }]}>
           {item.orb ? <Image source={KIT_ORB} style={styles.orbDock} accessible={false} /> : <Ionicons name={(on ? item.selectedIcon : item.icon) as 'grid'} size={24} color={on ? P.accent : P.muted} />}
           {labels ? <Animated.View accessible={false} importantForAccessibility="no-hide-descendants" style={{ width: labelWidth, opacity: labelOpacity, overflow: 'hidden' }}>
-            <Text style={[styles.dockLabel, { width: tab - 44, paddingLeft: 8, color: on ? P.accent : P.muted }]} numberOfLines={1}>{item.label}</Text>
+            <Text style={[styles.dockLabel, { width: tab - 44, paddingLeft: 8, color: on ? P.accentPressed : P.muted }]} numberOfLines={1}>{item.label}</Text>
           </Animated.View> : null}
         </Pressable>
       </Animated.View>; })}

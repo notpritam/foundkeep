@@ -334,6 +334,19 @@
       "live": [
         "decided-ask-kit--final-and-variations"
       ]
+    },
+    {
+      "id": "2026-10-03-save-detail",
+      "date": "2026-10-03",
+      "product": "App",
+      "title": "A save, opened: four shapes",
+      "question": "What does a save look like when you open it — for every kind of save, from an article to a voice memo?",
+      "tried": "Four shapes in the locked language, each for fifteen kinds of save (an article, a recipe, a post on X, a post with a photo, a reel, a video, a photo, a screenshot, a full page, a note, a highlight, a PDF, a voice memo, one still being read, one that couldn’t be read). Picture first: the picture, then where it came from, the title, tags, the words, a few facts and related saves; one bar by the thumb with the save’s primary action (“Open on X”, “Open the PDF”, “See it full size”, “Edit the note”), Kit’s orb and more. Reader: the words first, set for reading, a smaller picture, the actions on top. A sheet over the Library: rises from the card you tapped, the Library stays behind. With Kit: ready prompts (Sum it up, More like it, Where is it from?) and “Ask Kit about this save” by the thumb, the answers on the page (kit/aboutSave, tested). In all four: a page’s picture from its top, never cut at the sides; a photo whole; tap for full size; related saves as the Library’s cards, opening in place.",
+      "picked": "Open — waiting for Pritam’s pick. Today’s screen stays in In the app today/Save detail.",
+      "why": "Pritam: “we are ready to move to our detailed open view of our saves so we can clean and close that as well”. Today’s screen crops a page’s picture at the sides, puts every part in a frosted panel under uppercase labels, folds where it came from into “Original source”, has four small icons on top and no Kit.",
+      "live": [
+        "open-save-detail--four-shapes"
+      ]
     }
   ]
 }

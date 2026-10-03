@@ -18,7 +18,7 @@ import { useAppearance, useThemedStyles } from '../appearance/AppearanceProvider
 /** A card for one save in the gallery (GalleryCard; the design system tries others). */
 export type SaveCardComponent = ComponentType<{ capture: Capture; onOpen: (capture: Capture) => void }>;
 /** header: drawn inside the list, in the headerSpace above the saves, so it scrolls with them. */
-export function GalleryList({ collection, archived = false, filtered = false, headerSpace = 0, bottomSpace = 24, resetKey = 0, onScroll, Card = GalleryCard, header }: { collection: ReturnType<typeof useCollection>; archived?: boolean; filtered?: boolean; headerSpace?: number; bottomSpace?: number; resetKey?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void; Card?: SaveCardComponent; header?: ReactNode }) {
+export function GalleryList({ collection, archived = false, filtered = false, headerSpace = 0, bottomSpace = 24, resetKey = 0, onScroll, Card = GalleryCard, header, onOpen }: { collection: ReturnType<typeof useCollection>; archived?: boolean; filtered?: boolean; headerSpace?: number; bottomSpace?: number; resetKey?: number; onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void; Card?: SaveCardComponent; header?: ReactNode; onOpen?: (capture: Capture) => void }) {
   const styles = useThemedStyles(baseStyles);
   const palette = palettes[useAppearance().scheme];
   const { width, height, fontScale } = useWindowDimensions();
@@ -61,7 +61,9 @@ export function GalleryList({ collection, archived = false, filtered = false, he
   useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current); }, []);
   useEffect(() => { const ids = new Set(captures.map(item => item.id)); for (const id of sizes.current.keys()) if (!ids.has(id)) sizes.current.delete(id); }, [captures]);
   useEffect(() => { offset.current = 0; setWindowTop(0); previous.current = null; scroll.current?.scrollTo({ y: 0, animated: false }); }, [resetKey]);
-  const open = useCallback((capture: Capture) => router.push({ pathname: '/(app)/capture/[id]', params: { id: capture.id } }), []);
+  const opened = useRef(onOpen);
+  opened.current = onOpen;
+  const open = useCallback((capture: Capture) => (opened.current ? opened.current(capture) : router.push({ pathname: '/(app)/capture/[id]', params: { id: capture.id } })), []);
   const regionTop = headerSpace + 16;
   const footerVisible = windowTop + viewport.height > regionTop + layout.height - 320;
   return <ScrollView ref={scroll} testID="gallery-list" style={styles.list} contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }, !captures.length && { flexGrow: 1 }]}
