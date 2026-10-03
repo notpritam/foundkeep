@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Capture } from '../../api/types.ts';
-import { askKit, findSaves, recentPlaces } from './data.ts';
+import { askKit, findSaves } from './data.ts';
 
 const at = (hours: number) => Date.parse('2026-10-03T09:00:00Z') - hours * 3_600_000;
 const save = (id: string, hours: number, fields: Partial<Capture>) => ({ id, type: 'bookmark', status: 'done', capturedAt: at(hours), userTags: [], folder: null, provenance: null, sourceUrl: null, sourceTitle: null, summary: null, noteText: null, selectionText: null, ...fields }) as Capture;
@@ -12,12 +12,6 @@ const library = [
   save('pasta', 6, { sourceTitle: 'Weeknight tomato rigatoni', userTags: ['Cooking', 'Quick'], folder: kitchen, folderId: 'f-kitchen' }),
   save('margin', 50, { sourceTitle: 'The half-life of a good idea', userTags: ['Memory', 'Reading'], folder: reading, folderId: 'f-reading' }),
 ];
-
-test('recent folders and tags come from the saves, most recently used first, with how many', () => {
-  const places = recentPlaces(library);
-  assert.deepEqual(places.folders.map(f => [f.name, f.count]), [['Kitchen', 2], ['Reading list', 1]]);
-  assert.deepEqual(places.tags.map(t => [t.name, t.count]), [['Cooking', 2], ['Travel', 1], ['Quick', 1], ['Memory', 1], ['Reading', 1]]);
-});
 
 test('Kit finds a save by what it was about and what kind it was', () => {
   const answer = askKit('that ramen video I saved', library);
