@@ -9,12 +9,12 @@ function fourWays() {
   const looks = [
     ['proposals-search-and-kit--dock-search', 'Search beside + in the dock: a round button, opening the field at the top'],
     ['proposals-search-and-kit--ask-bar', '“Search or ask Kit”, always above the dock: the field opens at the bottom, by the thumb'],
-    ['proposals-search-and-kit--search-tab', 'Search as a tab, between Gallery and You; the folders as “jump back in” cards'],
+    ['proposals-search-and-kit--search-tab', 'Search as a tab, between Gallery and You'],
     ['proposals-search-and-kit--search-first', 'The field heading the Library, recent searches right under it'],
   ];
   const src = (id, theme) => `./app/iframe.html?id=${id}&viewMode=story&globals=${encodeURIComponent(`device:iphone-17-pro;theme:${theme}`)}`;
   el.innerHTML = `
-    <header class="bt-intro"><div><h1>Search and Kit</h1><p>One field — “Search or ask Kit” — and no switch: searching is asking Kit. A word finds its matches; a question (“that ramen video I saved”) gets a line from Kit on top of the same results. The backend decides which; here a stand-in reads the library on the phone. The kind tabs give way to the folders and tags your saves went into, newest first — tap one to see just those — and recent searches are big and easy to hit. Four places for the field, on today’s Library with its locked card; scroll any of them and the dock tucks in.</p></div></header>
+    <header class="bt-intro"><div><h1>Search and Kit</h1><p>One field — “Search or ask Kit” — and no switch: searching is asking Kit. A word finds its matches; a question (“that ramen video I saved”) gets a line from Kit on top of the same results. The backend decides which; here a stand-in reads the library on the phone. The kind tabs give way to Jump back in — the folders your saves went into as cards with their last saves, then the tags (#Cooking), newest first; tap one to see just those. Locked, so it heads every one. Recent searches are big and easy to hit. Four places for the field, on today’s Library with its locked card; scroll any of them and the dock tucks in.</p></div></header>
     <div class="bt-states" role="group" aria-label="State">
       <button type="button" data-state="library" aria-pressed="true">The Library</button><button type="button" data-state="word" aria-pressed="false">A word</button><button type="button" data-state="question" aria-pressed="false">A question</button>
       <span class="bt-gap"></span><button type="button" data-theme="light" aria-pressed="true">Light</button><button type="button" data-theme="dark" aria-pressed="false">Dark</button>

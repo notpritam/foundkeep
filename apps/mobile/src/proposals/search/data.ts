@@ -1,30 +1,12 @@
-// What the search and agent proposals know (2026-10-03): the folders and tags your saves went
-// into, most recently used first — so the Library shows where you've been keeping things, not
-// a fixed list of kinds — and Kit, finding saves from a sentence. Kit here is a stand-in that
+// What the search and agent proposals know (2026-10-03): Kit, finding saves from a sentence
+// (the folders and tags saves went into are the app's now: collection/places.ts). Kit here is a stand-in that
 // reads your library on the phone; the real one answers through FoundKeep's agent.
 import type { Capture } from '../../api/types.ts';
 import { captureTitle } from '../../collection/model.ts';
 import { origin } from '../../collection/origin.ts';
 import { savedAge } from '../../../../../packages/shared/src/collection-presentation.ts';
 
-export type Place = { name: string; count: number; latest: number };
-export type FolderPlace = Place & { id: string; saves: Capture[] };
-
-/** The folders and tags saves went into, most recently used first, with how many. */
-export function recentPlaces(captures: Capture[], limit = 8) {
-  const folders = new Map<string, FolderPlace>(), tags = new Map<string, Place>();
-  for (const capture of [...captures].sort((a, b) => b.capturedAt - a.capturedAt)) {
-    if (capture.folder) {
-      const folder = folders.get(capture.folder.id) ?? { id: capture.folder.id, name: capture.folder.name, count: 0, latest: capture.capturedAt, saves: [] };
-      folder.count++; folder.saves.push(capture); folders.set(folder.id, folder);
-    }
-    for (const name of capture.userTags ?? []) {
-      const tag = tags.get(name) ?? { name, count: 0, latest: capture.capturedAt };
-      tag.count++; tags.set(name, tag);
-    }
-  }
-  return { folders: [...folders.values()].slice(0, limit), tags: [...tags.values()].slice(0, limit) };
-}
+export { recentPlaces, type FolderPlace, type Place } from '../../collection/places.ts';
 
 const QUIET = new Set(['a', 'an', 'the', 'that', 'this', 'those', 'these', 'i', 'me', 'my', 'mine', 'saved', 'save', 'kept', 'about', 'from', 'in', 'on', 'of', 'for', 'with', 'to', 'find', 'show', 'where', 'what', 'was', 'is', 'it', 'one', 'things', 'stuff', 'folder', 'tag', 'any', 'all', 'last', 'week', 'some']);
 const KINDS: Record<string, Capture['type'][]> = {

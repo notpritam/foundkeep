@@ -25,12 +25,13 @@ import { origin } from '../../collection/origin.ts';
 import { useCollection } from '../../collection/useCollection.ts';
 import { savedAge } from '../../../../../packages/shared/src/collection-presentation.ts';
 import { usePalette } from '../library/parts.tsx';
-import { recentPlaces, type FolderPlace, type Place } from './data.ts';
+import { recentPlaces } from './data.ts';
+import { JumpBackIn as JumpBack, type PlaceFilter } from '../../components/JumpBackIn.tsx';
 
 export const KIT_ORB = require('../../../assets/images/elements/agent-orb.webp');
 const SETTLE = Easing.bezier(0.16, 1, 0.3, 1);
 const native = Platform.OS !== 'web';
-export type Filter = { kind: 'folder' | 'tag'; id: string; name: string } | null;
+export type Filter = PlaceFilter;
 
 // ——— The Library, and where it's been kept ———
 
@@ -93,26 +94,9 @@ export function PlaceChips({ library, label }: { library: ReturnType<typeof useL
     </ScrollView>
   </View>;
 }
-/** Recent folders as small cards with their last saves; recent tags as chips under them. */
+/** Jump back in — the app's now (components/JumpBackIn), locked 2026-10-03. */
 export function JumpBackIn({ library }: { library: ReturnType<typeof useLibrary> }) {
-  const P = usePalette();
-  return <View style={styles.block}>
-    <Text style={[styles.label, { color: P.muted }]}>Jump back in</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards}>
-      {library.places.folders.map((folder: FolderPlace) => { const on = library.filter?.kind === 'folder' && library.filter.id === folder.id; return <Pressable key={folder.id} accessibilityRole="button" accessibilityLabel={`${folder.name}, ${folder.count} saves`} accessibilityState={{ selected: on }}
-        onPress={() => library.toggle({ kind: 'folder', id: folder.id, name: folder.name })} style={({ pressed }): StyleProp<ViewStyle> => [styles.folderCard, { backgroundColor: on ? P.ink : P.surface, borderColor: on ? P.ink : P.line }, pressed && styles.pressed]}>
-        <View style={styles.thumbs}>{folder.saves.slice(0, 3).map((capture, i) => <View key={capture.id} style={[styles.thumb, { left: i * 20, zIndex: 3 - i, borderColor: on ? P.ink : P.surface }]}><Thumb capture={capture} /></View>)}</View>
-        <Text style={[styles.folderName, { color: on ? P.paper : P.ink }]} numberOfLines={1}>{folder.name}</Text>
-        <Text style={[styles.folderCount, { color: on ? P.paper : P.muted }]}>{folder.count} {folder.count === 1 ? 'save' : 'saves'}</Text>
-      </Pressable>; })}
-    </ScrollView>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-      {library.places.tags.map((tag: Place) => { const on = library.filter?.kind === 'tag' && library.filter.name === tag.name; return <Pressable key={tag.name} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => library.toggle({ kind: 'tag', id: tag.name, name: tag.name })}
-        style={({ pressed }): StyleProp<ViewStyle> => [styles.chip, { backgroundColor: on ? P.ink : P.surface, borderColor: on ? P.ink : P.line }, pressed && styles.pressed]}>
-        <Text style={[styles.hash, { color: on ? P.paper : P.accent }]}>#</Text><Text style={[styles.chipText, { color: on ? P.paper : P.ink }]}>{tag.name}</Text>
-      </Pressable>; })}
-    </ScrollView>
-  </View>;
+  return <JumpBack places={library.places} selected={library.filter} onChoose={library.toggle} />;
 }
 
 // ——— Searching, and asking Kit ———

@@ -268,6 +268,19 @@
       "live": [
         "search-and-kit--four-ways"
       ]
+    },
+    {
+      "id": "2026-10-03-jump-back-in",
+      "date": "2026-10-03",
+      "product": "App",
+      "title": "Jump back in",
+      "question": "What replaces the Library's kind tabs (links, images, notes, documents)?",
+      "tried": "The folders and tags saves went into, worked out from the library and newest first: as one row of chips (folders with counts, then #tags), or as “Jump back in” — each folder a small card with its last three saves and how many, then the tags as chips. Tapping one shows just its saves.",
+      "picked": "Jump back in — locked, in every Library design (components/JumpBackIn, collection/places, tested).",
+      "why": "Pritam: “the jump back in part — collections, tags like cooking — is good; lock this part in all of our designs”.",
+      "live": [
+        "search-and-kit--four-ways"
+      ]
     }
   ]
 }

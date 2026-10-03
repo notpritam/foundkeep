@@ -8,6 +8,7 @@
 //   dock     a round search button beside + in the dock
 //   bar      "Search or ask Kit", always above the dock, within the thumb's reach
 //   tab      Search as a tab in the dock, between Gallery and You
+// Jump back in (folders as cards, then tags) heads each Library — locked 2026-10-03.
 //   top      the field heading the Library, recent searches right under it
 import { useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -88,7 +89,7 @@ function SearchPanel({ s, at, top = 0 }: { s: Searching; at: 'top' | 'bottom'; t
 // ——— One: a search button beside + ———
 
 function DockSearch({ s }: { s: Searching }) {
-  return <LibraryShell library={s.library} header={<><Title /><PlaceChips library={s.library} /></>} actions={<IconAction icon="archive-outline" label="Open archive" />}>
+  return <LibraryShell library={s.library} header={<><Title /><JumpBackIn library={s.library} /></>} actions={<IconAction icon="archive-outline" label="Open archive" />}>
     <ProposalDock buttons={[{ key: 'search', label: 'Search or ask Kit', icon: 'search', onPress: () => s.setOpen(true) }, { key: 'add', label: 'Create a note', icon: 'add' }]} />
     <SearchPanel s={s} at="top" />
   </LibraryShell>;
@@ -98,7 +99,7 @@ function DockSearch({ s }: { s: Searching }) {
 
 function AskBar({ s }: { s: Searching }) {
   const insets = useSafeAreaInsets();
-  return <LibraryShell library={s.library} bottomExtra={62} header={<><Title /><PlaceChips library={s.library} /></>} actions={<IconAction icon="archive-outline" label="Open archive" />}>
+  return <LibraryShell library={s.library} bottomExtra={62} header={<><Title /><JumpBackIn library={s.library} /></>} actions={<IconAction icon="archive-outline" label="Open archive" />}>
     <ProposalDock buttons={[{ key: 'add', label: 'Create a note', icon: 'add' }]} />
     <View style={[styles.barWrap, { bottom: Math.max(insets.bottom, 12) + 70 }]}>
       <SearchButton onPress={() => s.setOpen(true)} big style={styles.bar} />
@@ -126,7 +127,7 @@ function SearchFirst({ s }: { s: Searching }) {
     <Title />
     <SearchButton onPress={() => s.setOpen(true)} big />
     <View style={styles.block}><Text style={[styles.label, { color: P.muted }]}>Recent</Text><RecentSearches recents={s.recents} onRun={s.run} look="chips" /></View>
-    <PlaceChips library={s.library} />
+    <JumpBackIn library={s.library} />
   </>} actions={<IconAction icon="archive-outline" label="Open archive" />}>
     <ProposalDock buttons={[{ key: 'add', label: 'Create a note', icon: 'add' }]} />
     <SearchPanel s={s} at="top" top={insets.top + 64} />
