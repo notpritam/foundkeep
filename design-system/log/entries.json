@@ -308,6 +308,19 @@
       "live": [
         "app-tour--four-versions"
       ]
+    },
+    {
+      "id": "2026-10-03-home-and-kit-closed",
+      "date": "2026-10-03",
+      "product": "App",
+      "title": "Home and Ask Kit, closed",
+      "question": "What are the final home screen and Ask Kit — and what variations of them are worth keeping?",
+      "tried": "The finals, then variations of each. Home: a greeting (“Good evening, Lena” and your counts in place of “The collection.”), compact (no big title, Jump back in right under the top bar), a nudge (a small card under Jump back in that asks Kit an example question). Ask Kit: the saves as a list under each answer, the best match large with the rest in a row, and a thinking moment (“Looking through your saves…”) before each answer.",
+      "picked": "Closed. Home: today's Library — “The collection.”, Jump back in, the concise glass cards, the scroll edge; the magnifier on top for Search, Kit's orb beside + for Ask Kit. Ask Kit: a conversation, one short line per answer, the saves in a row of cards. The variations stay as options (proposals/kit/Locked `home`, kit/AskKit `answers`, `thinking`).",
+      "why": "Pritam: “let's close our Ask Kit page design and home screen now — you got both right; give me the final version and some variations as well”. The app tour video is paused for later.",
+      "live": [
+        "ask-kit--final-and-variations"
+      ]
     }
   ]
 }
