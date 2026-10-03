@@ -1,7 +1,7 @@
 // What the search panel and Ask Kit share (locked 2026-10-03): Kit's orb, a panel that rises from
 // the bottom, the field (always at the bottom, by the thumb), saves as a list, recent searches.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Easing, Image, Platform, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Capture } from '../api/types.ts';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
@@ -9,6 +9,7 @@ import { AdaptiveText as Text } from '../components/AdaptiveText.tsx';
 import { AdaptiveIcon as Ionicons } from '../components/AdaptiveIcon.tsx';
 import { CapturePreview } from '../components/CapturePreview.tsx';
 import { useMotionAllowed } from '../components/motion.tsx';
+import { ScrollEdge } from '../components/ScrollEdge';
 import { captureTitle } from '../collection/model.ts';
 import { origin } from '../collection/origin.ts';
 import { palettes } from '../theme.ts';
@@ -30,11 +31,12 @@ export function Panel({ open, children }: { open: boolean; children: ReactNode }
   useEffect(() => { Animated.timing(t, { toValue: open ? 1 : 0, duration: motion ? 420 : 0, easing: SETTLE, useNativeDriver: native }).start(); }, [open, motion, t]);
   return <Animated.View pointerEvents={open ? 'auto' : 'none'} accessibilityViewIsModal={open} style={[StyleSheet.absoluteFill, styles.panel, { backgroundColor: P.paper, opacity: t, transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [height * 0.3, 0] }) }] }]}>{children}</Animated.View>;
 }
-/** The panel's head: close, its name (with Kit's orb), and one action on the right. */
+/** The panel's head: close, its name (with Kit's orb), and one action on the right — see-through, over
+ * the scrolling middle's blur. */
 export function Head({ title, orb = false, onClose, action }: { title: string; orb?: boolean; onClose: () => void; action?: ReactNode }) {
   const P = usePalette();
   const insets = useSafeAreaInsets();
-  return <View style={[styles.head, { paddingTop: insets.top + 6 }]}>
+  return <View style={[styles.head, { paddingTop: insets.top + 6, height: insets.top + HEAD }]}>
     <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8} style={styles.round}><Ionicons name="chevron-down" size={22} color={P.ink} /></Pressable>
     <View style={styles.headTitle}>{orb ? <Image source={KIT_ORB} style={styles.headOrb} accessible={false} /> : null}<Text accessibilityRole="header" style={[styles.title, { color: P.ink }]}>{title}</Text></View>
     <View style={styles.round}>{action}</View>
@@ -54,6 +56,21 @@ export function Field({ value, onChange, onSubmit, placeholder, kit = false, aut
     </View>
   </View>;
 }
+/** The panel's scrolling middle (2026-10-03): it runs under the see-through head, blurring as it
+ * passes (as the Library's scroll edge does), and blurs again as it reaches what's below it. */
+export const HEAD = 52;
+export function Scrolling({ children, scrollRef, bottomAligned = true }: { children: ReactNode; scrollRef?: React.Ref<ScrollView>; bottomAligned?: boolean }) {
+  const P = usePalette();
+  const insets = useSafeAreaInsets();
+  const head = insets.top + HEAD;
+  return <View style={styles.middle}>
+    <ScrollView ref={scrollRef} style={StyleSheet.absoluteFill} contentContainerStyle={[styles.scroll, bottomAligned && styles.bottomAligned, { paddingTop: head + 8 }]}
+      onContentSizeChange={() => { if (bottomAligned && scrollRef && 'current' in scrollRef) scrollRef.current?.scrollToEnd({ animated: false }); }} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+    <ScrollEdge edge="top" height={head + 18} hold={(head - 6) / (head + 18)} color={P.paper} />
+    <ScrollEdge edge="bottom" height={34} hold={0.15} color={P.paper} />
+  </View>;
+}
+
 /** Saves as a list: picture, title, where it came from and when. */
 export function SaveRows({ items, onOpen, limit = 12 }: { items: Capture[]; onOpen: (capture: Capture) => void; limit?: number }) {
   const P = usePalette();
@@ -88,7 +105,10 @@ export const headline = (capture: Capture) => (capture.type === 'tweet' && captu
 const styles = StyleSheet.create({
   panel: { zIndex: 6 },
   pressed: { opacity: 0.75 },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 6 },
+  head: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 6 },
+  middle: { flex: 1, overflow: 'hidden' },
+  scroll: { flexGrow: 1, paddingBottom: 14 },
+  bottomAligned: { justifyContent: 'flex-end' },
   headTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headOrb: { width: 26, height: 26 },
   title: { fontSize: 17, fontWeight: '700' },

@@ -4,8 +4,8 @@
 // and dock until the app's own Library takes them.
 //
 // Closed 2026-10-03 (Pritam: "you got both right — the final version, and some variations"). The
-// final is the default; the variations, kept as options: `home` — final, greeting ("Good evening,
-// Lena" and your counts instead of "The collection."), compact (no big title: Jump back in right
+// final is the default; the variations, kept as options: `home` — greeting (the final: "Good morning,
+// Lena" and your counts), collection ("The collection.", the first final), compact (no big title: Jump back in right
 // under the top bar), nudge (a small card inviting a question to Kit); and Ask Kit's own
 // (`answers`, `thinking`: see kit/AskKit).
 import { useState } from 'react';
@@ -16,6 +16,7 @@ import { DockProvider } from '../../components/FloatingDock.tsx';
 import { useSession } from '../../session/SessionProvider.tsx';
 import { AskKit, type KitAnswers } from '../../kit/AskKit.tsx';
 import { KIT_ORB, usePalette } from '../../kit/pieces.tsx';
+import { greeting } from '../../home/greeting.ts';
 import { SearchPanel } from '../../kit/SearchPanel.tsx';
 import { openSave } from '../library/parts.tsx';
 import { IconAction, JumpBackIn, LibraryShell, ProposalDock, Title, useLibrary, useRecentSearches } from '../search/parts.tsx';
@@ -23,12 +24,13 @@ import { IconAction, JumpBackIn, LibraryShell, ProposalDock, Title, useLibrary, 
 export type LockedState = 'library' | 'search' | 'word' | 'kit' | 'question' | 'followup';
 const SEED: Partial<Record<LockedState, string[]>> = { question: ['recent post I saved from twitter'], followup: ['recent post I saved from twitter', 'about cats'] };
 
-export type HomeLook = 'final' | 'greeting' | 'compact' | 'nudge';
+/** greeting is the final (Pritam, 2026-10-03: "clean, we'll use that"); collection was the first final. */
+export type HomeLook = 'greeting' | 'collection' | 'compact' | 'nudge';
 type Options = { home?: HomeLook; answers?: KitAnswers; thinking?: boolean };
 export function SearchAndKit({ state = 'library', ...options }: { state?: LockedState } & Options) {
   return <DockProvider><Screen state={state} {...options} /></DockProvider>;
 }
-function Screen({ state, home = 'final', answers, thinking }: { state: LockedState } & Options) {
+function Screen({ state, home = 'greeting', answers, thinking }: { state: LockedState } & Options) {
   const library = useLibrary();
   const recents = useRecentSearches();
   const [searching, setSearching] = useState(state === 'search' || state === 'word');
@@ -36,7 +38,7 @@ function Screen({ state, home = 'final', answers, thinking }: { state: LockedSta
   const [questions, setQuestions] = useState<string[]>(SEED[state] ?? []);
   const askKit = (question: string) => { setQuestions([question]); setAsking(true); };
   const header = home === 'compact' ? <View style={styles.compact}><JumpBackIn library={library} /></View>
-    : <>{home === 'greeting' ? <Greeting saves={library.all.total} folders={library.places.folders.length} /> : <Title />}<JumpBackIn library={library} />{home === 'nudge' ? <KitNudge onAsk={askKit} tag={library.places.tags[0]?.name} /> : null}</>;
+    : <>{home === 'collection' ? <Title /> : <Greeting saves={library.all.total} folders={library.places.folders.length} />}<JumpBackIn library={library} />{home === 'nudge' ? <KitNudge onAsk={askKit} tag={library.places.tags[0]?.name} /> : null}</>;
   return <LibraryShell library={library} header={header}
     actions={<><IconAction icon="search" label="Search your saves" onPress={() => setSearching(true)} /><IconAction icon="archive-outline" label="Open archive" /></>}>
     <ProposalDock buttons={[{ key: 'kit', label: 'Ask Kit', orb: true, onPress: () => setAsking(true) }, { key: 'add', label: 'Create a note', icon: 'add' }]} />
@@ -48,15 +50,13 @@ function Screen({ state, home = 'final', answers, thinking }: { state: LockedSta
   </LibraryShell>;
 }
 
-/** Greeting: the time of day and your name, then how much you've kept. */
+/** Greeting: hello by name — the time of day, "Hey Lena", "Welcome back, Lena" (home/greeting:
+ * steady for each part of the day, never past one line) — then how much you've kept. */
 function Greeting({ saves, folders }: { saves: number; folders: number }) {
   const P = usePalette();
   const { account } = useSession();
-  const hour = new Date().getHours();
-  const part = hour < 5 ? 'evening' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
-  const name = account?.name?.split(' ')[0];
   return <View style={styles.greeting}>
-    <Text style={[styles.greetingText, { color: P.ink }]}>Good {part}{name ? `, ${name}` : ''}</Text>
+    <Text accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.greetingText, { color: P.ink }]}>{greeting(account?.name)}</Text>
     <Text style={[styles.greetingLine, { color: P.muted }]}>{saves} saves · {folders} folders</Text>
   </View>;
 }

@@ -6,7 +6,7 @@ import { AdaptiveIcon as Ionicons } from '../components/AdaptiveIcon.tsx';
 import { GalleryCard } from '../components/GalleryCard.tsx';
 import { ShimmerText } from '../components/Shimmer.tsx';
 import { converse, followUps } from './conversation.ts';
-import { Field, Head, KIT_ORB, Panel, SaveRows, usePalette } from './pieces.tsx';
+import { Field, Head, KIT_ORB, Panel, SaveRows, Scrolling, usePalette } from './pieces.tsx';
 
 // Ask Kit (Pritam, 2026-10-03, locked): opened from Kit's orb beside + in the dock. A conversation
 // — your questions and Kit's answers, each answer one short line (a touch larger) and the saves it
@@ -39,10 +39,15 @@ export function AskKit({ open, onClose, questions, onQuestions, captures, tags, 
     return () => clearTimeout(timer);
   }, [thinking, turns.length, revealed]);
   const shown = thinking ? revealed : turns.length;
+  // Cards that take the width (Pritam): one spans the row under Kit's line, two share it, more scroll
+  // with a hint of the next.
+  const room = width - 54 - 16;
+  const cardWidth = (count: number) => (count === 1 ? room : count === 2 ? (room - 10) / 2 : ((room - 10) / 2) * 0.9);
   return <Panel open={open}>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Head title="Ask Kit" orb onClose={() => { onClose(); setText(''); }} action={turns.length ? <Pressable accessibilityRole="button" accessibilityLabel="Start over" onPress={() => onQuestions([])} hitSlop={8}><Ionicons name="create-outline" size={20} color={P.ink} /></Pressable> : null} />
-      <ScrollView ref={thread} style={styles.flex} contentContainerStyle={styles.thread} onContentSizeChange={() => thread.current?.scrollToEnd({ animated: false })} keyboardShouldPersistTaps="handled">
+      <View style={styles.flex}>
+      <Scrolling scrollRef={thread}>
+      <View style={styles.thread}>
         {turns.length ? turns.map((turn, i) => <View key={i} style={styles.turn}>
           <View style={[styles.you, { backgroundColor: P.ink }]}><Text style={[styles.youText, { color: P.paper }]}>{turn.question}</Text></View>
           <View style={styles.kit} accessibilityLiveRegion={i === turns.length - 1 ? 'polite' : 'none'}>
@@ -55,7 +60,7 @@ export function AskKit({ open, onClose, questions, onQuestions, captures, tags, 
             : <>
               {answers === 'lead' ? <View style={[styles.lead, { width: width - 54 - 16 }]}><GalleryCard capture={turn.items[0]} onOpen={onOpen} /></View> : null}
               {(answers === 'lead' ? turn.items.slice(1) : turn.items).length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards}>
-                {(answers === 'lead' ? turn.items.slice(1) : turn.items).slice(0, 8).map(capture => <View key={capture.id} style={answers === 'lead' ? styles.smallCard : styles.card}><GalleryCard capture={capture} onOpen={onOpen} /></View>)}
+                {(answers === 'lead' ? turn.items.slice(1) : turn.items).slice(0, 8).map((capture, _, list) => <View key={capture.id} style={{ width: answers === 'lead' ? 132 : cardWidth(list.length) }}><GalleryCard capture={capture} onOpen={onOpen} /></View>)}
               </ScrollView> : null}
             </>}
         </View>) : <View style={styles.hello}>
@@ -63,7 +68,10 @@ export function AskKit({ open, onClose, questions, onQuestions, captures, tags, 
           <Text style={[styles.helloTitle, { color: P.ink }]}>What are you looking for?</Text>
           <Text style={[styles.helloLine, { color: P.muted }]}>Ask in your own words, then keep going.</Text>
         </View>}
-      </ScrollView>
+      </View>
+      </Scrolling>
+      <Head title="Ask Kit" orb onClose={() => { onClose(); setText(''); }} action={turns.length ? <Pressable accessibilityRole="button" accessibilityLabel="Start over" onPress={() => onQuestions([])} hitSlop={8}><Ionicons name="create-outline" size={20} color={P.ink} /></Pressable> : null} />
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.nextRow} contentContainerStyle={styles.next} keyboardShouldPersistTaps="handled">
         {next.map(question => <Pressable key={question} accessibilityRole="button" accessibilityLabel={`Ask Kit: ${question}`} onPress={() => ask(question)} style={({ pressed }) => [styles.chip, { backgroundColor: P.surface, borderColor: P.line }, pressed && styles.pressed]}>
           <Text style={[styles.chipText, { color: P.ink }]}>{question}</Text>
@@ -77,7 +85,7 @@ export function AskKit({ open, onClose, questions, onQuestions, captures, tags, 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   pressed: { opacity: 0.75 },
-  thread: { flexGrow: 1, justifyContent: 'flex-end', gap: 20, paddingTop: 8, paddingBottom: 10 },
+  thread: { gap: 20 },
   turn: { gap: 10 },
   you: { alignSelf: 'flex-end', marginRight: 16, marginLeft: 60, borderRadius: 20, borderBottomRightRadius: 6, paddingHorizontal: 14, paddingVertical: 10 },
   youText: { fontSize: 16, lineHeight: 22 },
@@ -86,8 +94,6 @@ const styles = StyleSheet.create({
   // Kit's line: short, and a touch larger than the rest (Pritam).
   kitText: { flex: 1, fontSize: 17.5, lineHeight: 24, fontWeight: '500', letterSpacing: -0.2 },
   cards: { gap: 10, paddingLeft: 54, paddingRight: 16 },
-  card: { width: 158 },
-  smallCard: { width: 132 },
   lead: { marginLeft: 54 },
   list: { paddingLeft: 38 },
   thinking: { fontSize: 16, lineHeight: 24 },

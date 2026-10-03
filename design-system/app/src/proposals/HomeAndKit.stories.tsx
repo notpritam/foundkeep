@@ -6,8 +6,9 @@ import { SearchAndKit } from '../../../../apps/mobile/src/proposals/kit/Locked.t
 const meta: Meta = { title: 'Proposals/Home and Ask Kit', parameters: { simulator: true, layout: 'fullscreen', controls: { disable: true }, route: { pathname: '/collection', params: {} } } };
 export default meta;
 type Story = StoryObj;
-export const HomeFinal: Story = { name: 'Home · final', render: () => <SearchAndKit /> };
-export const HomeGreeting: Story = { name: 'Home · a greeting', render: () => <SearchAndKit home="greeting" /> };
+// The greeting became the final (2026-10-03); "The collection.", the first final, is a variation now.
+export const HomeFinal: Story = { name: 'Home · final (a greeting)', render: () => <SearchAndKit /> };
+export const HomeGreeting: Story = { name: 'Home · “The collection.”', render: () => <SearchAndKit home="collection" /> };
 export const HomeCompact: Story = { name: 'Home · compact', render: () => <SearchAndKit home="compact" /> };
 export const HomeNudge: Story = { name: 'Home · a nudge to ask Kit', render: () => <SearchAndKit home="nudge" /> };
 export const KitFinal: Story = { name: 'Ask Kit · final', render: () => <SearchAndKit state="followup" /> };

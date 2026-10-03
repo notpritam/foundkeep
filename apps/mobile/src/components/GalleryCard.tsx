@@ -5,12 +5,12 @@ import { Image, Platform, Pressable, StyleSheet, View, type ViewStyle } from 're
 import type { Capture } from '../api/types.ts';
 import { captureTitle } from '../collection/model.ts';
 import { origin } from '../collection/origin.ts';
-import { capturePreviewSource } from '../collection/preview.ts';
+import { capturePreviewSource, previewAspect } from '../collection/preview.ts';
 import { CapturePreview, captureLabels } from './CapturePreview.tsx';
 import { Shimmer, ShimmerText } from './Shimmer.tsx';
 import { colors, palettes } from '../theme.ts';
 import { useThemedStyles } from '../appearance/AppearanceProvider.tsx';
-import { previewRatio, savedAge, savedVia, savedViaLabels, type SavedVia } from '../../../../packages/shared/src/collection-presentation.ts';
+import { savedAge, savedVia, savedViaLabels, type SavedVia } from '../../../../packages/shared/src/collection-presentation.ts';
 import { useMaterial } from './ScenicSurface.tsx';
 import { useSession } from '../session/SessionProvider.tsx';
 
@@ -21,7 +21,9 @@ import { useSession } from '../session/SessionProvider.tsx';
 // The card is clean and white; only the caption is glass: frosted white, with the picture
 // softly blurred through it where it overlaps — a blurred copy of the picture lined up
 // exactly behind the frost, so no live blur per card. Reduce Transparency gives a solid
-// caption. The cards before: proposals/cards/BeforeCard and GlassEverywhereCard.
+// caption. The picture: a fixed height for a page, a PDF or a full page; a photo or a video
+// taller when it's tall, up to a most (collection/preview previewAspect). The cards before:
+// proposals/cards/BeforeCard and GlassEverywhereCard.
 const VIA: Record<SavedVia, string> = { iphone: 'phone-portrait-outline', android: 'logo-android', browser: 'laptop-outline', dashboard: 'globe-outline' };
 const alpha = (hex: string, amount: number) => `${hex}${Math.round(amount * 255).toString(16).padStart(2, '0')}`;
 /** From clear to `color`, top to bottom — where the blurred picture melts into the caption. */
@@ -41,6 +43,8 @@ export const GalleryCard = memo(function GalleryCard({ capture, onOpen }: { capt
   const source = useMemo(() => (written ? null : capturePreviewSource(capture, token, account?.id)), [written, capture, token, account?.id]);
   // Glass only on the caption, and only over a picture.
   const glass = Boolean(source) && !opaque && !written;
+  // A post with only words (no photo, nothing being fetched): its words are the card, no empty picture.
+  const wordsOnly = !written && !source && capture.type === 'tweet' && !pending;
   const [picture, setPicture] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [caption, setCaption] = useState({ x: 0, y: 0 });
   // Everything the icons say, for screen readers.
@@ -48,12 +52,12 @@ export const GalleryCard = memo(function GalleryCard({ capture, onOpen }: { capt
   return <Pressable accessibilityRole="button" accessibilityLabel={`Open ${captureLabels[capture.type]}: ${said}`} onPress={() => onOpen(capture)}
     style={({ pressed }) => [styles.card, { backgroundColor: opaque ? palette.surface : palette.glassCard }, written && styles.written, pressed && styles.pressed]}>
     {/* Being prepared, with nothing to show yet: the picture's place shimmers. */}
-    {written ? null : pending && !source ? <Shimmer style={[styles.preview, { aspectRatio: 1.4 }]} />
+    {written || wordsOnly ? null : pending && !source ? <Shimmer style={[styles.preview, { aspectRatio: 1.4 }]} />
       : <View onLayout={event => { const { x, y, width, height } = event.nativeEvent.layout; setPicture(previous => previous.x === x && previous.y === y && previous.width === width && previous.height === height ? previous : { x, y, width, height }); }}>
-        <CapturePreview capture={capture} style={[styles.preview, { aspectRatio: previewRatio(capture.width, capture.height) }]} />
+        <CapturePreview capture={capture} style={[styles.preview, { aspectRatio: previewAspect(capture) }]} />
       </View>}
     <View onLayout={event => { const { x, y } = event.nativeEvent.layout; setCaption(previous => previous.x === x && previous.y === y ? previous : { x, y }); }}
-      style={[styles.copy, !written && styles.caption, !written && { backgroundColor: glass ? 'transparent' : opaque ? palette.surface : palette.glassCard }, opaque && { borderColor: palette.line }]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+      style={[styles.copy, !written && !wordsOnly && styles.caption, !written && { backgroundColor: glass ? 'transparent' : opaque ? palette.surface : palette.glassCard }, opaque && { borderColor: palette.line }]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {glass && picture.width ? <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Image source={source!} blurRadius={18} resizeMode="cover" accessible={false} style={[styles.blurred, { left: picture.x - caption.x - 1, top: picture.y - caption.y - 1, width: picture.width, height: picture.height }]} />
         <View style={[styles.melt, { top: picture.y + picture.height - caption.y - 1 - 20 }, fade(scheme === 'dark' ? palette.surface : '#ffffff')]} />
