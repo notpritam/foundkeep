@@ -161,7 +161,9 @@ export function Results({ items, limit = 8 }: { items: Capture[]; limit?: number
 // ——— The dock ———
 
 export type DockTab = { key: string; label: string; icon: string; selectedIcon: string; orb?: boolean; onPress?: () => void };
-export type DockButton = { key: string; label: string; icon?: string; orb?: boolean; onPress?: () => void };
+/** text: a pill with its words beside the icon ("Ask Kit"), rather than a round button. */
+export type DockButton = { key: string; label: string; icon?: string; orb?: boolean; text?: string; onPress?: () => void };
+const PILL_WIDTH = 116;
 const TABS: DockTab[] = [{ key: 'collection', label: 'Gallery', icon: 'grid-outline', selectedIcon: 'grid' }, { key: 'settings', label: 'You', icon: 'person-circle-outline', selectedIcon: 'person-circle' }];
 /** A dock like the app's — Gallery and You on glass, round buttons beside — that can take more,
  * and tucks into its icons as the Library scrolls down, as the app's does (useDockOnScroll). */
@@ -172,7 +174,7 @@ export function ProposalDock({ tabs = TABS, buttons, selected = 'collection' }: 
   const { collapsed } = useDock();
   const motion = useMotionAllowed();
   const screenReader = useScreenReader();
-  const room = width - 32 - buttons.length * 70;
+  const room = width - 32 - buttons.reduce((sum, button) => sum + (button.text ? PILL_WIDTH : 60) + 10, 0);
   const tab = Math.min(118, (room - 12) / tabs.length);
   // Labels when they fit whole (two tabs); three tabs show their icons, named for screen readers.
   const labels = tab >= 104;
@@ -196,9 +198,10 @@ export function ProposalDock({ tabs = TABS, buttons, selected = 'collection' }: 
         </Pressable>
       </Animated.View>; })}
     </GlassSurface>
-    {buttons.map(button => <GlassSurface key={button.key} interactive style={[styles.dockSurface, styles.dockButton]}>
+    {buttons.map(button => <GlassSurface key={button.key} interactive style={[styles.dockSurface, button.text ? styles.dockPill : styles.dockButton]}>
       <Pressable accessibilityRole="button" accessibilityLabel={button.label} onPress={button.onPress} style={({ pressed }) => [styles.dockButtonInner, pressed && { backgroundColor: P.accentSoft }]}>
-        {button.orb ? <Image source={KIT_ORB} style={styles.orbButton} accessible={false} /> : <Ionicons name={button.icon as 'add'} size={button.icon === 'add' ? 28 : 24} color={P.accent} />}
+        {button.orb ? <Image source={KIT_ORB} style={button.text ? styles.orbPill : styles.orbButton} accessible={false} /> : <Ionicons name={button.icon as 'add'} size={button.icon === 'add' ? 28 : 24} color={P.accent} />}
+        {button.text ? <Text style={[styles.pillLabel, { color: P.ink }]}>{button.text}</Text> : null}
       </Pressable>
     </GlassSurface>)}
   </View>;
@@ -297,6 +300,9 @@ const styles = StyleSheet.create({
   dockTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 36 },
   dockLabel: { fontSize: 13, fontWeight: '600' },
   dockButton: { width: 60, height: 60 },
-  dockButtonInner: { flex: 1, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  dockButtonInner: { flex: 1, flexDirection: 'row', gap: 6, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  dockPill: { width: PILL_WIDTH, height: 60 },
+  orbPill: { width: 30, height: 30 },
+  pillLabel: { fontSize: 15, fontWeight: '700' },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6 },
 });
