@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { Capture } from '../../api/types.ts';
+import type { Capture } from '../api/types.ts';
 import { converse, readAsk, short } from './conversation.ts';
 
 const NOW = Date.parse('2026-10-03T09:00:00Z');
@@ -23,7 +23,7 @@ test('the first question finds the newest posts from X', () => {
   const [turn] = converse(['recent post I saved from twitter'], library, NOW);
   assert.deepEqual(turn.items.map(c => c.id), ['ada', 'kyoto', 'cat']);
   assert.equal(turn.followUp, false);
-  assert.match(turn.reply, /posts from X/);
+  assert.equal(turn.reply, '3 posts from X, newest first.');
 });
 
 test('a follow-up narrows what was asked before, instead of starting over', () => {
@@ -31,7 +31,7 @@ test('a follow-up narrows what was asked before, instead of starting over', () =
   assert.equal(turns[1].followUp, true);
   assert.deepEqual(turns[1].items.map(c => c.id), ['cat']);
   assert.deepEqual(turns[1].context, { kinds: ['tweet', 'image', 'video'], platforms: ['X'], topic: ['cats'], recent: true });
-  assert.match(turns[1].reply, /Of your posts from X, 1 is about cats/);
+  assert.equal(turns[1].reply, '1 of them is about cats.');
 });
 
 test('a follow-up can change where from, keeping the rest', () => {
@@ -44,7 +44,7 @@ test('when nothing fits the narrowed question, Kit says so and offers what it fo
   const turns = converse(['videos from instagram', 'about kyoto'], library, NOW);
   assert.deepEqual(turns[1].items.map(c => c.id), ['kyoto']);
   assert.equal(turns[1].elsewhere, true);
-  assert.match(turns[1].reply, /None of your videos from Instagram are about kyoto/);
+  assert.equal(turns[1].reply, 'No videos from Instagram about kyoto — 1 elsewhere.');
 });
 
 test('a new question with a kind of its own starts over', () => {
@@ -61,6 +61,12 @@ test('Kit quotes a few words of a long post, cut at a word', () => {
 
 test('one save is “a save”, not “1 saves”', () => {
   const [turn] = converse(['kyoto'], library, NOW);
-  assert.match(turn.reply, /^I found 1 save about kyoto\./);
-  assert.match(converse(['videos about cooking'], library, NOW)[0].reply, /^I found 1 video about cooking\./);
+  assert.equal(turn.reply, '1 save about kyoto.');
+  assert.equal(converse(['videos about cooking'], library, NOW)[0].reply, '1 video about cooking.');
+});
+
+test('Kit’s replies are one short line — the cards show the saves', () => {
+  const turns = converse(['recent post I saved from twitter', 'about cats', 'about sailing'], library, NOW);
+  assert.equal(turns[2].reply, 'No posts from X about sailing yet.');
+  for (const turn of turns) assert.ok(turn.reply.split(' ').length <= 10, turn.reply);
 });
