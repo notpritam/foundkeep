@@ -99,10 +99,11 @@ async function loadOptions() {
   message($('detailsFeedback'), failed ? 'Some folders or collections could not load. Retry, or save without them.' : '', failed ? 'error' : '');
   $('detailsReload').hidden = !failed;
 }
-// M4: keyboard users start on the first field — the note itself for a note.
+// M4: keyboard users start in the note, for every kind of save. Starting on the title made
+// people's notes replace a post's title ("AI UGC", "Write a blog on this" — 2026-10-03 audit).
 function focusFirstField() {
   if (!details || (document.activeElement && document.activeElement !== document.body)) return;
-  (details.type === 'note' ? $('detailsNote') : $('detailsTitle')).focus({ preventScroll: true });
+  $('detailsNote').focus({ preventScroll: true });
 }
 async function load() {
   try {
