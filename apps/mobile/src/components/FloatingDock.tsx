@@ -98,7 +98,7 @@ const baseStyles = StyleSheet.create({
   selected: { backgroundColor: colors.accentSoft },
   pressed: { backgroundColor: colors.accentSoft },
   label: { fontSize: 13, fontWeight: '600', color: colors.muted, textAlign: 'center' },
-  selectedLabel: { color: colors.accent },
+  selectedLabel: { color: colors.accentPressed },
   addSurface: { width: 60, height: 60 },
   add: { flex: 1, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
 });

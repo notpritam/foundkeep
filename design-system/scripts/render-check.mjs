@@ -17,7 +17,7 @@ import { chromium } from 'playwright-core';
 const args = process.argv.slice(2);
 const base = (args.find(a => !a.startsWith('--') && /^https?:/.test(a)) || '').replace(/\/$/, '');
 const option = name => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : undefined; };
-if (!base) { console.error('usage: render-check.mjs <storybook-url> [--globals k:v,k:v] [--only text] [--jobs n]'); process.exit(2); }
+if (!base) { console.error('usage: render-check.mjs <storybook-url> [--globals k:v,k:v] [--args k:v;k:v] [--only text] [--jobs n] [--inner] [--settle ms] [--why]'); process.exit(2); }
 const globals = option('globals') ? option('globals').split(',').join(';') : '';
 const only = option('only');
 // --why: print each failing element and the reason, not just the rule and a count.
@@ -26,6 +26,10 @@ const jobs = Number(option('jobs') || 4);
 // --inner: load framed screens directly at phone size (the screen, not the device
 // frame), so the accessibility check reaches the screen itself.
 const inner = args.includes('--inner');
+// --args k:v;k:v: story args, as in the URL (a proposal's kind of save, say).
+const storyArgs = option('args');
+// --settle ms: wait longer before checking, for screens that load and fade in (default 250).
+const settle = Number(option('settle') || 250);
 const axeSource = await readFile(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 
 const index = await fetch(base + '/index.json').then(r => { if (!r.ok) throw new Error(`${base}/index.json: ${r.status}`); return r.json(); });
@@ -43,7 +47,7 @@ async function check(story) {
   const httpOk = (story.tags || []).includes('expected-http-errors');
   page.on('response', r => { if (r.status() >= 400 && !httpOk) errors.push(`HTTP ${r.status()} ${r.url()}`); });
   page.on('pageerror', e => errors.push(String(e.message || e).slice(0, 300)));
-  const url = `${base}/iframe.html?id=${story.id}&viewMode=story${inner ? '&simulator=inner' : ''}${globals ? '&globals=' + encodeURIComponent(globals) : ''}`;
+  const url = `${base}/iframe.html?id=${story.id}&viewMode=story${inner ? '&simulator=inner' : ''}${globals ? '&globals=' + encodeURIComponent(globals) : ''}${storyArgs ? '&args=' + encodeURIComponent(storyArgs) : ''}`;
   let a11y = [];
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 30000 });
@@ -52,7 +56,7 @@ async function check(story) {
       errors.push('Storybook error: ' + (await page.locator('#error-message').innerText().catch(() => '')).slice(0, 300));
     else if (!(await page.waitForFunction(() => (document.querySelector('#storybook-root')?.childElementCount || 0) > 0, null, { timeout: 10000 }).then(() => true, () => false)))
       errors.push('Rendered nothing');
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(settle);
     await page.addScriptTag({ content: axeSource });
     a11y = await page.evaluate(async why => {
       const r = await window.axe.run(document.querySelector('#storybook-root') || document.body, { resultTypes: ['violations'] });

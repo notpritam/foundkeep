@@ -21,6 +21,23 @@ export function listFor(url: URL): Capture[] {
     .sort((a, b) => b.capturedAt - a.capturedAt);
 }
 
+/** What's related to a save, as the backend finds it: saved together, the same site, a shared
+ * tag, the same folder — most reasons first. */
+export function relatedTo(id: string) {
+  const save = byId(id);
+  if (!save) return [];
+  const host = (c: Capture) => { try { return new URL(c.sourceUrl ?? '').hostname.replace(/^www\./, ''); } catch { return null; } };
+  return world.allSaves.filter(c => c.id !== id && !c.archivedAt).map(c => {
+    const reasons: { kind: 'batch' | 'source' | 'tag' | 'folder'; label: string }[] = [];
+    if (save.batchId && c.batchId === save.batchId) reasons.push({ kind: 'batch', label: 'Saved together' });
+    if (host(save) && host(c) === host(save)) reasons.push({ kind: 'source', label: c.provenance?.siteName || host(c)! });
+    const tag = c.userTags?.find(t => save.userTags?.includes(t));
+    if (tag) reasons.push({ kind: 'tag', label: `#${tag}` });
+    if (save.folderId && c.folderId === save.folderId) reasons.push({ kind: 'folder', label: c.folder?.name ?? 'the same folder' });
+    return { capture: c, reasons };
+  }).filter(item => item.reasons.length).sort((a, b) => b.reasons.length - a.reasons.length || b.capture.capturedAt - a.capture.capturedAt).slice(0, 6);
+}
+
 export const automation = {
   available: true, enabled: false, fetchLinks: true, images: true, consentVersion: '2026-09', pro: false, canProcess: false, mode: 'manual',
   intervalHours: 24, monthlyLimit: 0, nextRunAt: null, usage: { used: 0, reserved: 0, limit: 0, monthlyLimit: 0 },
@@ -29,7 +46,7 @@ export const automation = {
 export const appHandlers = [
   http.get('*/api/mobile/me', () => HttpResponse.json({ account: world.account, connectionId: 'con-iphone', usage: world.usage })),
   http.get('*/api/mobile/captures', ({ request }) => HttpResponse.json(page(listFor(new URL(request.url))))),
-  http.get('*/api/mobile/captures/:id/related', () => HttpResponse.json({ items: world.related })),
+  http.get('*/api/mobile/captures/:id/related', ({ params }) => HttpResponse.json({ items: relatedTo(String(params.id)) })),
   http.get('*/api/mobile/captures/:id/preservation', () => HttpResponse.json({ preservation: null })),
   http.get('*/api/mobile/captures/:id/:kind', ({ params }) => {
     const capture = byId(String(params.id));
