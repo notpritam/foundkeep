@@ -92,7 +92,7 @@ function Keyboard({ device, dark }: { device: Device; dark: boolean }) {
   const key: CSSProperties = { flex: 1, height: 42, margin: '0 3px', borderRadius: 6, background: dark ? '#6b6b6e' : '#fff', color: dark ? '#fff' : '#000', display: 'grid', placeItems: 'center', font: '400 22px -apple-system, system-ui', boxShadow: '0 1px 0 rgba(0,0,0,.3)' };
   return <div aria-hidden="true" style={{ position: 'absolute', inset: 'auto 0 0 0', height: KEYBOARD[device.platform], background: dark ? '#2b2b2d' : '#d1d3d9', padding: '8px 3px', boxSizing: 'border-box', zIndex: 2 }}>
     {rows.map((row, i) => <div key={row} style={{ display: 'flex', marginBottom: 11, padding: i === 1 ? '0 18px' : i === 2 ? '0 46px' : 0 }}>{[...row].map(c => <span key={c} style={key}>{c}</span>)}</div>)}
-    <div style={{ display: 'flex', padding: '0 3px' }}><span style={{ ...key, flex: 2.4, fontSize: 15 }}>123</span><span style={{ ...key, flex: 6 }}>space</span><span style={{ ...key, flex: 2.4, fontSize: 15, background: dark ? '#4cc38a' : '#0d7a50', color: '#fff' }}>return</span></div>
+    <div style={{ display: 'flex', padding: '0 3px' }}><span style={{ ...key, flex: 2.4, fontSize: 15 }}>123</span><span style={{ ...key, flex: 6 }}>space</span><span style={{ ...key, flex: 2.4, fontSize: 15, background: dark ? '#4cc38a' : '#0d7a50', color: dark ? '#08130d' : '#fff' }}>return</span></div>
   </div>;
 }
 
