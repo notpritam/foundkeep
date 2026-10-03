@@ -79,3 +79,8 @@ test('an Instagram post keeps its own title; only an X post’s title can hold t
   assert.equal(bare.missingPost, true);
   assert.equal(bare.link, 'https://www.instagram.com/reel/abc123/');
 });
+
+test('share tracking is dropped from a link, but a YouTube timestamp stays', () => {
+  assert.equal(readSave(save({ sourceUrl: 'https://youtube.com/watch?v=abc&t=120&si=xyz' }), null).link, 'https://youtube.com/watch?v=abc&t=120');
+  assert.equal(readSave(save({ sourceUrl: 'https://x.com/a/status/1?s=12&t=Zk9' }), null).link, 'https://x.com/a/status/1');
+});

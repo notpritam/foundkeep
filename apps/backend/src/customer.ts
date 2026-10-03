@@ -942,6 +942,12 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
     return c.json({ captures: page.map(customerCaptureDto), nextCursor, total });
   });
 
+  /** The link, when shared text is nothing but one http(s) link. */
+  function linkOnly(text: string | null | undefined): string | null {
+    const value = text?.trim() ?? "";
+    if (!/^https?:\/\/\S+$/i.test(value) || value.length > 4096) return null;
+    try { const url = new URL(value); return url.username || url.password ? null : url.href; } catch { return null; }
+  }
   app.post("/captures", async (c) => {
     const current = auth(c);
     rates.take(`upload:${current.account.id}`, 120, 60_000);
@@ -949,18 +955,24 @@ export function createCustomerApi(db: Database, oauthGateway: OAuthGateway = cre
     try {
     const body = await jsonBody(c, MAX_BODY);
     const clientId = textField(body, "clientId", 128, true)!;
-    const type = textField(body, "type", 20, true)!;
-    if (!TYPES.has(type)) fail(400, "invalid_type", "Choose a supported capture type.");
+    const requestedType = textField(body, "type", 20, true)!;
+    if (!TYPES.has(requestedType)) fail(400, "invalid_type", "Choose a supported capture type.");
     const batchId = textField(body, "batchId", 64);
     if (batchId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(batchId)) fail(400, "invalid_batch", "The shared collection identifier is invalid.");
-    const sourceUrl = textField(body, "sourceUrl", 4096);
+    const requestedSourceUrl = textField(body, "sourceUrl", 4096);
+    const requestedSelection = textField(body, "selectionText", 50_000);
+    // YouTube, LinkedIn and others share a link from the phone as text. A highlight that is only a
+    // link is that link — saved as one, so it opens and gets its title (2026-10-03 audit).
+    const sharedLink = requestedType === "selection" && !requestedSourceUrl ? linkOnly(requestedSelection) : null;
+    const type = sharedLink ? "bookmark" : requestedType;
+    const sourceUrl = sharedLink ?? requestedSourceUrl;
     if (sourceUrl) {
       let url: URL;
       try { url = new URL(sourceUrl); } catch { fail(400, "invalid_url", "Use an http or https source URL."); }
       if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) fail(400, "invalid_url", "Use an http or https source URL without credentials.");
     }
     const sourceTitle = textField(body, "sourceTitle", 1000);
-    const selectionText = textField(body, "selectionText", 50_000);
+    const selectionText = sharedLink ? null : requestedSelection;
     const noteText = textField(body, "noteText", 50_000);
     const articleText = textField(body, "articleText", 500_000);
     const image = decodeImage(body.dataUrl);

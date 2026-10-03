@@ -310,3 +310,29 @@ test('retrying after signed video URLs rotate keeps one file and unchanged stora
     expect((db.query('SELECT storage_bytes FROM customer_captures').get() as any).storage_bytes).toBe(used);
   } finally { secondWorker.close(); }
 });
+
+// A link shared from another app (YouTube, Reddit, X from the iPhone) arrives without a title; the
+// title the platform gives it, and an X post's own words, are put on the save — never over a title
+// or words someone already gave it (2026-10-03 audit of real saves).
+test('a shared video or post without a title of its own gets the one it was published under', async () => {
+  const video = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+  db.query("INSERT INTO customer_captures(id,account_id,client_id,type,status,source_url,note_text,storage_bytes,captured_at,created_at,updated_at) VALUES('yt',?,'yt','bookmark','done',?,'Protein source',100,1,1,1)").run(owner, video);
+  db.query("INSERT INTO customer_captures(id,account_id,client_id,type,status,source_url,source_title,storage_bytes,captured_at,created_at,updated_at) VALUES('named',?,'named','bookmark','done',?,'My own name for it',100,1,1,1)").run(owner, 'https://youtu.be/dQw4w9WgXcQ');
+  db.query("INSERT INTO customer_captures(id,account_id,client_id,type,status,source_url,note_text,storage_bytes,captured_at,created_at,updated_at) VALUES('x',?,'x','bookmark','done',?,'Make a video on this',100,1,1,1)").run(owner, 'https://x.com/mina/status/777?s=12');
+  for (const id of ['yt', 'named', 'x']) enqueuePreservation(db, owner, id, (db.query('SELECT source_url FROM customer_captures WHERE id=?').get(id) as any).source_url);
+  const s = createPreservationService(db, {
+    root,
+    resolve: async (source: string) => source.includes('x.com')
+      ? { text: 'The exact post', author: 'Mina (@mina)', publishedAt: null, metadataAvailable: true, media: [], links: [] }
+      : { title: 'High-protein breakfast in 5 minutes', text: 'High-protein breakfast in 5 minutes', author: 'Kitchen Lab', publishedAt: null, metadataAvailable: true, media: [], links: [] },
+    read: async (url) => ({ url, mime: 'image/png', data: png, status: 200 }),
+    remote: async () => ({ status: 'unavailable' as const, reason: 'x' }),
+  });
+  for (let i = 0; i < 3; i++) await s.tick();
+  const row = (id: string) => db.query('SELECT source_title,selection_text,note_text,storage_bytes FROM customer_captures WHERE id=?').get(id) as any;
+  expect(row('yt')).toMatchObject({ source_title: 'High-protein breakfast in 5 minutes', note_text: 'Protein source' });
+  // The same video kept for both; the only difference in what each stores is the title given to 'yt'.
+  expect(row('yt').storage_bytes - row('named').storage_bytes).toBe(Buffer.byteLength('High-protein breakfast in 5 minutes'));
+  expect(row('named').source_title).toBe('My own name for it');
+  expect(row('x')).toMatchObject({ source_title: 'Mina (@mina) on X', selection_text: 'The exact post', note_text: 'Make a video on this' });
+});

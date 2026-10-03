@@ -16,3 +16,6 @@ test('resolver calls the oembed endpoint and degrades to the video item alone on
   const degraded = await resolveYouTube(post, hints, new AbortController().signal, { read: async () => { throw Error('down'); }, session: () => null, source: async () => { throw Error('unused'); } });
   expect(degraded).toMatchObject({ metadataAvailable: false, media: [{ kind: 'video', url: post.url }] });
 });
+test('the video’s own title is the manifest’s title, so a shared video can be named by it', () => {
+  expect(parseYouTubeOembed({ title: 'High-protein breakfast in 5 minutes', author_name: 'Kitchen Lab', thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg' }, post.id).title).toBe('High-protein breakfast in 5 minutes');
+});

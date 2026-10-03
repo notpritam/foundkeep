@@ -10,11 +10,13 @@ const KINDS = {
   photo: saves.desk.id, screenshot: saves.region.id, fullPage: saves.fullpage.id, note: saves.note.id, highlight: saves.highlight.id, pdf: saves.document.id,
   voiceMemo: saves.audio.id, preparing: saves.processing.id, failed: saves.failed.id,
   sharedPost: realShapes.sharedPost.id, postNotKept: realShapes.postNotKept.id, sharedLink: realShapes.sharedLink.id,
+  sharedVideo: realShapes.sharedVideo.id, sharedReddit: realShapes.sharedReddit.id,
 } as const;
 const LABELS: Record<keyof typeof KINDS, string> = {
   article: 'An article', recipe: 'A recipe', post: 'A post on X', photoPost: 'A post with a photo', reel: 'A reel', video: 'A video', photo: 'A photo', screenshot: 'A screenshot',
   fullPage: 'A full page', note: 'A note', highlight: 'A highlight', pdf: 'A PDF', voiceMemo: 'A voice memo', preparing: 'Still being read', failed: 'Couldn’t be read',
   sharedPost: 'A post shared from the iPhone', postNotKept: 'A post whose words weren’t kept', sharedLink: 'A link shared as text',
+  sharedVideo: 'A YouTube video, named', sharedReddit: 'A Reddit post, named',
 };
 type Args = { kind: keyof typeof KINDS };
 const meta: Meta<Args> = {

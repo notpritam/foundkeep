@@ -10,6 +10,8 @@ export type SocialContext = {
   articleText: string;
 };
 export type TwitterManifest = {
+  /** The title the platform published it under (a video's, a Reddit post's, a page's). */
+  title?: string;
   text: string;
   author: string;
   publishedAt: string | null;

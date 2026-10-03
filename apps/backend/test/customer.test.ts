@@ -1281,3 +1281,16 @@ test('device status comes from the issuing route and only lists live owned conne
   me = await (await request('/me', 'GET', undefined, owner.cookie)).json();
   expect(me.connections).toEqual([]);
 });
+
+// YouTube, LinkedIn and others share a link from the phone as text; it used to land as a highlight
+// holding a bare URL (2026-10-03 audit). A highlight that is only a link is saved as that link, with
+// the person's note — so it can be opened, and named once the platform's title is fetched.
+test("a link shared as text is saved as the link, keeping the person's note", async () => {
+  const { cookie } = await register();
+  const { bearer } = await connect(cookie);
+  const shared = await (await capture(bearer, { type: "selection", noteText: "Protein source", selectionText: "  https://youtube.com/shorts/koXYi49pXs8?si=Euz5JkiADVTo4veE \n" })).json();
+  expect(shared.capture).toMatchObject({ type: "bookmark", sourceUrl: "https://youtube.com/shorts/koXYi49pXs8?si=Euz5JkiADVTo4veE", selectionText: null, noteText: "Protein source" });
+  expect(db.query("SELECT 1 FROM customer_preservation_jobs WHERE capture_id=?").get(shared.capture.id)).toBeTruthy();
+  const words = await (await capture(bearer, { type: "selection", selectionText: "Watch https://youtube.com/shorts/koXYi49pXs8 later" })).json();
+  expect(words.capture).toMatchObject({ type: "selection", sourceUrl: null, selectionText: "Watch https://youtube.com/shorts/koXYi49pXs8 later" });
+});

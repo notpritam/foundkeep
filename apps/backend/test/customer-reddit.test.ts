@@ -49,3 +49,6 @@ test('resolver fetches .json with raw_json, resolves share links, and retries wi
   const noSession = await resolveReddit({ platform: 'reddit', site: 'reddit', id: '1abc2d', url: 'https://www.reddit.com/r/space/comments/1abc2d/' }, hints, new AbortController().signal, deps(read));
   expect(noSession).toMatchObject({ metadataAvailable: false, restricted: true });
 });
+test('a post’s own title is the manifest’s title', async () => {
+  expect(parseRedditListing(await load('reddit-gallery.json'), '1abc2d').title).toBe('Three views of the eclipse');
+});
