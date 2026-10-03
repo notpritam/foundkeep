@@ -82,7 +82,7 @@ export const resolveGeneric: SocialResolver = async (post, hints, signal, deps) 
   if (remoteVideoCandidate(post.url, snapshot)) media.push({ kind: 'video', url: post.url });
   if (snapshot?.imageUrl && !restricted) media.push({ kind: 'image', url: snapshot.imageUrl });
   const text = [snapshot?.title, snapshot?.text || snapshot?.description].filter((x, i, a) => x && a.indexOf(x) === i).join('\n\n');
-  return { text: restricted ? '' : text, author: snapshot?.author || '', publishedAt: snapshot?.publishedAt || null, media, links: hints.links.slice(0, 3),
+  return { ...(snapshot?.title && !restricted ? { title: snapshot.title } : {}), text: restricted ? '' : text, author: snapshot?.author || '', publishedAt: snapshot?.publishedAt || null, media, links: hints.links.slice(0, 3),
     metadataAvailable: !!snapshot && !restricted && snapshot.extractionStatus !== 'unavailable', restricted, incomplete: media.length === 0 };
 };
 const resolvers: Partial<Record<SocialPlatform, SocialResolver>> = {

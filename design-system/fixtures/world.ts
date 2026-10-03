@@ -75,6 +75,9 @@ export const saves = {
 export const realShapes = {
   sharedPost: { ...base, ...at(5), id: 'cap-shared-post', type: 'bookmark', savedVia: 'iphone', sourceUrl: 'https://x.com/marawrites/status/1843000000000000000?s=12', noteText: 'Make a video on this', summary: 'Make a video on this', userTags: ['Ideas'], provenance: { captureMethod: 'ios-share-url' } },
   postNotKept: { ...base, ...at(300), id: 'cap-post-not-kept', type: 'bookmark', savedVia: 'iphone', sourceUrl: 'https://x.com/jonnybuilds/status/1840100000000000000?s=12', noteText: 'Seo of app', summary: 'Seo of app', provenance: { captureMethod: 'ios-share-url' } },
+  // The same shares once the server names them (the title the platform published them under).
+  sharedVideo: { ...base, ...at(7), ...folder('f-kitchen'), id: 'cap-shared-video', type: 'bookmark', savedVia: 'iphone', sourceUrl: 'https://www.youtube.com/watch?v=kXy12abcd90&t=42', sourceTitle: 'High-protein breakfast in 5 minutes', noteText: 'Protein source', previewUrl: 'preview', width: 480, height: 360, provenance: { captureMethod: 'ios-share-text', siteName: 'YouTube', authors: ['Kitchen Lab'] } },
+  sharedReddit: { ...base, ...at(11), id: 'cap-shared-reddit', type: 'bookmark', savedVia: 'iphone', sourceUrl: 'https://www.reddit.com/r/Cooking/comments/1abc2d/', sourceTitle: 'What’s a kitchen tool you use every single day?', noteText: 'Read the top comments', provenance: { captureMethod: 'ios-share-url', authors: ['u/mina · r/Cooking'] } },
   sharedLink: { ...base, ...at(9), ...folder('f-kitchen'), id: 'cap-shared-link', type: 'selection', savedVia: 'iphone', selectionText: 'https://youtube.com/shorts/kXy12abcd90?si=Abc123', noteText: 'Protein source', summary: 'https://youtube.com/shorts/kXy12abcd90?si=Abc123', provenance: { captureMethod: 'ios-share-text' } },
 } satisfies Record<string, Capture & { savedVia?: Capture['savedVia'] }>;
 /** What the server kept of a post (the preservation API). */
@@ -90,7 +93,7 @@ export const allSaves: Capture[] = Object.values(saves);
 export const library: Capture[] = allSaves.filter(c => !c.archivedAt).sort((a, b) => b.capturedAt - a.capturedAt);
 
 /** The film's photographs, for the saves people make from their phones. */
-const FILM: Record<string, string> = { 'cap-shared-post': 'desk', 'cap-reel': 'ramen', 'cap-photo-post': 'kyoto', 'cap-recipe': 'pasta', 'cap-product': 'sneaker', 'cap-pin': 'lake', 'cap-short': 'tacos', 'cap-pour-over': 'coffee', 'cap-desk': 'desk', 'cap-plant': 'plant', 'cap-poster': 'poster', 'cap-chair': 'chair', 'cap-ridge': 'trail' };
+const FILM: Record<string, string> = { 'cap-shared-post': 'desk', 'cap-shared-video': 'tacos', 'cap-reel': 'ramen', 'cap-photo-post': 'kyoto', 'cap-recipe': 'pasta', 'cap-product': 'sneaker', 'cap-pin': 'lake', 'cap-short': 'tacos', 'cap-pour-over': 'coffee', 'cap-desk': 'desk', 'cap-plant': 'plant', 'cap-poster': 'poster', 'cap-chair': 'chair', 'cap-ridge': 'trail' };
 
 /** Which sample image stands in for a save's bytes (blob, file or preview). */
 export function sampleFor(capture: Pick<Capture, 'id' | 'height' | 'width'>): string {

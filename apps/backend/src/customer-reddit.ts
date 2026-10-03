@@ -29,7 +29,7 @@ export function parseRedditListing(json: unknown, id: string): SocialManifest {
   const links: string[] = [];
   if (!source.is_self && !media.length) { const link = outbound(source.url_overridden_by_dest ?? source.url); if (link) links.push(link); else incomplete = true; }
   const title = typeof post.title === 'string' ? post.title.trim() : '', body = typeof source.selftext === 'string' ? source.selftext.trim() : '';
-  return { text: [title, body].filter(Boolean).join('\n\n').slice(0, 50_000), author: [typeof post.author === 'string' ? `u/${post.author.slice(0, 50)}` : '', typeof post.subreddit === 'string' ? `r/${post.subreddit.slice(0, 50)}` : ''].filter(Boolean).join(' · '),
+  return { ...(title ? { title: title.slice(0, 1000) } : {}), text: [title, body].filter(Boolean).join('\n\n').slice(0, 50_000), author: [typeof post.author === 'string' ? `u/${post.author.slice(0, 50)}` : '', typeof post.subreddit === 'string' ? `r/${post.subreddit.slice(0, 50)}` : ''].filter(Boolean).join(' · '),
     publishedAt: isoDate(post.created_utc), media: media.slice(0, 8), links: links.slice(0, 3), metadataAvailable: true, incomplete: incomplete || (!media.length && !links.length && !body) };
 }
 async function fetchListing(url: string, read: PublicReader, signal: AbortSignal, cookies?: (host: string) => string | null) {

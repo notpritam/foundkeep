@@ -25,12 +25,14 @@ export type Reading = {
   missingPost: boolean;
 };
 
-const TRACKING = /^(s|t|si|igsh|igshid|stkn|ref_src|ref_url|utm_\w+)$/i;
+// `t` is share tracking on X, but the moment a video starts at on YouTube.
+const TRACKING = /^(s|si|igsh|igshid|stkn|ref_src|ref_url|utm_\w+)$/i;
 function cleanLink(raw: string | null | undefined): string | null {
   try {
     const url = new URL(raw ?? '');
     if (!['http:', 'https:'].includes(url.protocol)) return null;
-    for (const key of [...url.searchParams.keys()]) if (TRACKING.test(key)) url.searchParams.delete(key);
+    const onX = /(^|\.)(x|twitter)\.com$/.test(url.hostname);
+    for (const key of [...url.searchParams.keys()]) if (TRACKING.test(key) || (onX && key === 't')) url.searchParams.delete(key);
     return url.href;
   } catch { return null; }
 }

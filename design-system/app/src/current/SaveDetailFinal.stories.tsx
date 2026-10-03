@@ -7,6 +7,7 @@ import { realShapes, saves } from '../../../fixtures/world.ts';
 // picked from: Tried/Save detail. Board: Decided/Save detail.
 const KINDS = {
   article: saves.bookmark.id, post: saves.post.id, sharedPost: realShapes.sharedPost.id, postNotKept: realShapes.postNotKept.id, sharedLink: realShapes.sharedLink.id,
+  sharedVideo: realShapes.sharedVideo.id, sharedReddit: realShapes.sharedReddit.id,
   photoPost: saves.photoPost.id, reel: saves.reel.id, recipe: saves.recipe.id, video: saves.video.id, photo: saves.desk.id, screenshot: saves.region.id, fullPage: saves.fullpage.id,
   note: saves.note.id, highlight: saves.highlight.id, pdf: saves.document.id, voiceMemo: saves.audio.id, preparing: saves.processing.id, failed: saves.failed.id,
 } as const;
@@ -25,7 +26,9 @@ export const Article = kind('An article', 'article');
 export const Post = kind('A post on X', 'post');
 export const SharedPost = kind('A post shared from the iPhone (its words kept on the server)', 'sharedPost');
 export const PostNotKept = kind('A post whose words weren’t kept', 'postNotKept');
-export const SharedLink = kind('A link shared as text (YouTube)', 'sharedLink');
+export const SharedLink = kind('A link shared as text (YouTube), before the server names it', 'sharedLink');
+export const SharedVideo = kind('A YouTube video shared from the phone, named', 'sharedVideo');
+export const SharedReddit = kind('A Reddit post shared from the phone, named', 'sharedReddit');
 export const PhotoPost = kind('A post with a photo', 'photoPost');
 export const Reel = kind('A reel', 'reel');
 export const Recipe = kind('A recipe', 'recipe');

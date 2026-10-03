@@ -5,7 +5,7 @@ import '../brand/brand.css';
 
 const KINDS = [
   ['article', 'An article'], ['post', 'A post on X'], ['sharedPost', 'A post shared from the iPhone'], ['postNotKept', 'A post whose words weren’t kept'],
-  ['sharedLink', 'A link shared as text'], ['photoPost', 'A post with a photo'], ['reel', 'A reel'], ['recipe', 'A recipe'], ['video', 'A video'], ['photo', 'A photo'],
+  ['sharedLink', 'A link shared as text'], ['sharedVideo', 'A YouTube video, named'], ['sharedReddit', 'A Reddit post, named'], ['photoPost', 'A post with a photo'], ['reel', 'A reel'], ['recipe', 'A recipe'], ['video', 'A video'], ['photo', 'A photo'],
   ['screenshot', 'A screenshot'], ['fullPage', 'A full page'], ['note', 'A note'], ['highlight', 'A highlight'], ['pdf', 'A PDF'], ['voiceMemo', 'A voice memo'],
   ['preparing', 'Still being read'], ['failed', 'Couldn’t be read'],
 ];

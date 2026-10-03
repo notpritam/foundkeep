@@ -150,6 +150,21 @@ export function createPreservationService(
       ? row
       : null;
   }
+  // A link shared from another app (YouTube, Reddit, X from the iPhone) arrives without a title: give
+  // it the title the platform published it under ("Name (@handle) on X" for a post), and an X post
+  // its own words — never over a title or words someone already gave it.
+  function nameSave(job: Job, platform: string | undefined, manifest: SocialManifest) {
+    const save = current(job);
+    if (!save) return;
+    const title = !save.source_title?.trim()
+      ? (manifest.title?.trim() || (platform === "x" && manifest.author.trim() ? `${manifest.author.trim()} on X` : "")).slice(0, 1000)
+      : "";
+    const words = platform === "x" && !save.selection_text?.trim() && !save.article_text?.trim() ? manifest.text.trim().slice(0, 50_000) : "";
+    if (!title && !words) return;
+    db.query(
+      "UPDATE customer_captures SET source_title=CASE WHEN ?<>'' THEN ? ELSE source_title END, selection_text=CASE WHEN ?<>'' THEN ? ELSE selection_text END, storage_bytes=storage_bytes+?, updated_at=? WHERE id=? AND account_id=?",
+    ).run(title, title, words, words, Buffer.byteLength(title) + Buffer.byteLength(words), now(), job.capture_id, job.account_id);
+  }
   function existing(job: Job, key: string) {
     return !!db
       .query(
@@ -299,6 +314,7 @@ export function createPreservationService(
       signal.throwIfAborted();
       if (!current(job))
         throw Error("The saved source changed or was removed.");
+      nameSave(job, post?.platform, manifest);
       const issues: string[] = [];
       const captured = save.selection_text || save.article_text || "";
       const postText =

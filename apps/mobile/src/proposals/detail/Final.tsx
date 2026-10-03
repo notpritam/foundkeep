@@ -55,7 +55,7 @@ export function SaveDetailFinal({ id: start }: { id: string }) {
       <FadeIn id={capture.id}>
         <View style={styles.page}>
           {reading.post || reading.sharedAsText ? <ArchivedPicture capture={capture} preservation={shown.current?.preservation ?? null} /> : null}
-          {!reading.sharedAsText ? <Picture capture={capture} style={styles.picture} onView={() => actions.setViewing(true)} /> : null}
+          {!reading.sharedAsText ? <Picture capture={playable(asRead) ? { ...capture, type: 'video' } : capture} style={styles.picture} onView={() => actions.setViewing(true)} /> : null}
           <View style={styles.head}>
             <Source capture={asRead} link={reading.link} />
             {reading.title ? <Text selectable accessibilityRole="header" style={[styles.title, { color: P.ink }]}>{reading.title}</Text> : null}
@@ -91,6 +91,8 @@ export function SaveDetailFinal({ id: start }: { id: string }) {
   </View>;
 }
 
+/** A link to a video (YouTube, TikTok) shows its picture as a video does, with the play mark. */
+const playable = (capture: Capture) => capture.type === 'video' || ['logo-youtube', 'logo-tiktok'].includes(origin(capture).icon);
 /** The save as Kit and the source line should see it: a post with its words, a shared link as a link. */
 function readAs(capture: Capture, reading: Reading): Capture {
   return {
@@ -106,7 +108,9 @@ function readAs(capture: Capture, reading: Reading): Capture {
 /** Where it came from and opening it, as one line: the mark, who, when, and ↗ when it opens. */
 function Source({ capture, link }: { capture: Capture; link: string | null }) {
   const P = usePalette();
-  const from = origin(capture);
+  // A platform's mark with who posted it — the channel, the Reddit user, the post's author.
+  const mark = origin(capture);
+  const from = mark.icon.startsWith('logo-') && capture.provenance?.authors?.[0] ? { ...mark, name: capture.provenance.authors[0] } : mark;
   const words = <>
     <Ionicons name={from.icon as 'logo-x'} size={16} color={from.color === 'muted' ? P.muted : from.color ?? P.ink} />
     <Text style={[styles.sourceName, { color: P.ink }]} numberOfLines={1}>{from.name}</Text>
