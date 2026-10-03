@@ -167,7 +167,7 @@ _Exit criteria:_ Launch posts out and the first 100 non-friend signups.
 |---|---|---|---|---|
 | ○ To do | Landing polish pass, with pricing copy that matches reality | site | agent |  |
 | ◐ In progress | ★ More help articles from your usage ideas, with screenshots on every page | site | agent | help.foundkeep.app is live with 4 posts and 5 use cases; 3 pages lack screenshots. |
-| ○ To do | Launch video and demo | marketing | agent |  |
+| ○ To do | Launch video and demo | marketing | agent | Highlight (Pritam, 2026-10-03): a section showing the mind map growing — from a start with a few nodes to a very big map as saves pile up. One of the launch's highlights; the words and timing around it to be decided. |
 | ○ To do | ★ VC demo: saved-company watchlist with a daily agent report | marketing | agent |  |
 | ○ To do | Launch posts: Product Hunt, X, Hacker News, blog | marketing | **Pritam** |  |
 | ○ To do | ★ Customer discovery calls (goal 100–200) | marketing | **Pritam** |  |
